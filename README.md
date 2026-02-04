@@ -170,8 +170,8 @@ TheKnowledgeOrbits is a next-generation educational platform designed specifical
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/theknowledgeorbits.git
-cd theknowledgeorbits/backend
+git clone https://github.com/yourusername/TheKnowledgeOrbits.git
+cd TheKnowledgeOrbits/backend
 
 # Create virtual environment
 python -m venv venv
@@ -353,16 +353,16 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ## 📞 Contact & Support
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/theknowledgeorbits/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/theknowledgeorbits/discussions)
-- **Email:** support@theknowledgeorbits.com
+- **Issues:** [GitHub Issues](https://github.com/yourusername/TheKnowledgeOrbits/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/yourusername/TheKnowledgeOrbits/discussions)
+- **Email:** support@TheKnowledgeOrbits.com
 - **Twitter:** @KnowledgeOrbits
 
 ---
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/theknowledgeorbits&type=Date)](https://star-history.com/#yourusername/theknowledgeorbits&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/TheKnowledgeOrbits&type=Date)](https://star-history.com/#yourusername/TheKnowledgeOrbits&Date)
 
 ---
 
