@@ -24,7 +24,7 @@ urlpatterns = [
     path('api/v1/health/', health_check, name='health-check'),
     
     # Engine URLs will be added here as we build them
-    # path('api/v1/content/', include('engines.content.urls')),
+    path('api/v1/content/', include('engines.content.urls')),
     # path('api/v1/knowledge/', include('engines.knowledge.urls')),
     # path('api/v1/assessment/', include('engines.assessment.urls')),
     # path('api/v1/user-state/', include('engines.userstate.urls')),

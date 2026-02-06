@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     'corsheaders',
     
     # Local engines (will be added as we build them)
-    # 'engines.content',
+    'engines.content',
     # 'engines.knowledge',
     # 'engines.assessment',
     # 'engines.userstate',
@@ -138,14 +138,17 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
     'PAGE_SIZE': 20,
+
+    # Fix ordering field
+    'ORDERING_PARAM': 'ordering',
 }
 
 # JWT Settings
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': False,
     'UPDATE_LAST_LOGIN': True,
