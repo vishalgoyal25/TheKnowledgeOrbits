@@ -30,7 +30,10 @@ urlpatterns = [
     
     # Knowledge Engine
     path('api/v1/knowledge/', include('engines.knowledge.urls')),
-    
+
+    # Article Generation Engine
+    path('api/v1/articles/', include('engines.article_generation.urls')),
+
     # Assessment Engine
     # path('api/v1/assessment/', include('engines.assessment.urls')),
     
