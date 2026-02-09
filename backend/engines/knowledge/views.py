@@ -143,7 +143,7 @@ class TopicViewSet(viewsets.ModelViewSet):
         serializer = ChunkTopicMapSerializer(mappings, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='auto-suggest-chunks')
     def auto_suggest_chunks(self, request, pk=None):
         """
         Auto-suggest relevant chunks for this topic using AI.
@@ -189,7 +189,7 @@ class TopicViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], url_path='approve-mappings')
     def approve_mappings(self, request, pk=None):
         """
         Approve and create chunk-topic mappings.

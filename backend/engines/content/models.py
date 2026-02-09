@@ -205,6 +205,8 @@ class Chunk(models.Model):
         return f"Chunk {self.chunk_index} from {self.document.title}"
 
 
+from pgvector.django import VectorField
+
 class Embedding(models.Model):
     """
     Stores vector embeddings for semantic search.
@@ -238,8 +240,9 @@ class Embedding(models.Model):
     # Format: array of 384 floats
     # Note: In actual implementation, use pgvector's VectorField
     # For now, storing as JSONField to avoid pgvector dependency in models
-    vector = models.JSONField(
-        help_text="384-dimensional embedding vector (stored as JSON array)"
+    vector = VectorField(
+        dimensions=384,
+        help_text="384-dimensional embedding vector"
     )
     
     model_name = models.CharField(

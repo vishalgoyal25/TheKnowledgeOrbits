@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'pgvector',
     
     # Local engines (will be added as we build them)
     'engines.content',
@@ -84,6 +85,9 @@ DATABASES = {
         'PASSWORD': env('DB_PASSWORD', default='admin123'),
         'HOST': env('DB_HOST', default='localhost'),
         'PORT': env('DB_PORT', default='5432'),
+        'OPTIONS': {
+            'options': '-c timezone=Asia/Kolkata',
+        },
     }
 }
 

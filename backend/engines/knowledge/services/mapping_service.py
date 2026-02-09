@@ -204,7 +204,7 @@ class MappingService:
                         topic=topic,
                         relevance_score=relevance,
                         priority=priority,
-                        auto_mapped=False,
+                        auto_mapped=True,
                         approved_by=user
                     )
                     

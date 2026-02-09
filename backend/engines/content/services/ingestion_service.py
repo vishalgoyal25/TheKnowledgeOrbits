@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 from django.core.files.uploadedfile import UploadedFile
 import structlog
 
+from django.utils import timezone
 from engines.content.models import Document, Chunk, Embedding, IngestionJob
 from .chunking_service import ChunkingService
 from .embedding_service import EmbeddingService
@@ -81,6 +82,8 @@ class IngestionService:
             
             # Step 6: Process each page
             all_chunks = []
+            global_chunk_index = 0
+            
             for page_data in pages_data:
                 page_num = page_data['page_number']
                 page_text = page_data['text']
@@ -93,6 +96,11 @@ class IngestionService:
                     page_number=page_num,  # PASS PAGE NUMBER
                     chapter_name=chapter
                 )
+                
+                # Update chunk index to be globally unique for this document
+                for chunk in page_chunks:
+                    chunk['chunk_index'] = global_chunk_index
+                    global_chunk_index += 1
                 
                 all_chunks.extend(page_chunks)
                 
