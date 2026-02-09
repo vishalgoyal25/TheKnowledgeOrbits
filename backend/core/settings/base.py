@@ -36,7 +36,7 @@ INSTALLED_APPS = [
     
     # Local engines (will be added as we build them)
     'engines.content',
-    # 'engines.knowledge',
+    'engines.knowledge',
     # 'engines.assessment',
     # 'engines.userstate',
     # 'engines.analytics',
