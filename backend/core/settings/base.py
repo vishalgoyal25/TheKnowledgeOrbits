@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     # Local engines (will be added as we build them)
     'engines.content',
     'engines.knowledge',
+    'engines.article_generation',
+
     # 'engines.assessment',
     # 'engines.userstate',
     # 'engines.analytics',
@@ -131,6 +133,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # REST Framework
 REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.OrderingFilter',
+    ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
@@ -140,7 +145,7 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 
     # Fix ordering field
@@ -213,4 +218,11 @@ if SENTRY_DSN:
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
+    
+
+# GROQ Configuration
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
+if not GROQ_API_KEY:
+    raise ImproperlyConfigured("GROQ_API_KEY environment variable is not set")
     
