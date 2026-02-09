@@ -33,102 +33,124 @@ class IngestionService:
         title: str,
         source_type: str,
         source_edition: str = None,
-        metadata: Dict[str, Any] = None
-    ) -> Dict[str, Any]:
+        metadata: dict = None
+    ) -> dict:
         """
-        Main ingestion entry point.
-        
-        Args:
-            file: Uploaded file
-            title: Document title
-            source_type: 'static' or 'dynamic'
-            source_edition: Edition identifier
-            metadata: Additional metadata
-            
-        Returns:
-            Dictionary with document_id, job_id, status
+        Complete ingestion pipeline with page-level tracking.
         """
-        logger.info(
-            "ingestion_started",
-            title=title,
-            source_type=source_type,
-            file_name=file.name
-        )
-        
-        # Create ingestion job
-        job = IngestionJob.objects.create(status='pending')
+        job = None
+        document = None
         
         try:
-            # Create document record
+            # Step 1: Create ingestion job
+            job = IngestionJob.objects.create(
+                status='pending'
+            )
+            
+            logger.info(
+                "ingestion_started",
+                job_id=str(job.id),
+                file_name=file.name,
+                title=title,
+                source_type=source_type
+            )
+            
+            # Step 2: Save file
+            file_path = cls._save_file(file)
+            
+            # Step 3: Create document
             document = Document.objects.create(
                 title=title,
-                file_path=cls._save_file(file),
+                file_path=file_path,
                 source_type=source_type,
                 source_edition=source_edition or '',
                 metadata=metadata or {}
             )
             
-            # Link job to document
+            # Step 4: Link job to document
             job.document = document
             job.status = 'processing'
             job.save()
             
-            # Extract text from file
-            text = cls._extract_text(file)
+            # Step 5: Extract text BY PAGE
+            pages_data = cls._extract_text_by_pages(file)
             
-            # Chunk text
-            chunks_data = ChunkingService.chunk_text(
-                text=text,
-                document_id=str(document.id)
+            # Update total pages
+            job.total_pages = len(pages_data)
+            job.save()
+            
+            # Step 6: Process each page
+            all_chunks = []
+            for page_data in pages_data:
+                page_num = page_data['page_number']
+                page_text = page_data['text']
+                chapter = page_data.get('chapter', 'Unknown Chapter')
+                
+                # Chunk this page
+                page_chunks = ChunkingService.chunk_text(
+                    text=page_text,
+                    document_id=str(document.id),
+                    page_number=page_num,  # PASS PAGE NUMBER
+                    chapter_name=chapter
+                )
+                
+                all_chunks.extend(page_chunks)
+                
+                # Update progress
+                job.processed_pages = page_num
+                job.save()
+            
+            # Step 7: Store all chunks in database
+            chunk_objects = []
+            for chunk_data in all_chunks:
+                chunk_objects.append(Chunk(**chunk_data))
+            
+            Chunk.objects.bulk_create(chunk_objects)
+            
+            # Update chunks_created
+            job.chunks_created = len(chunk_objects)
+            job.save()
+            
+            logger.info(
+                "chunks_created",
+                document_id=str(document.id),
+                total_chunks=len(chunk_objects),
+                total_pages=job.total_pages
             )
             
-            job.total_pages = 1  # Simplified for Phase 1
-            job.save()
+            # Step 8: Generate embeddings
+            cls._generate_embeddings_for_chunks(chunk_objects)
             
-            # Create chunk records
-            chunks = []
-            for chunk_data in chunks_data:
-                chunk = Chunk.objects.create(
-                    document=document,
-                    **chunk_data
-                )
-                chunks.append(chunk)
-            
-            job.chunks_created = len(chunks)
-            job.processed_pages = 1
-            job.save()
-            
-            # Generate embeddings (async in production)
-            cls._generate_embeddings_for_chunks(chunks)
-            
-            # Mark job complete
+            # Step 9: Mark job complete
             job.status = 'completed'
+            job.completed_at = timezone.now()
             job.save()
             
             logger.info(
                 "ingestion_completed",
                 document_id=str(document.id),
-                chunks_created=len(chunks)
+                chunks_created=len(chunk_objects)
             )
             
             return {
                 'document_id': str(document.id),
                 'job_id': str(job.id),
                 'status': 'completed',
-                'chunks_created': len(chunks),
+                'chunks_created': len(chunk_objects),
+                'pages_processed': job.total_pages
             }
             
         except Exception as e:
-            # Mark job as failed
-            job.status = 'failed'
-            job.error_log = str(e)
-            job.save()
-            
             logger.error(
                 "ingestion_failed",
                 error=str(e),
-                job_id=str(job.id)
+                job_id=str(job.id) if job else None
             )
+            
+            if job:
+                job.status = 'failed'
+                job.error_log = str(e)
+                job.save()
             
             raise
     
@@ -267,6 +289,110 @@ class IngestionService:
                 error_type=type(e).__name__
             )
             raise ValueError(f"Could not extract text from file: {str(e)}")
+
+
+    @classmethod
+    def _extract_text_by_pages(cls, file: UploadedFile) -> list:
+        """
+        Extract text page-by-page from file.
+        
+        Returns:
+            List of dicts: [
+                {'page_number': 1, 'text': '...', 'chapter': 'Chapter 1'},
+                {'page_number': 2, 'text': '...', 'chapter': 'Chapter 1'},
+            ]
+        """
+        file_name = file.name.lower()
+        pages_data = []
+        
+        try:
+            # TEXT FILE (single page)
+            if file_name.endswith('.txt'):
+                logger.info("extracting_text_file", file_name=file.name)
+                
+                content = file.read()
+                if isinstance(content, bytes):
+                    text = content.decode('utf-8')
+                else:
+                    text = str(content)
+                
+                pages_data.append({
+                    'page_number': 1,
+                    'text': text,
+                    'chapter': 'Unknown Chapter'
+                })
+            
+            # PDF FILE (multi-page)
+            elif file_name.endswith('.pdf'):
+                logger.info("extracting_pdf_file", file_name=file.name)
+                
+                import pdfplumber
+                from io import BytesIO
+                
+                pdf_bytes = BytesIO(file.read())
+                current_chapter = 'Unknown Chapter'
+                
+                with pdfplumber.open(pdf_bytes) as pdf:
+                    total_pages = len(pdf.pages)
+                    logger.info("pdf_opened", pages=total_pages)
+                    
+                    for page_num, page in enumerate(pdf.pages, 1):
+                        try:
+                            page_text = page.extract_text()
+                            
+                            if page_text:
+                                # Try to detect new chapter on this page
+                                detected = cls._detect_chapter_from_page(page_text)
+                                if detected != 'Unknown Chapter':
+                                    current_chapter = detected
+                                
+                                pages_data.append({
+                                    'page_number': page_num,
+                                    'text': page_text,
+                                    'chapter': current_chapter
+                                })
+                                
+                                logger.debug(
+                                    "page_extracted",
+                                    page=page_num,
+                                    chapter=current_chapter,
+                                    length=len(page_text)
+                                )
+                            else:
+                                logger.warning("empty_page", page=page_num)
+                        
+                        except Exception as page_error:
+                            logger.error(
+                                "page_extraction_failed",
+                                page=page_num,
+                                error=str(page_error)
+                            )
+                            continue
+                
+                logger.info(
+                    "pdf_extraction_complete",
+                    total_pages=total_pages,
+                    extracted_pages=len(pages_data)
+                )
+            
+            else:
+                raise ValueError(f"Unsupported file type: {file_name}")
+            
+            return pages_data
+            
+        except Exception as e:
+            logger.error(
+                "text_extraction_failed",
+                file_name=file.name,
+                error=str(e)
+            )
+            raise
+
+    @classmethod
+    def _detect_chapter_from_page(cls, text: str) -> str:
+        """Detect chapter from page text (first 200 chars)."""
+        from engines.content.services.chunking_service import ChunkingService
+        return ChunkingService._detect_chapter(text)
 
 
     @classmethod

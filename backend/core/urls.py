@@ -24,10 +24,22 @@ urlpatterns = [
     path('api/v1/health/', health_check, name='health-check'),
     
     # Engine URLs will be added here as we build them
+
+    # Content Engine
     path('api/v1/content/', include('engines.content.urls')),
-    # path('api/v1/knowledge/', include('engines.knowledge.urls')),
+    
+    # Knowledge Engine
+    path('api/v1/knowledge/', include('engines.knowledge.urls')),
+    
+    # Assessment Engine
     # path('api/v1/assessment/', include('engines.assessment.urls')),
+    
+    # User State Engine
     # path('api/v1/user-state/', include('engines.userstate.urls')),
+    
+    # Analytics Engine
     # path('api/v1/analytics/', include('engines.analytics.urls')),
+    
+    # Auth Engine
     # path('api/v1/auth/', include('engines.auth.urls')),
 ]

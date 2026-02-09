@@ -31,55 +31,62 @@ class ChunkingService:
         cls,
         text: str,
         document_id: str,
-        page_number: int = None,
+        page_number: int,
         chapter_name: str = None
-    ) -> List[Dict[str, Any]]:
+    ) -> list:
         """
-        Split text into chunks with metadata.
+        Split text into semantic chunks with metadata.
         
         Args:
-            text: Full text to chunk
-            document_id: Parent document UUID
-            page_number: Source page number
+            text: Text content to chunk
+            document_id: UUID of parent document
+            page_number: Page number in document
             chapter_name: Chapter/section name
             
         Returns:
-            List of chunk dictionaries with text and metadata
+            List of chunk dictionaries ready for Chunk.objects.create()
         """
+
         if not text or len(text.strip()) == 0:
             logger.warning("empty_text_provided", document_id=document_id)
             return []
-        
+
         # Clean text
         cleaned_text = cls._clean_text(text)
         
-        # Split into chunks
-        chunks = cls._split_into_chunks(cleaned_text)
+        # Detect chapter if not provided
+        if not chapter_name:
+            chapter_name = cls._detect_chapter(text)
         
-        # Add metadata to each chunk
-        chunk_dicts = []
-        for idx, chunk_text in enumerate(chunks):
-            chunk_dict = {
+        # Split into chunks
+        chunk_texts = cls._split_into_chunks(cleaned_text)
+        
+        # Create chunk data
+        chunks = []
+        for idx, chunk_text in enumerate(chunk_texts):
+            quality = cls._assess_quality(chunk_text)
+            
+            chunks.append({
                 'chunk_text': chunk_text,
                 'chunk_index': idx,
                 'page_number': page_number,
-                'chapter_name': chapter_name or cls._detect_chapter(chunk_text),
-                'document_id': document_id,
                 'source_type': 'static',
-                'quality_flag': cls._assess_quality(chunk_text),
-                'confidence_score': 1.0,
-            }
-            chunk_dicts.append(chunk_dict)
+                'document_id': document_id,
+                'chapter_name': chapter_name,
+                'quality_flag': quality,
+                'confidence_score': 1.0 if quality == 'high' else 0.7
+            })
         
         logger.info(
             "text_chunked",
             document_id=document_id,
-            total_chunks=len(chunk_dicts),
-            avg_chunk_size=sum(len(c['chunk_text']) for c in chunk_dicts) // len(chunk_dicts) if chunk_dicts else 0
+            page_number=page_number,
+            total_chunks=len(chunks),
+            avg_chunk_size=sum(len(c['chunk_text']) for c in chunks) // len(chunks) if chunks else 0
         )
         
-        return chunk_dicts
-    
+        return chunks
+
     @classmethod
     def _clean_text(cls, text: str) -> str:
         """
@@ -142,27 +149,47 @@ class ChunkingService:
                 chunks.append(chunk_text)
         
         return chunks
+
     
     @classmethod
     def _detect_chapter(cls, text: str) -> str:
         """
-        Simple chapter detection from text.
+        Detect chapter name from text using pattern matching.
         
-        Looks for patterns like "Chapter 1", "CHAPTER I", etc.
+        Patterns detected:
+        - Chapter 1, Chapter I, CHAPTER 1
+        - Unit 1, UNIT I
+        - Part A, PART 1
+        - Section 1.1
+        
+        Args:
+            text: Text to analyze (first 200 chars)
+            
+        Returns:
+            Chapter name or "Unknown Chapter"
         """
-        # Check first 100 characters for chapter markers
-        first_100 = text[:100]
+        # Check first 200 characters
+        header = text[:200].strip()
         
+        # Patterns to match
         patterns = [
-            r'Chapter\s+\d+',
-            r'CHAPTER\s+[IVX]+',
-            r'Section\s+\d+',
+            (r'Chapter\s+(\d+)', 'Chapter {}'),
+            (r'CHAPTER\s+(\d+)', 'Chapter {}'),
+            (r'Chapter\s+([IVX]+)', 'Chapter {}'),
+            (r'CHAPTER\s+([IVX]+)', 'Chapter {}'),
+            (r'Unit\s+(\d+)', 'Unit {}'),
+            (r'UNIT\s+(\d+)', 'Unit {}'),
+            (r'Unit\s+([IVX]+)', 'Unit {}'),
+            (r'Part\s+([A-Z\d]+)', 'Part {}'),
+            (r'PART\s+([A-Z\d]+)', 'Part {}'),
+            (r'Section\s+(\d+\.?\d*)', 'Section {}'),
         ]
         
-        for pattern in patterns:
-            match = re.search(pattern, first_100, re.IGNORECASE)
+        for pattern, template in patterns:
+            match = re.search(pattern, header, re.IGNORECASE)
             if match:
-                return match.group()
+                chapter_id = match.group(1)
+                return template.format(chapter_id)
         
         return "Unknown Chapter"
     
