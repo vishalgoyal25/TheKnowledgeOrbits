@@ -1,24 +1,29 @@
 /**
- * Topics listing page
+ * Topic browser page
  */
 
 'use client';
 
 import { useState } from 'react';
 import { useTopics } from '@/lib/hooks/use-topics';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useSubjects } from '@/lib/hooks/use-subjects';
+import TopicCard from '@/components/topics/topic-card';
+import TopicTree from '@/components/topics/topic-tree';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Filter, BookOpen, Layers, Hash } from 'lucide-react';
-import Link from 'next/link';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, Filter, LayoutGrid, List } from 'lucide-react';
 
 export default function TopicsPage() {
     const [searchTerm, setSearchTerm] = useState('');
-    const { data, isLoading, error } = useTopics({
+
+    const { data: topicsData, isLoading: topicsLoading, error: topicsError } = useTopics({
         page_size: 50,
     });
+    const { data: subjectsData, isLoading: subjectsLoading } = useSubjects();
+
+    const isLoading = topicsLoading || subjectsLoading;
 
     if (isLoading) {
         return (
@@ -36,7 +41,7 @@ export default function TopicsPage() {
         );
     }
 
-    if (error) {
+    if (topicsError) {
         return (
             <div className="container mx-auto px-4 py-8">
                 <div className="text-center text-red-600 bg-red-50 p-8 rounded-lg border border-red-100">
@@ -47,9 +52,10 @@ export default function TopicsPage() {
         );
     }
 
-    const topics = data?.results || [];
+    const topics = topicsData?.results || [];
+    const subjects = subjectsData?.results || [];
 
-    // Client-side filter for now since API search might need specific param
+    // Client-side filter
     const filteredTopics = topics.filter(topic =>
         topic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         topic.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -61,7 +67,7 @@ export default function TopicsPage() {
             <div className="mb-8">
                 <h1 className="text-4xl font-bold mb-2">Topics</h1>
                 <p className="text-gray-600">
-                    Explore the knowledge graph and syllabus topics
+                    Browse UPSC topics organized by subject and module
                 </p>
             </div>
 
@@ -83,59 +89,53 @@ export default function TopicsPage() {
                 </Button>
             </div>
 
-            {/* Topics Grid */}
-            {filteredTopics.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
-                    <p className="text-gray-600">No topics found matching your search.</p>
+            {/* View Toggle & Content */}
+            <Tabs defaultValue="grid" className="w-full">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                    <p className="text-sm text-gray-600">
+                        Showing {filteredTopics.length} of {topics.length} topics across {subjects.length} subjects
+                    </p>
+
+                    <TabsList>
+                        <TabsTrigger value="grid" className="gap-2">
+                            <LayoutGrid className="h-4 w-4" />
+                            Grid
+                        </TabsTrigger>
+                        <TabsTrigger value="tree" className="gap-2">
+                            <List className="h-4 w-4" />
+                            Tree
+                        </TabsTrigger>
+                    </TabsList>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredTopics.map((topic) => (
-                        <Link key={topic.id} href={`/topics/${topic.id}`}>
-                            <Card className="h-full hover:shadow-lg transition-all hover:scale-[1.02] cursor-pointer">
-                                <CardHeader>
-                                    <div className="flex justify-between items-start gap-2">
-                                        <CardTitle className="text-lg line-clamp-2">{topic.name}</CardTitle>
-                                        <Badge variant={topic.topic_type === 'syllabus' ? 'default' : 'secondary'}>
-                                            {topic.topic_type}
-                                        </Badge>
-                                    </div>
-                                    <CardDescription className="line-clamp-2">
-                                        {topic.description || 'No description available'}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex flex-col gap-3 text-sm text-gray-500">
-                                        <div className="flex items-center gap-2">
-                                            <BookOpen className="h-4 w-4" />
-                                            <span className="truncate">{topic.subject_name}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Layers className="h-4 w-4" />
-                                            <span className="truncate">{topic.module_name}</span>
-                                        </div>
-                                        {topic.keywords && topic.keywords.length > 0 && (
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <Hash className="h-4 w-4" />
-                                                <div className="flex gap-1 flex-wrap">
-                                                    {topic.keywords.slice(0, 3).map((kw, i) => (
-                                                        <span key={i} className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
-                                                            {kw}
-                                                        </span>
-                                                    ))}
-                                                    {topic.keywords.length > 3 && (
-                                                        <span className="text-xs">+{topic.keywords.length - 3}</span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
-                </div>
-            )}
+
+                {/* Grid View */}
+                <TabsContent value="grid">
+                    {filteredTopics.length === 0 ? (
+                        <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
+                            <p className="text-gray-600">No topics found matching your search.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredTopics.map((topic) => (
+                                <TopicCard key={topic.id} topic={topic} />
+                            ))}
+                        </div>
+                    )}
+                </TabsContent>
+
+                {/* Tree View */}
+                <TabsContent value="tree">
+                    {filteredTopics.length === 0 ? (
+                        <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
+                            <p className="text-gray-600">No topics found matching your search.</p>
+                        </div>
+                    ) : (
+                        <div className="max-w-4xl border rounded-lg p-4 bg-white shadow-sm">
+                            <TopicTree topics={filteredTopics} />
+                        </div>
+                    )}
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

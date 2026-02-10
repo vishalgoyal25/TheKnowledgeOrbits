@@ -36,7 +36,7 @@ class ProgramViewSet(viewsets.ModelViewSet):
     
     queryset = Program.objects.all()
     serializer_class = ProgramSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = ContentCursorPagination
     
     def get_queryset(self):
@@ -55,7 +55,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
     
     queryset = Subject.objects.select_related('program').all()
     serializer_class = SubjectSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = ContentCursorPagination
     
     def get_queryset(self):
@@ -78,7 +78,7 @@ class ModuleViewSet(viewsets.ModelViewSet):
     
     queryset = Module.objects.select_related('subject__program').all()
     serializer_class = ModuleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = ContentCursorPagination
     
     def get_queryset(self):
@@ -246,7 +246,7 @@ class ChunkTopicMapViewSet(viewsets.ModelViewSet):
     
     queryset = ChunkTopicMap.objects.select_related('chunk', 'topic').all()
     serializer_class = ChunkTopicMapSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = ContentCursorPagination
     
     def get_queryset(self):
@@ -273,7 +273,7 @@ class ThemeViewSet(viewsets.ModelViewSet):
     
     queryset = Theme.objects.all()
     serializer_class = ThemeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = ContentCursorPagination
     
     def get_queryset(self):
