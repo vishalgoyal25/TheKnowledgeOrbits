@@ -4,7 +4,7 @@ Knowledge Engine Views
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 import structlog
 
 from engines.knowledge.models import (
@@ -101,7 +101,7 @@ class TopicViewSet(viewsets.ModelViewSet):
     
     queryset = Topic.objects.select_related('module__subject', 'subject').all()
     serializer_class = TopicSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     pagination_class = ContentCursorPagination
     
     def get_queryset(self):
