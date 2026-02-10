@@ -6,7 +6,7 @@ import structlog
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 
 from .models import Article, ArticleGenerationJob
@@ -32,7 +32,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     - Sources: GET /api/v1/articles/:id/sources/
     """
     
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     lookup_field = 'id'
     
     ordering_fields = ['created_at', 'title', 'review_status']
