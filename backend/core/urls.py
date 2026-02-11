@@ -34,6 +34,9 @@ urlpatterns = [
     # Article Generation Engine
     path('api/v1/articles/', include('engines.article_generation.urls')),
 
+    # Current Affairs Engine
+    path('api/v1/ca/', include('engines.current_affairs.urls')),
+
     # Assessment Engine
     # path('api/v1/assessment/', include('engines.assessment.urls')),
     
