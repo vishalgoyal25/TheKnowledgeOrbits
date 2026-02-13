@@ -79,3 +79,46 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-400;
 }
+
+/* Current Affairs Styles */
+.ca-timeline-dot {
+  @apply absolute -left-[29px] top-6 w-3 h-3 bg-blue-500 rounded-full border-2 border-white;
+}
+
+.ca-timeline-line {
+  @apply border-l-2 border-blue-200;
+}
+
+.ca-badge {
+  @apply bg-blue-50 text-blue-700 border-blue-200;
+}
+
+.ca-expired {
+  @apply opacity-50 grayscale;
+}
+
+.ca-source-active {
+  @apply bg-green-50 border-green-200;
+}
+
+.ca-source-inactive {
+  @apply bg-gray-50 border-gray-200;
+}
+
+/* CA Filter animations */
+.ca-filter-bar {
+  @apply transition-all duration-300 ease-in-out;
+}
+
+.ca-filter-bar:hover {
+  @apply shadow-md;
+}
+
+/* CA Card hover effects */
+.ca-article-card {
+  @apply transition-all duration-200;
+}
+
+.ca-article-card:hover {
+  @apply scale-[1.02] shadow-lg;
+}
