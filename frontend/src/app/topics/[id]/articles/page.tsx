@@ -12,17 +12,21 @@ import BreadcrumbNav from '@/components/topics/breadcrumb-nav';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, FileText } from 'lucide-react';
+import { Sparkles, FileText, Newspaper } from 'lucide-react';
 import Link from 'next/link';
-import { getDifficultyColor } from '@/lib/utils';
+import { getDifficultyColor } from '@/lib/utils'; // Keep this import
+
+import { useCAChunksForTopic } from '@/lib/hooks/use-current-affairs';
+import CATopicBadge from '@/components/current-affairs/ca-topic-badge';
 
 export default function TopicArticlesPage() {
   const params = useParams();
   const topicId = params.id as string;
-  
+
   const { data: topic, isLoading: topicLoading } = useTopic(topicId);
   const { data: articlesData, isLoading: articlesLoading } = useArticlesByTopic(topicId);
-  
+  const { data: caChunks, isLoading: caChunksLoading } = useCAChunksForTopic(topicId, 30);
+
   if (topicLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -31,7 +35,7 @@ export default function TopicArticlesPage() {
       </div>
     );
   }
-  
+
   if (!topic) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -39,16 +43,16 @@ export default function TopicArticlesPage() {
       </div>
     );
   }
-  
+
   const articles = articlesData?.results || [];
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Breadcrumb */}
       <div className="mb-6">
         <BreadcrumbNav topic={topic} currentPage="Articles" />
       </div>
-      
+
       {/* Topic Header */}
       <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6">
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -56,14 +60,14 @@ export default function TopicArticlesPage() {
             <h1 className="text-3xl font-bold mb-2">{topic.name}</h1>
             <p className="text-gray-700">{topic.description}</p>
           </div>
-          
+
           <div className="flex flex-col gap-2">
             {topic.difficulty_level && (
               <Badge className={getDifficultyColor(topic.difficulty_level)}>
                 {topic.difficulty_level}
               </Badge>
             )}
-            
+
             <Link href={`/generate?topic_id=${topic.id}`}>
               <Button className="gap-2">
                 <Sparkles className="h-4 w-4" />
@@ -72,19 +76,43 @@ export default function TopicArticlesPage() {
             </Link>
           </div>
         </div>
-        
-        {/* Keywords */}
-        {topic.keywords && topic.keywords.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {topic.keywords.map((keyword, idx) => (
-              <Badge key={idx} variant="secondary">
-                {keyword}
-              </Badge>
-            ))}
-          </div>
-        )}
+
+        {/* 🆕 CA Badge */}
+        <div className="flex items-center gap-2">
+          <p className="text-gray-600">
+            {articles?.length || 0} articles available
+          </p>
+          {caChunks && caChunks.length > 0 && (
+            <CATopicBadge count={caChunks.length} />
+          )}
+        </div>
       </div>
-      
+
+      {/* 🆕 CA Preview Section */}
+      {caChunks && caChunks.length > 0 && (
+        <div className="mb-8 p-4 bg-blue-50 rounded-lg">
+          <h3 className="font-semibold mb-2 flex items-center gap-2">
+            <Newspaper className="h-5 w-5 text-blue-600" />
+            Recent Current Affairs ({caChunks.length})
+          </h3>
+          <p className="text-sm text-gray-700">
+            Latest news and updates related to this topic from the past 30 days.
+            Generate an article with CA enabled to see integrated content.
+          </p>
+        </div>
+      )}
+
+      {/* Keywords */}
+      {topic.keywords && topic.keywords.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-8">
+          {topic.keywords.map((keyword, idx) => (
+            <Badge key={idx} variant="secondary">
+              {keyword}
+            </Badge>
+          ))}
+        </div>
+      )}
+
       {/* Articles */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -95,7 +123,7 @@ export default function TopicArticlesPage() {
           </div>
         </div>
       </div>
-      
+
       {articlesLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(3)].map((_, i) => (

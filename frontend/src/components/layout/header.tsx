@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { BookOpen, FileText, Folder, Sparkles, Search, LayoutDashboard } from 'lucide-react';
+import { BookOpen, FileText, Folder, Sparkles, Search, LayoutDashboard, Newspaper } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -22,6 +22,7 @@ export default function Header() {
     { href: '/articles', label: 'Articles', icon: FileText },
     { href: '/topics', label: 'Topics', icon: Folder },
     { href: '/generate', label: 'Generate', icon: Sparkles },
+    { href: '/current-affairs', label: 'Current Affairs', icon: Newspaper },
   ];
   
   const handleSearch = (e: React.FormEvent) => {
