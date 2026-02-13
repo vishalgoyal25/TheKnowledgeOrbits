@@ -9,6 +9,11 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
+@shared_task
+def test_task():
+    return "Task completed successfully"
+
+
 @shared_task(bind=True, max_retries=3)
 def process_document_async(self, document_id: str) -> dict:
     """

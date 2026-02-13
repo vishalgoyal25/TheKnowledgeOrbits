@@ -1,51 +1,52 @@
 # Django Core
-Django==5.0.0
-djangorestframework==3.15.0
-djangorestframework-simplejwt==5.3.1
-django-environ==0.11.2
-django-cors-headers==4.3.1
+Django>=5.1.4,<6.0
+djangorestframework>=3.15.2
+djangorestframework-simplejwt>=5.3.1
+django-environ>=0.11.2
+django-cors-headers>=4.6.0
 
 # Database
-psycopg2-binary==2.9.9
-pgvector==0.2.4
+psycopg2-binary>=2.9.10
+pgvector>=0.3.6
 
 # Async & Tasks
-celery==5.3.6
-redis==5.0.1
-flower==2.0.1
+celery>=5.4.0
+redis>=5.2.1
+flower>=2.0.1
 
 # Password Hashing
-argon2-cffi==23.1.0
+argon2-cffi>=23.1.0
 
 # AI/ML
-groq==0.4.1
-sentence-transformers==2.3.1
+groq>=0.13.0
+sentence-transformers>=3.3.1
+# torch will be installed as a dependency of sentence-transformers
 
 # PDF Processing
-pdfplumber==0.10.3
-pytesseract==0.3.10
-paddleocr==2.7.0
-# pymupdf==1.20.2  # TODO: Fix Windows install issue - not needed for Phase 0
+pdfplumber>=0.11.4
+pytesseract>=0.3.13
+paddleocr>=2.7.3
+PyMuPDF>=1.24.11
 
 # Logging & Monitoring
-structlog==24.1.0
-rich==13.7.0
-sentry-sdk==1.39.2
+structlog>=24.4.0
+rich>=13.9.4
+sentry-sdk>=2.19.0
 
 # Testing
-pytest==7.4.3
-pytest-django==4.7.0
-pytest-cov==4.1.0
-factory-boy==3.3.0
-faker==22.0.0
-schemathesis==3.27.1
+pytest>=8.3.4
+pytest-django>=4.9.0
+pytest-cov>=6.0.0
+factory-boy>=3.3.1
+faker>=33.1.0
+schemathesis>=3.39.6
 
 # Code Quality
-black==24.1.1
-flake8==7.0.0
-mypy==1.8.0
-bandit==1.7.6
+black>=24.10.0
+flake8>=7.1.1
+mypy>=1.13.0
+bandit>=1.8.0
 
 # Utils
-python-dotenv==1.0.0
-requests==2.31.0
+python-dotenv>=1.0.1
+requests>=2.32.3
