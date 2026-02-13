@@ -1,0 +1,79 @@
+
+<!-- ===================================== -->
+
+| #  | File Name                     | Primary Role / Responsibility                         |
+|----|-------------------------------|--------------------------------------------------------|
+| 1  | PROJECT_VISION.md             | What & Why (problem, users, goals, success metrics)   |
+| 2  | TECH_STACK.md                 | All tools, libraries, services & versions              |
+| 3  | ARCHITECTURE.md               | Overall system structure & engine layering             |
+| 4  | CODING_STANDARDS.md           | How code must be written (patterns & conventions)      |
+| 5  | WORKING_RULES.md              | Highest-authority behavioral & workflow rules          |
+| 6  | DATABASE_SCHEMA.md            | All database tables, fields & relationships             |
+| 7  | COMPLETE_FOLDER_STRUCTURE.md  | Canonical directory & file layout                      |
+| 8  | ENGINE_CATALOG.md             | Per-engine contracts, scope & boundaries               |
+| 9  | API_REFERENCE.md              | All public & internal API endpoints                    |
+| 10 | DATA_FLOW_PATTERNS.md         | Data movement, retries, idempotency, safety patterns   |
+| 11 | EVENT_DRIVEN_ARCHITECTURE.md  | Async events, queues, contracts & failure handling     |
+| 12 | EXECUTION_ROADMAP.md          | Phase-wise plan, tool gating & rollout order           |
+| 13 | TESTING_STRATEGY.md           | Testing patterns, levels & coverage expectations       |
+| 14 | MIGRATION_STRATEGY.md         | Schema evolution, backward compatibility, migrations   |
+| 15 | AGENTIC_DEVELOPMENT.md        | Agent roles, workflows & human-in-the-loop governance  |
+
+
+<!-- ===================================== -->
+
+The workflow — step by step:
+Stage A: Build the Rulebook (PKB) — 15 files, one at a time
+We create each .md file here. You copy it into your PKB/ folder. No code runs yet. 
+This is pure planning and documentation. 
+Order matters — we start with vision, then architecture, then standards, then engine-specific rules, then agentic rules last.
+
+<!-- ================================================== -->
+
+
+Stage B: Setup (Phase 0) — Environment ready
+You set up the project folder, install Django, Next.js, PostgreSQL, Docker. 
+
+I guide you command by command in PowerShell. One step at a time.
+
+<!-- =============================================================== -->
+
+
+Stage C: Build Core 5 Engines (Phase 1) — The real work begins
+This is where the loop starts:
+
+I generate one file (e.g., models.py for Content Engine)
+You copy to VS Code
+You run it
+You say "Done" or paste any error
+We move to next file
+Repeat until engine is complete
+Then next engine. Same loop.
+
+The 5 core engines in order: Content → Knowledge → Assessment → User State → Analytics
+
+<!-- ============================================================ -->
+
+
+Stage D: Article Generation + Current Affairs (Phase 2)
+Same loop. Now we add GROQ-powered article generation and RSS-based news ingestion.
+
+This is where RAG comes in — content is retrieved, then GenAI generates from it.
+
+<!-- ============================================================ -->
+
+Stage E: Frontend (Phase 3)
+Next.js pages. Same one-file-at-a-time loop but in TypeScript/React.
+
+<!-- ============================================================ -->
+
+Stage F: Launch (Phase 4)
+Deploy, populate content, go live as public beta.
+
+
+<!-- ============================================================ -->
+
+
+Stage G: Scale (Phase 5+)
+
+<!-- ============================================================ -->

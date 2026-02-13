@@ -1,4 +1,4 @@
-# Python
+# --- Python & Backend ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -10,7 +10,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -24,8 +23,17 @@ venv/
 myvenv/
 env/
 ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.cache/
+.pytest_cache/
+.mypy_cache/
 
-# Django
+# --- Django ---
 *.log
 local_settings.py
 db.sqlite3
@@ -33,20 +41,22 @@ db.sqlite3-journal
 media/
 staticfiles/
 
-# Environment
+# --- Environment Variables ---
 .env
 .env.local
 .env.*.local
+.DS_Store
 
-# IDEs
+# --- IDEs & Editors ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
+Thumbs.db
+*.bak
 
-# Node
+# --- Node & Frontend ---
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -54,20 +64,16 @@ yarn-error.log*
 .pnpm-debug.log*
 .next/
 out/
-build/
-dist/
+.vercel
+tsconfig.tsbuildinfo
+next-env.d.ts
 
-# Testing
+# --- Testing & Coverage ---
 .coverage
 htmlcov/
 .pytest_cache/
 .tox/
 
-# OS
-Thumbs.db
-*.bak
-
-
-# PROJECT-SPECIFIC
+# --- Project Specific (Ignored) ---
+# Add large datasets or temporary files here
 docs/
-PKB/
