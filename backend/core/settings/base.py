@@ -40,8 +40,8 @@ INSTALLED_APPS = [
     'engines.knowledge',
     'engines.article_generation',
     'engines.current_affairs',
+    'engines.assessment',
 
-    # 'engines.assessment',
     # 'engines.userstate',
     # 'engines.analytics',
     # 'engines.auth',

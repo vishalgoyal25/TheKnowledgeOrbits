@@ -38,7 +38,7 @@ urlpatterns = [
     path('api/v1/ca/', include('engines.current_affairs.urls')),
 
     # Assessment Engine
-    # path('api/v1/assessment/', include('engines.assessment.urls')),
+    path('api/v1/assessment/', include('engines.assessment.urls')),
     
     # User State Engine
     # path('api/v1/user-state/', include('engines.userstate.urls')),
