@@ -7,6 +7,7 @@ import { Inter } from 'next/font/google';
 import '../styles/globals.css';
 import { QueryProvider } from '@/components/providers/query-provider';
 import Header from '@/components/layout/header';
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -29,6 +30,7 @@ export default function RootLayout({
             <main className="flex-1">
               {children}
             </main>
+            <Toaster position="top-right" richColors />
           </div>
         </QueryProvider>
       </body>
