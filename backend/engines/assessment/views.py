@@ -1,0 +1,493 @@
+"""
+Assessment Engine Views
+
+API endpoints for quiz operations.
+"""
+
+import logging
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.db import transaction
+from django.db.models import Q
+
+from engines.assessment.models import (
+    Quiz, Question, QuizAttempt, QuestionResponse, TopicMastery
+)
+from engines.assessment.serializers import (
+    QuizListSerializer, QuizDetailSerializer, QuizGenerateSerializer,
+    QuizAttemptSerializer, QuizSubmitSerializer, QuestionDetailSerializer,
+    TopicMasterySerializer
+)
+from engines.assessment.services.quiz_generator import get_quiz_generator
+
+logger = logging.getLogger(__name__)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])  # Allow generation without auth for testing
+def generate_quiz(request):
+    """
+    Generate new quiz from topic.
+    
+    POST /api/v1/assessment/generate/
+    Body: {
+        "topic_id": "uuid",
+        "difficulty": "medium",
+        "include_ca": false,
+        "question_count": 10
+    }
+    
+    Returns:
+        201: Quiz detail with questions
+        400: Validation error
+        500: Generation failed
+    """
+    serializer = QuizGenerateSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Get generator service
+        generator = get_quiz_generator()
+        
+        # Generate quiz
+        quiz = generator.generate_quiz(
+            topic_id=str(serializer.validated_data['topic_id']),
+            difficulty=serializer.validated_data['difficulty'],
+            include_ca=serializer.validated_data['include_ca'],
+            question_count=serializer.validated_data['question_count'],
+            user_id=request.user.id if request.user.is_authenticated else None
+        )
+        
+        # Serialize and return
+        result = QuizDetailSerializer(quiz).data
+        
+        logger.info(
+            f"Quiz generated: {quiz.id}",
+            extra={'user_id': request.user.id if request.user.is_authenticated else None}
+        )
+        
+        return Response(result, status=status.HTTP_201_CREATED)
+        
+    except ValueError as e:
+        logger.warning(f"Quiz generation validation error: {str(e)}")
+        return Response(
+            {'error': 'VALIDATION_ERROR', 'message': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+        
+    except Exception as e:
+        logger.error(f"Quiz generation failed: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'GENERATION_FAILED', 'message': 'Failed to generate quiz'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_quizzes(request):
+    """
+    List available quizzes with filters.
+    
+    GET /api/v1/assessment/quizzes/
+    Query params:
+        - topic_id: UUID (optional)
+        - difficulty: easy|medium|hard (optional)
+        - include_ca: true|false (optional)
+    
+    Returns:
+        200: List of quizzes
+    """
+    queryset = Quiz.objects.filter(is_active=True)
+    
+    # Apply filters
+    topic_id = request.query_params.get('topic_id')
+    if topic_id:
+        queryset = queryset.filter(topic_id=topic_id)
+    
+    difficulty = request.query_params.get('difficulty')
+    if difficulty:
+        queryset = queryset.filter(difficulty_level=difficulty)
+    
+    include_ca = request.query_params.get('include_ca')
+    if include_ca is not None:
+        include_ca_bool = include_ca.lower() == 'true'
+        queryset = queryset.filter(include_ca=include_ca_bool)
+    
+    # Prefetch related data
+    quizzes = queryset.select_related('topic').order_by('-created_at')
+    
+    serializer = QuizListSerializer(quizzes, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_quiz(request, quiz_id):
+    """
+    Get quiz details WITHOUT correct answers.
+    
+    GET /api/v1/assessment/quizzes/{quiz_id}/
+    
+    Returns:
+        200: Quiz detail with questions (no answers)
+        404: Quiz not found
+    """
+    quiz = get_object_or_404(
+        Quiz.objects.prefetch_related('questions').select_related('topic'),
+        id=quiz_id,
+        is_active=True
+    )
+    
+    serializer = QuizDetailSerializer(quiz)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def start_quiz(request, quiz_id):
+    """
+    Start a new quiz attempt.
+    
+    POST /api/v1/assessment/quizzes/{quiz_id}/start/
+    
+    Returns:
+        201: Attempt created
+        404: Quiz not found
+        409: Active attempt already exists
+    """
+    quiz = get_object_or_404(Quiz, id=quiz_id, is_active=True)
+    
+    # Check for existing active attempt (for authenticated users)
+    if request.user.is_authenticated:
+        active_attempt = QuizAttempt.objects.filter(
+            quiz=quiz,
+            user=request.user,
+            status='active'
+        ).first()
+        
+        if active_attempt:
+            return Response(
+                {
+                    'error': 'ACTIVE_ATTEMPT_EXISTS',
+                    'message': 'You already have an active attempt for this quiz',
+                    'attempt_id': str(active_attempt.id)
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+    
+    # Create new attempt
+    attempt = QuizAttempt.objects.create(
+        quiz=quiz,
+        user=request.user if request.user.is_authenticated else None,
+        status='active'
+    )
+    
+    logger.info(
+        f"Quiz attempt started: {attempt.id}",
+        extra={
+            'quiz_id': str(quiz_id),
+            'user_id': request.user.id if request.user.is_authenticated else None
+        }
+    )
+    
+    serializer = QuizAttemptSerializer(attempt)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@transaction.atomic
+def submit_quiz(request):
+    """
+    Submit quiz attempt with answers.
+    
+    POST /api/v1/assessment/submit/
+    Body: {
+        "attempt_id": "uuid",
+        "answers": [
+            {
+                "question_id": "uuid",
+                "selected_option": "A",
+                "time_spent": 45,
+                "marked_for_review": false
+            }
+        ]
+    }
+    
+    Returns:
+        200: Graded results with explanations
+        400: Validation error
+        404: Attempt not found
+        409: Attempt already submitted
+    """
+    serializer = QuizSubmitSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    attempt_id = serializer.validated_data['attempt_id']
+    answers = serializer.validated_data['answers']
+    
+    # Get attempt
+    attempt = get_object_or_404(QuizAttempt, id=attempt_id)
+    
+    # Check if attempt belongs to user (for authenticated users)
+    if request.user.is_authenticated and attempt.user != request.user:
+        return Response(
+            {'error': 'FORBIDDEN', 'message': 'This attempt does not belong to you'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Check if already submitted
+    if attempt.status != 'active':
+        return Response(
+            {'error': 'ALREADY_SUBMITTED', 'message': 'This attempt is already submitted'},
+            status=status.HTTP_409_CONFLICT
+        )
+    
+    # Process answers
+    correct_count = 0
+    wrong_count = 0
+    unanswered_count = 0
+    total_time = 0
+    
+    # Create answer map
+    answer_map = {
+        str(answer['question_id']): answer
+        for answer in answers
+    }
+    
+    # Process each question
+    questions = attempt.quiz.questions.all()
+    
+    for question in questions:
+        answer_data = answer_map.get(str(question.id))
+        
+        if answer_data:
+            selected_option = answer_data.get('selected_option', '').strip()
+            time_spent = answer_data.get('time_spent', 0)
+            marked = answer_data.get('marked_for_review', False)
+            
+            # Check correctness
+            is_correct = (selected_option == question.correct_answer) if selected_option else False
+            
+            if selected_option:
+                if is_correct:
+                    correct_count += 1
+                else:
+                    wrong_count += 1
+            else:
+                unanswered_count += 1
+            
+            total_time += time_spent
+            
+            # Create response record
+            QuestionResponse.objects.create(
+                attempt=attempt,
+                question=question,
+                selected_option=selected_option,
+                is_correct=is_correct,
+                time_spent=time_spent,
+                marked_for_review=marked,
+                answered_at=timezone.now() if selected_option else None
+            )
+        else:
+            # Question not answered
+            unanswered_count += 1
+            QuestionResponse.objects.create(
+                attempt=attempt,
+                question=question,
+                selected_option='',
+                is_correct=False,
+                time_spent=0
+            )
+    
+    # Calculate score
+    total_questions = attempt.quiz.question_count
+    score = (correct_count / total_questions * 100) if total_questions > 0 else 0
+    
+    # Update attempt
+    attempt.status = 'submitted'
+    attempt.score = score
+    attempt.correct_count = correct_count
+    attempt.wrong_count = wrong_count
+    attempt.unanswered_count = unanswered_count
+    attempt.submitted_at = timezone.now()
+    attempt.time_spent = total_time
+    attempt.save()
+    
+    # Update topic mastery (for authenticated users)
+    if request.user.is_authenticated:
+        _update_topic_mastery(
+            user=request.user,
+            topic=attempt.quiz.topic,
+            correct=correct_count,
+            total=total_questions
+        )
+    
+    logger.info(
+        f"Quiz submitted: {attempt.id}",
+        extra={
+            'score': score,
+            'correct': correct_count,
+            'total': total_questions
+        }
+    )
+    
+    # Return results with questions and explanations
+    result_data = QuizAttemptSerializer(attempt).data
+    
+    # Add questions with answers for review
+    questions_with_answers = QuestionDetailSerializer(
+        questions,
+        many=True
+    ).data
+    result_data['questions_with_answers'] = questions_with_answers
+    
+    return Response(result_data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_attempt_result(request, attempt_id):
+    """
+    Get quiz attempt results.
+    
+    GET /api/v1/assessment/attempts/{attempt_id}/
+    
+    Returns:
+        200: Attempt results with explanations
+        404: Attempt not found
+        403: Not authorized to view
+    """
+    attempt = get_object_or_404(
+        QuizAttempt.objects.prefetch_related(
+            'responses__question',
+            'quiz__questions'
+        ).select_related('quiz__topic'),
+        id=attempt_id
+    )
+    
+    # Check authorization (for authenticated users)
+    if request.user.is_authenticated and attempt.user and attempt.user != request.user:
+        return Response(
+            {'error': 'FORBIDDEN', 'message': 'You cannot view this attempt'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    serializer = QuizAttemptSerializer(attempt)
+    result_data = serializer.data
+    
+    # Add questions with answers if submitted
+    if attempt.status == 'submitted':
+        questions_with_answers = QuestionDetailSerializer(
+            attempt.quiz.questions.all(),
+            many=True
+        ).data
+        result_data['questions_with_answers'] = questions_with_answers
+    
+    return Response(result_data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_user_attempts(request):
+    """
+    List user's quiz attempts.
+    
+    GET /api/v1/assessment/my-attempts/
+    Query params:
+        - quiz_id: UUID (optional)
+        - status: active|submitted|abandoned (optional)
+    
+    Returns:
+        200: List of attempts
+    """
+    queryset = QuizAttempt.objects.filter(user=request.user)
+    
+    # Apply filters
+    quiz_id = request.query_params.get('quiz_id')
+    if quiz_id:
+        queryset = queryset.filter(quiz_id=quiz_id)
+    
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+    
+    attempts = queryset.select_related('quiz__topic').order_by('-started_at')
+    serializer = QuizAttemptSerializer(attempts, many=True)
+    
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_topic_mastery(request):
+    """
+    Get user's topic mastery scores.
+    
+    GET /api/v1/assessment/mastery/
+    Query params:
+        - topic_id: UUID (optional)
+    
+    Returns:
+        200: List of topic mastery scores
+    """
+    queryset = TopicMastery.objects.filter(user=request.user)
+    
+    topic_id = request.query_params.get('topic_id')
+    if topic_id:
+        queryset = queryset.filter(topic_id=topic_id)
+    
+    mastery = queryset.select_related('topic').order_by('-mastery_score')
+    serializer = TopicMasterySerializer(mastery, many=True)
+    
+    return Response(serializer.data)
+
+
+def _update_topic_mastery(user, topic, correct: int, total: int):
+    """
+    Update or create topic mastery record for user.
+    
+    Args:
+        user: User instance
+        topic: Topic instance
+        correct: Number of correct answers
+        total: Total number of questions
+    """
+    mastery, created = TopicMastery.objects.get_or_create(
+        user=user,
+        topic=topic,
+        defaults={
+            'questions_attempted': total,
+            'questions_correct': correct,
+            'last_attempted_at': timezone.now()
+        }
+    )
+    
+    if not created:
+        # Update existing record
+        mastery.questions_attempted += total
+        mastery.questions_correct += correct
+        mastery.last_attempted_at = timezone.now()
+        mastery.save()
+        
+        # Recalculate mastery score
+        mastery.update_mastery()
+    else:
+        # Calculate initial mastery score
+        mastery.update_mastery()
+        
