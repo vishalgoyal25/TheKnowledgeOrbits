@@ -261,3 +261,117 @@ export interface CATopicLinkListResponse {
   previous: string | null;
   results: CATopicLink[];
 }
+
+/**
+ * Assessment Engine Types
+ * 
+ * Complete TypeScript definitions for quiz system.
+ */
+
+// ===== Quiz Types =====
+
+export interface Quiz {
+  id: string;
+  title: string;
+  topic: Topic;
+  difficulty_level: 'easy' | 'medium' | 'hard';
+  include_ca: boolean;
+  question_count: number;
+  time_limit: number | null;
+  is_active: boolean;
+  created_at: string;
+  questions?: Question[];
+}
+
+export interface Question {
+  id: string;
+  question_text: string;
+  question_type: 'single_mcq' | 'multi_statement' | 'assertion_reasoning';
+  statements: string[];
+  options: {
+    A: string;
+    B: string;
+    C: string;
+    D: string;
+  };
+  correct_answer?: string;  // Only present after submission
+  explanation?: string;
+  difficulty_level: 'easy' | 'medium' | 'hard';
+  order_index: number;
+  has_static_sources?: boolean;
+  has_ca_sources?: boolean;
+}
+
+export interface QuizAttempt {
+  id: string;
+  quiz: Quiz;
+  user: number | null;
+  status: 'active' | 'submitted' | 'abandoned' | 'expired';
+  score: number | null;
+  accuracy: number;
+  correct_count: number;
+  wrong_count: number;
+  unanswered_count: number;
+  started_at: string;
+  submitted_at: string | null;
+  time_spent: number | null;
+  responses?: QuestionResponse[];
+  questions_with_answers?: Question[];
+}
+
+export interface QuestionResponse {
+  id: string;
+  question: string;
+  question_detail?: Question;
+  selected_option: string;
+  is_correct: boolean;
+  time_spent: number;
+  marked_for_review: boolean;
+  answered_at: string | null;
+}
+
+export interface TopicMastery {
+  id: string;
+  topic: Topic;
+  mastery_score: number;
+  questions_attempted: number;
+  questions_correct: number;
+  last_attempted_at: string;
+  updated_at: string;
+}
+
+// ===== Request/Response Types =====
+
+export interface QuizGenerateRequest {
+  topic_id: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  include_ca: boolean;
+  question_count: number;
+}
+
+export interface QuizSubmitRequest {
+  attempt_id: string;
+  answers: Array<{
+    question_id: string;
+    selected_option: string;
+    time_spent: number;
+    marked_for_review?: boolean;
+  }>;
+}
+
+// ===== UI State Types =====
+
+export interface QuizState {
+  currentQuestionIndex: number;
+  answers: Record<string, string>;
+  questionTimes: Record<string, number>;
+  markedForReview: Set<string>;
+  visitedQuestions: Set<number>;
+}
+
+export interface TimerState {
+  timeRemaining: number;
+  isRunning: boolean;
+  isExpired: boolean;
+}
+
