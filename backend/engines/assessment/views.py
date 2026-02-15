@@ -15,14 +15,16 @@ from django.db import transaction
 from django.db.models import Q
 
 from engines.assessment.models import (
-    Quiz, Question, QuizAttempt, QuestionResponse, TopicMastery
+    Quiz, Question, QuizAttempt, QuestionResponse
 )
 from engines.assessment.serializers import (
     QuizListSerializer, QuizDetailSerializer, QuizGenerateSerializer,
-    QuizAttemptSerializer, QuizSubmitSerializer, QuestionDetailSerializer,
-    TopicMasterySerializer
+    QuizAttemptSerializer, QuizSubmitSerializer, QuestionDetailSerializer
 )
 from engines.assessment.services.quiz_generator import get_quiz_generator
+
+from engines.userstate.services.mastery_service import get_mastery_service
+from engines.userstate.services.activity_service import get_activity_service
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +274,7 @@ def submit_quiz(request):
     
     # Process each question
     questions = attempt.quiz.questions.all()
+    responses = []
     
     for question in questions:
         answer_data = answer_map.get(str(question.id))
@@ -295,7 +298,7 @@ def submit_quiz(request):
             total_time += time_spent
             
             # Create response record
-            QuestionResponse.objects.create(
+            resp = QuestionResponse.objects.create(
                 attempt=attempt,
                 question=question,
                 selected_option=selected_option,
@@ -304,16 +307,18 @@ def submit_quiz(request):
                 marked_for_review=marked,
                 answered_at=timezone.now() if selected_option else None
             )
+            responses.append(resp)
         else:
             # Question not answered
             unanswered_count += 1
-            QuestionResponse.objects.create(
+            resp = QuestionResponse.objects.create(
                 attempt=attempt,
                 question=question,
                 selected_option='',
                 is_correct=False,
                 time_spent=0
             )
+            responses.append(resp)
     
     # Calculate score
     total_questions = attempt.quiz.question_count
@@ -329,13 +334,24 @@ def submit_quiz(request):
     attempt.time_spent = total_time
     attempt.save()
     
-    # Update topic mastery (for authenticated users)
     if request.user.is_authenticated:
-        _update_topic_mastery(
+        # Update topic mastery for each question
+        mastery_service = get_mastery_service()
+        
+        for response in responses:
+            mastery_service.update_mastery(
+                user=request.user,
+                topic_id=str(response.question.quiz.topic_id),
+                is_correct=response.is_correct
+            )
+        
+        # Log quiz completion event
+        activity_service = get_activity_service()
+        activity_service.log_quiz_completed(
             user=request.user,
-            topic=attempt.quiz.topic,
-            correct=correct_count,
-            total=total_questions
+            quiz_id=str(attempt.quiz.id),
+            attempt_id=str(attempt.id),
+            score=score
         )
     
     logger.info(
@@ -431,63 +447,4 @@ def list_user_attempts(request):
     serializer = QuizAttemptSerializer(attempts, many=True)
     
     return Response(serializer.data)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_topic_mastery(request):
-    """
-    Get user's topic mastery scores.
     
-    GET /api/v1/assessment/mastery/
-    Query params:
-        - topic_id: UUID (optional)
-    
-    Returns:
-        200: List of topic mastery scores
-    """
-    queryset = TopicMastery.objects.filter(user=request.user)
-    
-    topic_id = request.query_params.get('topic_id')
-    if topic_id:
-        queryset = queryset.filter(topic_id=topic_id)
-    
-    mastery = queryset.select_related('topic').order_by('-mastery_score')
-    serializer = TopicMasterySerializer(mastery, many=True)
-    
-    return Response(serializer.data)
-
-
-def _update_topic_mastery(user, topic, correct: int, total: int):
-    """
-    Update or create topic mastery record for user.
-    
-    Args:
-        user: User instance
-        topic: Topic instance
-        correct: Number of correct answers
-        total: Total number of questions
-    """
-    mastery, created = TopicMastery.objects.get_or_create(
-        user=user,
-        topic=topic,
-        defaults={
-            'questions_attempted': total,
-            'questions_correct': correct,
-            'last_attempted_at': timezone.now()
-        }
-    )
-    
-    if not created:
-        # Update existing record
-        mastery.questions_attempted += total
-        mastery.questions_correct += correct
-        mastery.last_attempted_at = timezone.now()
-        mastery.save()
-        
-        # Recalculate mastery score
-        mastery.update_mastery()
-    else:
-        # Calculate initial mastery score
-        mastery.update_mastery()
-        

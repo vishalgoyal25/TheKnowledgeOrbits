@@ -41,7 +41,7 @@ urlpatterns = [
     path('api/v1/assessment/', include('engines.assessment.urls')),
     
     # User State Engine
-    # path('api/v1/user-state/', include('engines.userstate.urls')),
+    path('api/v1/userstate/', include('engines.userstate.urls')),
     
     # Analytics Engine
     # path('api/v1/analytics/', include('engines.analytics.urls')),

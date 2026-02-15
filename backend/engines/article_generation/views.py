@@ -18,6 +18,7 @@ from .serializers import (
     ArticleSourceMapSerializer,
 )
 from .services.generation_service import ArticleGenerationService
+from engines.userstate.services.activity_service import get_activity_service
 
 logger = structlog.get_logger(__name__)
 
@@ -57,6 +58,21 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(review_status=review_status)
         
         return queryset
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve article and log read event."""
+        article = self.get_object()
+        
+        if request.user.is_authenticated:
+            # Log article read event
+            activity_service = get_activity_service()
+            activity_service.log_article_read(
+                user=request.user,
+                article_id=str(article.id)
+            )
+            
+        serializer = self.get_serializer(article)
+        return Response(serializer.data)
     
     def get_serializer_class(self):
         """Return appropriate serializer."""
