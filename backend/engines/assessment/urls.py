@@ -51,10 +51,4 @@ urlpatterns = [
         name='my-attempts'
     ),
     
-    # Topic mastery
-    path(
-        'mastery/',
-        views.get_topic_mastery,
-        name='topic-mastery'
-    ),
 ]

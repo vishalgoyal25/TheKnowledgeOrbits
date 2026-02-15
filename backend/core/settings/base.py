@@ -42,8 +42,8 @@ INSTALLED_APPS = [
     'engines.current_affairs',
     'engines.assessment',
     'engines.auth',
-
-    # 'engines.userstate',
+    'engines.userstate',
+    
     # 'engines.analytics',
     # 'engines.authorization',
 ]

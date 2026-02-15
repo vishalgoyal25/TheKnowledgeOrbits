@@ -6,7 +6,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from engines.assessment.models import (
-    Quiz, Question, QuizAttempt, QuestionResponse, TopicMastery
+    Quiz, Question, QuizAttempt, QuestionResponse
 )
 
 
@@ -168,23 +168,4 @@ class QuestionResponseAdmin(admin.ModelAdmin):
     is_correct_display.short_description = 'Result'
 
 
-@admin.register(TopicMastery)
-class TopicMasteryAdmin(admin.ModelAdmin):
-    """Admin interface for TopicMastery model."""
-    
-    list_display = [
-        'user', 'topic', 'mastery_score_display',
-        'questions_attempted', 'questions_correct', 'last_attempted_at'
-    ]
-    list_filter = ['last_attempted_at']
-    search_fields = ['user__username', 'topic__name']
-    readonly_fields = ['created_at', 'updated_at']
-    
-    def mastery_score_display(self, obj):
-        color = 'green' if obj.mastery_score >= 70 else 'orange' if obj.mastery_score >= 50 else 'red'
-        return format_html(
-            '<span style="color: {}; font-weight: bold;">{:.1f}%</span>',
-            color, obj.mastery_score
-        )
-    mastery_score_display.short_description = 'Mastery'
     

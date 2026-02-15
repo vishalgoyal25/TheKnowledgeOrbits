@@ -8,7 +8,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 
 from engines.assessment.models import (
-    Quiz, Question, QuizAttempt, QuestionResponse, TopicMastery
+    Quiz, Question, QuizAttempt, QuestionResponse
 )
 from engines.knowledge.models import Topic
 
@@ -156,17 +156,4 @@ class QuizSubmitSerializer(serializers.Serializer):
                     "Each answer must have 'selected_option'"
                 )
         return value
-
-
-class TopicMasterySerializer(serializers.ModelSerializer):
-    """Serializer for topic mastery."""
-    
-    topic = TopicMinimalSerializer(read_only=True)
-    
-    class Meta:
-        model = TopicMastery
-        fields = [
-            'id', 'topic', 'mastery_score', 'questions_attempted',
-            'questions_correct', 'last_attempted_at', 'updated_at'
-        ]
         
