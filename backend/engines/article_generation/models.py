@@ -8,7 +8,7 @@ Articles are RAG-generated from chunks, never ingested directly.
 import uuid
 from django.db import models
 from django.utils.text import slugify
-from django.contrib.auth.models import User
+from django.conf import settings
 
 
 class Article(models.Model):
@@ -112,7 +112,7 @@ class Article(models.Model):
     )
     
     published_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -306,7 +306,7 @@ class ArticleGenerationJob(models.Model):
     
     # Request params
     requested_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

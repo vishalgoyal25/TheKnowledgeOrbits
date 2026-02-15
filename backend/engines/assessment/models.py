@@ -17,7 +17,7 @@ Design Principles:
 import uuid
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.contrib.auth.models import User
+from django.conf import settings
 
 
 class Quiz(models.Model):
@@ -269,7 +269,7 @@ class QuizAttempt(models.Model):
     )
     
     user = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='quiz_attempts',
         null=True,
@@ -452,7 +452,7 @@ class TopicMastery(models.Model):
     )
     
     user = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='topic_mastery',
         help_text="User"
