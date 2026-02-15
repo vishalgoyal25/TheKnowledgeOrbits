@@ -19,6 +19,7 @@ from .serializers import (
 )
 from .services.generation_service import ArticleGenerationService
 from engines.userstate.services.activity_service import get_activity_service
+from engines.authorization.permissions import CanGenerateArticle
 
 logger = structlog.get_logger(__name__)
 
@@ -80,7 +81,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             return ArticleDetailSerializer
         return ArticleListSerializer
     
-    @action(detail=False, methods=['post'], url_path='generate')
+    @action(detail=False, methods=['post'], url_path='generate', permission_classes=[AllowAny])
     def generate(self, request):
         """
         Generate article for a topic.
