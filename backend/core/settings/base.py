@@ -43,9 +43,9 @@ INSTALLED_APPS = [
     'engines.assessment',
     'engines.auth',
     'engines.userstate',
+    'engines.authorization',
     
     # 'engines.analytics',
-    # 'engines.authorization',
 ]
 
 # Custom User Model
@@ -58,6 +58,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'engines.authorization.middleware.RBACMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

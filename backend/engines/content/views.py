@@ -28,6 +28,9 @@ from engines.content.serializers import (
 from engines.content.services.ingestion_service import IngestionService
 from engines.content.pagination import ContentCursorPagination, ChunkCursorPagination
 
+from engines.authorization.permissions import CanManageContent
+from engines.authorization.decorators import admin_only, content_manager_or_admin
+
 logger = structlog.get_logger(__name__)
 
 
@@ -62,7 +65,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-created_at')
     
-    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser], permission_classes=[CanManageContent])
     def upload(self, request):
         """
         Upload and ingest a new document.

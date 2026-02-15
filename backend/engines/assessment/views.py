@@ -25,6 +25,7 @@ from engines.assessment.services.quiz_generator import get_quiz_generator
 
 from engines.userstate.services.mastery_service import get_mastery_service
 from engines.userstate.services.activity_service import get_activity_service
+from engines.authorization.permissions import CanGenerateQuiz
 
 logger = logging.getLogger(__name__)
 

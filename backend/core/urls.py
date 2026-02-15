@@ -48,4 +48,8 @@ urlpatterns = [
     
     # Auth Engine
     path('api/v1/auth/', include('engines.auth.urls')),
+
+    # Authorization Engine
+    path('api/v1/authorization/', include('engines.authorization.urls')),
+
 ]
