@@ -6,6 +6,7 @@ Hierarchical structure: Program → Subject → Module → Topic
 import uuid
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.conf import settings
 
 
 class Program(models.Model):
@@ -309,7 +310,7 @@ class ChunkTopicMap(models.Model):
         help_text="Was this mapping created automatically by AI?"
     )
     approved_by = models.ForeignKey(
-        'auth.User',
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
