@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Protected routes
-  const protectedPaths = ['/dashboard', '/profile', '/assessment', '/articles/my-notebook', '/generate'];
+  const protectedPaths = ['/profile', '/assessment', '/articles/my-notebook', '/generate'];
   const isProtected = protectedPaths.some(path => pathname.startsWith(path));
 
   if (isProtected && !token) {
