@@ -4,7 +4,7 @@ Article Generation Engine Views
 
 import structlog
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
@@ -20,6 +20,9 @@ from .serializers import (
 from .services.generation_service import ArticleGenerationService
 from engines.userstate.services.activity_service import get_activity_service
 from engines.authorization.permissions import CanGenerateArticle
+
+from engines.shared.services.visibility_service import get_visibility_service
+from engines.userstate.services.activity_service import get_activity_service
 
 logger = structlog.get_logger(__name__)
 
@@ -41,12 +44,12 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
-        """Get articles (published only for non-staff)."""
-        queryset = Article.objects.select_related('topic', 'topic__subject').all()
+        """Get articles (filtered by visibility)."""
+        queryset = Article.objects.filter(is_published=True).select_related('topic', 'topic__subject')
         
-        # Filter by published status for non-staff
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(is_published=True)
+        # Apply visibility filtering (PKB Ownership Logic)
+        visibility_service = get_visibility_service()
+        queryset = visibility_service.filter_articles(queryset, self.request.user)
         
         # Filter by topic
         topic_id = self.request.query_params.get('topic_id')
@@ -112,6 +115,30 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             # Fetch generated article
             article = Article.objects.get(id=result['article_id'])
             
+            # ===== OWNERSHIP LOGIC (PKB Extension) =====
+            if request.user.is_authenticated:
+                # User-owned private article
+                article.created_by = request.user
+                article.is_public = False
+                article.save()
+                
+                # Log activity
+                activity_service = get_activity_service()
+                activity_service.log_article_generated(
+                    user=request.user,
+                    article_id=str(article.id),
+                    topic_id=topic_id
+                )
+                
+                logger.info("private_article_generated", user_id=request.user.id, article_id=str(article.id))
+            else:
+                # Public article for anonymous users
+                article.is_public = True
+                article.created_by = None
+                article.save()
+                logger.info("public_article_generated_anonymous", article_id=str(article.id))
+            # ===== END OWNERSHIP LOGIC =====
+            
             return Response(
                 {
                     'message': 'Article generated successfully',
@@ -162,6 +189,20 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             'sources': serializer.data
         })
 
+    @action(detail=False, methods=['get'], url_path='my-notebook', permission_classes=[IsAuthenticated])
+    def my_notebook(self, request):
+        """
+        Get user's private articles ("My Notebook").
+        
+        GET /api/v1/articles/my-notebook/
+        """
+        articles = Article.objects.filter(
+            created_by=request.user,
+            is_public=False
+        ).select_related('topic').order_by('-created_at')
+        
+        serializer = ArticleListSerializer(articles, many=True)
+        return Response(serializer.data)
 
 class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -195,5 +236,51 @@ class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(status=status_filter)
         
         return queryset
+
+
+# === Function Based Views (Direct Access) ===
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_articles(request):
+    """
+    List articles.
+    
+    - Anonymous users: see only public articles
+    - Logged-in users: see public + own private articles
+    """
+    queryset = Article.objects.filter(is_published=True)
+    
+    # ===== VISIBILITY FILTERING =====
+    visibility_service = get_visibility_service()
+    queryset = visibility_service.filter_articles(queryset, request.user)
+    # ===== END FILTERING =====
+    
+    # Apply other filters
+    topic_id = request.query_params.get('topic_id')
+    if topic_id:
+        queryset = queryset.filter(topic_id=topic_id)
+    
+    articles = queryset.select_related('topic').order_by('-created_at')[:20]
+    
+    serializer = ArticleListSerializer(articles, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_notebook(request):
+    """
+    Get user's private articles ("My Notebook").
+    
+    GET /api/v1/articles/my-notebook/
+    """
+    articles = Article.objects.filter(
+        created_by=request.user,
+        is_public=False
+    ).select_related('topic').order_by('-created_at')
+    
+    serializer = ArticleListSerializer(articles, many=True)
+    return Response(serializer.data)
 
         

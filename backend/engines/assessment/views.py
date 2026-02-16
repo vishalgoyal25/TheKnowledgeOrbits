@@ -27,6 +27,8 @@ from engines.userstate.services.mastery_service import get_mastery_service
 from engines.userstate.services.activity_service import get_activity_service
 from engines.authorization.permissions import CanGenerateQuiz
 
+from engines.shared.services.visibility_service import get_visibility_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,6 +72,21 @@ def generate_quiz(request):
             user_id=request.user.id if request.user.is_authenticated else None
         )
         
+        # ===== OWNERSHIP LOGIC (PKB Extension) =====
+        if request.user.is_authenticated:
+            # User-owned private quiz
+            quiz.created_by = request.user
+            quiz.is_public = False
+            quiz.save()
+            logger.info(f"Private quiz generated: {request.user.email}")
+        else:
+            # Public quiz
+            quiz.is_public = True
+            quiz.created_by = None
+            quiz.save()
+            logger.info("Public quiz generated (anonymous)")
+        # ===== END OWNERSHIP LOGIC =====
+        
         # Serialize and return
         result = QuizDetailSerializer(quiz).data
         
@@ -112,6 +129,11 @@ def list_quizzes(request):
     """
     queryset = Quiz.objects.filter(is_active=True)
     
+    # ===== VISIBILITY FILTERING (PKB Ownership Logic) =====
+    visibility_service = get_visibility_service()
+    queryset = visibility_service.filter_quizzes(queryset, request.user)
+    # ===== END FILTERING =====
+    
     # Apply filters
     topic_id = request.query_params.get('topic_id')
     if topic_id:
@@ -132,6 +154,22 @@ def list_quizzes(request):
     serializer = QuizListSerializer(quizzes, many=True)
     return Response(serializer.data)
 
+# Add new view for "My Quizzes"
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_quizzes(request):
+    """
+    Get user's private quizzes.
+    
+    GET /api/v1/assessment/my-quizzes/
+    """
+    quizzes = Quiz.objects.filter(
+        created_by=request.user,
+        is_public=False
+    ).select_related('topic').order_by('-created_at')
+    
+    serializer = QuizListSerializer(quizzes, many=True)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

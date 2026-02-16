@@ -58,12 +58,16 @@ class QuizListSerializer(serializers.ModelSerializer):
     """Serializer for Quiz listing."""
     
     topic = TopicMinimalSerializer(read_only=True)
+    created_by_email = serializers.EmailField(source='created_by.email', read_only=True, allow_null=True)
+    is_user_owned = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = Quiz
         fields = [
             'id', 'title', 'topic', 'difficulty_level', 'include_ca',
-            'question_count', 'time_limit', 'is_active', 'created_at'
+            'question_count', 'time_limit', 'is_active',
+            'created_by', 'created_by_email', 'is_public', 'is_user_owned',
+            'created_at'
         ]
 
 
@@ -75,12 +79,16 @@ class QuizDetailSerializer(serializers.ModelSerializer):
     
     topic = TopicMinimalSerializer(read_only=True)
     questions = QuestionListSerializer(many=True, read_only=True)
+    created_by_email = serializers.EmailField(source='created_by.email', read_only=True, allow_null=True)
+    is_user_owned = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = Quiz
         fields = [
             'id', 'title', 'topic', 'difficulty_level', 'include_ca',
-            'question_count', 'time_limit', 'questions', 'created_at'
+            'question_count', 'time_limit', 'questions',
+            'created_by', 'created_by_email', 'is_public', 'is_user_owned',
+            'created_at'
         ]
 
 

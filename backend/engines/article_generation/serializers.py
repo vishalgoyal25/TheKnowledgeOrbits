@@ -31,6 +31,8 @@ class ArticleListSerializer(serializers.ModelSerializer):
     
     topic = TopicSerializer(read_only=True)
     source_chunk_count = serializers.IntegerField(read_only=True)
+    created_by_email = serializers.EmailField(source='created_by.email', read_only=True, allow_null=True)
+    is_user_owned = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = Article
@@ -42,6 +44,10 @@ class ArticleListSerializer(serializers.ModelSerializer):
             'topic',
             'word_count',
             'read_time',
+            'created_by',
+            'created_by_email',
+            'is_public',
+            'is_user_owned',
             'generation_type',
             'quality_score',
             'review_status',
@@ -61,6 +67,8 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
     source_chunk_count = serializers.IntegerField(read_only=True)
     static_chunk_count = serializers.IntegerField(read_only=True)
     ca_chunk_count = serializers.IntegerField(read_only=True)
+    created_by_email = serializers.EmailField(source='created_by.email', read_only=True, allow_null=True)
+    is_user_owned = serializers.BooleanField(read_only=True)
     
     class Meta:
         model = Article
@@ -73,6 +81,10 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
             'topic',
             'word_count',
             'read_time',
+            'created_by',
+            'created_by_email',
+            'is_public',
+            'is_user_owned',
             'generation_type',
             'quality_score',
             'review_status',

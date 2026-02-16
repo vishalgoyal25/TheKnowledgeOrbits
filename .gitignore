@@ -77,3 +77,4 @@ htmlcov/
 # --- Project Specific (Ignored) ---
 # Add large datasets or temporary files here
 docs/
+new_docs/

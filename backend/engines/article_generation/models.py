@@ -137,6 +137,22 @@ class Article(models.Model):
         auto_now=True,
         help_text="Last modification time"
     )
+
+    # ===== OWNERSHIP FIELDS (PKB EXTENSION) =====
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='created_articles',
+        null=True,
+        blank=True,
+        help_text="User who created this article (NULL = system/admin)"
+    )
+    
+    is_public = models.BooleanField(
+        default=True,
+        help_text="Is this article publicly visible?"
+    )
+    # ===== END OWNERSHIP FIELDS =====
     
     class Meta:
         db_table = 'article_article'
@@ -187,7 +203,11 @@ class Article(models.Model):
     def ca_chunk_count(self) -> int:
         """Count of CA chunks used."""
         return self.source_chunks.filter(chunk__source_type='dynamic').count()
-
+    
+    @property
+    def is_user_owned(self) -> bool:
+        """Check if article is user-owned."""
+        return self.created_by is not None
 
 class ArticleSourceMap(models.Model):
     """
