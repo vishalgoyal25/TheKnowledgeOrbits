@@ -44,8 +44,7 @@ INSTALLED_APPS = [
     'engines.auth',
     'engines.userstate',
     'engines.authorization',
-    
-    # 'engines.analytics',
+    'engines.analytics',
 ]
 
 # Custom User Model
@@ -274,3 +273,28 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@theknowledgeorbits
 # Frontend URL
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
+
+# Using Local Memory Cache for development (No Redis required)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# Redis configuration (Commented out for later activation)
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+#         'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+#         'KEY_PREFIX': 'theknowledgeorbits',
+#         'TIMEOUT': 300,  # 5 minutes default
+#     }
+# }
+
+# Cache keys
+CACHE_TTL = {
+    'dashboard': 300,      # 5 minutes
+    'weekly_stats': 600,   # 10 minutes
+    'monthly_stats': 1800, # 30 minutes
+}

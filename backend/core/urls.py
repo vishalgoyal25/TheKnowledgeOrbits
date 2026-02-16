@@ -44,7 +44,7 @@ urlpatterns = [
     path('api/v1/userstate/', include('engines.userstate.urls')),
     
     # Analytics Engine
-    # path('api/v1/analytics/', include('engines.analytics.urls')),
+    path('api/v1/analytics/', include('engines.analytics.urls')),
     
     # Auth Engine
     path('api/v1/auth/', include('engines.auth.urls')),
