@@ -12,4 +12,5 @@ router.register(r'', views.ArticleViewSet, basename='article')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('my-notebook/', views.my_notebook, name='my-notebook'),
 ]

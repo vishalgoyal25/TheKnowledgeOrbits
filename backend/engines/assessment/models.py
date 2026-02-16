@@ -100,6 +100,22 @@ class Quiz(models.Model):
         help_text="Last modification timestamp"
     )
     
+    # ===== OWNERSHIP FIELDS (PKB EXTENSION) =====
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='created_quizzes',
+        null=True,
+        blank=True,
+        help_text="User who created this quiz (NULL = system/admin)"
+    )
+    
+    is_public = models.BooleanField(
+        default=True,
+        help_text="Is quiz publicly accessible?"
+    )
+    # ===== END OWNERSHIP FIELDS =====
+
     class Meta:
         db_table = 'assessment_quiz'
         ordering = ['-created_at']
@@ -116,6 +132,11 @@ class Quiz(models.Model):
         ca_marker = " [CA]" if self.include_ca else ""
         return f"{self.title}{ca_marker} ({self.difficulty_level})"
 
+    @property
+    def is_user_owned(self) -> bool:
+        """Check if quiz is user-owned."""
+        return self.created_by is not None
+        
 
 class Question(models.Model):
     """

@@ -50,5 +50,9 @@ urlpatterns = [
         views.list_user_attempts,
         name='my-attempts'
     ),
-    
+    path(
+        'my-quizzes/', 
+        views.my_quizzes, 
+        name='my-quizzes'
+    ),
 ]
