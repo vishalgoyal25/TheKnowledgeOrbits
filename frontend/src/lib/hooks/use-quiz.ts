@@ -9,7 +9,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { quizAPI } from '../api/quiz';
 import { QuizGenerateRequest, QuizSubmitRequest } from '../types';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 // ===== Query Keys =====
 
@@ -60,14 +60,17 @@ export function useGenerateQuiz() {
     onSuccess: (newQuiz) => {
       // Invalidate quiz lists
       queryClient.invalidateQueries({ queryKey: quizKeys.lists() });
-      
-      toast.success('Quiz generated successfully!', {
+
+      toast({
+        title: 'Quiz generated successfully!',
         description: `${newQuiz.question_count} questions created`,
       });
     },
     onError: (error: any) => {
-      toast.error('Failed to generate quiz', {
+      toast({
+        title: 'Failed to generate quiz',
         description: error.response?.data?.message || 'Please try again',
+        variant: 'destructive',
       });
     },
   });
@@ -83,15 +86,18 @@ export function useStartQuiz() {
     onSuccess: (attempt) => {
       // Cache the attempt
       queryClient.setQueryData(quizKeys.attempt(attempt.id), attempt);
-      
-      toast.success('Quiz started!', {
+
+      toast({
+        title: 'Quiz started!',
         description: 'Good luck!',
       });
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to start quiz';
-      toast.error('Cannot start quiz', {
+      toast({
+        title: 'Cannot start quiz',
         description: message,
+        variant: 'destructive',
       });
     },
   });
@@ -107,20 +113,23 @@ export function useSubmitQuiz() {
     onSuccess: (result) => {
       // Update attempt cache
       queryClient.setQueryData(quizKeys.attempt(result.id), result);
-      
+
       // Invalidate attempts list
       queryClient.invalidateQueries({ queryKey: quizKeys.attempts() });
-      
+
       // Invalidate mastery (will be updated)
       queryClient.invalidateQueries({ queryKey: quizKeys.mastery() });
-      
-      toast.success('Quiz submitted!', {
+
+      toast({
+        title: 'Quiz submitted!',
         description: `You scored ${result.score?.toFixed(1)}%`,
       });
     },
     onError: (error: any) => {
-      toast.error('Failed to submit quiz', {
+      toast({
+        title: 'Failed to submit quiz',
         description: error.response?.data?.message || 'Please try again',
+        variant: 'destructive',
       });
     },
   });

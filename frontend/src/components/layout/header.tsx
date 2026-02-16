@@ -21,7 +21,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, protected: true },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, protected: false },
     { href: '/articles', label: 'Articles', icon: FileText, protected: false },
     { href: '/topics', label: 'Topics', icon: Folder, protected: false },
     { href: '/generate', label: 'Generate', icon: Sparkles, protected: false },

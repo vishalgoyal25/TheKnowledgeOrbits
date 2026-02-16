@@ -23,6 +23,13 @@ export default function HomePage() {
           </p>
 
           <div className="flex gap-4 justify-center">
+            <Link href="/dashboard">
+              <Button size="lg" variant="outline" className="gap-2">
+                <BookOpen className="h-5 w-5" />
+                Get Started
+              </Button>
+            </Link>
+
             <Link href="/generate">
               <Button size="lg" className="gap-2 bg-blue-600 hover:bg-blue-700">
                 <Sparkles className="h-5 w-5" />
