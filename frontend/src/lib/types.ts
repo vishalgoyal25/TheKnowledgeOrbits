@@ -375,3 +375,73 @@ export interface TimerState {
   isExpired: boolean;
 }
 
+
+/**
+ * Type Definitions for Authentication
+ */
+
+// User
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  is_verified: boolean;
+  subscription_tier: 'free' | 'premium' | 'enterprise';
+  roles: string[];
+  created_at: string;
+  last_login: string | null;
+}
+
+// Auth Requests
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  password_confirm: string;
+  full_name?: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  password: string;
+  password_confirm: string;
+}
+
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
+  new_password_confirm: string;
+}
+
+// Auth Responses
+export interface AuthTokens {
+  access: string;
+  refresh: string;
+}
+
+export interface LoginResponse {
+  message: string;
+  user: User;
+  tokens: AuthTokens;
+}
+
+export interface RegisterResponse {
+  message: string;
+  user: User;
+}
+
+// API Error
+export interface ApiError {
+  error?: string;
+  message?: string;
+  detail?: string;
+  [key: string]: any;
+}
+
