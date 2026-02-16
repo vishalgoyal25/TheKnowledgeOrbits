@@ -16,37 +16,37 @@ export default function HomePage() {
             Master UPSC with
             <span className="text-blue-600"> AI-Powered</span> Learning
           </h1>
-          
+
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Get personalized, RAG-generated articles tailored to your syllabus.
             Learn faster, retain better, ace your exams.
           </p>
-          
+
           <div className="flex gap-4 justify-center">
-            <Link href="/dashboard">
-              <Button size="lg" className="gap-2">
-                <BookOpen className="h-5 w-5" />
-                Get Started
+            <Link href="/generate">
+              <Button size="lg" className="gap-2 bg-blue-600 hover:bg-blue-700">
+                <Sparkles className="h-5 w-5" />
+                Generate AI Article
               </Button>
             </Link>
-            
+
             <Link href="/articles">
               <Button size="lg" variant="outline" className="gap-2">
-                <Sparkles className="h-5 w-5" />
+                <BookOpen className="h-5 w-5" />
                 Explore Articles
               </Button>
             </Link>
           </div>
         </div>
       </section>
-      
+
       {/* Features */}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12">
             Why TheKnowledgeOrbits?
           </h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -57,7 +57,7 @@ export default function HomePage() {
                 Articles generated from verified NCERT sources using RAG technology
               </p>
             </div>
-            
+
             <div className="text-center">
               <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Target className="h-8 w-8 text-green-600" />
@@ -67,7 +67,7 @@ export default function HomePage() {
                 Every topic mapped to UPSC syllabus for targeted preparation
               </p>
             </div>
-            
+
             <div className="text-center">
               <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Zap className="h-8 w-8 text-purple-600" />
@@ -80,7 +80,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      
+
       {/* CTA */}
       <section className="bg-blue-600 text-white py-16">
         <div className="container mx-auto px-4 text-center">
@@ -90,10 +90,10 @@ export default function HomePage() {
           <p className="text-xl mb-8 opacity-90">
             Join thousands of aspirants learning smarter with AI
           </p>
-          <Link href="/dashboard">
+          <Link href="/generate">
             <Button size="lg" variant="secondary" className="gap-2">
-              Start Learning Now
-              <BookOpen className="h-5 w-5" />
+              Start Generating Now
+              <Sparkles className="h-5 w-5" />
             </Button>
           </Link>
         </div>
