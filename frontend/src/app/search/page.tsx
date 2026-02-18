@@ -4,20 +4,21 @@
 
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useSearch } from '@/lib/hooks/use-search';
 import Link from 'next/link';
+import SearchResults from '@/components/search/search-results';
+import ErrorMessage from '@/components/shared/error-message';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Search, FileText, Folder, AlertCircle } from 'lucide-react';
+import { Search, FileText, Folder } from 'lucide-react';
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
-  
+
   const { data: results, isLoading, error } = useSearch({ q: query }, query.length >= 2);
-  
+
   if (!query || query.length < 2) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -28,7 +29,7 @@ export default function SearchPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -38,31 +39,28 @@ export default function SearchPage() {
           Showing results for <span className="font-medium">&quot;{query}&quot;</span>
         </p>
       </div>
-      
-      {/* Loading */}
+
+      {/* Loading / Error states via SearchResults */}
       {isLoading && (
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
-        </div>
+        <SearchResults results={[]} isLoading={true} query={query} />
       )}
-      
+
       {/* Error */}
       {error && (
-        <div className="text-center py-12">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600">Error loading search results</p>
-        </div>
+        <ErrorMessage
+          title="Search failed"
+          message="Could not fetch search results. Please try again."
+          onRetry={() => window.location.reload()}
+        />
       )}
-      
+
       {/* Results */}
       {!isLoading && results && (
         <>
           <div className="mb-6 text-sm text-gray-600">
             Found {results.length} results
           </div>
-          
+
           {results.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -96,19 +94,19 @@ export default function SearchPage() {
                               {result.type}
                             </Badge>
                           </div>
-                          
+
                           <CardTitle className="text-xl hover:text-blue-600 transition-colors">
                             {result.title}
                           </CardTitle>
                         </div>
                       </div>
                     </CardHeader>
-                    
+
                     <CardContent>
                       <p className="text-sm text-gray-600 line-clamp-2">
                         {result.snippet}
                       </p>
-                      
+
                       {/* Metadata */}
                       {result.metadata && (
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">

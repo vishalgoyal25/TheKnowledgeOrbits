@@ -42,7 +42,7 @@ class QuizGeneratorService:
     def __init__(self):
         """Initialize quiz generator with Groq client."""
         self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
-        self.model = "llama-3.3-70b-versatile"
+        self.model = "llama-3.1-8b-instant"
     
     def generate_quiz(
         self,

@@ -60,7 +60,7 @@ export default function QuizResultsPage() {
         </Button>
       </Link>
 
-      {/* Results Summary */}
+      {/* Results Analysis */}
       <ResultAnalysis attempt={attempt} />
 
       {/* Review Section */}
@@ -83,20 +83,19 @@ export default function QuizResultsPage() {
             return (
               <Card
                 key={question.id}
-                className={`border-l-4 ${
-                  response?.is_correct
-                    ? 'border-l-green-500'
-                    : response?.selected_option
+                className={`border-l-4 ${response?.is_correct
+                  ? 'border-l-green-500'
+                  : response?.selected_option
                     ? 'border-l-red-500'
                     : 'border-l-gray-300'
-                }`}
+                  }`}
               >
                 <CardContent className="pt-6">
                   <QuestionDisplay
                     question={question}
                     questionNumber={idx + 1}
                     selectedAnswer={answerMap[question.id] || ''}
-                    onAnswerChange={() => {}}
+                    onAnswerChange={() => { }}
                     showAnswer={true}
                     showExplanation={true}
                     readOnly={true}

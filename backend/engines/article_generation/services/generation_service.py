@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 
 # GROQ Configuration
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "llama-3.1-8b-instant"
 GROQ_TEMPERATURE = 0.7
 GROQ_MAX_TOKENS = 2000
 

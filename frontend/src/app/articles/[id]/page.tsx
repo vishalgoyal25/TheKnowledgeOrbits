@@ -7,9 +7,11 @@
 import { useParams } from 'next/navigation';
 import { useArticle } from '@/lib/hooks/use-article';
 import ArticleReader from '@/components/articles/article-reader';
+import SourceAttribution from '@/components/quiz/source-attribution';
+import ErrorMessage from '@/components/shared/error-message';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Share2, BookmarkPlus, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Share2, BookmarkPlus } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ArticleDetailPage() {
@@ -36,9 +38,11 @@ export default function ArticleDetailPage() {
   if (error || !article) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-red-600">
-          Article not found or error loading article.
-        </div>
+        <ErrorMessage
+          title="Article not found"
+          message="This article may have been removed or the link is incorrect."
+          onRetry={() => window.location.reload()}
+        />
       </div>
     );
   }
@@ -61,22 +65,35 @@ export default function ArticleDetailPage() {
           <BookmarkPlus className="h-4 w-4" />
           Save
         </Button>
-
         <Button variant="outline" size="sm" className="gap-2">
           <Share2 className="h-4 w-4" />
           Share
         </Button>
-
-        <Link href={`/articles/${article.id}/sources`}>
-          <Button variant="outline" size="sm" className="gap-2">
-            <ExternalLink className="h-4 w-4" />
-            View Sources
-          </Button>
-        </Link>
       </div>
 
       {/* Article */}
       <ArticleReader article={article} />
+
+      {/* Source Attribution */}
+      {(() => {
+        const sourceChunks = article.source_chunks;
+        if (!sourceChunks || sourceChunks.length === 0) return null;
+        return (
+          <div className="mt-8 max-w-3xl mx-auto">
+            <SourceAttribution
+              sources={sourceChunks.map((s) => ({
+                title: s.chunk?.chunk_text?.slice(0, 80) || s.chunk_contribution || 'Source',
+                document_title: s.chunk?.document_title || 'Knowledge Base',
+                chunk_index: s.sequence_order ?? 0,
+                relevance_score: s.relevance_weight,
+              }))}
+            />
+          </div>
+        );
+      })()}
+
+
+
     </div>
   );
 }
