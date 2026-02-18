@@ -5,8 +5,9 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '@/lib/api/client';
 import { articlesAPI } from '../api/articles';
-import { ArticleFilterParams, ArticleGenerationRequest } from '../types';
+import { Article, ArticleFilterParams, ArticleGenerationRequest } from '../types';
 
 // List articles
 export function useArticles(params?: ArticleFilterParams) {
@@ -18,12 +19,15 @@ export function useArticles(params?: ArticleFilterParams) {
 }
 
 // Get article by ID
-export function useArticle(id: string | null) {
+export function useArticle(articleId: string) {
   return useQuery({
-    queryKey: ['article', id],
-    queryFn: () => articlesAPI.getById(id!),
-    enabled: !!id,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    queryKey: ['article', articleId],
+    queryFn: async () => {
+      const response = await apiClient.get<Article>(`/articles/${articleId}/`);
+      return response.data;
+    },
+    enabled: !!articleId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
@@ -50,13 +54,13 @@ export function useArticlesByTopic(topicId: string | null, params?: ArticleFilte
 // Generate article mutation
 export function useGenerateArticle() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (data: ArticleGenerationRequest) => articlesAPI.generate(data),
     onSuccess: (data) => {
       // Invalidate articles list
       queryClient.invalidateQueries({ queryKey: ['articles'] });
-      
+
       // Set article in cache
       queryClient.setQueryData(['article', data.article.id], data.article);
     },

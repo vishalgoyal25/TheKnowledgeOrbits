@@ -5,7 +5,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useArticle } from '@/lib/hooks/use-articles';
+import { useArticle } from '@/lib/hooks/use-article';
 import ArticleReader from '@/components/articles/article-reader';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,9 +15,9 @@ import Link from 'next/link';
 export default function ArticleDetailPage() {
   const params = useParams();
   const articleId = params.id as string;
-  
+
   const { data: article, isLoading, error } = useArticle(articleId);
-  
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -32,7 +32,7 @@ export default function ArticleDetailPage() {
       </div>
     );
   }
-  
+
   if (error || !article) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -42,7 +42,7 @@ export default function ArticleDetailPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Back button */}
@@ -54,19 +54,19 @@ export default function ArticleDetailPage() {
           </Button>
         </Link>
       </div>
-      
+
       {/* Actions */}
       <div className="mb-8 flex gap-2 justify-end">
         <Button variant="outline" size="sm" className="gap-2">
           <BookmarkPlus className="h-4 w-4" />
           Save
         </Button>
-        
+
         <Button variant="outline" size="sm" className="gap-2">
           <Share2 className="h-4 w-4" />
           Share
         </Button>
-        
+
         <Link href={`/articles/${article.id}/sources`}>
           <Button variant="outline" size="sm" className="gap-2">
             <ExternalLink className="h-4 w-4" />
@@ -74,7 +74,7 @@ export default function ArticleDetailPage() {
           </Button>
         </Link>
       </div>
-      
+
       {/* Article */}
       <ArticleReader article={article} />
     </div>

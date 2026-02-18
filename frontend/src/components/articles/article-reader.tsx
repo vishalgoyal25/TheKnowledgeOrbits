@@ -1,135 +1,126 @@
 /**
- * Article reader with beautiful typography
+ * Article reader with reading progress tracking & bookmarking
+ *
+ * Combines existing rich article display (source breakdown, CA indicators,
+ * quality score) with new features: scroll-based reading progress,
+ * scroll position restore, and sub-component composition.
  */
 
 'use client';
 
+import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Article } from '@/lib/types';
+import { useReadingProgress } from '@/lib/hooks/use-reading-progress';
+import ArticleHeader from './article-header';
+import ArticleContent from './article-content';
+import ReadingProgress from './reading-progress';
+import BookmarkButton from './bookmark-button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Clock, FileText, Star, Calendar, Newspaper } from 'lucide-react';
-import { formatDate, getQualityColor } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Newspaper } from 'lucide-react';
 
 interface ArticleReaderProps {
     article: Article;
 }
 
 export default function ArticleReader({ article }: ArticleReaderProps) {
-    // Calculate source breakdown
+    const router = useRouter();
+    const contentRef = useRef<HTMLDivElement>(null);
+    const { progress, updateProgress } = useReadingProgress(article.id);
+
+    // Source breakdown
     const staticSources = article.sources?.filter(s => s.source_type === 'static').length || 0;
     const caSources = article.sources?.filter(s => s.source_type === 'dynamic').length || 0;
 
+    // Track scroll position for reading progress
+    useEffect(() => {
+        const handleScroll = () => {
+            if (!contentRef.current) return;
+
+            const element = contentRef.current;
+            const scrollTop = window.scrollY;
+            const scrollHeight = element.scrollHeight - window.innerHeight;
+            const percent = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+
+            updateProgress(Math.min(Math.max(percent, 0), 100), scrollTop);
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [article.id, updateProgress]);
+
+    // Restore scroll position on mount
+    useEffect(() => {
+        if (progress?.last_position) {
+            window.scrollTo(0, progress.last_position);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     return (
-        <article className="max-w-4xl mx-auto">
-            {/* Header */}
-            <header className="mb-8">
-                {/* Topic Badge */}
-                <div className="mb-4">
-                    <Badge variant="secondary" className="text-sm">
-                        {article.topic.subject_name} • {article.topic.name}
-                    </Badge>
+        <div className="min-h-screen bg-white">
+            {/* Fixed Reading Progress Bar */}
+            <ReadingProgress percent={progress?.percent_read || 0} />
+
+            <div className="max-w-4xl mx-auto px-6 py-8">
+                {/* Top Bar: Back */}
+                <div className="flex items-center justify-between mb-6">
+                    <Button
+                        variant="ghost"
+                        onClick={() => router.back()}
+                        className="flex items-center gap-2"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
+                    </Button>
                 </div>
 
-                {/* Title */}
-                <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
-                    {article.title}
-                </h1>
+                {/* Article Header (title, topic, metadata) */}
+                <ArticleHeader article={article} />
 
-                {/* Summary */}
-                {article.summary && (
-                    <p className="text-xl text-gray-600 leading-relaxed mb-6">
-                        {article.summary}
-                    </p>
-                )}
-
-                {/* Metadata */}
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
-                    <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatDate(article.created_at)}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                        <FileText className="h-4 w-4" />
-                        <span>{article.word_count} words</span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{article.read_time} min read</span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                        <Star className={`h-4 w-4 ${getQualityColor(article.quality_score)}`} />
-                        <span className={getQualityColor(article.quality_score)}>
-                            Quality: {article.quality_score.toFixed(0)}%
-                        </span>
-                    </div>
+                {/* Article Content (with scroll tracking ref) */}
+                <div ref={contentRef}>
+                    <ArticleContent content={article.content} />
                 </div>
 
-                <Separator />
-            </header>
+                {/* Footer with source attribution & CA info */}
+                <footer className="mt-12 pt-8 border-t">
+                    <div className="flex items-center justify-between text-sm text-gray-600">
+                        <div>
+                            <p className="font-medium">Generated by TheKnowledgeOrbits AI</p>
+                            <p className="flex items-center gap-2 mt-1">
+                                Based on {article.sources?.length || 0} source materials
+                                {staticSources > 0 && caSources > 0 && (
+                                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                                        {staticSources} textbook + {caSources} current affairs
+                                    </span>
+                                )}
+                            </p>
+                            <p className="text-xs mt-2 text-gray-400">
+                                {new Date(article.created_at).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                })}
+                            </p>
+                        </div>
 
-            {/* Content */}
-            <div className="prose prose-lg prose-slate max-w-none">
-                {/* Parse content paragraphs */}
-                {article.content.split('\n\n').map((paragraph, index) => {
-                    // Skip empty paragraphs
-                    if (!paragraph.trim()) return null;
-
-                    // Check if it's a heading (starts with #)
-                    if (paragraph.startsWith('#')) {
-                        const level = paragraph.match(/^#+/)?.[0].length || 1;
-                        const text = paragraph.replace(/^#+\s*/, '');
-
-                        if (level === 1) {
-                            return <h1 key={index} className="text-3xl font-bold mt-8 mb-4">{text}</h1>;
-                        } else if (level === 2) {
-                            return <h2 key={index} className="text-2xl font-bold mt-6 mb-3">{text}</h2>;
-                        } else {
-                            return <h3 key={index} className="text-xl font-bold mt-4 mb-2">{text}</h3>;
-                        }
-                    }
-
-                    // Regular paragraph
-                    return (
-                        <p key={index} className="mb-4 leading-relaxed">
-                            {paragraph}
-                        </p>
-                    );
-                })}
-            </div>
-
-            {/* 🆕 Enhanced Footer with CA info */}
-            <footer className="mt-12 pt-8 border-t">
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                    <div>
-                        <p className="font-medium">Generated by AI</p>
-                        <p className="flex items-center gap-2">
-                            Based on {article.sources?.length || 0} source materials
-                            {staticSources > 0 && caSources > 0 && (
-                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                                    {staticSources} textbook + {caSources} current affairs
-                                </span>
-                            )}
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                            {article.generation_type.replace('_', ' ')}
-                        </Badge>
-
-                        {/* 🆕 CA indicator */}
-                        {caSources > 0 && (
-                            <Badge className="bg-blue-100 text-blue-800 gap-1">
-                                <Newspaper className="h-3 w-3" />
-                                CA Integrated
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline">
+                                {article.generation_type.replace('_', ' ')}
                             </Badge>
-                        )}
+
+                            {caSources > 0 && (
+                                <Badge className="bg-blue-100 text-blue-800 gap-1">
+                                    <Newspaper className="h-3 w-3" />
+                                    CA Integrated
+                                </Badge>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </footer>
-        </article>
+                </footer>
+            </div>
+        </div>
     );
 }

@@ -6,7 +6,7 @@
 
 import { useParams } from 'next/navigation';
 import { useTopic } from '@/lib/hooks/use-topics';
-import { useArticlesByTopic } from '@/lib/hooks/use-articles';
+import { useArticlesByTopic } from '@/lib/hooks/use-article';
 import ArticleCard from '@/components/articles/article-card';
 import BreadcrumbNav from '@/components/topics/breadcrumb-nav';
 import { Button } from '@/components/ui/button';

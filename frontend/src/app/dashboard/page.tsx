@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useDashboard } from '@/lib/hooks/useDashboard';
+import { useDashboard } from '@/lib/hooks/use-dashboard';
 import DashboardOverview from '@/components/dashboard/DashboardOverview';
 import PerformanceChart from '@/components/dashboard/PerformanceChart';
 import TopicMasterySection from '@/components/dashboard/TopicMasterySection';
