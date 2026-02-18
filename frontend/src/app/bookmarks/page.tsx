@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useBookmarks } from '@/lib/hooks/useBookmarks';
+import { useBookmarks } from '@/lib/hooks/use-bookmarks';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import BookmarkCard from '@/components/bookmarks/BookmarkCard';

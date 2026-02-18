@@ -5,7 +5,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useArticles } from '@/lib/hooks/use-articles';
+import { useArticles } from '@/lib/hooks/use-article';
 import ArticleCard from '@/components/articles/article-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,12 +15,12 @@ import { Search, Filter } from 'lucide-react';
 export default function ArticlesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('');
-  
+
   const { data, isLoading, error } = useArticles({
     review_status: filterStatus || undefined,
     ordering: '-created_at',
   });
-  
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -32,7 +32,7 @@ export default function ArticlesPage() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -42,9 +42,9 @@ export default function ArticlesPage() {
       </div>
     );
   }
-  
+
   const articles = data?.results || [];
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -54,7 +54,7 @@ export default function ArticlesPage() {
           Browse AI-generated articles on UPSC topics
         </p>
       </div>
-      
+
       {/* Filters */}
       <div className="mb-8 flex gap-4">
         <div className="flex-1 relative">
@@ -66,18 +66,18 @@ export default function ArticlesPage() {
             className="pl-10"
           />
         </div>
-        
+
         <Button variant="outline" className="gap-2">
           <Filter className="h-4 w-4" />
           Filters
         </Button>
       </div>
-      
+
       {/* Stats */}
       <div className="mb-6 text-sm text-gray-600">
         Showing {articles.length} of {data?.count || 0} articles
       </div>
-      
+
       {/* Article Grid */}
       {articles.length === 0 ? (
         <div className="text-center py-12">

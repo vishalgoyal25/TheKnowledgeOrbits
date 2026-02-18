@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useGenerateArticle } from '@/lib/hooks/use-articles';
+import { useGenerateArticle } from '@/lib/hooks/use-article';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -21,9 +21,9 @@ interface GenerationFormProps {
 export default function GenerationForm({ topicId, topicName }: GenerationFormProps) {
   const router = useRouter();
   const [includeCA, setIncludeCA] = useState(false);
-  
+
   const { mutate: generateArticle, isPending, isSuccess, isError, error, data } = useGenerateArticle();
-  
+
   const handleGenerate = () => {
     generateArticle(
       { topic_id: topicId, include_ca: includeCA },
@@ -37,7 +37,7 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
       }
     );
   };
-  
+
   return (
     <div className="space-y-6">
       {/* Topic Info */}
@@ -45,7 +45,7 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
         <h3 className="font-semibold mb-1">Generating article for:</h3>
         <p className="text-gray-700">{topicName}</p>
       </div>
-      
+
       {/* Options */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -63,7 +63,7 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
           />
         </div>
       </div>
-      
+
       {/* Status Messages */}
       {isPending && (
         <Alert>
@@ -73,7 +73,7 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
           </AlertDescription>
         </Alert>
       )}
-      
+
       {isSuccess && data && (
         <Alert className="bg-green-50 border-green-200">
           <CheckCircle className="h-4 w-4 text-green-600" />
@@ -87,7 +87,7 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
           </AlertDescription>
         </Alert>
       )}
-      
+
       {isError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -96,7 +96,7 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
           </AlertDescription>
         </Alert>
       )}
-      
+
       {/* Generate Button */}
       <Button
         onClick={handleGenerate}
