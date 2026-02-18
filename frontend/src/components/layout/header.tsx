@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { BookOpen, FileText, Folder, Sparkles, Search, LayoutDashboard, Newspaper } from 'lucide-react';
+import { BookOpen, FileText, Folder, Sparkles, Search, LayoutDashboard, Newspaper, BookMarked, Bookmark } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth/useAuth';
@@ -26,6 +26,8 @@ export default function Header() {
     { href: '/topics', label: 'Topics', icon: Folder, protected: false },
     { href: '/generate', label: 'Generate', icon: Sparkles, protected: false },
     { href: '/current-affairs', label: 'Current Affairs', icon: Newspaper, protected: false },
+    { href: '/notebook', label: 'My Notebook', icon: BookMarked, protected: true },
+    { href: '/bookmarks', label: 'Bookmarks', icon: Bookmark, protected: true },
   ];
 
   const handleSearch = (e: React.FormEvent) => {
