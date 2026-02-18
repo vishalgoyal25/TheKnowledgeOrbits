@@ -41,7 +41,8 @@ class TestChunkingService:
         # ACT
         chunks = ChunkingService.chunk_text(
             text=text,
-            document_id=document_id
+            document_id=document_id,
+            page_number=1
         )
         
         # ASSERT
@@ -58,7 +59,8 @@ class TestChunkingService:
         # ACT
         chunks = ChunkingService.chunk_text(
             text=text,
-            document_id="test-id"
+            document_id="test-id",
+            page_number=1
         )
         
         # ASSERT
@@ -75,7 +77,8 @@ class TestChunkingService:
         # ACT
         chunks = ChunkingService.chunk_text(
             text=text,
-            document_id="test-id"
+            document_id="test-id",
+            page_number=1
         )
         
         # ASSERT
@@ -92,6 +95,7 @@ class TestChunkingService:
         chunks = ChunkingService.chunk_text(
             text=text,
             document_id="test-id",
+            page_number=1,
             chapter_name=chapter_name
         )
         
@@ -124,7 +128,8 @@ class TestChunkingService:
         # ACT
         chunks = ChunkingService.chunk_text(
             text=text,
-            document_id="test-id"
+            document_id="test-id",
+            page_number=1
         )
         
         # ASSERT
@@ -340,35 +345,35 @@ class TestIngestionService:
     # Use the same long text for mocking
     TEST_TEXT = TestChunkingService.TEST_TEXT
 
+    @patch('engines.content.services.ingestion_service.IngestionService._generate_embeddings_for_chunks')
     @patch('engines.content.services.ingestion_service.ChunkingService.chunk_text')
-    @patch('engines.content.services.ingestion_service.EmbeddingService.create_embedding_record')
+    @patch('engines.content.services.ingestion_service.IngestionService._extract_text_by_pages')
+    @patch('engines.content.services.ingestion_service.IngestionService._save_file')
     def test_ingest_document_creates_document_record(
         self,
-        mock_embedding,
-        mock_chunking
+        mock_save_file,
+        mock_extract,
+        mock_chunking,
+        mock_gen_embeddings
     ):
         """Test ingestion creates Document in database."""
         # ARRANGE
-        mock_chunking.return_value = [{
-            'chunk_text': self.TEST_TEXT,
-            'chunk_index': 0,
-            'page_number': 1,
-            'chapter_name': 'Chapter 1',
-
-            'source_type': 'static',
-            'quality_flag': 'high',
-            'confidence_score': 1.0
-        }]
+        mock_save_file.return_value = '/media/test.txt'
+        mock_extract.return_value = [{'page_number': 1, 'text': self.TEST_TEXT, 'chapter': 'Chapter 1'}]
         
-        # Side effect to return dict based on input inputs
-        def embedding_side_effect(content_type, content_id, text):
-            return {
-                'content_type': content_type,
-                'content_id': content_id,
-                'vector': [0.1] * 384,
-                'model_name': 'all-MiniLM-L6-v2'
-            }
-        mock_embedding.side_effect = embedding_side_effect
+        def chunking_side_effect(text, document_id, page_number, chapter_name=None):
+            return [{
+                'chunk_text': self.TEST_TEXT,
+                'chunk_index': 0,
+                'page_number': page_number,
+                'chapter_name': chapter_name or 'Chapter 1',
+                'source_type': 'static',
+                'document_id': document_id,
+                'quality_flag': 'high',
+                'confidence_score': 1.0
+            }]
+        mock_chunking.side_effect = chunking_side_effect
+        mock_gen_embeddings.return_value = None
         
         file = SimpleUploadedFile("test.txt", b"Test content")
         
@@ -383,46 +388,47 @@ class TestIngestionService:
         assert 'document_id' in result
         assert Document.objects.filter(title="Test Document").exists()
     
+    @patch('engines.content.services.ingestion_service.IngestionService._generate_embeddings_for_chunks')
     @patch('engines.content.services.ingestion_service.ChunkingService.chunk_text')
-    @patch('engines.content.services.ingestion_service.EmbeddingService.create_embedding_record')
+    @patch('engines.content.services.ingestion_service.IngestionService._extract_text_by_pages')
+    @patch('engines.content.services.ingestion_service.IngestionService._save_file')
     def test_ingest_document_creates_chunks(
         self,
-        mock_embedding,
-        mock_chunking
+        mock_save_file,
+        mock_extract,
+        mock_chunking,
+        mock_gen_embeddings
     ):
         """Test ingestion creates Chunk records."""
         # ARRANGE
-        mock_chunking.return_value = [
-            {
-                'chunk_text': self.TEST_TEXT,
-                'chunk_index': 0,
-                'page_number': 1,
-                'chapter_name': 'Chapter 1',
-    
-                'source_type': 'static',
-                'quality_flag': 'high',
-                'confidence_score': 1.0
-            },
-            {
-                'chunk_text': self.TEST_TEXT,
-                'chunk_index': 1,
-                'page_number': 1,
-                'chapter_name': 'Chapter 1',
-    
-                'source_type': 'static',
-                'quality_flag': 'high',
-                'confidence_score': 1.0
-            }
-        ]
+        mock_save_file.return_value = '/media/test.txt'
+        mock_extract.return_value = [{'page_number': 1, 'text': self.TEST_TEXT, 'chapter': 'Chapter 1'}]
         
-        def embedding_side_effect(content_type, content_id, text):
-            return {
-                'content_type': content_type,
-                'content_id': content_id,
-                'vector': [0.1] * 384,
-                'model_name': 'all-MiniLM-L6-v2'
-            }
-        mock_embedding.side_effect = embedding_side_effect
+        def chunking_side_effect(text, document_id, page_number, chapter_name=None):
+            return [
+                {
+                    'chunk_text': self.TEST_TEXT,
+                    'chunk_index': 0,
+                    'page_number': page_number,
+                    'chapter_name': chapter_name or 'Chapter 1',
+                    'source_type': 'static',
+                    'document_id': document_id,
+                    'quality_flag': 'high',
+                    'confidence_score': 1.0
+                },
+                {
+                    'chunk_text': self.TEST_TEXT,
+                    'chunk_index': 1,
+                    'page_number': page_number,
+                    'chapter_name': chapter_name or 'Chapter 1',
+                    'source_type': 'static',
+                    'document_id': document_id,
+                    'quality_flag': 'high',
+                    'confidence_score': 1.0
+                }
+            ]
+        mock_chunking.side_effect = chunking_side_effect
+        mock_gen_embeddings.return_value = None
         
         file = SimpleUploadedFile("test.txt", b"Test content")
         
@@ -437,34 +443,35 @@ class TestIngestionService:
         assert result['chunks_created'] == 2
         assert Chunk.objects.count() == 2
     
+    @patch('engines.content.services.ingestion_service.IngestionService._generate_embeddings_for_chunks')
     @patch('engines.content.services.ingestion_service.ChunkingService.chunk_text')
-    @patch('engines.content.services.ingestion_service.EmbeddingService.create_embedding_record')
+    @patch('engines.content.services.ingestion_service.IngestionService._extract_text_by_pages')
+    @patch('engines.content.services.ingestion_service.IngestionService._save_file')
     def test_ingest_document_creates_embeddings(
         self,
-        mock_embedding,
-        mock_chunking
+        mock_save_file,
+        mock_extract,
+        mock_chunking,
+        mock_gen_embeddings
     ):
         """Test ingestion creates Embedding records."""
         # ARRANGE
-        mock_chunking.return_value = [{
-            'chunk_text': self.TEST_TEXT,
-            'chunk_index': 0,
-            'page_number': 1,
-            'chapter_name': 'Chapter 1',
-
-            'source_type': 'static',
-            'quality_flag': 'high',
-            'confidence_score': 1.0
-        }]
+        mock_save_file.return_value = '/media/test.txt'
+        mock_extract.return_value = [{'page_number': 1, 'text': self.TEST_TEXT, 'chapter': 'Chapter 1'}]
         
-        def embedding_side_effect(content_type, content_id, text):
-            return {
-                'content_type': content_type,
-                'content_id': content_id,
-                'vector': [0.1] * 384,
-                'model_name': 'all-MiniLM-L6-v2'
-            }
-        mock_embedding.side_effect = embedding_side_effect
+        def chunking_side_effect(text, document_id, page_number, chapter_name=None):
+            return [{
+                'chunk_text': self.TEST_TEXT,
+                'chunk_index': 0,
+                'page_number': page_number,
+                'chapter_name': chapter_name or 'Chapter 1',
+                'source_type': 'static',
+                'document_id': document_id,
+                'quality_flag': 'high',
+                'confidence_score': 1.0
+            }]
+        mock_chunking.side_effect = chunking_side_effect
+        mock_gen_embeddings.return_value = None
         
         file = SimpleUploadedFile("test.txt", b"Test content")
         
@@ -476,36 +483,38 @@ class TestIngestionService:
         )
         
         # ASSERT
-        assert Embedding.objects.count() == 1
+        # Embeddings are now generated by _generate_embeddings_for_chunks (mocked)
+        mock_gen_embeddings.assert_called_once()
     
+    @patch('engines.content.services.ingestion_service.IngestionService._generate_embeddings_for_chunks')
     @patch('engines.content.services.ingestion_service.ChunkingService.chunk_text')
-    @patch('engines.content.services.ingestion_service.EmbeddingService.create_embedding_record')
+    @patch('engines.content.services.ingestion_service.IngestionService._extract_text_by_pages')
+    @patch('engines.content.services.ingestion_service.IngestionService._save_file')
     def test_ingest_document_creates_ingestion_job(
         self,
-        mock_embedding,
-        mock_chunking
+        mock_save_file,
+        mock_extract,
+        mock_chunking,
+        mock_gen_embeddings
     ):
         """Test ingestion creates IngestionJob record."""
         # ARRANGE
-        mock_chunking.return_value = [{
-            'chunk_text': self.TEST_TEXT,
-            'chunk_index': 0,
-            'page_number': 1,
-            'chapter_name': 'Chapter 1',
-
-            'source_type': 'static',
-            'quality_flag': 'high',
-            'confidence_score': 1.0
-        }]
+        mock_save_file.return_value = '/media/test.txt'
+        mock_extract.return_value = [{'page_number': 1, 'text': self.TEST_TEXT, 'chapter': 'Chapter 1'}]
         
-        def embedding_side_effect(content_type, content_id, text):
-            return {
-                'content_type': content_type,
-                'content_id': content_id,
-                'vector': [0.1] * 384,
-                'model_name': 'all-MiniLM-L6-v2'
-            }
-        mock_embedding.side_effect = embedding_side_effect
+        def chunking_side_effect(text, document_id, page_number, chapter_name=None):
+            return [{
+                'chunk_text': self.TEST_TEXT,
+                'chunk_index': 0,
+                'page_number': page_number,
+                'chapter_name': chapter_name or 'Chapter 1',
+                'source_type': 'static',
+                'document_id': document_id,
+                'quality_flag': 'high',
+                'confidence_score': 1.0
+            }]
+        mock_chunking.side_effect = chunking_side_effect
+        mock_gen_embeddings.return_value = None
         
         file = SimpleUploadedFile("test.txt", b"Test content")
         
@@ -521,10 +530,14 @@ class TestIngestionService:
         job = IngestionJob.objects.get(id=result['job_id'])
         assert job.status == 'completed'
     
+    @patch('engines.content.services.ingestion_service.IngestionService._extract_text_by_pages')
+    @patch('engines.content.services.ingestion_service.IngestionService._save_file')
     @patch('engines.content.services.ingestion_service.ChunkingService.chunk_text')
-    def test_ingest_document_handles_failure_gracefully(self, mock_chunking):
+    def test_ingest_document_handles_failure_gracefully(self, mock_chunking, mock_save_file, mock_extract):
         """Test ingestion marks job as failed on exception."""
         # ARRANGE
+        mock_save_file.return_value = '/media/test.txt'
+        mock_extract.return_value = [{'page_number': 1, 'text': 'Test text', 'chapter': 'Chapter 1'}]
         mock_chunking.side_effect = Exception("Chunking failed")
         file = SimpleUploadedFile("test.txt", b"Test content")
         
