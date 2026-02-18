@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/lib/auth/useAuth';
+import { useSidebar } from '@/components/providers/sidebar-provider';
 
 interface NavItem {
     title: string;
@@ -55,10 +56,8 @@ const navItems: NavItem[] = [
 
 export default function Sidebar() {
     const pathname = usePathname();
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const { isCollapsed, toggleSidebar } = useSidebar();
     const { user, isAuthenticated } = useAuth();
-
-    const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
     const NavLink = ({ item }: { item: NavItem }) => {
         const Icon = item.icon;
@@ -87,7 +86,7 @@ export default function Sidebar() {
 
     return (
         <aside className={cn(
-            "relative flex flex-col bg-white border-r transition-all duration-300 ease-in-out z-40 h-[calc(100vh-64px)]",
+            "absolute left-0 top-0 flex flex-col bg-white border-r transition-all duration-300 ease-in-out z-40 h-[calc(100vh-112px)]",
             isCollapsed ? "w-20" : "w-64"
         )}>
             {/* Collapse Toggle */}

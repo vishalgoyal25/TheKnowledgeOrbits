@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'engines.userstate',
     'engines.authorization',
     'engines.analytics',
+    'engines.support',
 ]
 
 # Custom User Model

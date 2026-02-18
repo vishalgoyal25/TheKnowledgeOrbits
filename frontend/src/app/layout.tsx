@@ -10,6 +10,9 @@ import Footer from '@/components/layout/footer';
 import Sidebar from '@/components/layout/sidebar';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/lib/auth/AuthProvider';
+import { SidebarProvider } from '@/components/providers/sidebar-provider';
+import { LayoutContent } from '@/components/layout/layout-content';
+import FeedbackButton from '@/components/support/feedback-button';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -28,19 +31,16 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <QueryProvider>
           <AuthProvider>
-            <div className="min-h-screen flex flex-col">
-              <Header />
-              <div className="flex flex-1 overflow-hidden">
-                <Sidebar />
-                <main className="flex-1 overflow-y-auto bg-gray-50 flex flex-col">
-                  <div className="flex-1">
-                    {children}
-                  </div>
-                  <Footer />
-                </main>
+            <SidebarProvider>
+              <div className="min-h-screen flex flex-col">
+                <Header />
+                <LayoutContent>
+                  {children}
+                </LayoutContent>
+                <FeedbackButton />
+                <Toaster />
               </div>
-              <Toaster />
-            </div>
+            </SidebarProvider>
           </AuthProvider>
         </QueryProvider>
       </body>

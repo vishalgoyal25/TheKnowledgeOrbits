@@ -52,4 +52,6 @@ urlpatterns = [
     # Authorization Engine
     path('api/v1/authorization/', include('engines.authorization.urls')),
 
+    # Support Engine
+    path('api/v1/support/', include('engines.support.urls')),
 ]
