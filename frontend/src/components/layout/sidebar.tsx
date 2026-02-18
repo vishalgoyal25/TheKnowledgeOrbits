@@ -15,6 +15,7 @@ import {
     Sparkles,
     Newspaper,
     BookMarked,
+    Bookmark,
     History,
     Settings,
     ChevronLeft,
@@ -37,7 +38,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     { title: 'Overview', href: '/dashboard', icon: LayoutDashboard, variant: 'default', category: 'primary' },
-    { title: 'My Notebook', href: '/articles/my-notebook', icon: BookMarked, variant: 'ghost', category: 'primary' },
+    { title: 'My Notebook', href: '/notebook', icon: BookMarked, variant: 'ghost', category: 'primary' },
+    { title: 'Bookmarks', href: '/bookmarks', icon: Bookmark, variant: 'ghost', category: 'primary' },
     { title: 'Reading History', href: '/articles/history', icon: History, variant: 'ghost', category: 'primary' },
 
     { title: 'Generate AI Article', href: '/generate', icon: Sparkles, variant: 'ghost', category: 'tools' },
