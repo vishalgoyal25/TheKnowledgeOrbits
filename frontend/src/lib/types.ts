@@ -305,7 +305,7 @@ export interface Question {
 export interface QuizAttempt {
   id: string;
   quiz: Quiz;
-  user: number | null;
+  user: string | null;
   status: 'active' | 'submitted' | 'abandoned' | 'expired';
   score: number | null;
   accuracy: number;

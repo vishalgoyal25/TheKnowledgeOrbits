@@ -148,14 +148,20 @@ export function useAttemptResult(attemptId: string | null) {
 
 // ===== List My Attempts =====
 
-export function useMyAttempts(params?: {
-  quiz_id?: string;
-  status?: 'active' | 'submitted' | 'abandoned';
-}) {
+// ===== List My Attempts =====
+
+export function useMyAttempts(
+  params?: {
+    quiz_id?: string;
+    status?: 'active' | 'submitted' | 'abandoned';
+  },
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: quizKeys.myAttempts(params || {}),
     queryFn: () => quizAPI.listMyAttempts(params),
     staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled: options?.enabled,
   });
 }
 

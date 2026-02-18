@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Sparkles, BookOpen, Target, Zap } from 'lucide-react';
+import { Sparkles, BookOpen, Target, Zap, FileQuestion } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -22,7 +22,7 @@ export default function HomePage() {
             Learn faster, retain better, ace your exams.
           </p>
 
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-wrap gap-4 justify-center">
             <Link href="/dashboard">
               <Button size="lg" variant="outline" className="gap-2">
                 <BookOpen className="h-5 w-5" />
@@ -43,6 +43,13 @@ export default function HomePage() {
                 Explore Articles
               </Button>
             </Link>
+
+            <Link href="/assessment">
+              <Button size="lg" variant="outline" className="gap-2 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800">
+                <FileQuestion className="h-5 w-5" />
+                Take Quiz
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -54,7 +61,7 @@ export default function HomePage() {
             Why TheKnowledgeOrbits?
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Sparkles className="h-8 w-8 text-blue-600" />
@@ -84,6 +91,16 @@ export default function HomePage() {
                 Generate fresh articles on-demand for any topic in seconds
               </p>
             </div>
+
+            <div className="text-center">
+              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileQuestion className="h-8 w-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Practice Quizzes</h3>
+              <p className="text-gray-600">
+                Test your knowledge with AI-created quizzes and get instant feedback
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -97,12 +114,14 @@ export default function HomePage() {
           <p className="text-xl mb-8 opacity-90">
             Join thousands of aspirants learning smarter with AI
           </p>
-          <Link href="/generate">
-            <Button size="lg" variant="secondary" className="gap-2">
-              Start Generating Now
-              <Sparkles className="h-5 w-5" />
-            </Button>
-          </Link>
+          <div className="flex justify-center gap-4">
+            <Link href="/generate">
+              <Button size="lg" variant="secondary" className="gap-2">
+                Start Generating Now
+                <Sparkles className="h-5 w-5" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </div>

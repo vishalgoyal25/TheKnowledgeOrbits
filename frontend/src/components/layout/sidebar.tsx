@@ -22,7 +22,8 @@ import {
     ChevronRight,
     Zap,
     GraduationCap,
-    LifeBuoy
+    LifeBuoy,
+    FileQuestion
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -42,6 +43,8 @@ const navItems: NavItem[] = [
     { title: 'Bookmarks', href: '/bookmarks', icon: Bookmark, variant: 'ghost', category: 'primary' },
     { title: 'Reading History', href: '/articles/history', icon: History, variant: 'ghost', category: 'primary' },
 
+    { title: 'Quizzes', href: '/assessment', icon: FileQuestion, variant: 'ghost', category: 'tools' },
+    { title: 'Quiz History', href: '/assessment/history', icon: History, variant: 'ghost', category: 'tools' },
     { title: 'Generate AI Article', href: '/generate', icon: Sparkles, variant: 'ghost', category: 'tools' },
     { title: 'Browse Topics', href: '/topics', icon: Folder, variant: 'ghost', category: 'tools' },
     { title: 'Current Affairs', href: '/current-affairs', icon: Newspaper, variant: 'ghost', category: 'tools' },
@@ -129,9 +132,11 @@ export default function Sidebar() {
                             <p className="text-[10px] leading-relaxed opacity-90">
                                 Regular quiz attempts increase syllabus retention by up to 45%. Try our daily orbits!
                             </p>
-                            <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-none text-[10px] h-7">
-                                Daily Quiz
-                            </Button>
+                            <Link href="/assessment/generate">
+                                <Button size="sm" className="w-full bg-white/20 hover:bg-white/30 text-white border-none text-[10px] h-7">
+                                    Take Quiz
+                                </Button>
+                            </Link>
                         </div>
                     )}
                 </div>

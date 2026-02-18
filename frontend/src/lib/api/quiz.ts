@@ -84,7 +84,7 @@ export const quizAPI = {
   getTopicMastery: async (params?: {
     topic_id?: string;
   }): Promise<TopicMastery[]> => {
-    const response = await apiClient.get('/assessment/mastery/', { params });
+    const response = await apiClient.get('/userstate/mastery/', { params });
     return response.data;
   },
 };

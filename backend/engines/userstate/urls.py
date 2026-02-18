@@ -19,6 +19,7 @@ urlpatterns = [
     path('bookmarks/<uuid:bookmark_id>/', views.remove_bookmark, name='remove-bookmark'),
     
     # Reading Progress
+    path('reading-progress/', views.list_reading_progress, name='list-reading-progress'),
     path('reading-progress/<uuid:article_id>/', views.get_reading_progress, name='get-reading-progress'),
     path('reading-progress/<uuid:article_id>/update/', views.update_reading_progress, name='update-reading-progress'),
 ]

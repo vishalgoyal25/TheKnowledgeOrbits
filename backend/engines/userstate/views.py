@@ -19,7 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
-from engines.userstate.models import Bookmark, ReadingProgress
+from engines.userstate.models import Bookmark, ReadingProgress, UserEvent, UserProgress
 from engines.userstate.serializers import (
     UserProgressSerializer, TopicMasterySerializer, UserEventSerializer,
     BookmarkSerializer, BookmarkCreateSerializer,
@@ -241,8 +241,48 @@ def update_reading_progress(request, article_id):
             'last_position': serializer.validated_data['last_position']
         }
     )
+
+    # Check for completion (75%)
+    if progress.percent_read >= 75.0:
+        exists = UserEvent.objects.filter(
+            user=request.user,
+            event_type='article_read',
+            event_data__article_id=str(article_id)
+        ).exists()
+
+        if not exists:
+            title = "Unknown Article"
+            try:
+                from engines.content.models import Article
+                article = Article.objects.get(id=article_id)
+                title = article.title
+            except Exception:
+                pass
+            
+            UserEvent.objects.create(
+                user=request.user,
+                event_type='article_read',
+                event_data={'article_id': str(article_id), 'title': title}
+            )
+
+            user_progress, _ = UserProgress.objects.get_or_create(user=request.user)
+            user_progress.total_articles_read += 1
+            user_progress.save()
     
     result = ReadingProgressSerializer(progress)
     return Response(result.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_reading_progress(request):
+    """
+    List user reading progress.
+    
+    GET /api/v1/userstate/reading-progress/
+    """
+    progress = ReadingProgress.objects.filter(user=request.user).order_by('-updated_at')
+    serializer = ReadingProgressSerializer(progress, many=True)
+    return Response(serializer.data)
 
     

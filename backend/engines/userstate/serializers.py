@@ -66,10 +66,27 @@ class BookmarkCreateSerializer(serializers.Serializer):
 class ReadingProgressSerializer(serializers.ModelSerializer):
     """Reading progress serializer."""
     
+    article_title = serializers.SerializerMethodField()
+    topic_name = serializers.SerializerMethodField()
+
     class Meta:
         model = ReadingProgress
-        fields = ['id', 'article_id', 'percent_read', 'last_position', 'updated_at']
+        fields = ['id', 'article_id', 'article_title', 'topic_name', 'percent_read', 'last_position', 'updated_at']
         read_only_fields = ['id', 'updated_at']
+    
+    def get_article_title(self, obj):
+        try:
+            from engines.content.models import Article
+            return Article.objects.get(id=obj.article_id).title
+        except Exception:
+            return "Unknown Article"
+
+    def get_topic_name(self, obj):
+        try:
+            from engines.content.models import Article
+            return Article.objects.get(id=obj.article_id).topic.name
+        except Exception:
+            return "Unknown Topic"
 
 
 class ReadingProgressUpdateSerializer(serializers.Serializer):

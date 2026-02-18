@@ -14,7 +14,7 @@ import QuizCard from '@/components/quiz/quiz-card';
 import QuizFilters from '@/components/quiz/quiz-filters';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileQuestion, Plus } from 'lucide-react';
+import { FileQuestion, Plus, History } from 'lucide-react';
 
 export default function AssessmentPage() {
   const [filters, setFilters] = useState({
@@ -52,13 +52,21 @@ export default function AssessmentPage() {
             <FileQuestion className="h-8 w-8 text-blue-600" />
             <h1 className="text-4xl font-bold">UPSC Quizzes</h1>
           </div>
-          
-          <Link href="/assessment/generate">
-            <Button size="lg" className="gap-2">
-              <Plus className="h-5 w-5" />
-              Generate New Quiz
-            </Button>
-          </Link>
+
+          <div className="flex gap-3">
+            <Link href="/assessment/history">
+              <Button size="lg" variant="outline" className="gap-2">
+                <History className="h-5 w-5" />
+                History
+              </Button>
+            </Link>
+            <Link href="/assessment/generate">
+              <Button size="lg" className="gap-2">
+                <Plus className="h-5 w-5" />
+                Generate New Quiz
+              </Button>
+            </Link>
+          </div>
         </div>
         <p className="text-gray-600">
           Practice with AI-generated quizzes based on NCERT textbooks and current affairs
