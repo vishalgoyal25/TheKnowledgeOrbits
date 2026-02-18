@@ -19,7 +19,7 @@ const apiClient: AxiosInstance = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    timeout: 30000, // 30 seconds for article generation
+    timeout: 120000, // 120 seconds for batched generation
 });
 
 // Request interceptor (add auth token)

@@ -8,11 +8,12 @@ import { useDashboard } from '@/lib/hooks/use-dashboard';
 import DashboardOverview from '@/components/dashboard/DashboardOverview';
 import PerformanceChart from '@/components/dashboard/PerformanceChart';
 import TopicMasterySection from '@/components/dashboard/TopicMasterySection';
+import RecentQuizzes from '@/components/dashboard/RecentQuizzes';
 import InsightsSection from '@/components/dashboard/InsightsSection';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import { useAuth } from '@/lib/auth/useAuth';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, BookOpen, FileText, Zap } from 'lucide-react';
+import { Loader2, Sparkles, BookOpen, FileText, Zap, FileQuestion } from 'lucide-react';
 import Link from 'next/link';
 
 const MOCK_DATA = {
@@ -135,6 +136,12 @@ export default function DashboardPage() {
                     </div>
                     {isAuthenticated && (
                         <div className="flex items-center gap-3">
+                            <Link href="/assessment">
+                                <Button variant="outline" className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50">
+                                    <FileQuestion className="h-4 w-4" />
+                                    Take Quiz
+                                </Button>
+                            </Link>
                             <Link href="/generate">
                                 <Button className="bg-blue-600 hover:bg-blue-700 shadow-md transition-all hover:scale-105 gap-2">
                                     <Sparkles className="h-4 w-4" />
@@ -160,13 +167,16 @@ export default function DashboardPage() {
                     strong={data!.topics.strong}
                 />
 
-                {/* 4. Quick Actions */}
+                {/* 4. Recent Quizzes */}
+                <RecentQuizzes isGuest={!isAuthenticated} />
+
+                {/* 5. Quick Actions */}
                 <section className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
                     <h2 className="text-2xl font-bold mb-6 text-gray-900 flex items-center gap-2">
                         <Zap className="h-6 w-6 text-yellow-500" />
                         Quick Actions
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <Link href="/generate">
                             <Button variant="outline" className="w-full h-32 flex-col gap-2 hover:bg-blue-50 hover:border-blue-200 transition-all group" size="lg">
                                 <Sparkles className="h-8 w-8 text-blue-600 group-hover:scale-110 transition-transform" />
@@ -185,6 +195,13 @@ export default function DashboardPage() {
                             <Button variant="outline" className="w-full h-32 flex-col gap-2 hover:bg-purple-50 hover:border-purple-200 transition-all group" size="lg">
                                 <FileText className="h-8 w-8 text-purple-600 group-hover:scale-110 transition-transform" />
                                 <span className="font-semibold text-gray-700">Read Articles</span>
+                            </Button>
+                        </Link>
+
+                        <Link href="/assessment">
+                            <Button variant="outline" className="w-full h-32 flex-col gap-2 hover:bg-red-50 hover:border-red-200 transition-all group" size="lg">
+                                <FileQuestion className="h-8 w-8 text-red-600 group-hover:scale-110 transition-transform" />
+                                <span className="font-semibold text-gray-700">Take Quiz</span>
                             </Button>
                         </Link>
                     </div>

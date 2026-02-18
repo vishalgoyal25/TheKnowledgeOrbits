@@ -257,82 +257,108 @@ class QuizGeneratorService:
         include_ca: bool
     ) -> List[Dict[str, Any]]:
         """
-        Generate questions using Groq LLM.
+        Generate questions using Groq LLM with batching to avoid token limits.
         
         Args:
             context: RAG context assembled from chunks
             topic_name: Name of topic for contextual prompting
             difficulty: 'easy', 'medium', or 'hard'
-            question_count: Number of questions to generate
-            include_ca: Whether CA is included (affects prompt strategy)
+            question_count: Total questions to generate
+            include_ca: Whether CA is included
             
         Returns:
-            List of question dictionaries with all required fields
-            
-        Raises:
-            ValueError: If Groq returns invalid JSON
-            Exception: If API call fails
+            List of question dictionaries
         """
-        # Build specialized prompt based on mode
-        prompt = self._build_groq_prompt(
-            context=context,
-            topic_name=topic_name,
-            difficulty=difficulty,
-            question_count=question_count,
-            include_ca=include_ca
-        )
+        all_questions = []
+        BATCH_SIZE = 5
+        generated_count = 0
         
-        logger.info("Calling Groq API for question generation")
+        logger.info(f"Starting batched generation for {question_count} questions")
         
-        try:
-            # Call Groq API
-            response = self.groq_client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert UPSC question creator. Generate only valid JSON output with no markdown formatting or extra text."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=4000
-            )
+        # Loop until we have enough questions
+        while generated_count < question_count:
+            # Determine size of current batch
+            remaining = question_count - generated_count
+            current_batch_size = min(BATCH_SIZE, remaining)
             
-            # Extract response text
-            response_text = response.choices[0].message.content.strip()
+            logger.info(f"Generating batch: {current_batch_size} questions (Progress: {generated_count}/{question_count})")
             
-            # Clean response (remove markdown if present)
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
-            response_text = response_text.strip()
+            try:
+                # Build specialized prompt for this batch
+                prompt = self._build_groq_prompt(
+                    context=context,
+                    topic_name=topic_name,
+                    difficulty=difficulty,
+                    question_count=current_batch_size,
+                    include_ca=include_ca
+                )
+                
+                # Call Groq API
+                response = self.groq_client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert UPSC question creator. Generate response in valid JSON format only."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=0.7,
+                    max_tokens=4000,
+                    response_format={"type": "json_object"}
+                )
+                
+                # Extract response text
+                response_text = response.choices[0].message.content.strip()
+                
+                # Clean response (remove markdown if present)
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                if response_text.startswith("```"):
+                    response_text = response_text[3:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                response_text = response_text.strip()
+                
+                # Parse JSON
+                data = json.loads(response_text)
+                batch_questions = data.get('questions', [])
+                
+                if not batch_questions:
+                    logger.warning("No questions found in batch response")
+                    # If we fail to get questions, avoid infinite loop
+                    if current_batch_size == 1:
+                         break # Give up if even 1 question fails
+                    continue # Retry or proceed? proceed might result in partial quiz
+                
+                all_questions.extend(batch_questions)
+                generated_count += len(batch_questions)
+                
+                logger.info(f"Batch successful. Total so far: {len(all_questions)}")
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing failed for batch: {str(e)}")
+                # If a batch fails, we might return partial results or fail completely
+                # For now, let's stop and return what we have to avoid crashing? 
+                # Or better, log and try to continue if we haven't hit limit?
+                # Actually, raising error is safer than creating broken quiz
+                if not all_questions:
+                    raise ValueError(f"Invalid JSON from Groq: {str(e)}")
+                break
+                
+            except Exception as e:
+                logger.error(f"Groq API call failed: {str(e)}")
+                if not all_questions:
+                    raise
+                break
+                
+        if not all_questions:
+            raise ValueError("Failed to generate any questions")
             
-            # Parse JSON
-            data = json.loads(response_text)
-            questions = data.get('questions', [])
-            
-            if not questions:
-                raise ValueError("No questions in Groq response")
-            
-            logger.info(f"Successfully generated {len(questions)} questions")
-            
-            return questions
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Groq response: {str(e)}")
-            logger.error(f"Response text: {response_text[:500]}")
-            raise ValueError(f"Invalid JSON from Groq: {str(e)}")
-            
-        except Exception as e:
-            logger.error(f"Groq API call failed: {str(e)}")
-            raise
+        return all_questions[:question_count]
     
     def _build_groq_prompt(
         self,

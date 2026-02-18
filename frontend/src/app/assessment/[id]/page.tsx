@@ -40,7 +40,7 @@ export default function TakeQuizPage() {
 
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  
+
   // Quiz state
   const [state, setState] = useState<QuizState>({
     currentQuestionIndex: 0,
@@ -93,7 +93,7 @@ export default function TakeQuizPage() {
     // Save time spent on current question
     const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
     const currentQuestionId = quiz?.questions?.[state.currentQuestionIndex]?.id;
-    
+
     if (currentQuestionId) {
       setState((prev) => ({
         ...prev,
@@ -125,7 +125,7 @@ export default function TakeQuizPage() {
     // Save time for current question
     const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
     const currentQuestionId = quiz.questions?.[state.currentQuestionIndex]?.id;
-    
+
     const finalTimes = { ...state.questionTimes };
     if (currentQuestionId) {
       finalTimes[currentQuestionId] = (finalTimes[currentQuestionId] || 0) + timeSpent;
@@ -194,7 +194,7 @@ export default function TakeQuizPage() {
                 Question {state.currentQuestionIndex + 1} of {quiz.question_count}
               </p>
             </div>
-            
+
             {quiz.time_limit && (
               <Timer
                 initialSeconds={quiz.time_limit}
@@ -291,16 +291,18 @@ export default function TakeQuizPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Submit Quiz?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>Are you sure you want to submit your quiz?</p>
-              <div className="bg-gray-50 p-3 rounded-md text-sm space-y-1">
-                <p>✅ Answered: {answeredCount}</p>
-                <p>⚠️ Unanswered: {quiz.question_count - answeredCount}</p>
-                <p>🚩 Marked for Review: {markedCount}</p>
+            <AlertDialogDescription className="space-y-2" asChild>
+              <div className="text-sm text-muted-foreground">
+                <p>Are you sure you want to submit your quiz?</p>
+                <div className="bg-gray-50 p-3 rounded-md text-sm space-y-1 my-2">
+                  <p>✅ Answered: {answeredCount}</p>
+                  <p>⚠️ Unanswered: {quiz.question_count - answeredCount}</p>
+                  <p>🚩 Marked for Review: {markedCount}</p>
+                </div>
+                <p className="text-xs text-gray-600">
+                  You cannot change your answers after submission.
+                </p>
               </div>
-              <p className="text-xs text-gray-600">
-                You cannot change your answers after submission.
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

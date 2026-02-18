@@ -12,6 +12,7 @@ const footerLinks = {
     platform: [
         { label: 'Dashboard', href: '/dashboard' },
         { label: 'Generate Articles', href: '/generate' },
+        { label: 'Take Quiz', href: '/assessment' },
         { label: 'Topic Mastery', href: '/topics' },
         { label: 'Current Affairs', href: '/current-affairs' },
     ],

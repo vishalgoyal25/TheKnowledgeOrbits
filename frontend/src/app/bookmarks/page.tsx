@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
 import { useBookmarks } from '@/lib/hooks/use-bookmarks';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import BookmarkCard from '@/components/bookmarks/BookmarkCard';
 import EmptyState from '@/components/notebook/EmptyState';
-import { Loader2, BookMarked } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { Loader2, BookMarked, BookOpen } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function BookmarksPage() {
-  const [activeTab, setActiveTab] = useState<'all' | 'article' | 'quiz'>('all');
-  const { data: bookmarks, isLoading, refetch } = useBookmarks(activeTab === 'all' ? undefined : activeTab);
+  const router = useRouter();
+  // Only fetch 'article' bookmarks as requested
+  const { data: bookmarks, isLoading, refetch } = useBookmarks('article');
 
   if (isLoading) {
     return (
@@ -24,30 +25,23 @@ export default function BookmarksPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto p-6">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <BookMarked className="h-8 w-8 text-blue-600" />
-            Bookmarks
-          </h1>
-          <p className="text-gray-600 mt-1">Your saved articles and quizzes</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <BookMarked className="h-8 w-8 text-blue-600" />
+              Bookmarked Articles
+            </h1>
+            <p className="text-gray-600 mt-1">Your curated collection of saved articles.</p>
+          </div>
+          <Link href="/articles">
+            <Button className="gap-2">
+              <BookOpen className="h-5 w-5" />
+              Browse Articles
+            </Button>
+          </Link>
         </div>
 
-        {/* Tabs */}
-        <Card className="mb-6">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">All ({bookmarks?.length || 0})</TabsTrigger>
-              <TabsTrigger value="article">
-                Articles ({bookmarks?.filter(b => b.content_type === 'article').length || 0})
-              </TabsTrigger>
-              <TabsTrigger value="quiz">
-                Quizzes ({bookmarks?.filter(b => b.content_type === 'quiz').length || 0})
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </Card>
-
-        {/* Bookmarks List */}
+        {/* Bookmarks List (Articles Only) */}
         {bookmarks && bookmarks.length > 0 ? (
           <div className="space-y-4">
             {bookmarks.map(bookmark => (
@@ -60,10 +54,10 @@ export default function BookmarksPage() {
           </div>
         ) : (
           <EmptyState
-            title="No bookmarks yet"
-            description="Bookmark articles and quizzes to access them quickly"
+            title="No bookmarked articles"
+            description="Bookmark insightful articles from the library to save them here."
             actionLabel="Browse Articles"
-            onAction={() => window.location.href = '/articles'}
+            onAction={() => router.push('/articles')}
           />
         )}
       </div>
