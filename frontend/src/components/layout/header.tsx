@@ -40,73 +40,96 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between gap-4">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
-            <BookOpen className="h-6 w-6 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900 hidden sm:inline">
-              TheKnowledgeOrbits
-            </span>
-            <span className="text-xl font-bold text-gray-900 sm:hidden">
-              TKO
-            </span>
-          </Link>
+      {/* LAYER 1: TOP BAR (Brand, Search, Utility) */}
+      <div className="border-b bg-white/50">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-between gap-8">
+            {/* Logo */}
+            <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
+              <BookOpen className="h-7 w-7 text-blue-600" />
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-slate-900 tracking-tight leading-none">
+                  TheKnowledgeOrbits
+                </span>
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1">
+                  AI-Powered UPSC OS
+                </span>
+              </div>
+            </Link>
 
-          {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-md hidden md:block">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="search"
-                placeholder="Search articles, topics..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4"
-              />
-            </div>
-          </form>
+            {/* Central Search Bar (Professional Global Command) */}
+            <form onSubmit={handleSearch} className="flex-1 max-w-xl hidden md:block">
+              <div className="relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                <Input
+                  type="search"
+                  placeholder="Ask anything about UPSC Syllabus..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 h-11 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all rounded-xl"
+                />
+              </div>
+            </form>
 
-          {/* Navigation */}
-          <div className="flex items-center space-x-4">
-            <nav className="hidden lg:flex items-center space-x-1">
-              {navItems.filter(item => !item.protected || isAuthenticated).map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
+            {/* Top Right Utility */}
+            <div className="flex items-center gap-6">
+              <nav className="hidden xl:flex items-center gap-6 text-sm font-semibold text-slate-600">
+                <Link href="/" className="hover:text-blue-600 transition-colors">Home</Link>
+                <Link href="/about" className="hover:text-blue-600 transition-colors">About</Link>
+                <Link href="/contact" className="hover:text-blue-600 transition-colors">Contact Us</Link>
+              </nav>
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-gray-100',
-                      isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-600'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-
-            <div className="flex items-center space-x-2 border-l pl-4">
-              {!isLoading && (
-                isAuthenticated ? (
-                  <UserMenu />
-                ) : (
-                  <>
-                    <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
-                      <Link href="/auth/login">Login</Link>
-                    </Button>
-                    <Button size="sm" asChild>
-                      <Link href="/auth/register">Sign Up</Link>
-                    </Button>
-                  </>
-                )
-              )}
+              <div className="flex items-center space-x-2 border-l pl-6 border-slate-200 h-8">
+                {!isLoading && (
+                  isAuthenticated ? (
+                    <UserMenu />
+                  ) : (
+                    <>
+                      <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex font-bold">
+                        <Link href="/auth/login">Login</Link>
+                      </Button>
+                      <Button size="sm" asChild className="bg-blue-600 hover:bg-blue-700 font-bold shadow-md shadow-blue-200">
+                        <Link href="/auth/register">Join Pro</Link>
+                      </Button>
+                    </>
+                  )
+                )}
+              </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* LAYER 2: FEATURE BAR (Horizontal Navigation) */}
+      <div className="bg-white">
+        <div className="container mx-auto px-4">
+          <nav className="flex items-center h-12 overflow-x-auto no-scrollbar gap-2 scroll-smooth">
+            {navItems.filter(item => !item.protected || isAuthenticated).map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center space-x-2 px-4 h-full text-sm font-bold transition-all border-b-2 whitespace-nowrap shrink-0',
+                    isActive
+                      ? 'text-blue-600 border-blue-600 bg-blue-50/50'
+                      : 'text-slate-500 border-transparent hover:text-slate-900 hover:bg-slate-50'
+                  )}
+                >
+                  <Icon className={cn("h-4 w-4", isActive ? "text-blue-600" : "text-slate-400")} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+
+            {/* Future Scaling Space */}
+            <div className="ml-auto flex items-center gap-2 pl-4 border-l border-slate-100 hidden lg:flex">
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">New Sections Coming Soon</span>
+            </div>
+          </nav>
         </div>
       </div>
     </header>

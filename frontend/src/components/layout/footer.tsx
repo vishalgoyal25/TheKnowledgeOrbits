@@ -15,12 +15,14 @@ const footerLinks = {
         { label: 'Take Quiz', href: '/assessment' },
         { label: 'Topic Mastery', href: '/topics' },
         { label: 'Current Affairs', href: '/current-affairs' },
+        { label: 'FAQs', href: '/#faqs' },
     ],
     resources: [
         { label: 'UPSC Syllabus', href: '/resources/syllabus' },
         { label: 'Preparation Guide', href: '/blog/prep-guide' },
         { label: 'PYQ Analysis', href: '/resources/pyq' },
         { label: 'Study Timetable', href: '/resources/timetable' },
+        { label: 'Give Feedback', href: '/#feedback' },
     ],
     company: [
         { label: 'About Us', href: '/about' },
