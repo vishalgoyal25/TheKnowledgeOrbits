@@ -1,0 +1,126 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.11, pytest-8.4.2, pluggy-1.5.0 -- C:\Users\DELL\anaconda3\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+django: version: 5.2.11, settings: core.settings.dev (from ini)
+rootdir: D:\AI_Projects\TheKnowledgeOrbits\backend
+configfile: pytest.ini
+plugins: anyio-4.10.0, Faker-40.1.2, hydra-core-1.3.2, hypothesis-6.151.6, locust-2.42.2, cov-7.0.0, django-4.11.1, mock-3.15.1, subtests-0.15.0, schemathesis-4.10.1
+collecting ... collected 26 items
+
+backend\engines\assessment\tests\test_integration.py::TestCompleteQuizFlow::test_start_take_submit_flow PASSED [  3%]
+backend\engines\assessment\tests\test_integration.py::TestPrivateQuizWorkflow::test_private_quiz_visibility PASSED [  7%]
+backend\engines\assessment\tests\test_models.py::TestQuizModel::test_create_quiz PASSED [ 11%]
+backend\engines\assessment\tests\test_models.py::TestQuizModel::test_quiz_has_uuid PASSED [ 15%]
+backend\engines\assessment\tests\test_models.py::TestQuizModel::test_quiz_ownership_fields PASSED [ 19%]
+backend\engines\assessment\tests\test_models.py::TestQuizModel::test_is_user_owned_property PASSED [ 23%]
+backend\engines\assessment\tests\test_models.py::TestQuizModel::test_include_ca_flag PASSED [ 26%]
+backend\engines\assessment\tests\test_models.py::TestQuestionModel::test_create_question PASSED [ 30%]
+backend\engines\assessment\tests\test_models.py::TestQuestionModel::test_multi_statement_question PASSED [ 34%]
+backend\engines\assessment\tests\test_models.py::TestQuestionModel::test_question_ordering PASSED [ 38%]
+backend\engines\assessment\tests\test_models.py::TestQuizAttemptModel::test_create_attempt PASSED [ 42%]
+backend\engines\assessment\tests\test_models.py::TestQuizAttemptModel::test_accuracy_property PASSED [ 46%]
+backend\engines\assessment\tests\test_models.py::TestQuizAttemptModel::test_accuracy_with_no_answers PASSED [ 50%]
+backend\engines\assessment\tests\test_models.py::TestQuizAttemptModel::test_guest_mode_attempt PASSED [ 53%]
+backend\engines\assessment\tests\test_models.py::TestQuestionResponseModel::test_create_response PASSED [ 57%]
+backend\engines\assessment\tests\test_models.py::TestQuestionResponseModel::test_unique_attempt_question_constraint PASSED [ 61%]
+backend\engines\assessment\tests\test_models.py::TestQuestionResponseModel::test_unanswered_response PASSED [ 65%]
+backend\engines\assessment\tests\test_services.py::TestQuizGeneratorService::test_generate_quiz_basic FAILED [ 69%]
+backend\engines\assessment\tests\test_services.py::TestQuizGeneratorService::test_generate_quiz_invalid_topic PASSED [ 73%]
+backend\engines\assessment\tests\test_views.py::TestQuizListView::test_list_public_quizzes PASSED [ 76%]
+backend\engines\assessment\tests\test_views.py::TestQuizListView::test_inactive_quizzes_hidden PASSED [ 80%]
+backend\engines\assessment\tests\test_views.py::TestQuizGenerateView::test_generate_quiz_authenticated PASSED [ 84%]
+backend\engines\assessment\tests\test_views.py::TestQuizGenerateView::test_generate_quiz_invalid_topic PASSED [ 88%]
+backend\engines\assessment\tests\test_views.py::TestQuizStartView::test_start_quiz PASSED [ 92%]
+backend\engines\assessment\tests\test_views.py::TestQuizSubmitView::test_submit_quiz_all_correct PASSED [ 96%]
+backend\engines\assessment\tests\test_views.py::TestQuizSubmitView::test_submit_quiz_partial_correct PASSED [100%]
+
+================================== FAILURES ===================================
+______________ TestQuizGeneratorService.test_generate_quiz_basic ______________
+backend\engines\assessment\tests\test_services.py:78: in test_generate_quiz_basic
+    quiz = service.generate_quiz(
+backend\engines\assessment\services\quiz_generator.py:103: in generate_quiz
+    questions_data = self._generate_questions_with_groq(
+backend\engines\assessment\services\quiz_generator.py:319: in _generate_questions_with_groq
+    questions = data.get('questions', [])
+                ^^^^^^^^
+E   AttributeError: 'list' object has no attribute 'get'
+---------------------------- Captured stdout call -----------------------------
+[02/18/26 12:31:41] INFO     INFO 2026-02-18 12:31:41,697  quiz_generator.py:72
+                             quiz_generator Starting quiz                      
+                             generation                                        
+                    INFO     INFO 2026-02-18 12:31:41,701  quiz_generator.py:86
+                             quiz_generator Topic found:                       
+                             Test Topic                                        
+                    INFO     INFO 2026-02-18 12:31:41,707  quiz_generator.py:95
+                             quiz_generator Chunks fetched                     
+                             - Static: 5, CA: 0                                
+                    INFO     INFO 2026-02-18 12:31:41,709 quiz_generator.py:285
+                             quiz_generator Calling Groq                       
+                             API for question generation                       
+                    ERROR    ERROR 2026-02-18             quiz_generator.py:334
+                             12:31:41,710 quiz_generator                       
+                             Groq API call failed: 'list'                      
+                             object has no attribute                           
+                             'get'                                             
+                    ERROR    ERROR 2026-02-18             quiz_generator.py:136
+                             12:31:41,711 quiz_generator                       
+                             Quiz generation failed:                           
+                             'list' object has no                              
+                             attribute 'get'                                   
+                             Traceback (most recent call                       
+                             last):                                            
+                               File                                            
+                             "D:\AI_Projects\TheKnowledge                      
+                             Orbits\backend\engines\asses                      
+                             sment\services\quiz_generato                      
+                             r.py", line 103, in                               
+                             generate_quiz                                     
+                                 questions_data =                              
+                             self._generate_questions_wit                      
+                             h_groq(                                           
+                                                  ^^^^^^^                      
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^                      
+                               File                                            
+                             "D:\AI_Projects\TheKnowledge                      
+                             Orbits\backend\engines\asses                      
+                             sment\services\quiz_generato                      
+                             r.py", line 319, in                               
+                             _generate_questions_with_gro                      
+                             q                                                 
+                                 questions =                                   
+                             data.get('questions', [])                         
+                                             ^^^^^^^^                          
+                             AttributeError: 'list'                            
+                             object has no attribute                           
+                             'get'                                             
+------------------------------ Captured log call ------------------------------
+INFO     engines.assessment.services.quiz_generator:quiz_generator.py:72 Starting quiz generation
+INFO     engines.assessment.services.quiz_generator:quiz_generator.py:86 Topic found: Test Topic
+INFO     engines.assessment.services.quiz_generator:quiz_generator.py:95 Chunks fetched - Static: 5, CA: 0
+INFO     engines.assessment.services.quiz_generator:quiz_generator.py:285 Calling Groq API for question generation
+ERROR    engines.assessment.services.quiz_generator:quiz_generator.py:334 Groq API call failed: 'list' object has no attribute 'get'
+ERROR    engines.assessment.services.quiz_generator:quiz_generator.py:136 Quiz generation failed: 'list' object has no attribute 'get'
+Traceback (most recent call last):
+  File "D:\AI_Projects\TheKnowledgeOrbits\backend\engines\assessment\services\quiz_generator.py", line 103, in generate_quiz
+    questions_data = self._generate_questions_with_groq(
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\AI_Projects\TheKnowledgeOrbits\backend\engines\assessment\services\quiz_generator.py", line 319, in _generate_questions_with_groq
+    questions = data.get('questions', [])
+                ^^^^^^^^
+AttributeError: 'list' object has no attribute 'get'
+============================== warnings summary ===============================
+engines/assessment/tests/test_integration.py::TestCompleteQuizFlow::test_start_take_submit_flow
+engines/assessment/tests/test_integration.py::TestCompleteQuizFlow::test_start_take_submit_flow
+engines/assessment/tests/test_integration.py::TestCompleteQuizFlow::test_start_take_submit_flow
+  C:\Users\DELL\anaconda3\Lib\site-packages\rest_framework\urlpatterns.py:108: RemovedInDjango60Warning: Converter 'drf_format_suffix' is already registered. Support for overriding registered converters is deprecated and will be removed in Django 6.0.
+    register_converter(suffix_converter, converter_name)
+
+engines/assessment/tests/test_integration.py::TestCompleteQuizFlow::test_start_take_submit_flow
+  C:\Users\DELL\anaconda3\Lib\site-packages\torch\cuda\__init__.py:56: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+    import pynvml  # type: ignore[import]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED backend\engines\assessment\tests\test_services.py::TestQuizGeneratorService::test_generate_quiz_basic
+================== 1 failed, 25 passed, 4 warnings in 28.22s ==================

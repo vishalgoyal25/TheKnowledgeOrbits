@@ -3,7 +3,7 @@ import { DashboardOverview, WeeklyStats } from '@/types/dashboard';
 
 export const analyticsAPI = {
   getDashboard: async (): Promise<DashboardOverview> => {
-    const response = await apiClient.get('/analytics/dashboard/overview/');
+    const response = await apiClient.get('/analytics/dashboard/');
     return response.data;
   },
 

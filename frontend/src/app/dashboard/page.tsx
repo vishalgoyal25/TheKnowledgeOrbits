@@ -70,8 +70,8 @@ export default function DashboardPage() {
     // Determine loading state
     const isLoading = authLoading || (isAuthenticated && dataLoading);
 
-    // Choose data: Real if authenticated, Mock otherwise
-    const data = isAuthenticated ? realData : MOCK_DATA;
+    // Choose data: Real if authenticated and available, Mock as fallback
+    const data = (isAuthenticated && realData) ? realData : MOCK_DATA;
 
     if (isLoading) {
         return (
