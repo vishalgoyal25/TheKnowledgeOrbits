@@ -22,7 +22,7 @@ export interface Article {
   ca_chunk_count?: number;
   created_at: string;
   updated_at: string;
-  sources?: ArticleSourceMap[];
+  source_chunks?: ArticleSourceMap[];
 }
 
 // Article List Response
@@ -444,4 +444,3 @@ export interface ApiError {
   detail?: string;
   [key: string]: any;
 }
-

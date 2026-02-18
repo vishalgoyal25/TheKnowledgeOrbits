@@ -96,7 +96,9 @@ export default function Sidebar() {
                 size="icon"
                 className="absolute -right-3 top-6 h-6 w-6 rounded-full border bg-white shadow-sm hover:bg-gray-50 z-50"
                 onClick={toggleSidebar}
+                suppressHydrationWarning
             >
+
                 {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
             </Button>
 

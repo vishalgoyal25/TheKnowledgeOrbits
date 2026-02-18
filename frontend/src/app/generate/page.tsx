@@ -5,34 +5,49 @@ import { useSearchParams } from 'next/navigation';
 import { useTopic } from '@/lib/hooks/use-topics';
 import { Topic } from '@/lib/types';
 import TopicSelector from '@/components/generate/topic-selector';
+import GenerationProgress from '@/components/generate/generation-progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGenerateArticle } from '@/lib/hooks/use-article-generation';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Sparkles, Newspaper } from 'lucide-react';
+import { Sparkles, Newspaper, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function GeneratePage() {
-  const [includeCA, setIncludeCA] = useState(true); // 🆕 CA toggle state
+  const [includeCA, setIncludeCA] = useState(true);
   const searchParams = useSearchParams();
   const topicIdFromUrl = searchParams.get('topic_id');
 
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
+  const [progress, setProgress] = useState(0);
 
-  // If topic_id in URL, fetch that topic
   const { data: topicFromUrl } = useTopic(topicIdFromUrl);
-
-  // Create hooks
   const generateMutation = useGenerateArticle();
   const selectedTopicId = selectedTopic?.id;
 
+  // Simulate progress while generating
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (generateMutation.isPending) {
+      setProgress(5);
+      interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) return prev; // Hold at 90 until done
+          return prev + Math.random() * 12;
+        });
+      }, 1200);
+    } else if (generateMutation.isSuccess) {
+      setProgress(100);
+      setTimeout(() => setProgress(0), 1500);
+    } else {
+      setProgress(0);
+    }
+    return () => clearInterval(interval);
+  }, [generateMutation.isPending, generateMutation.isSuccess]);
+
   const handleGenerate = () => {
     if (!selectedTopicId) return;
-
-    generateMutation.mutate({
-      topic_id: selectedTopicId,
-      include_ca: includeCA, // 🆕 Pass CA flag
-    });
+    generateMutation.mutate({ topic_id: selectedTopicId, include_ca: includeCA });
   };
 
   useEffect(() => {
@@ -76,13 +91,14 @@ export default function GeneratePage() {
           <CardContent>
             {selectedTopic ? (
               <div className="space-y-6">
-                {/* 🆕 CA Toggle */}
+                {/* CA Toggle */}
                 <div>
                   <div className="flex items-center gap-2">
                     <Switch
                       id="include-ca"
                       checked={includeCA}
                       onCheckedChange={setIncludeCA}
+                      disabled={generateMutation.isPending}
                     />
                     <Label htmlFor="include-ca" className="flex items-center gap-2 cursor-pointer font-medium">
                       <Newspaper className="h-4 w-4 text-blue-600" />
@@ -95,6 +111,26 @@ export default function GeneratePage() {
                       : '× Article will only use textbook content (NCERT)'}
                   </p>
                 </div>
+
+                {/* Progress Bar */}
+                <GenerationProgress
+                  isGenerating={generateMutation.isPending}
+                  progress={Math.min(progress, 100)}
+                />
+
+                {/* Error */}
+                {generateMutation.isError && (
+                  <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium">Generation failed</p>
+                      <p className="text-red-600 mt-0.5">
+                        {(generateMutation.error as any)?.response?.data?.error ||
+                          'Could not generate article. Please try again.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Generate Button */}
                 <Button

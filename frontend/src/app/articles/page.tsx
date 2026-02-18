@@ -7,14 +7,26 @@
 import { useState } from 'react';
 import { useArticles } from '@/lib/hooks/use-article';
 import ArticleCard from '@/components/articles/article-card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import SearchBar from '@/components/search/search-bar';
+import SearchFilters from '@/components/search/search-filters';
+import ErrorMessage from '@/components/shared/error-message';
+import EmptyState from '@/components/shared/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Filter } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { Sparkles } from 'lucide-react';
 
 export default function ArticlesPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+
+  const filterOptions = [
+    { label: 'Approved', value: 'approved' },
+    { label: 'Pending', value: 'pending' },
+    { label: 'AI Generated', value: 'ai_generated' },
+  ];
+
+  const filterStatus = activeFilters.find(f => ['approved', 'pending'].includes(f)) || '';
 
   const { data, isLoading, error } = useArticles({
     review_status: filterStatus || undefined,
@@ -36,9 +48,11 @@ export default function ArticlesPage() {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-red-600">
-          Error loading articles. Please try again.
-        </div>
+        <ErrorMessage
+          title="Failed to load articles"
+          message="Could not fetch articles. Please check your connection and try again."
+          onRetry={() => window.location.reload()}
+        />
       </div>
     );
   }
@@ -55,22 +69,24 @@ export default function ArticlesPage() {
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="mb-8 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search articles..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" />
-          Filters
-        </Button>
+      {/* Search & Filters */}
+      <div className="mb-6 space-y-3">
+        <SearchBar
+          placeholder="Search articles..."
+          onSearch={setSearchTerm}
+          defaultValue={searchTerm}
+        />
+        <SearchFilters
+          filters={filterOptions}
+          activeFilters={activeFilters}
+          onFilterToggle={(val) =>
+            setActiveFilters((prev) =>
+              prev.includes(val) ? prev.filter((f) => f !== val) : [...prev, val]
+            )
+          }
+          onClearAll={() => setActiveFilters([])}
+          label="Filter"
+        />
       </div>
 
       {/* Stats */}
@@ -80,9 +96,21 @@ export default function ArticlesPage() {
 
       {/* Article Grid */}
       {articles.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-600">No articles found.</p>
-        </div>
+        <EmptyState
+          title="No articles found"
+          description={searchTerm ? `No articles match "${searchTerm}". Try a different search.` : 'No articles yet. Generate your first article to get started.'}
+          icon={<Sparkles className="h-8 w-8" />}
+          action={
+            !searchTerm ? (
+              <Link href="/generate">
+                <Button className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Generate Article
+                </Button>
+              </Link>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {articles.map((article) => (
