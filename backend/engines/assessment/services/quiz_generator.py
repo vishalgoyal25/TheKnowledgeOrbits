@@ -168,33 +168,75 @@ class QuizGeneratorService:
     
     def _fetch_ca_chunks(self, topic: Topic) -> List[CAChunk]:
         """
-        Fetch recent Current Affairs chunks linked to topic.
+        Fetch recent Current Affairs chunks linked to topic using Hybrid Strategy.
+        1. DB Links (Primary): High precision, manual/system tags
+        2. Vector Search (Secondary): Discovery of untagged but relevant content
         
         Args:
             topic: Target Topic instance
             
         Returns:
-            List of CAChunk instances from last 60 days, ordered by relevance
+            List of CAChunk instances from last 60 days
         """
-        # Calculate cutoff date (60 days ago)
+        # Calculate cutoff date
         cutoff_date = timezone.now() - timedelta(days=self.CA_RELEVANCE_DAYS)
         
-        # Get CA chunk IDs via CATopicLink
-        ca_chunk_ids = CATopicLink.objects.filter(
-            topic=topic,
-            ca_chunk__published_at__gte=cutoff_date,
-            ca_chunk__is_expired=False
-        ).order_by('-relevance_score')[:self.MAX_CA_CHUNKS].values_list(
-            'ca_chunk_id', flat=True
-        )
-        
-        # Fetch actual CA chunks
-        ca_chunks = CAChunk.objects.filter(
-            id__in=ca_chunk_ids,
+        # --- STRATEGY 1: Strict Database Links (Existing) ---
+        linked_ca_chunks = list(CAChunk.objects.filter(
+            topic_links__topic=topic,
+            published_at__gte=cutoff_date,
+            is_expired=False,
             quality_flag__in=['high', 'medium']
-        ).select_related('ca_article__source').order_by('-published_at')
+        ).select_related('ca_article__source').order_by('-topic_links__relevance_score')[:self.MAX_CA_CHUNKS])
         
-        return list(ca_chunks)
+        # If we have enough chunks, return them
+        if len(linked_ca_chunks) >= self.MAX_CA_CHUNKS:
+            return linked_ca_chunks
+            
+        # --- STRATEGY 2: Semantic Vector Search (Fill the gap) ---
+        try:
+            from engines.content.services.embedding_service import EmbeddingService
+            from engines.content.models import Embedding
+            from pgvector.django import CosineDistance
+            
+            # Generate topic embedding
+            query_vector = EmbeddingService.generate_embedding(topic.name)
+            
+            # Find similar CA chunks
+            # Filter by date and distance < 0.65 (slightly looser than strict search to find related news)
+            sem_embeddings = Embedding.objects.annotate(
+                distance=CosineDistance('vector', query_vector)
+            ).filter(
+                content_type='ca_chunk',
+                distance__lt=0.65
+            ).order_by('distance')[:10]  # Get a few candidates
+            
+            # Get candidate IDs
+            candidate_ids = [emb.content_id for emb in sem_embeddings]
+            
+            # Filter candidates by date and exclude already found
+            existing_ids = {c.id for c in linked_ca_chunks}
+            
+            semantic_chunks = CAChunk.objects.filter(
+                id__in=candidate_ids,
+                published_at__gte=cutoff_date,
+                is_expired=False
+            ).exclude(
+                id__in=existing_ids
+            ).select_related('ca_article__source')
+            
+            # Add semantic chunks to fill quota
+            needed = self.MAX_CA_CHUNKS - len(linked_ca_chunks)
+            linked_ca_chunks.extend(list(semantic_chunks)[:needed])
+            
+        except Exception as e:
+            logger.warning(f"Semantic CA fetch failed for topic {topic.name}: {e}")
+            # Fallback: just return what we have from links
+            
+        # Final sort by date for context flow
+        linked_ca_chunks.sort(key=lambda x: x.published_at, reverse=True)
+        
+        return linked_ca_chunks
     
     def _build_context(
         self,

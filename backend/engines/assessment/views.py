@@ -217,14 +217,10 @@ def start_quiz(request, quiz_id):
         ).first()
         
         if active_attempt:
-            return Response(
-                {
-                    'error': 'ACTIVE_ATTEMPT_EXISTS',
-                    'message': 'You already have an active attempt for this quiz',
-                    'attempt_id': str(active_attempt.id)
-                },
-                status=status.HTTP_409_CONFLICT
-            )
+            # If user wants to restart, we should mark the old one as abandoned
+            active_attempt.status = 'abandoned'
+            active_attempt.save()
+            logger.info(f"Abandoned previous attempt {active_attempt.id} for quiz {quiz_id}")
     
     # Create new attempt
     attempt = QuizAttempt.objects.create(
