@@ -15,6 +15,8 @@ from engines.content.models import Chunk
 from engines.knowledge.models import Topic, ChunkTopicMap
 from engines.current_affairs.models import CAChunk, CATopicLink
 from ..models import Article, ArticleSourceMap
+from engines.content.services.embedding_service import EmbeddingService
+from engines.content.models import Embedding
 
 logger = structlog.get_logger(__name__)
 
@@ -429,6 +431,22 @@ Generate the article now:"""
              # update metadata with explicit source list
              article.generation_metadata['ca_sources'] = ca_sources_meta
              article.save()
+
+        # Generate Embedding for Semantic Search
+        try:
+            # Combine title, summary, and first part of content for rich context
+            embedding_text = f"{article.title}\n{article.summary}\n{article.content[:1000]}"
+            vector = EmbeddingService.generate_embedding(embedding_text)
+            
+            Embedding.objects.create(
+                content_type='article',
+                content_id=article.id,
+                vector=vector,
+                model_name=EmbeddingService.MODEL_NAME
+            )
+            logger.info("article_embedding_created", article_id=str(article.id))
+        except Exception as e:
+            logger.error("article_embedding_generation_failed", error=str(e))
 
         return article
         

@@ -130,8 +130,11 @@ class ChunkViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['document', 'chunk_index']
     
     def get_serializer_class(self):
-        """Use lightweight serializer for list, full for detail."""
+        """Use lightweight serializer for list, full for detail or if content requested."""
         if self.action == 'list':
+            # Allow forcing full serializer via query param
+            if self.request.query_params.get('include_content') == 'true':
+                return ChunkSerializer
             return ChunkListSerializer
         return ChunkSerializer
     
@@ -163,6 +166,14 @@ class ChunkViewSet(viewsets.ReadOnlyModelViewSet):
         search = self.request.query_params.get('search')
         if search:
             queryset = queryset.filter(chunk_text__icontains=search)
+        
+        # Filter by start_index (for deep linking/reading)
+        start_index = self.request.query_params.get('start_index')
+        if start_index:
+            try:
+                queryset = queryset.filter(chunk_index__gte=int(start_index))
+            except (ValueError, TypeError):
+                pass
         
         return queryset.order_by('document', 'chunk_index')
 

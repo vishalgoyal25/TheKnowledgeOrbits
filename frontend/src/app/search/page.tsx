@@ -59,6 +59,8 @@ export default function SearchPage() {
         <>
           <div className="mb-6 text-sm text-gray-600">
             Found {results.length} results
+            {/* Debug helper: REMOVE IN PRODUCTION */}
+            <span className="hidden">{JSON.stringify(results)}</span>
           </div>
 
           {results.length === 0 ? (
@@ -71,31 +73,31 @@ export default function SearchPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {results.map((result) => (
+              {results.map((result: any) => (
                 <Link
                   key={`${result.type}-${result.id}`}
-                  href={
-                    result.type === 'article'
-                      ? `/articles/${result.id}`
-                      : `/topics/${result.id}/articles`
-                  }
+                  href={result.url || (result.type === 'article' ? `/articles/${result.id}` : '#')}
+                  className="block group"
                 >
-                  <Card className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
+                  <Card className="hover:shadow-md transition-shadow border-slate-200">
+                    <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            {result.type === 'article' ? (
-                              <FileText className="h-4 w-4 text-blue-500" />
-                            ) : (
-                              <Folder className="h-4 w-4 text-green-500" />
-                            )}
-                            <Badge variant="secondary">
-                              {result.type}
+                            {result.type === 'article' && <FileText className="h-4 w-4 text-blue-500" />}
+                            {result.type === 'topic' && <Folder className="h-4 w-4 text-purple-500" />}
+                            {result.type === 'current_affair' && <div className="h-4 w-4 rounded-full bg-emerald-500" />}
+
+                            <Badge variant={
+                              result.type === 'topic' ? 'default' :
+                                result.type === 'current_affair' ? 'secondary' :
+                                  'outline'
+                            } className="uppercase text-[10px] tracking-wider">
+                              {result.type.replace('_', ' ')}
                             </Badge>
                           </div>
 
-                          <CardTitle className="text-xl hover:text-blue-600 transition-colors">
+                          <CardTitle className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
                             {result.title}
                           </CardTitle>
                         </div>
@@ -103,24 +105,32 @@ export default function SearchPage() {
                     </CardHeader>
 
                     <CardContent>
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                      <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">
                         {result.snippet}
                       </p>
 
-                      {/* Metadata */}
-                      {result.metadata && (
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
-                          {result.metadata.topic && (
-                            <span>Topic: {result.metadata.topic}</span>
-                          )}
-                          {result.metadata.subject && (
-                            <span>Subject: {result.metadata.subject}</span>
-                          )}
-                          {result.metadata.word_count && (
-                            <span>{result.metadata.word_count} words</span>
-                          )}
-                        </div>
-                      )}
+                      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 border-t pt-3">
+                        {result.metadata?.source && (
+                          <span className="flex items-center gap-1">
+                            <span className="font-semibold text-slate-700">Source:</span> {result.metadata.source}
+                          </span>
+                        )}
+                        {result.metadata?.chapter && (
+                          <span className="flex items-center gap-1">
+                            <span className="font-semibold text-slate-700">Chapter:</span> {result.metadata.chapter}
+                          </span>
+                        )}
+                        {result.metadata?.subject && (
+                          <span className="flex items-center gap-1">
+                            <span className="font-semibold text-slate-700">Subject:</span> {result.metadata.subject}
+                          </span>
+                        )}
+                        {result.metadata?.date && (
+                          <span className="flex items-center gap-1">
+                            <span className="font-semibold text-slate-700">Date:</span> {result.metadata.date}
+                          </span>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </Link>
