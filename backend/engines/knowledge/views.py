@@ -27,6 +27,7 @@ from engines.knowledge.serializers import (
 )
 from engines.content.pagination import ContentCursorPagination
 from engines.knowledge.services.mapping_service import MappingService
+from engines.knowledge.services.search_service import SearchService
 
 logger = structlog.get_logger(__name__)
 
@@ -297,3 +298,27 @@ class ThemeViewSet(viewsets.ModelViewSet):
         topics = theme.topics.all()
         serializer = TopicSerializer(topics, many=True)
         return Response(serializer.data)
+
+
+class SearchViewSet(viewsets.ViewSet):
+    """
+    Unified Semantic Search across all content.
+    GET /api/v1/knowledge/search/?q=...
+    """
+    permission_classes = [AllowAny]
+
+    def list(self, request):
+        query = request.query_params.get('q', '').strip()
+        if not query or len(query) < 2:
+           return Response([])
+
+        limit = int(request.query_params.get('limit', 10))
+        
+        # Use our Unified Search Service
+        results = SearchService.semantic_search(
+            query=query,
+            limit=limit,
+            user=request.user
+        )
+        
+        return Response(results)

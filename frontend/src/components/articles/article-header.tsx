@@ -27,10 +27,12 @@ export default function ArticleHeader({ article }: Props) {
                         <Clock className="h-4 w-4" />
                         {article.read_time} min read
                     </span>
-                    <span className="flex items-center gap-1">
-                        <Tag className="h-4 w-4" />
-                        {article.topic.name}
-                    </span>
+                    {article.topic && (
+                        <span className="flex items-center gap-1">
+                            <Tag className="h-4 w-4" />
+                            {article.topic.name}
+                        </span>
+                    )}
                     <span>{article.word_count.toLocaleString()} words</span>
                     <span className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />

@@ -19,14 +19,14 @@ export function useArticles(params?: ArticleFilterParams) {
 }
 
 // Get article by ID
-export function useArticle(articleId: string) {
+export function useArticle(articleId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['article', articleId],
     queryFn: async () => {
       const response = await apiClient.get<Article>(`/articles/${articleId}/`);
       return response.data;
     },
-    enabled: !!articleId,
+    enabled: !!articleId && (options?.enabled ?? true),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
