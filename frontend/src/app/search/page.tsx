@@ -13,7 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Search, FileText, Folder } from 'lucide-react';
 
-export default function SearchPage() {
+import { Suspense } from 'react';
+
+function SearchPageContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
 
@@ -140,5 +142,13 @@ export default function SearchPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-gray-500">Loading search...</div>}>
+      <SearchPageContent />
+    </Suspense>
   );
 }

@@ -262,18 +262,24 @@ if not GROQ_API_KEY:
     raise ImproperlyConfigured("GROQ_API_KEY environment variable is not set")
     
 
-# Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@theknowledgeorbits.com')
+# ==============================================================================
+# EMAIL CONFIGURATION
+# ==============================================================================
 
-# Frontend URL
+# Default to SMTP, but this will be overridden in dev.py for safety
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "vishal25goyal25@gmail.com")
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
+# SMTP Configuration (Brevo)
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp-relay.brevo.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+
+# Optional: Brevo API Key if using their official API client instead of SMTP
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 
 # Using Local Memory Cache for development (No Redis required)
 CACHES = {

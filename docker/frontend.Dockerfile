@@ -1,19 +1,29 @@
-FROM node:20-alpine
-
-# Set work directory
+# Build Stage
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy package files
+# Install dependencies (including devDependencies needed for build)
 COPY frontend/package*.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Copy project files
+# Copy source and build
 COPY frontend/ .
-
-# Build app
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# Start app
+# Production Stage
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Copy necessary files from builder
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3000
+
 CMD ["npm", "start"]
