@@ -10,43 +10,26 @@ psycopg2-binary>=2.9.10
 pgvector>=0.3.6
 
 # Async & Tasks
-celery>=5.4.0
-redis>=5.2.1
-flower>=2.0.1
+django-background-tasks>=1.2.5
 
 # Password Hashing
 argon2-cffi>=23.1.0
 
-# AI/ML
+# API integration
 groq>=0.13.0
-sentence-transformers>=3.3.1
-# torch will be installed as a dependency of sentence-transformers
 
-# PDF Processing
+# PDF Extraction
 pdfplumber>=0.11.4
-pytesseract>=0.3.13
-paddleocr>=2.7.3
-PyMuPDF>=1.24.11
 
 # Logging & Monitoring
 structlog>=24.4.0
 rich>=13.9.4
 sentry-sdk>=2.19.0
 
-# Testing
-pytest>=8.3.4
-pytest-django>=4.9.0
-pytest-cov>=6.0.0
-factory-boy>=3.3.1
-faker>=33.1.0
-schemathesis>=3.39.6
-
-# Code Quality
-black>=24.10.0
-flake8>=7.1.1
-mypy>=1.13.0
-bandit>=1.8.0
-
 # Utils
 python-dotenv>=1.0.1
 requests>=2.32.3
+
+# Web Scraping
+feedparser>=6.0.11
+beautifulsoup4>=4.12.3

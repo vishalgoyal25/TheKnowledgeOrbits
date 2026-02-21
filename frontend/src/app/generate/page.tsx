@@ -13,7 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Sparkles, Newspaper, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function GeneratePage() {
+import { Suspense } from 'react';
+
+function GeneratePageContent() {
   const [includeCA, setIncludeCA] = useState(true);
   const searchParams = useSearchParams();
   const topicIdFromUrl = searchParams.get('topic_id');
@@ -151,5 +153,13 @@ export default function GeneratePage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-gray-500">Loading generation tools...</div>}>
+      <GeneratePageContent />
+    </Suspense>
   );
 }
