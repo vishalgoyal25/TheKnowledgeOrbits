@@ -134,7 +134,12 @@ class SearchService:
                                             },
                                         }
                                     )
-                            except Exception:  # CAChunk might not exist or import error
+                            except (
+                                Exception
+                            ) as e:  # CAChunk might not exist or import error
+                                logger.debug(
+                                    f"CAChunk lookup failed for search result: {str(e)}"
+                                )  # nosec: B112
                                 continue
 
                 except Exception as e:

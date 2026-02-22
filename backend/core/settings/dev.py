@@ -7,7 +7,7 @@ from .base import *  # noqa: F403, F401
 DEBUG = True
 
 # Development-specific settings
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]  # nosec: B104 (dev only)
 
 # Email backend for development
 # Default to console so we don't spam real emails

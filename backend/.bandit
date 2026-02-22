@@ -1,0 +1,19 @@
+# Bandit configuration file
+# Ref: https://bandit.readthedocs.io/en/latest/config.html
+
+# Ignore tests directory for assert and hardcoded password checks
+# B101: assert_used (Pytest requires asserts)
+# B106: hardcoded_password_funcarg (Dummy passwords in tests)
+
+# You can also exclude directories
+exclude_dirs:
+  - '.git'
+  - '.tox'
+  - 'venv'
+  - '__pycache__'
+  - 'tests'
+
+# Or specific tests to skip globally
+skips:
+  - B101  # Use of assert detected (Ignored because of Pytest)
+  - B106  # Hardcoded password (Ignored because of local test data)
