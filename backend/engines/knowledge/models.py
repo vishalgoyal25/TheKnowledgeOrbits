@@ -286,7 +286,7 @@ class Theme(models.Model):
     )
     name = models.CharField(max_length=200, unique=True, help_text="Theme name")
     description = models.TextField(help_text="Theme description")
-    topics = models.ManyToManyField(
+    topics: models.ManyToManyField = models.ManyToManyField(  # type: ignore
         Topic,
         through="ThemeTopicMap",
         related_name="themes",

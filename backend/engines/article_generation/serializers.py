@@ -2,13 +2,15 @@
 Article Generation Engine Serializers
 """
 
+from typing import Any
+
 from rest_framework import serializers
 from .models import Article, ArticleSourceMap, ArticleGenerationJob
 from engines.knowledge.serializers import TopicSerializer
 from engines.content.serializers import ChunkSerializer
 
 
-class ArticleSourceMapSerializer(serializers.ModelSerializer):
+class ArticleSourceMapSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for ArticleSourceMap with chunk details."""
 
     chunk = ChunkSerializer(read_only=True)
@@ -26,7 +28,7 @@ class ArticleSourceMapSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
-class ArticleListSerializer(serializers.ModelSerializer):
+class ArticleListSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for article list view."""
 
     topic = TopicSerializer(read_only=True)
@@ -61,7 +63,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class ArticleDetailSerializer(serializers.ModelSerializer):
+class ArticleDetailSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for article detail view."""
 
     topic = TopicSerializer(read_only=True)
@@ -106,13 +108,13 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class ArticleGenerationRequestSerializer(serializers.Serializer):
+class ArticleGenerationRequestSerializer(serializers.Serializer):  # type: ignore
     """Serializer for article generation request."""
 
     topic_id = serializers.UUIDField(required=True)
     include_ca = serializers.BooleanField(default=False)
 
-    def validate_topic_id(self, value):
+    def validate_topic_id(self, value) -> Any:  # type: ignore
         """Validate that topic exists."""
         from engines.knowledge.models import Topic
 
@@ -122,7 +124,7 @@ class ArticleGenerationRequestSerializer(serializers.Serializer):
         return value
 
 
-class ArticleGenerationJobSerializer(serializers.ModelSerializer):
+class ArticleGenerationJobSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for ArticleGenerationJob."""
 
     topic = TopicSerializer(read_only=True)

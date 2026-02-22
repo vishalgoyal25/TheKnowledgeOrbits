@@ -1,22 +1,27 @@
+import sentry_sdk
+
 """
 Article Generation Service
 
 RAG-based article generation using GROQ with integrated Contextual Analysis.
 """
 
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
+
 import structlog
-from typing import List, Dict, Any, Optional
 from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
 from groq import Groq
 
-from engines.content.models import Chunk
+from engines.content.models import Chunk, Embedding
 from engines.knowledge.models import Topic, ChunkTopicMap
 from engines.current_affairs.models import CAChunk, CATopicLink
-from ..models import Article, ArticleSourceMap
 from engines.content.services.embedding_service import EmbeddingService
-from engines.content.models import Embedding
+from ..models import Article, ArticleSourceMap
+
+if TYPE_CHECKING:
+    pass
 
 logger = structlog.get_logger(__name__)
 
@@ -37,18 +42,25 @@ class ArticleGenerationService:
 
     @staticmethod
     def generate_article(
-        topic_id: str, include_ca: bool = False, user_id: int = None
+        topic_id: str, include_ca: bool = False, user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Generate article for a topic using RAG pipeline with optional CA integration.
+        Orchestrate the RAG pipeline to generate a comprehensive UPSC-style article.
+
+        This process includes:
+        1. Retrieving high-relevance chunks from static sources.
+        2. Optionally fetching and merging recent current affairs context.
+        3. Formulating a context-rich prompt for the Groq LLM.
+        4. Validating the generated article for quality and length.
+        5. Persisting the result with full source attribution.
 
         Args:
-            topic_id: UUID of topic
-            include_ca: Whether to include current affairs chunks
-            user_id: User requesting generation (optional)
+            topic_id (str): UUID of the Knowledge Topic to generate for.
+            include_ca (bool): Flag to trigger Current Affairs (CA) integration.
+            user_id (int, optional): The ID of the user triggering the generation.
 
         Returns:
-            Dict with article data and metadata
+            Dict[str, Any]: Article metadata and success status.
         """
         logger.info(
             "article_generation_started", topic_id=topic_id, include_ca=include_ca
@@ -66,7 +78,7 @@ class ArticleGenerationService:
                 raise ValueError(f"No source material found for topic: {topic.name}")
 
             # Fetch CA chunks if requested
-            ca_chunks = []
+            ca_chunks: List[CAChunk] = []
             if include_ca:
                 ca_chunks = ArticleGenerationService._fetch_ca_chunks(topic)
                 logger.info("ca_chunks_fetched", count=len(ca_chunks))
@@ -118,14 +130,20 @@ class ArticleGenerationService:
             raise
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error("article_generation_failed", topic_id=topic_id, error=str(e))
             raise
 
     @staticmethod
     def _fetch_chunks(topic: Topic) -> List[Chunk]:
         """
-        Fetch static chunks mapped to topic.
-        Returns chunks ordered by relevance score (highest first).
+        Retrieve theoretical foundation chunks mapped to the target topic.
+
+        Args:
+            topic (Topic): The topic instance.
+
+        Returns:
+            List[Chunk]: Chunks ordered by their relevance to the topic.
         """
         # Get mapping objects
         mappings = (
@@ -135,7 +153,7 @@ class ArticleGenerationService:
         )
 
         # Filter for static source type and extract chunks
-        chunks = []
+        chunks: List[Chunk] = []
         for mapping in mappings:
             chunk = mapping.chunk
             if chunk.source_type == "static":  # Explicitly check for static type
@@ -146,14 +164,14 @@ class ArticleGenerationService:
     @staticmethod
     def _fetch_ca_chunks(topic: Topic, days: int = 30) -> List[CAChunk]:
         """
-        Fetch recent CA chunks linked to topic.
+        Retrieve recent Current Affairs (dynamic) chunks linked to the topic.
 
         Args:
-            topic: Topic to fetch CA chunks for
-            days: How many days back to look (default 30)
+            topic (Topic): The topic instance.
+            days (int): Temporal window for CA relevance (default: 30 days).
 
         Returns:
-            List of CAChunk objects
+            List[CAChunk]: Recent news chunks relevant to the topic.
         """
         from datetime import timedelta
 
@@ -198,14 +216,16 @@ class ArticleGenerationService:
         # 2. Current Context (CA Chunks)
         if include_ca and ca_chunks:
             context_parts.append("\n=== CURRENT CONTEXT (Recent Developments) ===\n")
-            for idx, chunk in enumerate(ca_chunks, 1):
+            for ca_idx, ca_chunk in enumerate(ca_chunks, 1):
                 article_title = (
-                    chunk.ca_article.title if chunk.ca_article else "News Article"
+                    ca_chunk.ca_article.title if ca_chunk.ca_article else "News Article"
                 )
-                date_str = chunk.published_at.strftime("%Y-%m-%d")
+                date_str = ca_chunk.published_at.strftime("%Y-%m-%d")
 
-                context_parts.append(f"[CA Source {idx}: {article_title}, {date_str}]")
-                context_parts.append(chunk.chunk_text)
+                context_parts.append(
+                    f"[CA Source {ca_idx}: {article_title}, {date_str}]"
+                )
+                context_parts.append(ca_chunk.chunk_text)
                 context_parts.append("---\n")
 
         return "\n".join(context_parts)
@@ -238,6 +258,8 @@ class ArticleGenerationService:
         )
 
         content = response.choices[0].message.content
+        if not content:
+            raise ValueError("Empty response received from Groq LLM API")
 
         # Parse output
         article_data = ArticleGenerationService._parse_groq_output(content)
@@ -351,7 +373,7 @@ Generate the article now:"""
             checks["not_repetitive"] = False
 
         score = (sum(checks.values()) / len(checks)) * 100
-        return round(score, 2)
+        return round(score, 2)  # type: ignore
 
     @staticmethod
     @transaction.atomic
@@ -361,9 +383,22 @@ Generate the article now:"""
         static_chunks: List[Chunk],
         ca_chunks: List[CAChunk],
         include_ca: bool,
-        user_id: int = None,
+        user_id: Optional[int] = None,
     ) -> Article:
-        """Store generated article including references to both static and CA sources."""
+        """
+        Persist the generated article and create formal source mapping for provenance.
+
+        Args:
+            topic (Topic): The associated knowledge topic.
+            article_data (Dict): Content and metadata returned from LLM.
+            static_chunks (List[Chunk]): Foundation materials used.
+            ca_chunks (List[CAChunk]): Dynamic news materials used.
+            include_ca (bool): Mode used for relative metadata tracking.
+            user_id (int, optional): Owning user ID.
+
+        Returns:
+            Article: The saved Article instance.
+        """
 
         # Fallback title
         title = article_data.get("title") or f"{topic.name}: Comprehensive Guide"
@@ -456,6 +491,7 @@ Generate the article now:"""
             )
             logger.info("article_embedding_created", article_id=str(article.id))
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error("article_embedding_generation_failed", error=str(e))
 
         return article

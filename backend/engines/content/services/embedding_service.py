@@ -26,7 +26,7 @@ class EmbeddingService:
     _model = None
 
     @classmethod
-    def _get_model(cls):
+    def _get_model(cls) -> Any:
         """Lazy load sentence-transformers model."""
         if cls._model is None:
             try:
@@ -71,7 +71,7 @@ class EmbeddingService:
             embedding_dim=len(embedding_list),
         )
 
-        return embedding_list
+        return embedding_list  # type: ignore
 
     @classmethod
     def generate_embeddings_batch(cls, texts: List[str]) -> List[List[float]]:

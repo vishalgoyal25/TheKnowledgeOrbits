@@ -2,6 +2,8 @@
 Global pytest fixtures for TheKnowledgeOrbits.
 """
 
+from typing import Any
+
 import os
 import pytest
 
@@ -18,7 +20,7 @@ from rest_framework.test import APIClient  # noqa: E402
 
 
 @pytest.fixture
-def api_client():
+def api_client() -> Any:
     """
     Unauthenticated DRF test client.
     """
@@ -26,7 +28,7 @@ def api_client():
 
 
 @pytest.fixture
-def db_fixture(db):
+def db_fixture(db) -> Any:  # type: ignore
     """
     Database fixture - ensures test database is available.
     """

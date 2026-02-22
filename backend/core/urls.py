@@ -2,6 +2,8 @@
 URL configuration for TheKnowledgeOrbits.
 """
 
+from typing import Any
+
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework import status
@@ -12,7 +14,7 @@ from rest_framework.response import Response
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def health_check(request):
+def health_check(request) -> Any:  # type: ignore
     """Health check endpoint."""
     return Response(
         {"status": "healthy", "message": "TheKnowledgeOrbits API is running"},

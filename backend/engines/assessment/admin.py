@@ -2,6 +2,8 @@
 Assessment Engine Admin Interface
 """
 
+from typing import Any
+
 from django.contrib import admin
 from django.utils.html import format_html
 
@@ -9,7 +11,7 @@ from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionRespo
 
 
 @admin.register(Quiz)
-class QuizAdmin(admin.ModelAdmin):
+class QuizAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Quiz model."""
 
     list_display = [
@@ -42,7 +44,7 @@ class QuizAdmin(admin.ModelAdmin):
 
 
 @admin.register(Question)
-class QuestionAdmin(admin.ModelAdmin):
+class QuestionAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Question model."""
 
     list_display = [
@@ -76,12 +78,12 @@ class QuestionAdmin(admin.ModelAdmin):
 
     filter_horizontal = ["source_static_chunks", "source_ca_chunks"]
 
-    def quiz_title(self, obj):
+    @admin.display(description="Quiz")
+    def quiz_title(self, obj) -> Any:  # type: ignore
         return obj.quiz.title
 
-    quiz_title.short_description = "Quiz"
-
-    def has_sources(self, obj):
+    @admin.display(description="Sources")
+    def has_sources(self, obj) -> Any:  # type: ignore
         static = obj.source_static_chunks.count()
         ca = obj.source_ca_chunks.count()
         return format_html(
@@ -91,11 +93,9 @@ class QuestionAdmin(admin.ModelAdmin):
             ca,
         )
 
-    has_sources.short_description = "Sources"
-
 
 @admin.register(QuizAttempt)
-class QuizAttemptAdmin(admin.ModelAdmin):
+class QuizAttemptAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for QuizAttempt model."""
 
     list_display = [
@@ -108,7 +108,7 @@ class QuizAttemptAdmin(admin.ModelAdmin):
         "time_spent_display",
     ]
     list_filter = ["status", "started_at"]
-    search_fields = ["user__username", "quiz__title"]
+    search_fields = ["user__email", "quiz__title"]
     readonly_fields = ["started_at", "submitted_at", "attempt_metadata"]
 
     fieldsets = (
@@ -121,12 +121,12 @@ class QuizAttemptAdmin(admin.ModelAdmin):
         ("Metadata", {"fields": ("attempt_metadata",), "classes": ("collapse",)}),
     )
 
-    def user_display(self, obj):
-        return obj.user.username if obj.user else "Guest"
+    @admin.display(description="User")
+    def user_display(self, obj) -> Any:  # type: ignore
+        return obj.user.email if obj.user else "Guest"
 
-    user_display.short_description = "User"
-
-    def score_display(self, obj):
+    @admin.display(description="Score")
+    def score_display(self, obj) -> Any:  # type: ignore
         if obj.score is not None:
             color = (
                 "green" if obj.score >= 70 else "orange" if obj.score >= 50 else "red"
@@ -138,20 +138,17 @@ class QuizAttemptAdmin(admin.ModelAdmin):
             )
         return "-"
 
-    score_display.short_description = "Score"
-
-    def time_spent_display(self, obj):
+    @admin.display(description="Time")
+    def time_spent_display(self, obj) -> Any:  # type: ignore
         if obj.time_spent:
             minutes = obj.time_spent // 60
             seconds = obj.time_spent % 60
             return f"{minutes}m {seconds}s"
         return "-"
 
-    time_spent_display.short_description = "Time"
-
 
 @admin.register(QuestionResponse)
-class QuestionResponseAdmin(admin.ModelAdmin):
+class QuestionResponseAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for QuestionResponse model."""
 
     list_display = [
@@ -162,25 +159,22 @@ class QuestionResponseAdmin(admin.ModelAdmin):
         "time_spent",
     ]
     list_filter = ["is_correct", "marked_for_review"]
-    search_fields = ["attempt__user__username", "question__question_text"]
+    search_fields = ["attempt__user__email", "question__question_text"]
     readonly_fields = ["created_at", "first_visited_at", "answered_at"]
 
-    def attempt_user(self, obj):
-        return obj.attempt.user.username if obj.attempt.user else "Guest"
+    @admin.display(description="User")
+    def attempt_user(self, obj) -> Any:  # type: ignore
+        return obj.attempt.user.email if obj.attempt.user else "Guest"
 
-    attempt_user.short_description = "User"
-
-    def question_text_short(self, obj):
+    @admin.display(description="Question")
+    def question_text_short(self, obj) -> Any:  # type: ignore
         return obj.question.question_text[:60] + "..."
 
-    question_text_short.short_description = "Question"
-
-    def is_correct_display(self, obj):
+    @admin.display(description="Result")
+    def is_correct_display(self, obj) -> Any:  # type: ignore
         if not obj.selected_option:
             return format_html('<span style="color: gray;">○ Unanswered</span>')
         elif obj.is_correct:
             return format_html('<span style="color: green;">✓ Correct</span>')
         else:
             return format_html('<span style="color: red;">✗ Wrong</span>')
-
-    is_correct_display.short_description = "Result"

@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 Quiz Generator Service
 
@@ -11,7 +13,7 @@ Key Features:
 - Groq LLM integration for generation
 """
 
-import logging
+import structlog
 import json
 from typing import List, Dict, Any, Optional
 from datetime import timedelta
@@ -25,7 +27,7 @@ from engines.current_affairs.models import CAChunk
 from engines.knowledge.models import Topic, ChunkTopicMap
 from engines.assessment.models import Quiz, Question
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class QuizGeneratorService:
@@ -38,7 +40,7 @@ class QuizGeneratorService:
     MAX_CA_CHUNKS = 5
     CA_RELEVANCE_DAYS = 60
 
-    def __init__(self):
+    def __init__(self) -> Any:  # type: ignore
         """Initialize quiz generator with Groq client."""
         self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
         self.model = "llama-3.1-8b-instant"
@@ -49,7 +51,7 @@ class QuizGeneratorService:
         difficulty: str = "medium",
         include_ca: bool = False,
         question_count: int = 10,
-        user_id: Optional[int] = None,
+        user_id: Optional[Any] = None,
     ) -> Quiz:
         """
         Generate a complete quiz for a topic.
@@ -69,20 +71,18 @@ class QuizGeneratorService:
             Exception: If Groq generation fails
         """
         logger.info(
-            "Starting quiz generation",
-            extra={
-                "topic_id": topic_id,
-                "difficulty": difficulty,
-                "include_ca": include_ca,
-                "question_count": question_count,
-                "user_id": user_id,
-            },
+            "quiz_generation_requested",
+            topic_id=topic_id,
+            difficulty=difficulty,
+            include_ca=include_ca,
+            question_count=question_count,
+            user_id=user_id,
         )
 
         try:
             # Step 1: Get topic
             topic = Topic.objects.get(id=topic_id)
-            logger.info(f"Topic found: {topic.name}")
+            logger.info("topic_found", topic_name=topic.name, topic_id=topic_id)
 
             # Step 2: Fetch chunks
             static_chunks = self._fetch_static_chunks(topic)
@@ -92,7 +92,10 @@ class QuizGeneratorService:
                 raise ValueError(f"No chunks available for topic: {topic.name}")
 
             logger.info(
-                f"Chunks fetched - Static: {len(static_chunks)}, CA: {len(ca_chunks)}"
+                "chunks_retrieved",
+                static_count=len(static_chunks),
+                ca_count=len(ca_chunks),
+                topic_id=topic_id,
             )
 
             # Step 3: Build RAG context
@@ -118,20 +121,24 @@ class QuizGeneratorService:
             )
 
             logger.info(
-                f"Quiz generated successfully: {quiz.id}",
-                extra={"quiz_id": str(quiz.id), "question_count": len(questions_data)},
+                "quiz_generation_successful",
+                quiz_id=str(quiz.id),
+                question_count=len(questions_data),
+                topic_id=topic_id,
             )
 
             return quiz
 
         except Topic.DoesNotExist:
-            logger.error(f"Topic not found: {topic_id}")
+            logger.error("topic_not_found", topic_id=topic_id)
             raise ValueError(f"Topic with ID {topic_id} not found")
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error(
-                f"Quiz generation failed: {str(e)}",
-                extra={"topic_id": topic_id},
+                "quiz_generation_failed",
+                error=str(e),
+                topic_id=topic_id,
                 exc_info=True,
             )
             raise
@@ -237,7 +244,13 @@ class QuizGeneratorService:
             linked_ca_chunks.extend(list(semantic_chunks)[:needed])
 
         except Exception as e:
-            logger.warning(f"Semantic CA fetch failed for topic {topic.name}: {e}")
+            sentry_sdk.capture_exception(e)
+            logger.warning(
+                "semantic_ca_fetch_failed",
+                topic_name=topic.name,
+                error=str(e),
+                exc_info=True,
+            )
             # Fallback: just return what we have from links
 
         # Final sort by date for context flow
@@ -323,7 +336,12 @@ class QuizGeneratorService:
         BATCH_SIZE = 5
         generated_count = 0
 
-        logger.info(f"Starting batched generation for {question_count} questions")
+        logger.info(
+            "batched_generation_started",
+            total_questions=question_count,
+            batch_size=BATCH_SIZE,
+            topic=topic_name,
+        )
 
         # Loop until we have enough questions
         while generated_count < question_count:
@@ -332,7 +350,9 @@ class QuizGeneratorService:
             current_batch_size = min(BATCH_SIZE, remaining)
 
             logger.info(
-                f"Generating batch: {current_batch_size} questions (Progress: {generated_count}/{question_count})"
+                "generating_question_batch",
+                current_batch_size=current_batch_size,
+                progress=f"{generated_count}/{question_count}",
             )
 
             try:
@@ -361,7 +381,7 @@ class QuizGeneratorService:
                 )
 
                 # Extract response text
-                response_text = response.choices[0].message.content.strip()
+                response_text = response.choices[0].message.content.strip()  # type: ignore
 
                 # Clean response (remove markdown if present)
                 if response_text.startswith("```json"):
@@ -386,7 +406,11 @@ class QuizGeneratorService:
                 all_questions.extend(batch_questions)
                 generated_count += len(batch_questions)
 
-                logger.info(f"Batch successful. Total so far: {len(all_questions)}")
+                logger.info(
+                    "batch_generation_successful",
+                    batch_questions_count=len(batch_questions),
+                    total_so_far=len(all_questions),
+                )
 
             except json.JSONDecodeError as e:
                 logger.error(f"JSON parsing failed for batch: {str(e)}")
@@ -399,7 +423,13 @@ class QuizGeneratorService:
                 break
 
             except Exception as e:
-                logger.error(f"Groq API call failed: {str(e)}")
+                sentry_sdk.capture_exception(e)
+                logger.error(
+                    "groq_api_call_failed",
+                    error=str(e),
+                    exc_info=True,
+                    questions_generated=len(all_questions),
+                )
                 if not all_questions:
                     raise
                 break
@@ -607,7 +637,7 @@ Generate the {question_count} questions now:"""
             },
         )
 
-        logger.info(f"Quiz created: {quiz.id}")
+        logger.info("quiz_record_created", quiz_id=str(quiz.id), topic=topic.name)
 
         # Create questions
         for idx, q_data in enumerate(questions_data):
@@ -642,7 +672,11 @@ Generate the {question_count} questions now:"""
                 if include_ca:
                     question.source_ca_chunks.set(ca_chunks)
 
-        logger.info(f"Created {len(questions_data)} questions for quiz {quiz.id}")
+        logger.info(
+            "quiz_questions_created",
+            count=len(questions_data),
+            quiz_id=str(quiz.id),
+        )
 
         return quiz
 

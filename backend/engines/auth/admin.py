@@ -2,6 +2,8 @@
 Auth Engine Admin Interface
 """
 
+from typing import Any
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
@@ -10,7 +12,7 @@ from engines.auth.models import User, Role, RoleAssignment
 
 
 @admin.register(User)
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(BaseUserAdmin):  # type: ignore
     """Custom user admin."""
 
     list_display = [
@@ -50,30 +52,28 @@ class UserAdmin(BaseUserAdmin):
 
     readonly_fields = ["created_at", "updated_at", "last_login"]
 
-    def is_verified_badge(self, obj):
+    @admin.display(description="Status")
+    def is_verified_badge(self, obj) -> Any:  # type: ignore
         if obj.is_verified:
             return format_html('<span style="color: green;">✓ Verified</span>')
         return format_html('<span style="color: red;">✗ Not Verified</span>')
 
-    is_verified_badge.short_description = "Status"
-
 
 @admin.register(Role)
-class RoleAdmin(admin.ModelAdmin):
+class RoleAdmin(admin.ModelAdmin):  # type: ignore
     """Role admin."""
 
     list_display = ["name", "description", "user_count", "created_at"]
     search_fields = ["name", "description"]
     readonly_fields = ["created_at"]
 
-    def user_count(self, obj):
+    @admin.display(description="Users")
+    def user_count(self, obj) -> Any:  # type: ignore
         return obj.assignments.count()
-
-    user_count.short_description = "Users"
 
 
 @admin.register(RoleAssignment)
-class RoleAssignmentAdmin(admin.ModelAdmin):
+class RoleAssignmentAdmin(admin.ModelAdmin):  # type: ignore
     """Role assignment admin."""
 
     list_display = ["user_email", "role_name", "created_at"]
@@ -81,12 +81,10 @@ class RoleAssignmentAdmin(admin.ModelAdmin):
     search_fields = ["user__email"]
     readonly_fields = ["created_at"]
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
 
-    user_email.short_description = "User"
-
-    def role_name(self, obj):
+    @admin.display(description="Role")
+    def role_name(self, obj) -> Any:  # type: ignore
         return obj.role.get_name_display()
-
-    role_name.short_description = "Role"

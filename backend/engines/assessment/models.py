@@ -340,7 +340,7 @@ class QuizAttempt(models.Model):
         ]
 
     def __str__(self) -> str:
-        user_info = self.user.username if self.user else "Guest"
+        user_info = self.user.email if self.user else "Guest"
         return f"{user_info} - {self.quiz.title} ({self.status})"
 
     @property

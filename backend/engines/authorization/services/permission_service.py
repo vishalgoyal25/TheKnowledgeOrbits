@@ -4,17 +4,20 @@ Permission Service
 Centralized permission checking logic.
 """
 
-import logging
-from typing import List
+import structlog
+from typing import List, TYPE_CHECKING
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class PermissionService:
     """Service for checking user permissions."""
 
     @staticmethod
-    def has_role(user, role_name: str) -> bool:
+    def has_role(user: "User", role_name: str) -> bool:
         """
         Check if user has specific role.
 
@@ -31,7 +34,7 @@ class PermissionService:
         return user.role_assignments.filter(role__name=role_name).exists()
 
     @staticmethod
-    def has_any_role(user, role_names: List[str]) -> bool:
+    def has_any_role(user: "User", role_names: List[str]) -> bool:
         """
         Check if user has any of the specified roles.
 
@@ -48,7 +51,7 @@ class PermissionService:
         return user.role_assignments.filter(role__name__in=role_names).exists()
 
     @staticmethod
-    def get_user_roles(user) -> List[str]:
+    def get_user_roles(user: "User") -> List[str]:
         """
         Get list of user's role names.
 
@@ -64,27 +67,27 @@ class PermissionService:
         return list(user.role_assignments.values_list("role__name", flat=True))
 
     @staticmethod
-    def can_manage_content(user) -> bool:
+    def can_manage_content(user: "User") -> bool:
         """Check if user can manage content (upload, edit, delete)."""
         return PermissionService.has_any_role(user, ["admin", "content_manager"])
 
     @staticmethod
-    def can_generate_quiz(user) -> bool:
+    def can_generate_quiz(user: "User") -> bool:
         """Check if user can generate quizzes."""
         return PermissionService.has_any_role(user, ["admin", "content_manager"])
 
     @staticmethod
-    def can_generate_article(user) -> bool:
+    def can_generate_article(user: "User") -> bool:
         """Check if user can generate articles."""
         return PermissionService.has_any_role(user, ["admin", "content_manager"])
 
     @staticmethod
-    def can_manage_roles(user) -> bool:
+    def can_manage_roles(user: "User") -> bool:
         """Check if user can manage roles (admin only)."""
         return PermissionService.has_role(user, "admin")
 
     @staticmethod
-    def can_view_all_users(user) -> bool:
+    def can_view_all_users(user: "User") -> bool:
         """Check if user can view all users (admin only)."""
         return PermissionService.has_role(user, "admin")
 

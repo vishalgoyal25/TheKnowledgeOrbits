@@ -1,11 +1,13 @@
+import sentry_sdk
+
 """
 Topic Linker Service
 
 Auto-links CA chunks to syllabus topics using semantic similarity
 """
 
-import logging
-from typing import Dict
+import structlog
+from typing import Dict, List, Any, cast
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
@@ -13,7 +15,7 @@ from ..models import CAChunk, CATopicLink
 from engines.knowledge.models import Topic
 from engines.content.models import Embedding
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Initialize model for fallback topic embedding generation
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -34,7 +36,7 @@ class TopicLinkerService:
             int: Number of topics linked
         """
         chunks_id_str = str(ca_chunk.id)
-        logger.info(f"Linking CA chunk {chunks_id_str} to topics")
+        logger.info("linking_ca_chunk_to_topics", chunk_id=chunks_id_str)
 
         try:
             # Get CA chunk embedding
@@ -60,12 +62,11 @@ class TopicLinkerService:
             topic_embeddings = TopicLinkerService._get_topic_embeddings()
 
             if not topic_embeddings:
-                logger.warning("No topic embeddings available")
-                print("DEBUG: No topic embeddings found! Check Topic table.")
+                logger.warning("no_topic_embeddings_available")
                 return 0
 
             # Calculate similarities
-            similarities = []
+            similarities: List[Dict[str, Any]] = []
             max_sim = 0.0
             best_topic_id = None
 
@@ -80,11 +81,11 @@ class TopicLinkerService:
 
                 if similarity >= TopicLinkerService.SIMILARITY_THRESHOLD:
                     similarities.append(
-                        {"topic_id": topic_id, "similarity": similarity}
+                        {"topic_id": topic_id, "similarity": float(similarity)}
                     )
 
             # Sort by similarity (descending)
-            similarities.sort(key=lambda x: x["similarity"], reverse=True)
+            similarities.sort(key=lambda x: cast(float, x["similarity"]), reverse=True)
 
             # Take top N
             top_similarities = similarities[: TopicLinkerService.MAX_LINKS_PER_CHUNK]
@@ -94,7 +95,7 @@ class TopicLinkerService:
             current_topic_ids = []
 
             for sim in top_similarities:
-                topic = Topic.objects.get(id=sim["topic_id"])
+                topic = Topic.objects.get(id=str(sim["topic_id"]))
                 current_topic_ids.append(topic.id)
 
                 # Create or update link
@@ -102,7 +103,7 @@ class TopicLinkerService:
                     ca_chunk=ca_chunk,
                     topic=topic,
                     defaults={
-                        "relevance_score": float(sim["similarity"]),
+                        "relevance_score": float(cast(float, sim["similarity"])),
                         "link_method": "auto",
                     },
                 )
@@ -111,33 +112,36 @@ class TopicLinkerService:
                     links_created += 1
 
             if links_created == 0:
-                print(
-                    f"DEBUG: Chunk {chunks_id_str} - Max Sim: {max_sim:.4f} with Topic {best_topic_id} (Threshold: {TopicLinkerService.SIMILARITY_THRESHOLD})"
+                logger.debug(
+                    "no_strong_topic_links_found",
+                    chunk_id=chunks_id_str,
+                    max_similarity=max_sim,
+                    best_topic_id=best_topic_id,
+                    threshold=TopicLinkerService.SIMILARITY_THRESHOLD,
                 )
 
             logger.info(
-                f"Linked CA chunk to {links_created} topics",
-                extra={
-                    "chunk_id": chunks_id_str,
-                    "topics": [str(tid) for tid in current_topic_ids],
-                    "max_similarity": max_sim,
-                },
+                "linked_ca_chunk_to_topics",
+                links_created=links_created,
+                chunk_id=chunks_id_str,
+                topics=[str(tid) for tid in current_topic_ids],
+                max_similarity=max_sim,
             )
 
             return links_created
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error(
-                f"Failed to link CA chunk: {e}", extra={"chunk_id": str(ca_chunk.id)}
+                "failed_to_link_ca_chunk",
+                error=str(e),
+                chunk_id=str(ca_chunk.id),
+                exc_info=True,
             )
-            # Print traceback helps debugging in development
-            import traceback
-
-            traceback.print_exc()
             return 0
 
     @staticmethod
-    def _get_topic_embeddings() -> Dict[str, np.ndarray]:
+    def _get_topic_embeddings() -> Dict[str, np.ndarray]:  # type: ignore
         """
         Get representative embeddings for each topic.
 
@@ -187,14 +191,14 @@ class TopicLinkerService:
                 # We should cache this in future, but fine for now.
                 avg_vector = embedding_model.encode(topic_text)
 
-            topic_embeddings[str(topic.id)] = avg_vector
+            topic_embeddings[str(topic.id)] = np.array(avg_vector)
 
         logger.info(f"Loaded {len(topic_embeddings)} topic embeddings")
 
-        return topic_embeddings
+        return cast(Dict[str, np.ndarray], topic_embeddings)  # type: ignore
 
     @staticmethod
-    def _cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
+    def _cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:  # type: ignore
         """Calculate cosine similarity between two vectors"""
         dot_product = np.dot(v1, v2)
         norm_v1 = np.linalg.norm(v1)
@@ -203,7 +207,7 @@ class TopicLinkerService:
         if norm_v1 == 0 or norm_v2 == 0:
             return 0.0
 
-        return dot_product / (norm_v1 * norm_v2)
+        return dot_product / (norm_v1 * norm_v2)  # type: ignore
 
     @staticmethod
     def link_unlinked_chunks(batch_size: int = 20) -> int:
@@ -221,7 +225,7 @@ class TopicLinkerService:
         processed_chunks_count = 0
         total_links_created = 0
 
-        print(f"DEBUG: Found {unlinked_chunks.count()} unlinked chunks to process.")
+        logger.info("bulk_linking_unlinked_chunks", count=unlinked_chunks.count())
 
         for chunk in unlinked_chunks:
             links = TopicLinkerService.link_chunk_to_topics(chunk)

@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 Content Engine Views
 """
@@ -7,8 +9,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.request import Request
+from typing import Optional, Any, cast
+from engines.auth.models import User
 import structlog
 
+from django.db.models import QuerySet
 from engines.content.models import Document, Chunk, Embedding, Asset, IngestionJob
 from engines.content.serializers import (
     DocumentSerializer,
@@ -21,13 +27,12 @@ from engines.content.serializers import (
 )
 from engines.content.services.ingestion_service import IngestionService
 from engines.content.pagination import ContentCursorPagination, ChunkCursorPagination
-
 from engines.authorization.permissions import CanManageContent
 
 logger = structlog.get_logger(__name__)
 
 
-class DocumentViewSet(viewsets.ModelViewSet):
+class DocumentViewSet(viewsets.ModelViewSet):  # type: ignore
     """
     ViewSet for Document CRUD operations.
     """
@@ -38,8 +43,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
     pagination_class = ContentCursorPagination
     ordering = ["-created_at"]
 
-    def get_queryset(self):
-        """Filter documents by query parameters."""
+    def get_queryset(self) -> QuerySet:  # type: ignore
+        """
+        Filter documents by query parameters (source_type, source_edition, search).
+
+        Returns:
+            QuerySet[Document]: Filtered and ordered document collection.
+        """
         queryset = Document.objects.all()
 
         # Filter by source_type
@@ -65,9 +75,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         parser_classes=[MultiPartParser, FormParser],
         permission_classes=[CanManageContent],
     )
-    def upload(self, request):
+    def upload(self, request: Request) -> Response:
         """
-        Upload and ingest a new document.
+        Upload and ingest a new document (PDF/Text) into the Knowledge Orbit.
+
+        This invokes the full orchestration pipeline.
 
         POST /api/v1/content/documents/upload/
         """
@@ -87,25 +99,30 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 metadata=serializer.validated_data.get("metadata", {}),
             )
 
+            user = cast(User, request.user)
             logger.info(
                 "document_uploaded",
                 document_id=result["document_id"],
-                user_id=request.user.id,
+                user_id=user.id,
             )
 
             return Response(result, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            logger.error("document_upload_failed", error=str(e))
+            sentry_sdk.capture_exception(e)
+            logger.error("document_upload_failed", error=str(e), exc_info=True)
             return Response(
-                {"error": "Upload failed", "message": str(e)},
+                {
+                    "error": "Upload failed",
+                    "message": "An error occurred during document ingestion.",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["get"])
-    def chunks(self, request, pk=None):
+    def chunks(self, request: Request, pk: Optional[str] = None) -> Response:
         """
-        Get all chunks for a document.
+        Get all chunks for a specific document with ordered sequence.
 
         GET /api/v1/content/documents/{id}/chunks/
         """
@@ -116,7 +133,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class ChunkViewSet(viewsets.ReadOnlyModelViewSet):
+class ChunkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """
     ViewSet for Chunk read operations.
     """
@@ -126,7 +143,7 @@ class ChunkViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = ChunkCursorPagination
     ordering = ["document", "chunk_index"]
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Any:
         """Use lightweight serializer for list, full for detail or if content requested."""
         if self.action == "list":
             # Allow forcing full serializer via query param
@@ -135,7 +152,7 @@ class ChunkViewSet(viewsets.ReadOnlyModelViewSet):
             return ChunkListSerializer
         return ChunkSerializer
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         """Filter chunks by query parameters."""
         queryset = Chunk.objects.select_related("document").all()
 
@@ -175,7 +192,7 @@ class ChunkViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.order_by("document", "chunk_index")
 
 
-class EmbeddingViewSet(viewsets.ReadOnlyModelViewSet):
+class EmbeddingViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """
     ViewSet for Embedding read operations.
     """
@@ -186,7 +203,7 @@ class EmbeddingViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = ContentCursorPagination
     ordering = ["-created_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         """Filter embeddings by query parameters."""
         queryset = Embedding.objects.all()
 
@@ -203,7 +220,7 @@ class EmbeddingViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.order_by("-created_at")
 
 
-class AssetViewSet(viewsets.ReadOnlyModelViewSet):
+class AssetViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """
     ViewSet for Asset read operations.
     """
@@ -214,7 +231,7 @@ class AssetViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = ContentCursorPagination
     ordering = ["-created_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         """Filter assets by query parameters."""
         queryset = Asset.objects.select_related("chunk").all()
 
@@ -231,7 +248,7 @@ class AssetViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.order_by("-created_at")
 
 
-class IngestionJobViewSet(viewsets.ReadOnlyModelViewSet):
+class IngestionJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """
     ViewSet for IngestionJob monitoring.
     """
@@ -242,7 +259,7 @@ class IngestionJobViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = ContentCursorPagination
     ordering = ["-created_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         """Filter jobs by query parameters."""
         queryset = IngestionJob.objects.select_related("document").all()
 

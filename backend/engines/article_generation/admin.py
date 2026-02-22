@@ -2,6 +2,8 @@
 Article Generation Engine Admin Interface
 """
 
+from typing import Any
+
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
@@ -9,7 +11,7 @@ from .models import Article, ArticleSourceMap, ArticleGenerationJob
 
 
 @admin.register(Article)
-class ArticleAdmin(admin.ModelAdmin):
+class ArticleAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Articles."""
 
     list_display = [
@@ -120,25 +122,23 @@ class ArticleAdmin(admin.ModelAdmin):
         ),
     ]
 
-    def source_count(self, obj):
+    @admin.display(description="Sources")
+    def source_count(self, obj) -> Any:  # type: ignore
         """Total chunks used."""
         return obj.source_chunk_count
 
-    source_count.short_description = "Sources"
-
-    def static_chunks(self, obj):
+    @admin.display(description="Static")
+    def static_chunks(self, obj) -> Any:  # type: ignore
         """Static chunk count."""
         return obj.static_chunk_count
 
-    static_chunks.short_description = "Static"
-
-    def ca_chunks(self, obj):
+    @admin.display(description="CA")
+    def ca_chunks(self, obj) -> Any:  # type: ignore
         """CA chunk count."""
         return obj.ca_chunk_count
 
-    ca_chunks.short_description = "CA"
-
-    def content_preview(self, obj):
+    @admin.display(description="Preview")
+    def content_preview(self, obj) -> Any:  # type: ignore
         """First 200 chars of content."""
         if obj.content:
             preview = obj.content[:200]
@@ -147,11 +147,9 @@ class ArticleAdmin(admin.ModelAdmin):
             )
         return "-"
 
-    content_preview.short_description = "Preview"
-
 
 @admin.register(ArticleSourceMap)
-class ArticleSourceMapAdmin(admin.ModelAdmin):
+class ArticleSourceMapAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Article Source Maps."""
 
     list_display = [
@@ -222,29 +220,27 @@ class ArticleSourceMapAdmin(admin.ModelAdmin):
         ),
     ]
 
-    def article_title(self, obj):
+    @admin.display(description="Article")
+    def article_title(self, obj) -> Any:  # type: ignore
         """Article title."""
         return obj.article.title
 
-    article_title.short_description = "Article"
-
-    def chunk_preview(self, obj):
+    @admin.display(description="Chunk")
+    def chunk_preview(self, obj) -> Any:  # type: ignore
         """Chunk preview."""
         if obj.chunk:
             return obj.chunk.chunk_text[:80] + "..."
         return "-"
 
-    chunk_preview.short_description = "Chunk"
-
-    def chunk_source_type(self, obj):
+    @admin.display(description="Type")
+    def chunk_source_type(self, obj) -> Any:  # type: ignore
         """Chunk source type."""
         if obj.chunk:
             return obj.chunk.source_type.upper()
         return "-"
 
-    chunk_source_type.short_description = "Type"
-
-    def chunk_preview_full(self, obj):
+    @admin.display(description="Full Chunk Text")
+    def chunk_preview_full(self, obj) -> Any:  # type: ignore
         """Full chunk text."""
         if obj.chunk:
             return format_html(
@@ -253,11 +249,9 @@ class ArticleSourceMapAdmin(admin.ModelAdmin):
             )
         return "-"
 
-    chunk_preview_full.short_description = "Full Chunk Text"
-
 
 @admin.register(ArticleGenerationJob)
-class ArticleGenerationJobAdmin(admin.ModelAdmin):
+class ArticleGenerationJobAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Article Generation Jobs."""
 
     list_display = [
@@ -337,7 +331,8 @@ class ArticleGenerationJobAdmin(admin.ModelAdmin):
         ),
     ]
 
-    def article_link(self, obj):
+    @admin.display(description="Article")
+    def article_link(self, obj) -> Any:  # type: ignore
         """Link to generated article."""
         if obj.article:
             url = reverse(
@@ -346,13 +341,10 @@ class ArticleGenerationJobAdmin(admin.ModelAdmin):
             return format_html('<a href="{}">{}</a>', url, obj.article.title)
         return "-"
 
-    article_link.short_description = "Article"
-
-    def duration(self, obj):
+    @admin.display(description="Duration")
+    def duration(self, obj) -> Any:  # type: ignore
         """Job duration."""
         if obj.started_at and obj.completed_at:
             delta = obj.completed_at - obj.started_at
             return f"{delta.total_seconds():.1f}s"
         return "-"
-
-    duration.short_description = "Duration"

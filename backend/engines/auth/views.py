@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 Auth Engine Views (PKB-Compliant)
 
@@ -13,11 +15,13 @@ Auth Engine Views (PKB-Compliant)
 9. GET /me/
 """
 
-import logging
+import structlog
+from typing import Any, cast
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.request import Request
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.utils import timezone
@@ -35,10 +39,10 @@ from engines.auth.serializers import (
 from engines.auth.services.email_service import get_email_service
 from engines.auth.services.token_service import get_token_service
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
-def get_tokens_for_user(user):
+def get_tokens_for_user(user) -> Any:  # type: ignore
     """Generate JWT tokens."""
     refresh = RefreshToken.for_user(user)
     return {
@@ -50,7 +54,7 @@ def get_tokens_for_user(user):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @transaction.atomic
-def register(request):
+def register(request: Request) -> Response:
     """
     Register new user.
 
@@ -94,7 +98,7 @@ def register(request):
         email_service = get_email_service()
         email_service.send_verification_email(user, token)
 
-        logger.info(f"User registered: {user.email}")
+        logger.info("user_registered_successfully", email=user.email, id=str(user.id))
 
         return Response(
             {
@@ -105,16 +109,20 @@ def register(request):
         )
 
     except Exception as e:
-        logger.error(f"Registration failed: {str(e)}")
+        sentry_sdk.capture_exception(e)
+        logger.error("registration_process_failed", error=str(e), exc_info=True)
         return Response(
-            {"error": "REGISTRATION_FAILED", "message": str(e)},
+            {
+                "error": "REGISTRATION_FAILED",
+                "message": "An unexpected error occurred during registration.",
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def verify_email(request, token):
+def verify_email(request: Request, token: str) -> Response:
     """
     Verify user email.
 
@@ -134,7 +142,7 @@ def verify_email(request, token):
         user.verification_sent_at = None
         user.save()
 
-        logger.info(f"Email verified: {user.email}")
+        logger.info("email_verified_successfully", email=user.email)
 
         return Response({"message": "Email verified successfully"})
 
@@ -144,7 +152,7 @@ def verify_email(request, token):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def resend_verification(request):
+def resend_verification(request: Request) -> Response:
     """
     Resend verification email.
 
@@ -180,7 +188,7 @@ def resend_verification(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def login(request):
+def login(request: Request) -> Response:
     """
     Login user.
 
@@ -216,7 +224,7 @@ def login(request):
     user.last_login = timezone.now()
     user.save()
 
-    logger.info(f"User logged in: {user.email}")
+    logger.info("user_logged_in_successfully", email=user.email)
 
     return Response(
         {
@@ -229,19 +237,20 @@ def login(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def logout(request):
+def logout(request: Request) -> Response:
     """
     Logout user.
 
     POST /api/v1/auth/logout/
     """
-    logger.info(f"User logged out: {request.user.email}")
+    user = cast(User, request.user)
+    logger.info("user_logged_out", email=user.email)
     return Response({"message": "Logout successful"})
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def forgot_password(request):
+def forgot_password(request: Request) -> Response:
     """
     Request password reset.
 
@@ -268,7 +277,7 @@ def forgot_password(request):
         email_service = get_email_service()
         email_service.send_password_reset_email(user, token)
 
-        logger.info(f"Password reset requested: {user.email}")
+        logger.info("password_reset_link_requested", email=user.email)
 
     except User.DoesNotExist:
         pass  # Don't reveal if email exists
@@ -278,7 +287,7 @@ def forgot_password(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def reset_password(request, token):
+def reset_password(request: Request, token: str) -> Response:
     """
     Reset password with token.
 
@@ -306,7 +315,7 @@ def reset_password(request, token):
         user.reset_sent_at = None
         user.save()
 
-        logger.info(f"Password reset: {user.email}")
+        logger.info("password_reset_successful", email=user.email)
 
         return Response({"message": "Password reset successful"})
 
@@ -316,7 +325,7 @@ def reset_password(request, token):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def change_password(request):
+def change_password(request: Request) -> Response:
     """
     Change password (when logged in).
 
@@ -332,7 +341,7 @@ def change_password(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    user = request.user
+    user = cast(User, request.user)
 
     if not user.check_password(serializer.validated_data["old_password"]):
         return Response(
@@ -342,18 +351,19 @@ def change_password(request):
     user.set_password(serializer.validated_data["new_password"])
     user.save()
 
-    logger.info(f"Password changed: {user.email}")
+    logger.info("password_changed_successfully", email=user.email)
 
     return Response({"message": "Password changed successfully"})
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def get_current_user(request):
+def get_current_user(request: Request) -> Response:
     """
     Get current user profile.
 
     GET /api/v1/auth/me/
     """
-    serializer = UserSerializer(request.user)
+    user = cast(User, request.user)
+    serializer = UserSerializer(user)
     return Response(serializer.data)

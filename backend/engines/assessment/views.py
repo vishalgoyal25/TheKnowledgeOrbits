@@ -1,15 +1,20 @@
+import sentry_sdk
+
 """
 Assessment Engine Views
 
 API endpoints for quiz operations.
 """
 
-import logging
+import structlog
+from typing import cast
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.request import Request
 from django.shortcuts import get_object_or_404
+from engines.auth.models import User
 from django.utils import timezone
 from django.db import transaction
 
@@ -29,12 +34,12 @@ from engines.userstate.services.activity_service import get_activity_service
 
 from engines.shared.services.visibility_service import get_visibility_service
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])  # Allow generation without auth for testing
-def generate_quiz(request):
+def generate_quiz(request: Request) -> Response:
     """
     Generate new quiz from topic.
 
@@ -72,39 +77,42 @@ def generate_quiz(request):
         # ===== OWNERSHIP LOGIC (PKB Extension) =====
         if request.user.is_authenticated:
             # User-owned private quiz
-            quiz.created_by = request.user
+            user = cast(User, request.user)  # type: ignore
+            quiz.created_by = user
             quiz.is_public = False
             quiz.save()
-            logger.info(f"Private quiz generated: {request.user.email}")
+            logger.info(
+                "private_quiz_generated", user_email=user.email, quiz_id=str(quiz.id)
+            )
         else:
             # Public quiz
             quiz.is_public = True
             quiz.created_by = None
             quiz.save()
-            logger.info("Public quiz generated (anonymous)")
+            logger.info("public_quiz_generated", quiz_id=str(quiz.id))
         # ===== END OWNERSHIP LOGIC =====
 
         # Serialize and return
         result = QuizDetailSerializer(quiz).data
 
         logger.info(
-            f"Quiz generated: {quiz.id}",
-            extra={
-                "user_id": request.user.id if request.user.is_authenticated else None
-            },
+            "quiz_generation_success",
+            quiz_id=str(quiz.id),
+            user_id=request.user.id if request.user.is_authenticated else None,
         )
 
         return Response(result, status=status.HTTP_201_CREATED)
 
     except ValueError as e:
-        logger.warning(f"Quiz generation validation error: {str(e)}")
+        logger.warning("quiz_generation_validation_error", error=str(e))
         return Response(
             {"error": "VALIDATION_ERROR", "message": str(e)},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     except Exception as e:
-        logger.error(f"Quiz generation failed: {str(e)}", exc_info=True)
+        sentry_sdk.capture_exception(e)
+        logger.error("quiz_generation_failed", error=str(e), exc_info=True)
         return Response(
             {"error": "GENERATION_FAILED", "message": "Failed to generate quiz"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -113,7 +121,7 @@ def generate_quiz(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def list_quizzes(request):
+def list_quizzes(request: Request) -> Response:
     """
     List available quizzes with filters.
 
@@ -130,7 +138,10 @@ def list_quizzes(request):
 
     # ===== VISIBILITY FILTERING (PKB Ownership Logic) =====
     visibility_service = get_visibility_service()
-    queryset = visibility_service.filter_quizzes(queryset, request.user)
+
+    # We only apply filtering if the user is authenticated since AnonymousUser might not be expected
+    user = cast(User, request.user) if request.user.is_authenticated else None  # type: ignore
+    queryset = visibility_service.filter_quizzes(queryset, user)
     # ===== END FILTERING =====
 
     # Apply filters
@@ -157,14 +168,15 @@ def list_quizzes(request):
 # Add new view for "My Quizzes"
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def my_quizzes(request):
+def my_quizzes(request: Request) -> Response:
     """
     Get user's private quizzes.
 
     GET /api/v1/assessment/my-quizzes/
     """
+    user = cast(User, request.user)
     quizzes = (
-        Quiz.objects.filter(created_by=request.user, is_public=False)
+        Quiz.objects.filter(created_by=user, is_public=False)
         .select_related("topic")
         .order_by("-created_at")
     )
@@ -175,7 +187,7 @@ def my_quizzes(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def get_quiz(request, quiz_id):
+def get_quiz(request: Request, quiz_id: str) -> Response:
     """
     Get quiz details WITHOUT correct answers.
 
@@ -197,7 +209,7 @@ def get_quiz(request, quiz_id):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
-def start_quiz(request, quiz_id):
+def start_quiz(request: Request, quiz_id: str) -> Response:
     """
     Start a new quiz attempt.
 
@@ -221,7 +233,10 @@ def start_quiz(request, quiz_id):
             active_attempt.status = "abandoned"
             active_attempt.save()
             logger.info(
-                f"Abandoned previous attempt {active_attempt.id} for quiz {quiz_id}"
+                "stale_attempt_abandoned",
+                attempt_id=str(active_attempt.id),
+                quiz_id=quiz_id,
+                user_email=request.user.email,
             )
 
     # Create new attempt
@@ -232,11 +247,10 @@ def start_quiz(request, quiz_id):
     )
 
     logger.info(
-        f"Quiz attempt started: {attempt.id}",
-        extra={
-            "quiz_id": str(quiz_id),
-            "user_id": request.user.id if request.user.is_authenticated else None,
-        },
+        "quiz_attempt_started",
+        attempt_id=str(attempt.id),
+        quiz_id=str(quiz_id),
+        user_id=request.user.id if request.user.is_authenticated else None,
     )
 
     serializer = QuizAttemptSerializer(attempt)
@@ -246,7 +260,7 @@ def start_quiz(request, quiz_id):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @transaction.atomic
-def submit_quiz(request):
+def submit_quiz(request: Request) -> Response:
     """
     Submit quiz attempt with answers.
 
@@ -393,8 +407,11 @@ def submit_quiz(request):
         )
 
     logger.info(
-        f"Quiz submitted: {attempt.id}",
-        extra={"score": score, "correct": correct_count, "total": total_questions},
+        "quiz_submitted",
+        attempt_id=str(attempt.id),
+        score=score,
+        correct=correct_count,
+        total=total_questions,
     )
 
     # Return results with questions and explanations
@@ -409,7 +426,7 @@ def submit_quiz(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def get_attempt_result(request, attempt_id):
+def get_attempt_result(request: Request, attempt_id: str) -> Response:
     """
     Get quiz attempt results.
 
@@ -449,7 +466,7 @@ def get_attempt_result(request, attempt_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def list_user_attempts(request):
+def list_user_attempts(request: Request) -> Response:
     """
     List user's quiz attempts.
 
@@ -461,7 +478,8 @@ def list_user_attempts(request):
     Returns:
         200: List of attempts
     """
-    queryset = QuizAttempt.objects.filter(user=request.user)
+    user = cast(User, request.user)
+    queryset = QuizAttempt.objects.filter(user=user)
 
     # Apply filters
     quiz_id = request.query_params.get("quiz_id")

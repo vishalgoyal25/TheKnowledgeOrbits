@@ -8,6 +8,8 @@ Tables:
 - CATopicLink: CA chunk to topic mapping
 """
 
+from typing import Any
+
 import uuid
 from datetime import timedelta
 from django.db import models
@@ -61,7 +63,7 @@ class CASource(models.Model):
             models.Index(fields=["last_scraped_at"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> Any:
         return f"{self.name} ({self.source_type})"
 
 
@@ -129,7 +131,7 @@ class CAArticle(models.Model):
             models.Index(fields=["published_at"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> Any:
         return self.title
 
 
@@ -202,13 +204,13 @@ class CAChunk(models.Model):
             models.Index(fields=["source_type"]),
         ]
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, **kwargs) -> Any:  # type: ignore
         """Auto-set expiry_date if not set"""
         if not self.expiry_date and self.published_at:
             self.expiry_date = self.published_at + timedelta(days=180)
         super().save(*args, **kwargs)
 
-    def __str__(self):
+    def __str__(self) -> Any:
         return f"CA Chunk {self.chunk_index} from {self.ca_article.title[:50]}"
 
 
@@ -259,5 +261,5 @@ class CATopicLink(models.Model):
             models.Index(fields=["relevance_score"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> Any:
         return f"{self.ca_chunk.ca_article.title[:30]} → {self.topic.name}"

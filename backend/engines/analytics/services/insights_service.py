@@ -4,23 +4,27 @@ Insights Service
 Generates actionable insights for users.
 """
 
-import logging
+import structlog
 from datetime import timedelta
+from typing import TYPE_CHECKING, List
 from django.utils import timezone
-
 from django.db import models
+
 from engines.analytics.models import Insight
 from engines.userstate.models import TopicMastery, UserEvent
 from engines.userstate.services.progress_service import get_progress_service
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class InsightsService:
     """Service for generating user insights."""
 
     @staticmethod
-    def generate_insights(user):
+    def generate_insights(user: "User") -> List[Insight]:
         """
         Generate all types of insights for user.
 
@@ -44,7 +48,7 @@ class InsightsService:
         return insights
 
     @staticmethod
-    def _generate_weak_topic_insights(user):
+    def _generate_weak_topic_insights(user: "User") -> List[Insight]:
         """Generate insights for weak topics."""
         weak_topics = (
             TopicMastery.objects.filter(
@@ -74,7 +78,7 @@ class InsightsService:
         return insights
 
     @staticmethod
-    def _generate_streak_insights(user):
+    def _generate_streak_insights(user: "User") -> List[Insight]:
         """Generate streak-related insights."""
         progress_service = get_progress_service()
         progress = progress_service.get_or_create_progress(user)
@@ -102,7 +106,7 @@ class InsightsService:
         return insights
 
     @staticmethod
-    def _generate_improvement_insights(user):
+    def _generate_improvement_insights(user: "User") -> List[Insight]:
         """Generate performance improvement insights."""
         # Compare this week vs last week
         from engines.analytics.services.analytics_service import get_analytics_service
@@ -151,7 +155,7 @@ class InsightsService:
         return insights
 
     @staticmethod
-    def _generate_milestone_insights(user):
+    def _generate_milestone_insights(user: "User") -> List[Insight]:
         """Generate milestone achievement insights."""
         progress_service = get_progress_service()
         progress = progress_service.get_or_create_progress(user)
@@ -177,7 +181,7 @@ class InsightsService:
         return insights
 
     @staticmethod
-    def get_active_insights(user):
+    def get_active_insights(user: "User") -> models.QuerySet:  # type: ignore
         """Get active (non-expired) insights for user."""
         now = timezone.now()
 

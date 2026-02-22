@@ -4,14 +4,17 @@ Bookmark Service
 Handles bookmark CRUD operations.
 """
 
-import logging
-from typing import List, Optional
+import structlog
+from typing import List, Optional, TYPE_CHECKING
 from django.db import transaction
 
 from engines.userstate.models import Bookmark
 from engines.userstate.services.activity_service import get_activity_service
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class BookmarkService:
@@ -20,7 +23,7 @@ class BookmarkService:
     @staticmethod
     @transaction.atomic
     def add_bookmark(
-        user, content_type: str, content_id: str, notes: str = ""
+        user: "User", content_type: str, content_id: str, notes: str = ""
     ) -> Bookmark:
         """
         Add bookmark.
@@ -57,13 +60,18 @@ class BookmarkService:
         activity_service = get_activity_service()
         activity_service.log_bookmark_added(user, content_type, content_id)
 
-        logger.info(f"Bookmark added: {user.email} - {content_type}:{content_id}")
+        logger.info(
+            "bookmark_added",
+            user_email=user.email,
+            content_type=content_type,
+            content_id=str(content_id),
+        )
 
         return bookmark
 
     @staticmethod
     @transaction.atomic
-    def remove_bookmark(user, bookmark_id: str) -> bool:
+    def remove_bookmark(user: "User", bookmark_id: str) -> bool:
         """
         Remove bookmark.
 
@@ -89,7 +97,11 @@ class BookmarkService:
             activity_service = get_activity_service()
             activity_service.log_bookmark_removed(user, content_type, str(content_id))
 
-            logger.info(f"Bookmark removed: {user.email} - {bookmark_id}")
+            logger.info(
+                "bookmark_removed",
+                user_email=user.email,
+                bookmark_id=bookmark_id,
+            )
 
             return True
 
@@ -97,7 +109,9 @@ class BookmarkService:
             raise ValueError("Bookmark not found or not owned by you")
 
     @staticmethod
-    def get_bookmarks(user, content_type: Optional[str] = None) -> List[Bookmark]:
+    def get_bookmarks(
+        user: "User", content_type: Optional[str] = None
+    ) -> List[Bookmark]:
         """
         Get user's bookmarks.
 
@@ -118,7 +132,7 @@ class BookmarkService:
         return list(queryset.order_by("-created_at"))
 
     @staticmethod
-    def is_bookmarked(user, content_type: str, content_id: str) -> bool:
+    def is_bookmarked(user: "User", content_type: str, content_id: str) -> bool:
         """Check if content is bookmarked."""
         return Bookmark.objects.filter(
             user=user, content_type=content_type, content_id=content_id

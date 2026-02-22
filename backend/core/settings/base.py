@@ -3,10 +3,12 @@ Django Base settings for TheKnowledgeOrbits.
 """
 
 import os
+import logging
 from pathlib import Path
 import environ
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
+from typing import Dict, Any
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -217,37 +219,62 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 
 # Logging Configuration
-LOGGING = {
+LOGGING: Dict[str, Any] = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {message}",
-            "style": "{",
+        "json_formatter": {
+            "()": "structlog.stdlib.ProcessorFormatter",
+            "processor": "structlog.processors.JSONRenderer",
+        },
+        "plain_console": {
+            "()": "structlog.stdlib.ProcessorFormatter",
+            "processor": "structlog.dev.ConsoleRenderer",
+        },
+        "key_value": {
+            "()": "structlog.stdlib.ProcessorFormatter",
+            "processor": "structlog.processors.KeyValueRenderer",
         },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
+            "formatter": "plain_console",
         },
     },
-    "root": {
-        "handlers": ["console"],
-        "level": "INFO",
+    "loggers": {
+        "django_structlog": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "engines": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
-# Sentry Configuration (optional)
+
+# Structlog configuration temporarily removed for mypy scan
+
+# Sentry Configuration
 SENTRY_DSN = env("SENTRY_DSN", default="")
 if SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.celery import CeleryIntegration
 
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+        ],
+        environment=env("SENTRY_ENVIRONMENT", default="development"),
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
         send_default_pii=True,
     )
 

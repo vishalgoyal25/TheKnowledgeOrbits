@@ -4,11 +4,13 @@ Authorization Engine Serializers
 For role management operations.
 """
 
+from typing import Any
+
 from rest_framework import serializers
 from engines.auth.models import Role, RoleAssignment, User
 
 
-class RoleSerializer(serializers.ModelSerializer):
+class RoleSerializer(serializers.ModelSerializer):  # type: ignore
     """Role serializer."""
 
     user_count = serializers.SerializerMethodField()
@@ -18,12 +20,12 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description", "user_count", "created_at"]
         read_only_fields = ["id", "created_at"]
 
-    def get_user_count(self, obj):
+    def get_user_count(self, obj) -> Any:  # type: ignore
         """Count users with this role."""
         return obj.assignments.count()
 
 
-class RoleAssignmentSerializer(serializers.ModelSerializer):
+class RoleAssignmentSerializer(serializers.ModelSerializer):  # type: ignore
     """Role assignment serializer."""
 
     user_email = serializers.EmailField(source="user.email", read_only=True)
@@ -35,7 +37,7 @@ class RoleAssignmentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
-class AssignRoleSerializer(serializers.Serializer):
+class AssignRoleSerializer(serializers.Serializer):  # type: ignore
     """Serializer for assigning role to user."""
 
     user_id = serializers.UUIDField(required=True)
@@ -44,7 +46,7 @@ class AssignRoleSerializer(serializers.Serializer):
     )
 
 
-class RemoveRoleSerializer(serializers.Serializer):
+class RemoveRoleSerializer(serializers.Serializer):  # type: ignore
     """Serializer for removing role from user."""
 
     user_id = serializers.UUIDField(required=True)
@@ -53,7 +55,7 @@ class RemoveRoleSerializer(serializers.Serializer):
     )
 
 
-class UserRolesSerializer(serializers.ModelSerializer):
+class UserRolesSerializer(serializers.ModelSerializer):  # type: ignore
     """User with roles serializer."""
 
     roles = serializers.SerializerMethodField()
@@ -62,7 +64,7 @@ class UserRolesSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "email", "full_name", "roles"]
 
-    def get_roles(self, obj):
+    def get_roles(self, obj) -> Any:  # type: ignore
         """Get user's role names."""
         return [
             assignment.role.name

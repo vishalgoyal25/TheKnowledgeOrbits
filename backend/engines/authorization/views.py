@@ -11,10 +11,12 @@ Role management API (admin only).
 5. GET /user-roles/{user_id}/
 """
 
-import logging
+import structlog
+from typing import cast
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.request import Request
 from django.shortcuts import get_object_or_404
 
 from engines.authorization.permissions import IsAdmin
@@ -27,12 +29,12 @@ from engines.authorization.serializers import (
     UserRolesSerializer,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @api_view(["GET"])
 @permission_classes([IsAdmin])
-def list_roles(request):
+def list_roles(request: Request) -> Response:
     """
     List all roles.
 
@@ -45,7 +47,7 @@ def list_roles(request):
 
 @api_view(["GET"])
 @permission_classes([IsAdmin])
-def get_role(request, role_id):
+def get_role(request: Request, role_id: str) -> Response:
     """
     Get role details.
 
@@ -58,7 +60,7 @@ def get_role(request, role_id):
 
 @api_view(["POST"])
 @permission_classes([IsAdmin])
-def assign_role(request):
+def assign_role(request: Request) -> Response:
     """
     Assign role to user.
 
@@ -90,7 +92,13 @@ def assign_role(request):
     # Assign role
     assignment = RoleAssignment.objects.create(user=user, role=role)
 
-    logger.info(f"Role assigned: {user.email} → {role_name} by {request.user.email}")
+    admin_user = cast(User, request.user)
+    logger.info(
+        "role_assigned",
+        user_email=user.email,
+        role=role_name,
+        assigned_by=admin_user.email,
+    )
 
     result = RoleAssignmentSerializer(assignment)
     return Response(result.data, status=status.HTTP_201_CREATED)
@@ -98,7 +106,7 @@ def assign_role(request):
 
 @api_view(["POST"])
 @permission_classes([IsAdmin])
-def remove_role(request):
+def remove_role(request: Request) -> Response:
     """
     Remove role from user.
 
@@ -125,7 +133,13 @@ def remove_role(request):
         assignment = RoleAssignment.objects.get(user=user, role=role)
         assignment.delete()
 
-        logger.info(f"Role removed: {user.email} ✗ {role_name} by {request.user.email}")
+        admin_user = cast(User, request.user)
+        logger.info(
+            "role_removed",
+            user_email=user.email,
+            role=role_name,
+            removed_by=admin_user.email,
+        )
 
         return Response({"message": "Role removed successfully"})
 
@@ -138,7 +152,7 @@ def remove_role(request):
 
 @api_view(["GET"])
 @permission_classes([IsAdmin])
-def get_user_roles(request, user_id):
+def get_user_roles(request: Request, user_id: str) -> Response:
     """
     Get user's roles.
 

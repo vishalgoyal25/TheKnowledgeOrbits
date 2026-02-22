@@ -4,20 +4,24 @@ Dashboard Service
 Assembles complete dashboard data from multiple sources.
 """
 
-import logging
+import structlog
+from typing import TYPE_CHECKING, Dict, Any
 from engines.userstate.services.progress_service import get_progress_service
 from engines.userstate.models import TopicMastery, UserEvent
 from engines.analytics.services.analytics_service import get_analytics_service
 from engines.analytics.services.insights_service import get_insights_service
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class DashboardService:
     """Service for assembling dashboard data."""
 
     @staticmethod
-    def get_dashboard_overview(user):
+    def get_dashboard_overview(user: "User") -> Dict[str, Any]:
         """
         Get complete dashboard overview for user.
 

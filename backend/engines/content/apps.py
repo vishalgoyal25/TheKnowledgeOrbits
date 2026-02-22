@@ -2,6 +2,8 @@
 Content Engine App Configuration
 """
 
+from typing import Any
+
 from django.apps import AppConfig
 
 
@@ -16,7 +18,7 @@ class ContentConfig(AppConfig):
     name = "engines.content"
     verbose_name = "Content Engine"
 
-    def ready(self):
+    def ready(self) -> Any:
         """
         Import signal handlers and perform startup tasks.
         """

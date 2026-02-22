@@ -3,10 +3,14 @@ from .models import Feedback
 from .serializers import FeedbackSerializer
 
 
-class FeedbackViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+class FeedbackViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):  # type: ignore
     """
     ViewSet for handling public feedback submissions.
-    Only allows 'POST' (create) for non-authenticated users.
+
+    Attributes:
+        queryset: All Feedback instances.
+        serializer_class: FeedbackSerializer.
+        permission_classes: AllowAny (Public).
     """
 
     queryset = Feedback.objects.all()

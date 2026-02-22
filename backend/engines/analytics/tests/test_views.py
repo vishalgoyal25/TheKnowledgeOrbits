@@ -5,10 +5,11 @@ Tests for all 5 API endpoints.
 """
 
 import pytest
-from datetime import date, timedelta
+from datetime import timedelta
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.core.cache import cache
+from django.utils import timezone
 from engines.auth.models import User
 from engines.analytics.models import DailyAggregate, Insight
 from engines.userstate.models import UserEvent
@@ -84,7 +85,7 @@ class TestGetWeeklyStatsView:
         client, user = authenticated_client
 
         # Create aggregates for last 7 days
-        today = date.today()
+        today = timezone.localdate()
         for i in range(7):
             day = today - timedelta(days=i)
             DailyAggregate.objects.create(
@@ -109,7 +110,7 @@ class TestGetMonthlyStatsView:
         client, user = authenticated_client
 
         # Create some aggregates
-        today = date.today()
+        today = timezone.now().date()
         for i in range(10):
             day = today - timedelta(days=i)
             DailyAggregate.objects.create(

@@ -2,6 +2,8 @@
 Knowledge Engine Django App Configuration
 """
 
+from typing import Any
+
 from django.apps import AppConfig
 
 
@@ -12,7 +14,7 @@ class KnowledgeConfig(AppConfig):
     name = "engines.knowledge"
     verbose_name = "Knowledge Engine"
 
-    def ready(self):
+    def ready(self) -> Any:
         """Initialize engine when Django starts."""
         import structlog
 

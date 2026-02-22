@@ -4,17 +4,22 @@ Mastery Service
 Handles topic mastery computation.
 """
 
-import logging
+import structlog
+from typing import TYPE_CHECKING
+from django.db.models import QuerySet
 from engines.userstate.models import TopicMastery
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class MasteryService:
     """Service for computing topic mastery scores."""
 
     @staticmethod
-    def update_mastery(user, topic_id: str, is_correct: bool):
+    def update_mastery(user: "User", topic_id: str, is_correct: bool) -> TopicMastery:
         """
         Update topic mastery after quiz question.
 
@@ -42,14 +47,18 @@ class MasteryService:
         mastery.update_mastery()
 
         logger.info(
-            f"Mastery updated: {user.email} - Topic {topic_id} - "
-            f"{mastery.mastery_score:.1f}%"
+            "mastery_updated",
+            user_email=user.email,
+            topic_id=topic_id,
+            score=round(mastery.mastery_score, 2),
         )
 
         return mastery
 
     @staticmethod
-    def get_weak_topics(user, threshold: float = 50.0):
+    def get_weak_topics(
+        user: "User", threshold: float = 50.0
+    ) -> QuerySet[TopicMastery]:
         """
         Get topics where user has low mastery.
 
@@ -71,7 +80,9 @@ class MasteryService:
         )
 
     @staticmethod
-    def get_strong_topics(user, threshold: float = 80.0):
+    def get_strong_topics(
+        user: "User", threshold: float = 80.0
+    ) -> QuerySet[TopicMastery]:
         """Get topics where user has high mastery."""
         return (
             TopicMastery.objects.filter(

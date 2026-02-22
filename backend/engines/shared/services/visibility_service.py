@@ -4,18 +4,21 @@ Visibility Service
 Filters content based on ownership and public/private status.
 """
 
-import logging
-from typing import Optional
+import structlog
+from typing import Optional, TYPE_CHECKING, Any
 from django.db.models import Q, QuerySet
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class VisibilityService:
     """Service for filtering content by visibility rules."""
 
     @staticmethod
-    def filter_articles(queryset: QuerySet, user: Optional = None) -> QuerySet:
+    def filter_articles(queryset: QuerySet, user: Optional["User"] = None) -> QuerySet:  # type: ignore
         """
         Filter articles based on visibility.
 
@@ -40,7 +43,7 @@ class VisibilityService:
             return queryset.filter(is_public=True)
 
     @staticmethod
-    def filter_quizzes(queryset: QuerySet, user: Optional = None) -> QuerySet:
+    def filter_quizzes(queryset: QuerySet, user: Optional["User"] = None) -> QuerySet:  # type: ignore
         """
         Filter quizzes based on visibility.
 
@@ -52,7 +55,7 @@ class VisibilityService:
             return queryset.filter(is_public=True)
 
     @staticmethod
-    def can_access_article(article, user: Optional = None) -> bool:
+    def can_access_article(article: Any, user: Optional["User"] = None) -> bool:
         """
         Check if user can access specific article.
 
@@ -74,7 +77,7 @@ class VisibilityService:
         return False
 
     @staticmethod
-    def can_access_quiz(quiz, user: Optional = None) -> bool:
+    def can_access_quiz(quiz: Any, user: Optional["User"] = None) -> bool:
         """
         Check if user can access specific quiz.
 

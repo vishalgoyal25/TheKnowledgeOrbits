@@ -9,6 +9,8 @@ Tables (per DATABASE_SCHEMA.md):
 - userstate_reading_progress
 """
 
+from typing import Any
+
 import uuid
 from django.db import models
 from django.conf import settings
@@ -196,7 +198,7 @@ class TopicMastery(models.Model):
     def __str__(self) -> str:
         return f"{self.user.email} - {self.topic.name}: {self.mastery_score:.1f}%"
 
-    def update_mastery(self):
+    def update_mastery(self) -> Any:
         """Recalculate mastery score."""
         if self.questions_attempted > 0:
             self.mastery_score = (

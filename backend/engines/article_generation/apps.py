@@ -2,6 +2,8 @@
 Article Generation Engine App Configuration
 """
 
+from typing import Any
+
 from django.apps import AppConfig
 import structlog
 
@@ -15,6 +17,6 @@ class ArticleGenerationConfig(AppConfig):
     name = "engines.article_generation"
     verbose_name = "Article Generation Engine"
 
-    def ready(self):
+    def ready(self) -> Any:
         """Initialize engine on startup."""
         logger.info("article_generation_engine_initialized")

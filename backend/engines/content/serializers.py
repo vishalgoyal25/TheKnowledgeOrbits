@@ -6,7 +6,7 @@ from rest_framework import serializers
 from engines.content.models import Document, Chunk, Embedding, Asset, IngestionJob
 
 
-class DocumentSerializer(serializers.ModelSerializer):
+class DocumentSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for Document model."""
 
     class Meta:
@@ -27,7 +27,7 @@ class DocumentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class DocumentUploadSerializer(serializers.Serializer):
+class DocumentUploadSerializer(serializers.Serializer):  # type: ignore
     """Serializer for document upload request."""
 
     file = serializers.FileField(required=True)
@@ -46,7 +46,7 @@ class DocumentUploadSerializer(serializers.Serializer):
     metadata = serializers.JSONField(required=False, default=dict)
 
 
-class ChunkSerializer(serializers.ModelSerializer):
+class ChunkSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for Chunk model."""
 
     document_title = serializers.CharField(source="document.title", read_only=True)
@@ -70,7 +70,7 @@ class ChunkSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class ChunkListSerializer(serializers.ModelSerializer):
+class ChunkListSerializer(serializers.ModelSerializer):  # type: ignore
     """Lightweight serializer for chunk listing."""
 
     document_title = serializers.CharField(source="document.title", read_only=True)
@@ -88,7 +88,7 @@ class ChunkListSerializer(serializers.ModelSerializer):
         ]
 
 
-class EmbeddingSerializer(serializers.ModelSerializer):
+class EmbeddingSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for Embedding model."""
 
     class Meta:
@@ -104,7 +104,7 @@ class EmbeddingSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
-class AssetSerializer(serializers.ModelSerializer):
+class AssetSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for Asset model."""
 
     class Meta:
@@ -113,7 +113,7 @@ class AssetSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
-class IngestionJobSerializer(serializers.ModelSerializer):
+class IngestionJobSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for IngestionJob model."""
 
     document_title = serializers.CharField(

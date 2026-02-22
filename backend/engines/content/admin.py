@@ -3,7 +3,7 @@ from .models import Document, Chunk, Embedding, Asset, IngestionJob
 
 
 @admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
+class DocumentAdmin(admin.ModelAdmin):  # type: ignore
     list_display = (
         "title",
         "source_type",
@@ -18,7 +18,7 @@ class DocumentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Chunk)
-class ChunkAdmin(admin.ModelAdmin):
+class ChunkAdmin(admin.ModelAdmin):  # type: ignore
     list_display = (
         "__str__",
         "document",
@@ -34,7 +34,7 @@ class ChunkAdmin(admin.ModelAdmin):
 
 
 @admin.register(Embedding)
-class EmbeddingAdmin(admin.ModelAdmin):
+class EmbeddingAdmin(admin.ModelAdmin):  # type: ignore
     list_display = ("__str__", "model_name", "created_at")
     list_filter = ("content_type", "model_name")
     search_fields = ("content_id",)
@@ -42,7 +42,7 @@ class EmbeddingAdmin(admin.ModelAdmin):
 
 
 @admin.register(Asset)
-class AssetAdmin(admin.ModelAdmin):
+class AssetAdmin(admin.ModelAdmin):  # type: ignore
     list_display = ("__str__", "asset_type", "created_at")
     list_filter = ("asset_type", "created_at")
     search_fields = ("chunk__document__title",)
@@ -51,7 +51,7 @@ class AssetAdmin(admin.ModelAdmin):
 
 
 @admin.register(IngestionJob)
-class IngestionJobAdmin(admin.ModelAdmin):
+class IngestionJobAdmin(admin.ModelAdmin):  # type: ignore
     list_display = (
         "__str__",
         "status",

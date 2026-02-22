@@ -4,8 +4,9 @@ AI-Assisted Chunk-Topic Mapping Service
 Uses embedding similarity to suggest relevant chunks for topics.
 """
 
+import sentry_sdk
 import structlog
-from typing import List, Dict
+from typing import List, Dict, cast, Any
 
 logger = structlog.get_logger(__name__)
 
@@ -17,7 +18,7 @@ class MappingService:
     MAX_SUGGESTIONS = 30  # Max chunks to suggest
 
     @classmethod
-    def auto_suggest_chunks(cls, topic_id: str, limit: int = 20) -> List[Dict]:
+    def auto_suggest_chunks(cls, topic_id: str, limit: int = 20) -> List[Dict]:  # type: ignore
         """
         Auto-suggest relevant chunks for a topic using AI.
 
@@ -101,6 +102,7 @@ class MappingService:
                         )
 
                 except Exception as e:
+                    sentry_sdk.capture_exception(e)
                     logger.warning(
                         "chunk_similarity_failed",
                         embedding_id=str(embedding.id),
@@ -109,7 +111,9 @@ class MappingService:
                     continue
 
             # Step 4: Sort by relevance and limit
-            suggestions.sort(key=lambda x: x["relevance_score"], reverse=True)
+            suggestions.sort(
+                key=lambda x: cast(float, x["relevance_score"]), reverse=True
+            )
             suggestions = suggestions[: min(limit, cls.MAX_SUGGESTIONS)]
 
             logger.info(
@@ -123,13 +127,14 @@ class MappingService:
             return suggestions
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error("auto_suggest_failed", topic_id=topic_id, error=str(e))
             raise
 
     @classmethod
     def approve_mappings(
         cls, topic_id: str, chunk_ids: List[str], user_id: str, priority: int = 1
-    ) -> Dict:
+    ) -> Dict:  # type: ignore
         """
         Create approved chunk-topic mappings.
 
@@ -144,7 +149,7 @@ class MappingService:
         """
         from engines.knowledge.models import Topic, ChunkTopicMap
         from engines.content.models import Chunk
-        from django.contrib.auth.models import User
+        from engines.auth.models import User
 
         try:
             topic = Topic.objects.get(id=topic_id)
@@ -220,11 +225,12 @@ class MappingService:
             }
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error("approve_mappings_failed", topic_id=topic_id, error=str(e))
             raise
 
     @classmethod
-    def _build_topic_text(cls, topic) -> str:
+    def _build_topic_text(cls, topic: Any) -> str:
         """
         Build comprehensive text representation of topic for embedding.
 
@@ -270,7 +276,7 @@ class MappingService:
         return max(0.0, min(1.0, similarity))
 
     @classmethod
-    def _calculate_relevance(cls, chunk, topic) -> float:
+    def _calculate_relevance(cls, chunk: Any, topic: Any) -> float:
         """
         Calculate relevance score for chunk-topic pair.
 
@@ -298,6 +304,7 @@ class MappingService:
             return similarity
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.warning(
                 "relevance_calculation_failed",
                 chunk_id=str(chunk.id),

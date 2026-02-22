@@ -2,6 +2,8 @@
 Knowledge Engine Admin Interface
 """
 
+from typing import Any
+
 from django.contrib import admin
 from engines.knowledge.models import (
     Program,
@@ -16,7 +18,7 @@ from engines.knowledge.models import (
 
 
 @admin.register(Program)
-class ProgramAdmin(admin.ModelAdmin):
+class ProgramAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Program."""
 
     list_display = ["name", "is_active", "created_at"]
@@ -35,7 +37,7 @@ class ProgramAdmin(admin.ModelAdmin):
 
 
 @admin.register(Subject)
-class SubjectAdmin(admin.ModelAdmin):
+class SubjectAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Subject."""
 
     list_display = ["name", "program", "order_index", "is_active", "created_at"]
@@ -57,7 +59,7 @@ class SubjectAdmin(admin.ModelAdmin):
 
 
 @admin.register(Module)
-class ModuleAdmin(admin.ModelAdmin):
+class ModuleAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Module."""
 
     list_display = ["name", "subject", "order_index", "is_active", "created_at"]
@@ -79,7 +81,7 @@ class ModuleAdmin(admin.ModelAdmin):
 
 
 @admin.register(Topic)
-class TopicAdmin(admin.ModelAdmin):
+class TopicAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Topic."""
 
     list_display = [
@@ -119,7 +121,7 @@ class TopicAdmin(admin.ModelAdmin):
         ),
     )
 
-    def get_urls(self):
+    def get_urls(self) -> Any:
         from django.urls import path
 
         urls = super().get_urls()
@@ -132,7 +134,7 @@ class TopicAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    def suggest_chunks_view(self, request, object_id):
+    def suggest_chunks_view(self, request, object_id) -> Any:  # type: ignore
         """Custom admin view for suggesting chunks."""
         from django.shortcuts import render
         from engines.knowledge.services.mapping_service import MappingService
@@ -145,7 +147,7 @@ class TopicAdmin(admin.ModelAdmin):
 
             if chunk_ids:
                 result = MappingService.approve_mappings(
-                    topic_id=str(topic.id),
+                    topic_id=str(topic.id),  # type: ignore
                     chunk_ids=chunk_ids,
                     user_id=request.user.id,
                     priority=1,
@@ -153,12 +155,12 @@ class TopicAdmin(admin.ModelAdmin):
 
                 self.message_user(
                     request,
-                    f"Successfully mapped {result['created']} chunks to {topic.name}",
+                    f"Successfully mapped {result['created']} chunks to {topic.name}",  # type: ignore
                 )
 
         # Get suggestions
         suggestions = MappingService.auto_suggest_chunks(
-            topic_id=str(topic.id), limit=20
+            topic_id=str(topic.id), limit=20  # type: ignore
         )
 
         context = {
@@ -171,7 +173,7 @@ class TopicAdmin(admin.ModelAdmin):
 
 
 @admin.register(ChunkTopicMap)
-class ChunkTopicMapAdmin(admin.ModelAdmin):
+class ChunkTopicMapAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for ChunkTopicMap."""
 
     list_display = [
@@ -187,7 +189,8 @@ class ChunkTopicMapAdmin(admin.ModelAdmin):
     readonly_fields = ["id", "created_at"]
     ordering = ["-relevance_score"]
 
-    def chunk_preview(self, obj):
+    @admin.display(description="Chunk Preview")
+    def chunk_preview(self, obj) -> Any:  # type: ignore
         """Show chunk text preview."""
         return (
             obj.chunk.chunk_text[:100] + "..."
@@ -195,11 +198,9 @@ class ChunkTopicMapAdmin(admin.ModelAdmin):
             else obj.chunk.chunk_text
         )
 
-    chunk_preview.short_description = "Chunk Preview"
-
 
 @admin.register(Theme)
-class ThemeAdmin(admin.ModelAdmin):
+class ThemeAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Theme."""
 
     list_display = ["name", "is_active", "created_at"]
@@ -209,7 +210,7 @@ class ThemeAdmin(admin.ModelAdmin):
 
 
 @admin.register(ThemeTopicMap)
-class ThemeTopicMapAdmin(admin.ModelAdmin):
+class ThemeTopicMapAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for ThemeTopicMap."""
 
     list_display = ["theme", "topic", "weight", "created_at"]
@@ -220,7 +221,7 @@ class ThemeTopicMapAdmin(admin.ModelAdmin):
 
 
 @admin.register(ChunkRelation)
-class ChunkRelationAdmin(admin.ModelAdmin):
+class ChunkRelationAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for ChunkRelation."""
 
     list_display = [
@@ -233,14 +234,12 @@ class ChunkRelationAdmin(admin.ModelAdmin):
     list_filter = ["relation_type", "created_at"]
     readonly_fields = ["id", "created_at"]
 
-    def chunk_1_preview(self, obj):
+    @admin.display(description="Chunk 1")
+    def chunk_1_preview(self, obj) -> Any:  # type: ignore
         """Show chunk 1 preview."""
         return f"Chunk #{obj.chunk_1.chunk_index}"
 
-    chunk_1_preview.short_description = "Chunk 1"
-
-    def chunk_2_preview(self, obj):
+    @admin.display(description="Chunk 2")
+    def chunk_2_preview(self, obj) -> Any:  # type: ignore
         """Show chunk 2 preview."""
         return f"Chunk #{obj.chunk_2.chunk_index}"
-
-    chunk_2_preview.short_description = "Chunk 2"

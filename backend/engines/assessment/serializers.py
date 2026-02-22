@@ -4,13 +4,15 @@ Assessment Engine Serializers
 DRF serializers for API endpoints.
 """
 
+from typing import Any
+
 from rest_framework import serializers
 
 from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionResponse
 from engines.knowledge.models import Topic
 
 
-class TopicMinimalSerializer(serializers.ModelSerializer):
+class TopicMinimalSerializer(serializers.ModelSerializer):  # type: ignore
     """Minimal topic serializer for nested use."""
 
     class Meta:
@@ -18,7 +20,7 @@ class TopicMinimalSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "difficulty_level"]
 
 
-class QuestionListSerializer(serializers.ModelSerializer):
+class QuestionListSerializer(serializers.ModelSerializer):  # type: ignore
     """
     Serializer for Question in quiz listing (WITHOUT correct answer).
     Used when quiz is being taken.
@@ -38,7 +40,7 @@ class QuestionListSerializer(serializers.ModelSerializer):
         # Explicitly exclude correct_answer and explanation
 
 
-class QuestionDetailSerializer(serializers.ModelSerializer):
+class QuestionDetailSerializer(serializers.ModelSerializer):  # type: ignore
     """
     Serializer for Question with correct answer and explanation.
     Used after quiz submission for review.
@@ -64,7 +66,7 @@ class QuestionDetailSerializer(serializers.ModelSerializer):
         ]
 
 
-class QuizListSerializer(serializers.ModelSerializer):
+class QuizListSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for Quiz listing."""
 
     topic = TopicMinimalSerializer(read_only=True)
@@ -92,7 +94,7 @@ class QuizListSerializer(serializers.ModelSerializer):
         ]
 
 
-class QuizDetailSerializer(serializers.ModelSerializer):
+class QuizDetailSerializer(serializers.ModelSerializer):  # type: ignore
     """
     Serializer for Quiz detail (includes questions WITHOUT answers).
     Used when starting a quiz.
@@ -124,7 +126,7 @@ class QuizDetailSerializer(serializers.ModelSerializer):
         ]
 
 
-class QuizGenerateSerializer(serializers.Serializer):
+class QuizGenerateSerializer(serializers.Serializer):  # type: ignore
     """Serializer for quiz generation request."""
 
     topic_id = serializers.UUIDField(required=True)
@@ -135,7 +137,7 @@ class QuizGenerateSerializer(serializers.Serializer):
     question_count = serializers.IntegerField(min_value=5, max_value=20, default=10)
 
 
-class QuestionResponseSerializer(serializers.ModelSerializer):
+class QuestionResponseSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for question response."""
 
     question_detail = QuestionDetailSerializer(source="question", read_only=True)
@@ -155,7 +157,7 @@ class QuestionResponseSerializer(serializers.ModelSerializer):
         read_only_fields = ["is_correct", "answered_at"]
 
 
-class QuizAttemptSerializer(serializers.ModelSerializer):
+class QuizAttemptSerializer(serializers.ModelSerializer):  # type: ignore
     """Serializer for quiz attempt."""
 
     quiz = QuizListSerializer(read_only=True)
@@ -189,13 +191,13 @@ class QuizAttemptSerializer(serializers.ModelSerializer):
         ]
 
 
-class QuizSubmitSerializer(serializers.Serializer):
+class QuizSubmitSerializer(serializers.Serializer):  # type: ignore
     """Serializer for quiz submission."""
 
     attempt_id = serializers.UUIDField(required=True)
     answers = serializers.ListField(child=serializers.DictField(), required=True)
 
-    def validate_answers(self, value):
+    def validate_answers(self, value) -> Any:  # type: ignore
         """Validate answers format."""
         for answer in value:
             if "question_id" not in answer:

@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 User State Engine Views
 
@@ -12,11 +14,14 @@ User State Engine Views
 8. PUT /reading-progress/{article_id}/
 """
 
-import logging
+import structlog
+from typing import cast
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.request import Request
+from engines.auth.models import User
 
 from engines.userstate.models import ReadingProgress, UserEvent, UserProgress
 from engines.userstate.serializers import (
@@ -31,19 +36,20 @@ from engines.userstate.serializers import (
 from engines.userstate.services.bookmark_service import get_bookmark_service
 from engines.userstate.services.progress_service import get_progress_service
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def get_progress(request):
+def get_progress(request: Request) -> Response:
     """
     Get user progress.
 
     GET /api/v1/userstate/progress/
     """
     progress_service = get_progress_service()
-    progress = progress_service.update_progress(request.user)
+    user = cast(User, request.user)
+    progress = progress_service.update_progress(user)
 
     serializer = UserProgressSerializer(progress)
     return Response(serializer.data)
@@ -51,7 +57,7 @@ def get_progress(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def get_mastery(request):
+def get_mastery(request: Request) -> Response:
     """
     Get topic mastery scores.
 
@@ -60,7 +66,8 @@ def get_mastery(request):
         - weak (bool): Filter weak topics
         - strong (bool): Filter strong topics
     """
-    masteries = request.user.topic_masteries.select_related("topic").all()
+    user = cast(User, request.user)
+    masteries = user.topic_masteries.select_related("topic").all()
 
     # Apply filters
     if request.query_params.get("weak"):
@@ -77,7 +84,7 @@ def get_mastery(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def get_events(request):
+def get_events(request: Request) -> Response:
     """
     Get recent user events.
 
@@ -89,7 +96,8 @@ def get_events(request):
     limit = int(request.query_params.get("limit", 20))
     event_type = request.query_params.get("event_type")
 
-    events = request.user.events.all()
+    user = cast(User, request.user)
+    events = user.events.all()
 
     if event_type:
         events = events.filter(event_type=event_type)
@@ -102,7 +110,7 @@ def get_events(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def list_bookmarks(request):
+def list_bookmarks(request: Request) -> Response:
     """
     List user bookmarks.
 
@@ -112,12 +120,11 @@ def list_bookmarks(request):
     """
     content_type = request.query_params.get("content_type")
 
+    user = cast(User, request.user)
     bookmark_service = get_bookmark_service()
 
     try:
-        bookmarks = bookmark_service.get_bookmarks(
-            user=request.user, content_type=content_type
-        )
+        bookmarks = bookmark_service.get_bookmarks(user=user, content_type=content_type)
 
         serializer = BookmarkSerializer(bookmarks, many=True)
         return Response(serializer.data)
@@ -128,7 +135,7 @@ def list_bookmarks(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def add_bookmark(request):
+def add_bookmark(request: Request) -> Response:
     """
     Add bookmark.
 
@@ -144,11 +151,12 @@ def add_bookmark(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    user = cast(User, request.user)
     bookmark_service = get_bookmark_service()
 
     try:
         bookmark = bookmark_service.add_bookmark(
-            user=request.user,
+            user=user,
             content_type=serializer.validated_data["content_type"],
             content_id=str(serializer.validated_data["content_id"]),
             notes=serializer.validated_data.get("notes", ""),
@@ -163,16 +171,17 @@ def add_bookmark(request):
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def remove_bookmark(request, bookmark_id):
+def remove_bookmark(request: Request, bookmark_id: str) -> Response:
     """
     Remove bookmark.
 
     DELETE /api/v1/userstate/bookmarks/{bookmark_id}/
     """
+    user = cast(User, request.user)
     bookmark_service = get_bookmark_service()
 
     try:
-        bookmark_service.remove_bookmark(user=request.user, bookmark_id=bookmark_id)
+        bookmark_service.remove_bookmark(user=user, bookmark_id=bookmark_id)
 
         return Response({"message": "Bookmark removed"})
 
@@ -182,14 +191,15 @@ def remove_bookmark(request, bookmark_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def get_reading_progress(request, article_id):
+def get_reading_progress(request: Request, article_id: str) -> Response:
     """
     Get reading progress for article.
 
     GET /api/v1/userstate/reading-progress/{article_id}/
     """
     try:
-        progress = ReadingProgress.objects.get(user=request.user, article_id=article_id)
+        user = cast(User, request.user)
+        progress = ReadingProgress.objects.get(user=user, article_id=article_id)
         serializer = ReadingProgressSerializer(progress)
         return Response(serializer.data)
 
@@ -201,7 +211,7 @@ def get_reading_progress(request, article_id):
 
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
-def update_reading_progress(request, article_id):
+def update_reading_progress(request: Request, article_id: str) -> Response:
     """
     Update reading progress.
 
@@ -218,8 +228,9 @@ def update_reading_progress(request, article_id):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    user = cast(User, request.user)
     progress, created = ReadingProgress.objects.update_or_create(
-        user=request.user,
+        user=user,
         article_id=article_id,
         defaults={
             "percent_read": serializer.validated_data["percent_read"],
@@ -230,7 +241,7 @@ def update_reading_progress(request, article_id):
     # Check for completion (75%)
     if progress.percent_read >= 75.0:
         exists = UserEvent.objects.filter(
-            user=request.user,
+            user=user,
             event_type="article_read",
             event_data__article_id=str(article_id),
         ).exists()
@@ -238,21 +249,23 @@ def update_reading_progress(request, article_id):
         if not exists:
             title = "Unknown Article"
             try:
-                from engines.content.models import Article
+                from engines.article_generation.models import Article
 
                 article = Article.objects.get(id=article_id)
                 title = article.title
             except Exception as e:
-                logger.debug(f"Could not find article title for {article_id}: {str(e)}")
-                pass
+                sentry_sdk.capture_exception(e)
+                logger.debug(
+                    "article_title_lookup_failed", article_id=article_id, error=str(e)
+                )
 
             UserEvent.objects.create(
-                user=request.user,
+                user=user,
                 event_type="article_read",
                 event_data={"article_id": str(article_id), "title": title},
             )
 
-            user_progress, _ = UserProgress.objects.get_or_create(user=request.user)
+            user_progress, _ = UserProgress.objects.get_or_create(user=user)
             user_progress.total_articles_read += 1
             user_progress.save()
 
@@ -262,12 +275,13 @@ def update_reading_progress(request, article_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def list_reading_progress(request):
+def list_reading_progress(request: Request) -> Response:
     """
     List user reading progress.
 
     GET /api/v1/userstate/reading-progress/
     """
-    progress = ReadingProgress.objects.filter(user=request.user).order_by("-updated_at")
+    user = cast(User, request.user)
+    progress = ReadingProgress.objects.filter(user=user).order_by("-updated_at")
     serializer = ReadingProgressSerializer(progress, many=True)
     return Response(serializer.data)
