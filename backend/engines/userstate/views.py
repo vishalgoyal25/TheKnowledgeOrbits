@@ -242,7 +242,8 @@ def update_reading_progress(request, article_id):
 
                 article = Article.objects.get(id=article_id)
                 title = article.title
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Could not find article title for {article_id}: {str(e)}")
                 pass
 
             UserEvent.objects.create(

@@ -143,7 +143,8 @@ class RSSScraperService:
                 if fetched:
                     content = fetched
                     # logger.info(f"Fetched full content for '{title}' (Length: {len(content)})")
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to fetch full content for {url}: {str(e)}")
                 pass
 
         # Clean content (basic checks)
@@ -161,7 +162,8 @@ class RSSScraperService:
                 published_at = datetime(*entry.published_parsed[:6])
                 if timezone.is_naive(published_at):
                     published_at = timezone.make_aware(published_at)
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to parse published date: {str(e)}")  # nosec: B110
                 pass  # Fallback to now
 
         # Extract author
