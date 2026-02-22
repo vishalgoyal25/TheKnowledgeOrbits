@@ -1,18 +1,14 @@
 """Knowledge Engine - Model Tests"""
 
 import pytest
-import uuid
 from engines.knowledge.models import (
     Program,
     Subject,
     Module,
     Topic,
     ChunkTopicMap,
-    Theme,
-    ThemeTopicMap,
 )
 from engines.content.models import Document, Chunk
-from engines.auth.models import User
 
 
 @pytest.mark.django_db

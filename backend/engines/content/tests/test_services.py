@@ -6,14 +6,13 @@ Target: 85% service coverage.
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from engines.content.services.chunking_service import ChunkingService
 from engines.content.services.embedding_service import EmbeddingService
 from engines.content.services.ingestion_service import IngestionService
-from engines.content.models import Document, Chunk, Embedding, IngestionJob
-from engines.content.tests.factories import DocumentFactory, ChunkFactory
+from engines.content.models import Document, Chunk, IngestionJob
 
 
 # ============================================================================

@@ -5,6 +5,8 @@ Django Base settings for TheKnowledgeOrbits.
 import os
 from pathlib import Path
 import environ
+from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -157,8 +159,6 @@ REST_FRAMEWORK = {
 }
 
 # JWT Settings
-from datetime import timedelta
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),

@@ -11,7 +11,7 @@ from rest_framework import status
 from engines.auth.models import User
 from engines.analytics.models import DailyAggregate
 from engines.analytics.services.analytics_service import AnalyticsService
-from engines.userstate.models import UserEvent, UserProgress, TopicMastery
+from engines.userstate.models import UserProgress, TopicMastery
 
 
 @pytest.fixture

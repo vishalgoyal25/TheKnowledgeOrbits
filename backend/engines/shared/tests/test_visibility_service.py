@@ -5,7 +5,6 @@ Tests for VisibilityService (public/private content filtering).
 """
 
 import pytest
-from django.db.models import Q
 from engines.shared.services.visibility_service import (
     VisibilityService,
     get_visibility_service,

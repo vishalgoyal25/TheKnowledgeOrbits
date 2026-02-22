@@ -5,7 +5,7 @@ Knowledge Engine Views
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny
 import structlog
 
 from engines.knowledge.models import (
@@ -23,7 +23,6 @@ from engines.knowledge.serializers import (
     TopicSerializer,
     ChunkTopicMapSerializer,
     ThemeSerializer,
-    ThemeTopicMapSerializer,
 )
 from engines.content.pagination import ContentCursorPagination
 from engines.knowledge.services.mapping_service import MappingService

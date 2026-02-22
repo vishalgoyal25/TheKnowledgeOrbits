@@ -8,7 +8,7 @@ import pytest
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
-from engines.auth.models import User, Role, RoleAssignment
+from engines.auth.models import User
 
 
 @pytest.fixture
@@ -107,7 +107,7 @@ class TestVerifyEmailView:
         user.verification_sent_at = timezone.now()
         user.save()
 
-        response = api_client.post(f"/api/v1/auth/verify-email/test-token-123/")
+        response = api_client.post("/api/v1/auth/verify-email/test-token-123/")
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["message"] == "Email verified successfully"

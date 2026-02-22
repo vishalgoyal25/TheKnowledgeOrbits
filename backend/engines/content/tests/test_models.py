@@ -9,7 +9,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from engines.content.models import Document, Chunk, Embedding, Asset, IngestionJob
+from engines.content.models import Document, Chunk, Asset, IngestionJob
 from engines.content.tests.factories import (
     DocumentFactory,
     ChunkFactory,

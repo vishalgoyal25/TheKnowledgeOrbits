@@ -7,7 +7,7 @@ End-to-end user flow tests.
 import pytest
 from rest_framework.test import APIClient
 from rest_framework import status
-from engines.auth.models import User, Role
+from engines.auth.models import User
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ Tests for Document, Chunk, Embedding viewsets.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.core.files.uploadedfile import SimpleUploadedFile

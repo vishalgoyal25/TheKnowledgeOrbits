@@ -9,7 +9,6 @@ import uuid
 from rest_framework.test import APIClient
 from rest_framework import status
 from engines.auth.models import User
-from engines.userstate.models import UserEvent, Bookmark, TopicMastery
 
 
 @pytest.fixture

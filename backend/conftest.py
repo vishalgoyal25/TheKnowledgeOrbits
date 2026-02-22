@@ -9,12 +9,12 @@ import pytest
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
 
 # Import Django and setup
-import django
+import django  # noqa: E402
 
 django.setup()
 
 # NOW it's safe to import Django/DRF components
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient  # noqa: E402
 
 
 @pytest.fixture

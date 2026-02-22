@@ -6,7 +6,6 @@ Tests for Quiz, Question, QuizAttempt, QuestionResponse models.
 
 import pytest
 import uuid
-from django.utils import timezone
 from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionResponse
 from engines.auth.models import User
 from engines.knowledge.models import Program, Subject, Module, Topic

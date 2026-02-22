@@ -7,7 +7,7 @@ Tests for ActivityService, BookmarkService, MasteryService, ProgressService.
 import pytest
 import uuid
 from engines.auth.models import User
-from engines.userstate.models import UserEvent, Bookmark, TopicMastery, UserProgress
+from engines.userstate.models import UserEvent, Bookmark, TopicMastery
 from engines.userstate.services.activity_service import ActivityService
 from engines.userstate.services.bookmark_service import BookmarkService
 from engines.userstate.services.mastery_service import MasteryService

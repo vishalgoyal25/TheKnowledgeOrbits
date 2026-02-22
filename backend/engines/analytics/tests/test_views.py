@@ -11,7 +11,7 @@ from rest_framework import status
 from django.core.cache import cache
 from engines.auth.models import User
 from engines.analytics.models import DailyAggregate, Insight
-from engines.userstate.models import UserEvent, TopicMastery
+from engines.userstate.models import UserEvent
 
 
 @pytest.fixture

@@ -5,7 +5,6 @@ End-to-end CA workflows.
 """
 
 import pytest
-from unittest.mock import patch
 from rest_framework.test import APIClient
 from django.utils import timezone
 from engines.current_affairs.models import CASource, CAArticle, CAChunk

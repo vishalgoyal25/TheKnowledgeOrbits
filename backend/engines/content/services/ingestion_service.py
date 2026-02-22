@@ -9,12 +9,11 @@ Orchestrates the full ingestion pipeline:
 5. Store in database
 """
 
-from typing import Dict, Any, Optional
 from django.core.files.uploadedfile import UploadedFile
 import structlog
 
 from django.utils import timezone
-from engines.content.models import Document, Chunk, Embedding, IngestionJob
+from engines.content.models import Document, Chunk, IngestionJob
 from .chunking_service import ChunkingService
 from .embedding_service import EmbeddingService
 

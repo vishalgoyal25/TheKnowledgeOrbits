@@ -6,7 +6,7 @@ Tests for article viewset endpoints.
 
 import pytest
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from rest_framework.test import APIClient
 from rest_framework import status
 from engines.article_generation.models import Article

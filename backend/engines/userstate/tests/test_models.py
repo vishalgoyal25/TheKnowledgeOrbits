@@ -6,7 +6,6 @@ Tests for UserEvent, UserProgress, TopicMastery, Bookmark, ReadingProgress model
 
 import pytest
 import uuid
-from django.utils import timezone
 from engines.userstate.models import (
     UserEvent,
     UserProgress,
@@ -59,8 +58,8 @@ class TestUserEventModel:
 
     def test_event_ordering(self, user):
         """Test events ordered by created_at descending."""
-        event1 = UserEvent.objects.create(user=user, event_type="login")
-        event2 = UserEvent.objects.create(user=user, event_type="logout")
+        UserEvent.objects.create(user=user, event_type="login")
+        UserEvent.objects.create(user=user, event_type="logout")
 
         events = list(UserEvent.objects.all())
         # Both may have same created_at (same millisecond), so just verify
@@ -103,7 +102,7 @@ class TestUserProgressModel:
 
     def test_progress_one_to_one_with_user(self, user):
         """Test one-to-one relationship with user."""
-        progress1 = UserProgress.objects.create(user=user)
+        UserProgress.objects.create(user=user)
 
         with pytest.raises(Exception):  # IntegrityError
             UserProgress.objects.create(user=user)

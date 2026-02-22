@@ -4,7 +4,7 @@ Auth Engine Serializers (PKB-Compliant)
 
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from engines.auth.models import User, Role, RoleAssignment
+from engines.auth.models import User, Role
 
 
 class RegisterSerializer(serializers.Serializer):

@@ -2,8 +2,6 @@
 Production settings for TheKnowledgeOrbits.
 """
 
-from .base import *
-
 DEBUG = False
 
 # Production security settings

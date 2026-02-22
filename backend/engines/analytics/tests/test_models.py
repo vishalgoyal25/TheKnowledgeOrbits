@@ -148,6 +148,12 @@ class TestInsightModel:
         i1 = Insight.objects.create(user=user, insight_type="weak_topic")
         i2 = Insight.objects.create(user=user, insight_type="milestone")
 
+        # Ensure strictly different generated_at times for deterministic sorting
+        i1.generated_at = timezone.now() - timedelta(minutes=5)
+        i1.save()
+        i2.generated_at = timezone.now()
+        i2.save()
+
         insights = list(Insight.objects.all())
         assert insights[0] == i2
         assert insights[1] == i1
