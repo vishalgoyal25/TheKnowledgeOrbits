@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 Ingestion Service
 
@@ -9,13 +11,14 @@ Orchestrates the full ingestion pipeline:
 5. Store in database
 """
 
+from typing import List, Dict, Optional, Any
 from django.core.files.uploadedfile import UploadedFile
+from django.utils import timezone
 import structlog
 
-from django.utils import timezone
-from engines.content.models import Document, Chunk, IngestionJob
 from .chunking_service import ChunkingService
 from .embedding_service import EmbeddingService
+from engines.content.models import Document, Chunk, IngestionJob
 
 logger = structlog.get_logger(__name__)
 
@@ -33,11 +36,28 @@ class IngestionService:
         file: UploadedFile,
         title: str,
         source_type: str,
-        source_edition: str = None,
-        metadata: dict = None,
-    ) -> dict:
+        source_edition: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
-        Complete ingestion pipeline with page-level tracking.
+        Orchestrates the full ingestion pipeline from file upload to embedding storage.
+
+        This method handles:
+        1. Tracking the job via IngestionJob.
+        2. Permanent storage of the file.
+        3. Document metadata creation.
+        4. Page-by-page text extraction for positional accuracy.
+        5. Batch embedding generation.
+
+        Args:
+            file (UploadedFile): The uploaded PDF or text file.
+            title (str): Human-readable title for the document.
+            source_type (str): Category (e.g., 'static', 'standard_book').
+            source_edition (str, optional): Edition or version string.
+            metadata (dict, optional): Additional key-value pairs for categorization.
+
+        Returns:
+            Dict[str, Any]: Summary of the ingestion results including IDs and counts.
         """
         job = None
         document = None
@@ -147,6 +167,7 @@ class IngestionService:
             }
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error(
                 "ingestion_failed", error=str(e), job_id=str(job.id) if job else None
             )
@@ -174,17 +195,9 @@ class IngestionService:
     def _extract_text(cls, file: UploadedFile) -> str:
         """
         Extract text from uploaded file.
-        Supports: .txt, .pdf
-
-        Args:
-            file: Uploaded file object
-
-        Returns:
-            Extracted text content
-
-        Raises:
-            ValueError: If file type unsupported or extraction fails
         """
+        if not file or not file.name:
+            raise ValueError("Invalid file object: Name is missing")
         file_name = file.name.lower()
 
         try:
@@ -243,6 +256,7 @@ class IngestionService:
                                 logger.warning("empty_page", page=page_num)
 
                         except Exception as page_error:
+                            sentry_sdk.capture_exception(page_error)
                             logger.error(
                                 "page_extraction_failed",
                                 page=page_num,
@@ -282,6 +296,7 @@ class IngestionService:
             raise
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error(
                 "text_extraction_failed",
                 file_name=file.name,
@@ -291,16 +306,21 @@ class IngestionService:
             raise ValueError(f"Could not extract text from file: {str(e)}")
 
     @classmethod
-    def _extract_text_by_pages(cls, file: UploadedFile) -> list:
+    def _extract_text_by_pages(cls, file: UploadedFile) -> List[Dict[str, Any]]:
         """
-        Extract text page-by-page from file.
+        Extract text from a file while maintaining page-level isolation.
+
+        This is critical for allowing users to jump directly to specific pages
+        referenced in generated articles or search results.
+
+        Args:
+            file (UploadedFile): The file to process.
 
         Returns:
-            List of dicts: [
-                {'page_number': 1, 'text': '...', 'chapter': 'Chapter 1'},
-                {'page_number': 2, 'text': '...', 'chapter': 'Chapter 1'},
-            ]
+            List[Dict[str, Any]]: A list containing text and metadata for each page.
         """
+        if not file or not file.name:
+            raise ValueError("Invalid file object: Name is missing")
         file_name = file.name.lower()
         pages_data = []
 
@@ -361,6 +381,7 @@ class IngestionService:
                                 logger.warning("empty_page", page=page_num)
 
                         except Exception as page_error:
+                            sentry_sdk.capture_exception(page_error)
                             logger.error(
                                 "page_extraction_failed",
                                 page=page_num,
@@ -380,6 +401,7 @@ class IngestionService:
             return pages_data
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error("text_extraction_failed", file_name=file.name, error=str(e))
             raise
 
@@ -391,12 +413,14 @@ class IngestionService:
         return ChunkingService._detect_chapter(text)
 
     @classmethod
-    def _generate_embeddings_for_chunks(cls, chunks: list) -> None:
+    def _generate_embeddings_for_chunks(cls, chunks: List["Chunk"]) -> None:
         """
-        Generate and store embeddings for all chunks.
+        Generate semantic embeddings for a list of document chunks.
+
+        This batches the embedding process and stores results in the vector database.
 
         Args:
-            chunks: List of Chunk instances
+            chunks (List[Chunk]): The pre-created chunk instances needing embeddings.
         """
         from engines.content.models import Embedding
 
@@ -421,6 +445,7 @@ class IngestionService:
                 logger.info("embedding_created", chunk_id=str(chunk.id))
 
             except Exception as e:
+                sentry_sdk.capture_exception(e)
                 logger.error(
                     "embedding_generation_failed", chunk_id=str(chunk.id), error=str(e)
                 )

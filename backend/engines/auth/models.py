@@ -19,24 +19,49 @@ from django.contrib.auth.models import (
 )
 from django.utils import timezone
 from datetime import timedelta
+from typing import Any, Optional, cast
 
 
-class UserManager(BaseUserManager):
+class UserManager(BaseUserManager):  # type: ignore
     """Custom user manager for email-based authentication."""
 
-    def create_user(self, email, password=None, **extra_fields):
-        """Create and return a regular user."""
+    def create_user(
+        self, email: str, password: Optional[str] = None, **extra_fields: Any
+    ) -> "User":
+        """
+        Create, normalize, and save a regular User with the given email and password.
+
+        Args:
+            email (str): The unique identifier for the user.
+            password (str, optional): The user's password.
+            **extra_fields (Any): Arbitrary keyword arguments to be stored on User.
+
+        Returns:
+            User: The newly created user instance.
+        """
         if not email:
             raise ValueError("Email is required")
 
         email = self.normalize_email(email).lower()
-        user = self.model(email=email, **extra_fields)
+        user = cast(User, self.model(email=email, **extra_fields))
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
-        """Create and return a superuser."""
+    def create_superuser(
+        self, email: str, password: Optional[str] = None, **extra_fields: Any
+    ) -> "User":
+        """
+        Create and save a SuperUser with administrative privileges.
+
+        Args:
+            email (str): The unique identifier for the admin.
+            password (str, optional): The admin's password.
+            **extra_fields (Any): Arbitrary keyword arguments.
+
+        Returns:
+            User: The newly created superuser instance.
+        """
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_verified", True)

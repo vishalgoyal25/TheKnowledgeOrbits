@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 RSS Scraper Service
 
@@ -5,7 +7,7 @@ Scrapes RSS feeds from news sources
 """
 
 import feedparser
-import logging
+import structlog
 from datetime import datetime
 from typing import Dict, Any
 from django.utils import timezone
@@ -15,7 +17,7 @@ from bs4 import BeautifulSoup
 
 from ..models import CASource, CAArticle
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class RSSScraperService:
@@ -26,16 +28,16 @@ class RSSScraperService:
         """
         Scrape a single source
         """
-        logger.info(f"Scraping source: {source.name}")
+        logger.info("scraping_source", source_name=source.name)
 
         try:
             # Parse RSS feed
             feed = feedparser.parse(source.url)
-            # print(f"DEBUG: Feed Status: {feed.get('status', 'Unknown')}, Entries: {len(feed.entries)}")
-
             if feed.bozo:
                 error_msg = f"Feed parsing error: {feed.bozo_exception}"
-                logger.error(error_msg)
+                logger.error(
+                    "feed_parsing_error", error=error_msg, source_name=source.name
+                )
 
                 source.last_error = error_msg
                 source.save()
@@ -57,6 +59,7 @@ class RSSScraperService:
                     if article_created:
                         articles_new += 1
                 except Exception as e:
+                    sentry_sdk.capture_exception(e)
                     logger.warning(f"Failed to process entry: {e}")
 
             # Update source stats
@@ -79,6 +82,7 @@ class RSSScraperService:
             }
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             error_msg = f"Scraping failed: {str(e)}"
             logger.error(error_msg)
 
@@ -144,8 +148,8 @@ class RSSScraperService:
                     content = fetched
                     # logger.info(f"Fetched full content for '{title}' (Length: {len(content)})")
             except Exception as e:
+                sentry_sdk.capture_exception(e)
                 logger.debug(f"Failed to fetch full content for {url}: {str(e)}")
-                pass
 
         # Clean content (basic checks)
         if not content or len(content.strip()) < 10:
@@ -163,6 +167,7 @@ class RSSScraperService:
                 if timezone.is_naive(published_at):
                     published_at = timezone.make_aware(published_at)
             except Exception as e:
+                sentry_sdk.capture_exception(e)
                 logger.debug(f"Failed to parse published date: {str(e)}")  # nosec: B110
                 pass  # Fallback to now
 
@@ -196,6 +201,7 @@ class RSSScraperService:
             return True
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error(f"Error creating article {title}: {str(e)}")
             return False
 
@@ -250,6 +256,7 @@ class RSSScraperService:
             return ""
 
         except Exception:
+            sentry_sdk.capture_message("Handled Exception without var")
             # Silent failure - returning empty string allows graceful degradation
             return ""
 
@@ -258,7 +265,7 @@ class RSSScraperService:
         """
         Scrape all active RSS sources
         """
-        results = {
+        results: Dict[str, Any] = {
             "sources_scraped": 0,
             "sources_success": 0,
             "sources_failed": 0,

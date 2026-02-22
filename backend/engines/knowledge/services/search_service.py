@@ -2,8 +2,9 @@
 Unified Search Service using pgvector
 """
 
+import sentry_sdk
 from django.db.models import Q
-from typing import List, Dict
+from typing import List, Dict, Any
 import structlog
 from pgvector.django import CosineDistance
 from engines.content.services.embedding_service import EmbeddingService
@@ -17,7 +18,7 @@ logger = structlog.get_logger(__name__)
 
 class SearchService:
     @classmethod
-    def semantic_search(cls, query: str, limit: int = 10, user=None) -> List[Dict]:
+    def semantic_search(cls, query: str, limit: int = 10, user: Any = None) -> List[Dict]:  # type: ignore
         """
         Perform semantic search across all content types.
         """
@@ -28,8 +29,8 @@ class SearchService:
             try:
                 query_vector = EmbeddingService.generate_embedding(query)
             except Exception as e:
-                print(f"Embedding generation failed: {e}")
-                logger.error("embedding_generation_failed", error=str(e))
+                sentry_sdk.capture_exception(e)
+                logger.error("embedding_generation_failed", error=str(e), query=query)
                 query_vector = None
 
             # --- STRATEGY A1: Vector Search for Chunks (Core Content) ---
@@ -143,6 +144,7 @@ class SearchService:
                                 continue
 
                 except Exception as e:
+                    sentry_sdk.capture_exception(e)
                     # If vector search fails (e.g. pgvector not installed/configured), log and continue to keyword search
                     logger.warning("vector_search_failed", error=str(e))
 
@@ -272,5 +274,6 @@ class SearchService:
             return results
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error("semantic_search_failed", error=str(e))
             return []

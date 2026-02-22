@@ -1,3 +1,6 @@
+from typing import Any
+import sentry_sdk
+
 """
 Content Engine Celery Tasks
 
@@ -10,13 +13,13 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
-@shared_task
-def test_task():
+@shared_task  # type: ignore
+def test_task() -> Any:
     return "Task completed successfully"
 
 
-@shared_task(bind=True, max_retries=3)
-def process_document_async(self, document_id: str) -> dict:
+@shared_task(bind=True, max_retries=3)  # type: ignore
+def process_document_async(self, document_id: str) -> dict:  # type: ignore
     """
     Async task for processing large documents.
 
@@ -42,12 +45,13 @@ def process_document_async(self, document_id: str) -> dict:
         return result
 
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         logger.error("async_task_failed", task_id=self.request.id, error=str(e))
         raise self.retry(exc=e, countdown=60)
 
 
-@shared_task
-def generate_embeddings_batch(chunk_ids: list) -> dict:
+@shared_task  # type: ignore
+def generate_embeddings_batch(chunk_ids: list) -> dict:  # type: ignore
     """
     Generate embeddings for multiple chunks in batch.
 

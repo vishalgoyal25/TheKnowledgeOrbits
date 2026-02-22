@@ -2,12 +2,14 @@
 Analytics Engine Admin
 """
 
+from typing import Any
+
 from django.contrib import admin
 from engines.analytics.models import DailyAggregate, Insight
 
 
 @admin.register(DailyAggregate)
-class DailyAggregateAdmin(admin.ModelAdmin):
+class DailyAggregateAdmin(admin.ModelAdmin):  # type: ignore
     """Daily aggregate admin."""
 
     list_display = [
@@ -23,19 +25,17 @@ class DailyAggregateAdmin(admin.ModelAdmin):
     readonly_fields = ["created_at"]
     date_hierarchy = "date"
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
 
-    user_email.short_description = "User"
-
-    def average_score_display(self, obj):
+    @admin.display(description="Avg Score")
+    def average_score_display(self, obj) -> Any:  # type: ignore
         return f"{obj.average_score:.1f}%"
-
-    average_score_display.short_description = "Avg Score"
 
 
 @admin.register(Insight)
-class InsightAdmin(admin.ModelAdmin):
+class InsightAdmin(admin.ModelAdmin):  # type: ignore
     """Insight admin."""
 
     list_display = [
@@ -49,14 +49,12 @@ class InsightAdmin(admin.ModelAdmin):
     search_fields = ["user__email"]
     readonly_fields = ["generated_at"]
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
 
-    user_email.short_description = "User"
-
-    def is_expired_display(self, obj):
+    @admin.display(description="Status")
+    def is_expired_display(self, obj) -> Any:  # type: ignore
         if obj.is_expired:
             return "✗ Expired"
         return "✓ Active"
-
-    is_expired_display.short_description = "Status"

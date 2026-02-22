@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 Current Affairs Engine - Views
 """
@@ -8,6 +10,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser, AllowAny
 from django.utils import timezone
 from datetime import timedelta
+from typing import Optional, Any
+from rest_framework.request import Request
+from rest_framework import status
+import structlog
 
 from .models import CASource, CAArticle, CAChunk, CATopicLink
 from .serializers import (
@@ -18,8 +24,10 @@ from .serializers import (
 )
 from .services.rss_scraper import RSSScraperService
 
+logger = structlog.get_logger(__name__)
 
-class CASourceViewSet(viewsets.ModelViewSet):
+
+class CASourceViewSet(viewsets.ModelViewSet):  # type: ignore
     """CA Source management"""
 
     queryset = CASource.objects.all()
@@ -29,27 +37,55 @@ class CASourceViewSet(viewsets.ModelViewSet):
     ordering_fields = ["name", "last_scraped_at", "article_count"]
     ordering = ["name"]
 
-    def get_permissions(self):
+    def get_permissions(self) -> Any:
         # Only admins can create/update/delete sources
         if self.action in ["create", "update", "partial_update", "destroy", "scrape"]:
             return [IsAdminUser()]
         return [AllowAny()]
 
     @action(detail=True, methods=["post"])
-    def scrape(self, request, pk=None):
-        """Manually trigger scraping for a source"""
-        source = self.get_object()
-        result = RSSScraperService.scrape_source(source)
+    def scrape(self, request: Request, pk: Optional[str] = None) -> Response:
+        """
+        Manually trigger the RSS scraping and processing pipeline for a specific source.
 
-        return Response(
-            {
-                "message": f"Scraped {result['articles_new']} new articles",
-                "result": result,
-            }
+        POST /api/v1/ca/sources/{id}/scrape/
+        """
+        source = self.get_object()
+        logger.info(
+            "manual_scrape_triggered", source_id=str(source.id), source_name=source.name
         )
 
+        try:
+            result = RSSScraperService.scrape_source(source)
+            logger.info(
+                "manual_scrape_completed",
+                source_id=str(source.id),
+                new_articles=result.get("articles_new", 0),
+            )
+            return Response(
+                {
+                    "message": f"Scraped {result['articles_new']} new articles",
+                    "result": result,
+                }
+            )
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            logger.error(
+                "manual_scrape_failed",
+                source_id=str(source.id),
+                error=str(e),
+                exc_info=True,
+            )
+            return Response(
+                {
+                    "error": "Scrape failed",
+                    "message": "An error occurred during manual scraping.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):
+
+class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """CA Article viewing"""
 
     queryset = CAArticle.objects.all()
@@ -60,7 +96,7 @@ class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["published_at", "word_count", "chunk_count"]
     ordering = ["-published_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         queryset = super().get_queryset()
 
         # Filter by source
@@ -85,7 +121,7 @@ class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
-class CAChunkViewSet(viewsets.ReadOnlyModelViewSet):
+class CAChunkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """CA Chunk viewing"""
 
     queryset = CAChunk.objects.all()
@@ -95,7 +131,7 @@ class CAChunkViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["published_at", "confidence_score"]
     ordering = ["-published_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         queryset = super().get_queryset()
 
         # Filter by topic
@@ -120,8 +156,12 @@ class CAChunkViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
     @action(detail=False, methods=["get"])
-    def recent(self, request):
-        """Get recent CA chunks (last 30 days)"""
+    def recent(self, request: Request) -> Response:
+        """
+        Retrieve high-relevance CA chunks from the last 30 days.
+
+        GET /api/v1/ca/chunks/recent/
+        """
         thirty_days_ago = timezone.now() - timedelta(days=30)
 
         chunks = self.get_queryset().filter(
@@ -132,7 +172,7 @@ class CAChunkViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
-class CATopicLinkViewSet(viewsets.ReadOnlyModelViewSet):
+class CATopicLinkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """CA Topic Link viewing"""
 
     queryset = CATopicLink.objects.all()
@@ -142,7 +182,7 @@ class CATopicLinkViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["relevance_score", "created_at"]
     ordering = ["-relevance_score"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         queryset = super().get_queryset()
 
         # Filter by topic

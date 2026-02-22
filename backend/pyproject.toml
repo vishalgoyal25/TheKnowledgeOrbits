@@ -12,3 +12,13 @@ exclude = '''
   | \.venv
 )/
 '''
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+strict = false
+ignore_missing_imports = true
+exclude = ["migrations", "tests"]
+
+[tool.django-stubs]
+django_settings_module = "core.settings.mypy"

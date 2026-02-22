@@ -2,6 +2,8 @@
 User State Engine Admin
 """
 
+from typing import Any
+
 from django.contrib import admin
 from engines.userstate.models import (
     UserEvent,
@@ -13,7 +15,7 @@ from engines.userstate.models import (
 
 
 @admin.register(UserEvent)
-class UserEventAdmin(admin.ModelAdmin):
+class UserEventAdmin(admin.ModelAdmin):  # type: ignore
     """User event admin."""
 
     list_display = ["user_email", "event_type", "created_at"]
@@ -21,14 +23,13 @@ class UserEventAdmin(admin.ModelAdmin):
     search_fields = ["user__email"]
     readonly_fields = ["created_at"]
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
-
-    user_email.short_description = "User"
 
 
 @admin.register(UserProgress)
-class UserProgressAdmin(admin.ModelAdmin):
+class UserProgressAdmin(admin.ModelAdmin):  # type: ignore
     """User progress admin."""
 
     list_display = [
@@ -42,14 +43,13 @@ class UserProgressAdmin(admin.ModelAdmin):
     search_fields = ["user__email"]
     readonly_fields = ["updated_at"]
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
-
-    user_email.short_description = "User"
 
 
 @admin.register(TopicMastery)
-class TopicMasteryAdmin(admin.ModelAdmin):
+class TopicMasteryAdmin(admin.ModelAdmin):  # type: ignore
     """Topic mastery admin."""
 
     list_display = [
@@ -64,19 +64,17 @@ class TopicMasteryAdmin(admin.ModelAdmin):
     search_fields = ["user__email", "topic__name"]
     readonly_fields = ["updated_at"]
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
 
-    user_email.short_description = "User"
-
-    def topic_name(self, obj):
+    @admin.display(description="Topic")
+    def topic_name(self, obj) -> Any:  # type: ignore
         return obj.topic.name
-
-    topic_name.short_description = "Topic"
 
 
 @admin.register(Bookmark)
-class BookmarkAdmin(admin.ModelAdmin):
+class BookmarkAdmin(admin.ModelAdmin):  # type: ignore
     """Bookmark admin."""
 
     list_display = ["user_email", "content_type", "content_id_short", "created_at"]
@@ -84,19 +82,17 @@ class BookmarkAdmin(admin.ModelAdmin):
     search_fields = ["user__email"]
     readonly_fields = ["created_at"]
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
 
-    user_email.short_description = "User"
-
-    def content_id_short(self, obj):
+    @admin.display(description="Content ID")
+    def content_id_short(self, obj) -> Any:  # type: ignore
         return str(obj.content_id)[:8] + "..."
-
-    content_id_short.short_description = "Content ID"
 
 
 @admin.register(ReadingProgress)
-class ReadingProgressAdmin(admin.ModelAdmin):
+class ReadingProgressAdmin(admin.ModelAdmin):  # type: ignore
     """Reading progress admin."""
 
     list_display = [
@@ -109,12 +105,10 @@ class ReadingProgressAdmin(admin.ModelAdmin):
     search_fields = ["user__email"]
     readonly_fields = ["updated_at"]
 
-    def user_email(self, obj):
+    @admin.display(description="User")
+    def user_email(self, obj) -> Any:  # type: ignore
         return obj.user.email
 
-    user_email.short_description = "User"
-
-    def article_id_short(self, obj):
+    @admin.display(description="Article")
+    def article_id_short(self, obj) -> Any:  # type: ignore
         return str(obj.article_id)[:8] + "..."
-
-    article_id_short.short_description = "Article"

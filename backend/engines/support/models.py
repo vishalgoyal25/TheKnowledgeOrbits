@@ -1,3 +1,4 @@
+from typing import Any
 from django.db import models
 
 
@@ -31,5 +32,5 @@ class Feedback(models.Model):
         ordering = ["-created_at"]
         verbose_name_plural = "Feedbacks"
 
-    def __str__(self):
+    def __str__(self) -> Any:
         return f"Feedback from {self.name or 'Anonymous'} - {self.created_at.strftime('%Y-%m-%d')}"

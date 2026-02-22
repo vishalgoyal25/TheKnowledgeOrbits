@@ -4,12 +4,14 @@ Authorization Engine - Role-Based Decorators
 Provides function decorators for role checking.
 """
 
+from typing import Any
+
 from functools import wraps
 from rest_framework.response import Response
 from rest_framework import status
 
 
-def require_role(*required_roles):
+def require_role(*required_roles) -> Any:  # type: ignore
     """
     Decorator: Require user to have one of the specified roles.
 
@@ -19,9 +21,9 @@ def require_role(*required_roles):
             ...
     """
 
-    def decorator(view_func):
+    def decorator(view_func) -> Any:  # type: ignore
         @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
+        def wrapper(request, *args, **kwargs) -> Any:  # type: ignore
             if not request.user or not request.user.is_authenticated:
                 return Response(
                     {"error": "AUTHENTICATION_REQUIRED"},
@@ -49,7 +51,7 @@ def require_role(*required_roles):
     return decorator
 
 
-def admin_only(view_func):
+def admin_only(view_func) -> Any:  # type: ignore
     """
     Decorator: Require admin role.
 
@@ -61,7 +63,7 @@ def admin_only(view_func):
     return require_role("admin")(view_func)
 
 
-def content_manager_or_admin(view_func):
+def content_manager_or_admin(view_func) -> Any:  # type: ignore
     """
     Decorator: Require content_manager or admin role.
 

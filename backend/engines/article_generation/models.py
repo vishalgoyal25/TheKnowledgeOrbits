@@ -5,6 +5,8 @@ Stores generated articles and their source attribution.
 Articles are RAG-generated from chunks, never ingested directly.
 """
 
+from typing import Any
+
 import uuid
 from django.db import models
 from django.utils.text import slugify
@@ -149,7 +151,7 @@ class Article(models.Model):
     def __str__(self) -> str:
         return self.title
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, **kwargs) -> Any:  # type: ignore
         """Auto-generate slug if not provided."""
         if not self.slug:
             base_slug = slugify(self.title)

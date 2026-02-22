@@ -2,12 +2,14 @@
 Current Affairs Engine - Serializers
 """
 
+from typing import Any
+
 from rest_framework import serializers
 from .models import CASource, CAArticle, CAChunk, CATopicLink
 from engines.knowledge.serializers import TopicSerializer
 
 
-class CASourceSerializer(serializers.ModelSerializer):
+class CASourceSerializer(serializers.ModelSerializer):  # type: ignore
     class Meta:
         model = CASource
         fields = [
@@ -31,7 +33,7 @@ class CASourceSerializer(serializers.ModelSerializer):
         ]
 
 
-class CAArticleSerializer(serializers.ModelSerializer):
+class CAArticleSerializer(serializers.ModelSerializer):  # type: ignore
     source_name = serializers.CharField(source="source.name", read_only=True)
 
     class Meta:
@@ -64,7 +66,7 @@ class CAArticleSerializer(serializers.ModelSerializer):
         ]
 
 
-class CAChunkSerializer(serializers.ModelSerializer):
+class CAChunkSerializer(serializers.ModelSerializer):  # type: ignore
     article_title = serializers.CharField(source="ca_article.title", read_only=True)
     topic_count = serializers.SerializerMethodField()
 
@@ -96,11 +98,11 @@ class CAChunkSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-    def get_topic_count(self, obj):
+    def get_topic_count(self, obj) -> Any:  # type: ignore
         return obj.topic_links.count()
 
 
-class CATopicLinkSerializer(serializers.ModelSerializer):
+class CATopicLinkSerializer(serializers.ModelSerializer):  # type: ignore
     topic = TopicSerializer(read_only=True)
     chunk_text = serializers.CharField(source="ca_chunk.chunk_text", read_only=True)
     article_title = serializers.CharField(

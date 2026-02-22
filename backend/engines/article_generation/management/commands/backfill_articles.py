@@ -1,3 +1,5 @@
+from typing import Any
+import sentry_sdk
 from django.core.management.base import BaseCommand
 from engines.article_generation.models import Article
 from engines.content.services.embedding_service import EmbeddingService
@@ -10,7 +12,7 @@ logger = structlog.get_logger(__name__)
 class Command(BaseCommand):
     help = "Backfill embeddings for existing AI-generated articles"
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> Any:  # type: ignore
         self.stdout.write("Starting backfill for article embeddings...")
 
         articles = Article.objects.all()
@@ -42,6 +44,7 @@ class Command(BaseCommand):
                 count += 1
 
             except Exception as e:
+                sentry_sdk.capture_exception(e)
                 self.stdout.write(
                     self.style.ERROR(f"Failed for {article.title}: {str(e)}")
                 )

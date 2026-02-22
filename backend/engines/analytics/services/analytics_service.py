@@ -1,24 +1,30 @@
+import sentry_sdk
+
 """
 Analytics Service
 
 Handles data aggregation from UserEvent logs.
 """
 
-import logging
-from datetime import datetime, timedelta
+import structlog
+from datetime import datetime, date, timedelta
+from typing import TYPE_CHECKING, Dict, Any
 from django.utils import timezone
 
 from engines.analytics.models import DailyAggregate
 from engines.userstate.models import UserEvent
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class AnalyticsService:
     """Service for aggregating user analytics."""
 
     @staticmethod
-    def aggregate_user_day(user, date):
+    def aggregate_user_day(user: "User", date: date) -> DailyAggregate:
         """
         Aggregate user activity for specific date.
 
@@ -70,14 +76,17 @@ class AnalyticsService:
         )
 
         logger.info(
-            f"Aggregated {user.email} for {date}: "
-            f"{articles_read} articles, {quizzes_taken} quizzes"
+            "user_day_aggregated",
+            user_email=user.email,
+            date=str(date),
+            articles_read=articles_read,
+            quizzes_taken=quizzes_taken,
         )
 
         return aggregate
 
     @staticmethod
-    def aggregate_all_users(date):
+    def aggregate_all_users(date: date) -> int:
         """
         Aggregate all users for specific date.
 
@@ -97,20 +106,26 @@ class AnalyticsService:
                 AnalyticsService.aggregate_user_day(user, date)
                 count += 1
             except Exception as e:
-                logger.error(f"Failed to aggregate {user.email}: {str(e)}")
+                sentry_sdk.capture_exception(e)
+                logger.error(
+                    "user_aggregation_failed",
+                    user_email=user.email,
+                    error=str(e),
+                    exc_info=True,
+                )
 
-        logger.info(f"Aggregated {count} users for {date}")
+        logger.info("all_users_aggregated", count=count, date=str(date))
         return count
 
     @staticmethod
-    def get_weekly_stats(user):
+    def get_weekly_stats(user: "User") -> Dict[str, Any]:
         """
         Get user's stats for last 7 days.
 
         Returns:
             dict: Weekly statistics
         """
-        end_date = timezone.now().date()
+        end_date = timezone.localdate()
         start_date = end_date - timedelta(days=7)
 
         aggregates = DailyAggregate.objects.filter(
@@ -141,9 +156,9 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_monthly_stats(user):
+    def get_monthly_stats(user: "User") -> Dict[str, Any]:
         """Get user's stats for last 30 days."""
-        end_date = timezone.now().date()
+        end_date = timezone.localdate()
         start_date = end_date - timedelta(days=30)
 
         aggregates = DailyAggregate.objects.filter(

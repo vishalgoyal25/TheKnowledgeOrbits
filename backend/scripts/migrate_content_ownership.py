@@ -4,6 +4,8 @@ Data Migration: Set Existing Content as Public
 Run this script ONCE after applying ownership migrations.
 """
 
+from typing import Any
+
 import os
 import sys
 import django
@@ -18,7 +20,12 @@ from engines.article_generation.models import Article  # noqa: E402
 from engines.assessment.models import Quiz  # noqa: E402
 
 
-def migrate_articles():
+from rich.console import Console  # noqa: E402
+
+console = Console()
+
+
+def migrate_articles() -> Any:
     """Mark all existing articles as public."""
 
     # Articles without created_by are system/admin articles
@@ -28,10 +35,10 @@ def migrate_articles():
     # Set as public
     articles.update(is_public=True)
 
-    print(f"✅ Migrated {count} articles to public")
+    console.print(f"[green]✅ Migrated {count} articles to public[/green]")
 
 
-def migrate_quizzes():
+def migrate_quizzes() -> Any:
     """Mark all existing quizzes as public."""
 
     # Quizzes without created_by are system/admin quizzes
@@ -41,21 +48,29 @@ def migrate_quizzes():
     # Set as public
     quizzes.update(is_public=True)
 
-    print(f"✅ Migrated {count} quizzes to public")
+    console.print(f"[green]✅ Migrated {count} quizzes to public[/green]")
 
 
 if __name__ == "__main__":
-    print("Starting content ownership migration...")
-    print("=" * 50)
+    console.print("[bold cyan]Starting content ownership migration...[/bold cyan]")
+    console.print("=" * 50)
 
     migrate_articles()
     migrate_quizzes()
 
-    print("=" * 50)
-    print("✅ Migration complete!")
-    print()
-    print("Summary:")
-    print(f"  - Public articles: {Article.objects.filter(is_public=True).count()}")
-    print(f"  - Private articles: {Article.objects.filter(is_public=False).count()}")
-    print(f"  - Public quizzes: {Quiz.objects.filter(is_public=True).count()}")
-    print(f"  - Private quizzes: {Quiz.objects.filter(is_public=False).count()}")
+    console.print("=" * 50)
+    console.print("[bold green]✅ Migration complete![/bold green]")
+    console.print("")
+    console.print("[bold]Summary:[/bold]")
+    console.print(
+        f"  - Public articles: [blue]{Article.objects.filter(is_public=True).count()}[/blue]"
+    )
+    console.print(
+        f"  - Private articles: [blue]{Article.objects.filter(is_public=False).count()}[/blue]"
+    )
+    console.print(
+        f"  - Public quizzes: [blue]{Quiz.objects.filter(is_public=True).count()}[/blue]"
+    )
+    console.print(
+        f"  - Private quizzes: [blue]{Quiz.objects.filter(is_public=False).count()}[/blue]"
+    )

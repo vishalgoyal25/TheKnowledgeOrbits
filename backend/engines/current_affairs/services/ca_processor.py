@@ -1,10 +1,12 @@
+import sentry_sdk
+
 """
 CA Processor Service
 
 Processes CA articles into chunks and generates embeddings
 """
 
-import logging
+import structlog
 from typing import List
 from django.utils import timezone
 from django.db import transaction
@@ -13,7 +15,7 @@ from sentence_transformers import SentenceTransformer
 from ..models import CAArticle, CAChunk
 from engines.content.models import Embedding
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Initialize embedding model (same as content engine)
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -35,8 +37,9 @@ class CAProcessorService:
             bool: True if successful, False otherwise
         """
         logger.info(
-            f"Processing CA article: {article.title}",
-            extra={"article_id": str(article.id)},
+            "processing_ca_article_start",
+            title=article.title,
+            article_id=str(article.id),
         )
 
         try:
@@ -54,7 +57,11 @@ class CAProcessorService:
                 msg = (
                     f"No valid chunks generated. Content length: {len(article.content)}"
                 )
-                logger.warning(msg)
+                logger.warning(
+                    "no_valid_chunks_generated",
+                    content_len=len(article.content),
+                    article_id=str(article.id),
+                )
                 article.processing_status = "failed"
                 article.processing_error = msg
                 article.save()
@@ -102,20 +109,20 @@ class CAProcessorService:
                 article.save()
 
             logger.info(
-                f"Processed CA article: {len(chunks_created)} chunks",
-                extra={"article_id": str(article.id)},
+                "processing_ca_article_completed",
+                chunk_count=len(chunks_created),
+                article_id=str(article.id),
             )
 
             return True
 
         except Exception as e:
-            import traceback
-
-            traceback.print_exc()
-            print(f"CRITICAL ERROR processing {article.id}: {e}")
+            sentry_sdk.capture_exception(e)
             logger.error(
-                f"Failed to process CA article: {e}",
-                extra={"article_id": str(article.id)},
+                "failed_to_process_ca_article",
+                error=str(e),
+                article_id=str(article.id),
+                exc_info=True,
             )
 
             article.processing_status = "failed"
@@ -189,7 +196,9 @@ class CAProcessorService:
                 processed_count += 1
 
         logger.info(
-            f"Processed {processed_count}/{len(pending_articles)} pending CA articles"
+            "bulk_process_pending_ca_articles",
+            processed_count=processed_count,
+            total_found=len(pending_articles),
         )
 
         return processed_count

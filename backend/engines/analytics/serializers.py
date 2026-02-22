@@ -6,7 +6,7 @@ from rest_framework import serializers
 from engines.analytics.models import DailyAggregate, Insight
 
 
-class DailyAggregateSerializer(serializers.ModelSerializer):
+class DailyAggregateSerializer(serializers.ModelSerializer):  # type: ignore
     """Daily aggregate serializer."""
 
     average_score = serializers.FloatField(read_only=True)
@@ -26,7 +26,7 @@ class DailyAggregateSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class InsightSerializer(serializers.ModelSerializer):
+class InsightSerializer(serializers.ModelSerializer):  # type: ignore
     """Insight serializer."""
 
     is_expired = serializers.BooleanField(read_only=True)

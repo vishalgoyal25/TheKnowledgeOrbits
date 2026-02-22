@@ -4,11 +4,14 @@ Activity Service
 Handles event logging (event sourcing pattern).
 """
 
-import logging
-from typing import Dict, Any, Optional
+import structlog
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from engines.userstate.models import UserEvent
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class ActivityService:
@@ -16,7 +19,7 @@ class ActivityService:
 
     @staticmethod
     def log_event(
-        user, event_type: str, event_data: Optional[Dict[str, Any]] = None
+        user: "User", event_type: str, event_data: Optional[Dict[str, Any]] = None
     ) -> UserEvent:
         """
         Log a user event.
@@ -33,14 +36,14 @@ class ActivityService:
             user=user, event_type=event_type, event_data=event_data or {}
         )
 
-        logger.debug(f"Event logged: {user.email} - {event_type}")
+        logger.debug("event_logged", user_email=user.email, event_type=event_type)
 
         return event
 
     # Convenience methods for common events
 
     @staticmethod
-    def log_article_read(user, article_id: str):
+    def log_article_read(user: "User", article_id: str) -> UserEvent:
         """Log article read event."""
         return ActivityService.log_event(
             user=user,
@@ -49,7 +52,9 @@ class ActivityService:
         )
 
     @staticmethod
-    def log_article_generated(user, article_id: str, topic_id: str):
+    def log_article_generated(
+        user: "User", article_id: str, topic_id: str
+    ) -> UserEvent:
         """Log article generation event."""
         return ActivityService.log_event(
             user=user,
@@ -58,7 +63,7 @@ class ActivityService:
         )
 
     @staticmethod
-    def log_quiz_started(user, quiz_id: str, attempt_id: str):
+    def log_quiz_started(user: "User", quiz_id: str, attempt_id: str) -> UserEvent:
         """Log quiz start event."""
         return ActivityService.log_event(
             user=user,
@@ -67,7 +72,9 @@ class ActivityService:
         )
 
     @staticmethod
-    def log_quiz_completed(user, quiz_id: str, attempt_id: str, score: float):
+    def log_quiz_completed(
+        user: "User", quiz_id: str, attempt_id: str, score: float
+    ) -> UserEvent:
         """Log quiz completion event."""
         return ActivityService.log_event(
             user=user,
@@ -80,7 +87,9 @@ class ActivityService:
         )
 
     @staticmethod
-    def log_bookmark_added(user, content_type: str, content_id: str):
+    def log_bookmark_added(
+        user: "User", content_type: str, content_id: str
+    ) -> UserEvent:
         """Log bookmark addition."""
         return ActivityService.log_event(
             user=user,
@@ -89,7 +98,9 @@ class ActivityService:
         )
 
     @staticmethod
-    def log_bookmark_removed(user, content_type: str, content_id: str):
+    def log_bookmark_removed(
+        user: "User", content_type: str, content_id: str
+    ) -> UserEvent:
         """Log bookmark removal."""
         return ActivityService.log_event(
             user=user,

@@ -6,7 +6,7 @@ Preserves context with chapter/page metadata.
 """
 
 import re
-from typing import List
+from typing import List, Optional, Dict, Any
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -29,8 +29,12 @@ class ChunkingService:
 
     @classmethod
     def chunk_text(
-        cls, text: str, document_id: str, page_number: int, chapter_name: str = None
-    ) -> list:
+        cls,
+        text: str,
+        document_id: str,
+        page_number: int,
+        chapter_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Split text into semantic chunks with metadata.
 
@@ -82,7 +86,7 @@ class ChunkingService:
             page_number=page_number,
             total_chunks=len(chunks),
             avg_chunk_size=(
-                sum(len(c["chunk_text"]) for c in chunks) // len(chunks)
+                sum(len(str(c["chunk_text"])) for c in chunks) // len(chunks)
                 if chunks
                 else 0
             ),
@@ -123,8 +127,8 @@ class ChunkingService:
         # Split into sentences (simple approach)
         sentences = re.split(r"(?<=[.!?])\s+", text)
 
-        chunks = []
-        current_chunk = []
+        chunks: List[str] = []
+        current_chunk: List[str] = []
         current_length = 0
 
         for sentence in sentences:

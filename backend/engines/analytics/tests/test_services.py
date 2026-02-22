@@ -5,7 +5,7 @@ Tests for AnalyticsService, DashboardService, InsightsService.
 """
 
 import pytest
-from datetime import date, timedelta
+from datetime import timedelta
 from django.utils import timezone
 from engines.auth.models import User
 from engines.analytics.models import DailyAggregate, Insight
@@ -39,7 +39,7 @@ class TestAnalyticsService:
     def test_aggregate_user_day(self, user):
         """Test aggregating user's day."""
         service = AnalyticsService()
-        today = date.today()
+        today = timezone.localdate()
 
         # Create events
         import uuid
@@ -64,7 +64,7 @@ class TestAnalyticsService:
     def test_aggregate_updates_existing(self, user):
         """Test aggregation updates existing record."""
         service = AnalyticsService()
-        today = date.today()
+        today = timezone.localdate()
 
         # Create initial aggregate
         DailyAggregate.objects.create(user=user, date=today, articles_read=1)
@@ -80,7 +80,7 @@ class TestAnalyticsService:
         service = AnalyticsService()
 
         # Create aggregates
-        today = date.today()
+        today = timezone.localdate()
         for i in range(7):
             day = today - timedelta(days=i)
             DailyAggregate.objects.create(
@@ -99,7 +99,7 @@ class TestAnalyticsService:
         service = AnalyticsService()
 
         # Create aggregates
-        today = date.today()
+        today = timezone.localdate()
         for i in range(10):
             DailyAggregate.objects.create(
                 user=user,

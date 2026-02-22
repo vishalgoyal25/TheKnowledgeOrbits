@@ -1,3 +1,5 @@
+import sentry_sdk
+
 """
 Email Service
 
@@ -6,29 +8,34 @@ Handles email sending for:
 - Password reset
 """
 
-import logging
+from typing import TYPE_CHECKING
+
+import structlog
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils.html import strip_tags
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class EmailService:
     """Service for sending authentication emails."""
 
     @staticmethod
-    def send_verification_email(user, token: str) -> bool:
+    def send_verification_email(user: "User", token: str) -> bool:
         """
-        Send email verification email.
+        Send an email verification link to a newly registered user.
 
         Args:
-            user: User instance
-            token: Verification token
+            user (User): The user instance to receive the email.
+            token (str): The unique verification token.
 
         Returns:
-            bool: True if sent successfully
+            bool: True if the email was dispatched successfully, False otherwise.
         """
         try:
             verification_url = f"{settings.FRONTEND_URL}/auth/verify/{token}"
@@ -51,24 +58,27 @@ class EmailService:
                 fail_silently=False,
             )
 
-            logger.info(f"Verification email sent to {user.email}")
+            logger.info("verification_email_dispatched", user_email=user.email)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to send verification email: {str(e)}")
+            sentry_sdk.capture_exception(e)
+            logger.error(
+                "verification_email_failed", error=str(e), user_email=user.email
+            )
             return False
 
     @staticmethod
-    def send_password_reset_email(user, token: str) -> bool:
+    def send_password_reset_email(user: "User", token: str) -> bool:
         """
-        Send password reset email.
+        Send a password reset link to a user who requested it.
 
         Args:
-            user: User instance
-            token: Reset token
+            user (User): The user instance to receive the email.
+            token (str): The time-bound reset token.
 
         Returns:
-            bool: True if sent successfully
+            bool: True if the email was dispatched successfully, False otherwise.
         """
         try:
             reset_url = f"{settings.FRONTEND_URL}/auth/reset-password/{token}"
@@ -91,11 +101,14 @@ class EmailService:
                 fail_silently=False,
             )
 
-            logger.info(f"Password reset email sent to {user.email}")
+            logger.info("password_reset_email_dispatched", user_email=user.email)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to send reset email: {str(e)}")
+            sentry_sdk.capture_exception(e)
+            logger.error(
+                "password_reset_email_failed", error=str(e), user_email=user.email
+            )
             return False
 
 

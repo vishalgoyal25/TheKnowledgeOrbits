@@ -5,9 +5,10 @@ End-to-end analytics workflow tests.
 """
 
 import pytest
-from datetime import date, timedelta
+from datetime import timedelta
 from rest_framework.test import APIClient
 from rest_framework import status
+from django.utils import timezone
 from engines.auth.models import User
 from engines.analytics.models import DailyAggregate
 from engines.analytics.services.analytics_service import AnalyticsService
@@ -48,7 +49,7 @@ class TestAnalyticsAggregationFlow:
 
         # Step 2: Aggregate today's data
         analytics = AnalyticsService()
-        today = date.today()
+        today = timezone.localdate()
         aggregate = analytics.aggregate_user_day(user, today)
 
         assert aggregate.articles_read == 1
@@ -105,7 +106,7 @@ class TestWeeklyPerformanceTracking:
         client, user = authenticated_user
 
         # Create data for 7 days
-        today = date.today()
+        today = timezone.localdate()
         for i in range(7):
             day = today - timedelta(days=i)
             DailyAggregate.objects.create(

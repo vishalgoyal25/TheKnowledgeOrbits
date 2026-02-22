@@ -9,6 +9,7 @@ from django.db import migrations, models
 import pgvector.django.vector
 from pgvector.django import VectorExtension
 
+
 class Migration(migrations.Migration):
 
     initial = True
@@ -265,8 +266,7 @@ class Migration(migrations.Migration):
                 (
                     "vector",
                     pgvector.django.vector.VectorField(
-                        dimensions=384,
-                        help_text="384-dimensional embedding vector"
+                        dimensions=384, help_text="384-dimensional embedding vector"
                     ),
                 ),
                 (

@@ -5,6 +5,8 @@ Usage:
     python manage.py cleanup_expired
 """
 
+from typing import Any
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from engines.current_affairs.models import CAChunk
@@ -13,14 +15,14 @@ from engines.current_affairs.models import CAChunk
 class Command(BaseCommand):
     help = "Mark expired CA chunks and optionally delete them"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser) -> Any:  # type: ignore
         parser.add_argument(
             "--delete",
             action="store_true",
             help="Actually delete expired chunks (instead of just marking)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> Any:  # type: ignore
         delete_expired = options["delete"]
 
         # Find expired chunks

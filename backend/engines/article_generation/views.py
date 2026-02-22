@@ -1,3 +1,6 @@
+from typing import Any
+import sentry_sdk
+
 """
 Article Generation Engine Views
 """
@@ -24,7 +27,7 @@ from engines.shared.services.visibility_service import get_visibility_service
 logger = structlog.get_logger(__name__)
 
 
-class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
+class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """
     ViewSet for Articles.
 
@@ -40,7 +43,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["created_at", "title", "review_status"]
     ordering = ["-created_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         """Get articles (filtered by visibility)."""
         queryset = Article.objects.filter(is_published=True).select_related(
             "topic", "topic__subject"
@@ -48,7 +51,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Apply visibility filtering (PKB Ownership Logic)
         visibility_service = get_visibility_service()
-        queryset = visibility_service.filter_articles(queryset, self.request.user)
+        queryset = visibility_service.filter_articles(queryset, self.request.user)  # type: ignore
 
         # Filter by topic
         topic_id = self.request.query_params.get("topic_id")
@@ -62,7 +65,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(self, request, *args, **kwargs) -> Any:  # type: ignore
         """Retrieve article and log read event."""
         article = self.get_object()
 
@@ -76,7 +79,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(article)
         return Response(serializer.data)
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Any:
         """Return appropriate serializer."""
         if self.action == "retrieve":
             return ArticleDetailSerializer
@@ -88,7 +91,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         url_path="generate",
         permission_classes=[AllowAny],
     )
-    def generate(self, request):
+    def generate(self, request) -> Any:  # type: ignore
         """
         Generate article for a topic.
 
@@ -162,6 +165,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
+            sentry_sdk.capture_exception(e)
             logger.error("article_generation_error", error=str(e))
             return Response(
                 {"error": "Article generation failed. Please try again."},
@@ -169,7 +173,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
     @action(detail=True, methods=["get"], url_path="sources")
-    def sources(self, request, id=None):
+    def sources(self, request, id=None) -> Any:  # type: ignore
         """
         Get source chunks for an article.
 
@@ -198,7 +202,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         url_path="my-notebook",
         permission_classes=[IsAuthenticated],
     )
-    def my_notebook(self, request):
+    def my_notebook(self, request) -> Any:  # type: ignore
         """
         Get user's private articles ("My Notebook").
 
@@ -214,7 +218,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
-class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):
+class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     """
     ViewSet for ArticleGenerationJobs.
 
@@ -229,13 +233,13 @@ class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ["status", "created_at"]
     ordering = ["-created_at"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         """Get jobs for current user (or all for staff)."""
         queryset = ArticleGenerationJob.objects.select_related("topic", "article").all()
 
         # Filter by user for non-staff
         if not self.request.user.is_staff:
-            queryset = queryset.filter(requested_by=self.request.user)
+            queryset = queryset.filter(requested_by=self.request.user)  # type: ignore
 
         # Filter by status
         status_filter = self.request.query_params.get("status")
@@ -250,7 +254,7 @@ class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
-def list_articles(request):
+def list_articles(request) -> Any:  # type: ignore
     """
     List articles.
 
@@ -277,7 +281,7 @@ def list_articles(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def my_notebook(request):
+def my_notebook(request) -> Any:  # type: ignore
     """
     Get user's private articles ("My Notebook").
 

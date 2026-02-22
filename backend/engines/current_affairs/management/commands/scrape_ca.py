@@ -5,6 +5,8 @@ Usage:
     python manage.py scrape_ca
 """
 
+from typing import Any
+
 from django.core.management.base import BaseCommand
 from engines.current_affairs.services.rss_scraper import RSSScraperService
 from engines.current_affairs.services.ca_processor import CAProcessorService
@@ -14,7 +16,7 @@ from engines.current_affairs.services.topic_linker import TopicLinkerService
 class Command(BaseCommand):
     help = "Scrape current affairs from RSS feeds, process, and link to topics"
 
-    def add_arguments(self, parser):
+    def add_arguments(self, parser) -> Any:  # type: ignore
         parser.add_argument(
             "--scrape-only",
             action="store_true",
@@ -31,7 +33,7 @@ class Command(BaseCommand):
             help="Only link unlinked chunks",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> Any:  # type: ignore
         scrape_only = options["scrape_only"]
         process_only = options["process_only"]
         link_only = options["link_only"]

@@ -4,6 +4,8 @@ Authorization Engine - RBAC Middleware
 Attaches user roles to request object for easy access.
 """
 
+from typing import Any
+
 from django.utils.deprecation import MiddlewareMixin
 
 
@@ -17,7 +19,7 @@ class RBACMiddleware(MiddlewareMixin):
         - request.is_content_manager (boolean)
     """
 
-    def process_request(self, request):
+    def process_request(self, request) -> Any:  # type: ignore
         """Attach role information to request."""
 
         if hasattr(request, "user") and request.user.is_authenticated:

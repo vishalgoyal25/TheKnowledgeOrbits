@@ -4,6 +4,8 @@ Authorization Engine - DRF Permission Classes
 Provides role-based permission classes for Django REST Framework views.
 """
 
+from typing import Any
+
 from rest_framework import permissions
 
 
@@ -14,7 +16,7 @@ class IsAdmin(permissions.BasePermission):
 
     message = "Admin role required."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> Any:  # type: ignore
         if not request.user or not request.user.is_authenticated:
             return False
 
@@ -29,7 +31,7 @@ class IsContentManager(permissions.BasePermission):
 
     message = "Content manager or admin role required."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> Any:  # type: ignore
         if not request.user or not request.user.is_authenticated:
             return False
 
@@ -46,7 +48,7 @@ class IsStudent(permissions.BasePermission):
 
     message = "Student, content manager, or admin role required."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> Any:  # type: ignore
         if not request.user or not request.user.is_authenticated:
             return False
 
@@ -65,7 +67,7 @@ class IsOwnerOrAdmin(permissions.BasePermission):
 
     message = "Owner or admin role required."
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request, view, obj) -> Any:  # type: ignore
         # Read permissions for all authenticated users
         if request.method in permissions.SAFE_METHODS:
             return request.user.is_authenticated
@@ -86,7 +88,7 @@ class CanManageContent(permissions.BasePermission):
 
     message = "Content management permission required."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> Any:  # type: ignore
         if not request.user or not request.user.is_authenticated:
             return False
 
@@ -109,7 +111,7 @@ class CanGenerateQuiz(permissions.BasePermission):
 
     message = "Quiz generation permission required."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> Any:  # type: ignore
         if not request.user or not request.user.is_authenticated:
             return False
 
@@ -127,7 +129,7 @@ class CanGenerateArticle(permissions.BasePermission):
 
     message = "Article generation permission required."
 
-    def has_permission(self, request, view):
+    def has_permission(self, request, view) -> Any:  # type: ignore
         if not request.user or not request.user.is_authenticated:
             return False
 

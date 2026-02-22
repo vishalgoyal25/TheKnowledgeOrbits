@@ -4,28 +4,32 @@ Progress Service
 Handles user progress computation.
 """
 
-import logging
+import structlog
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 from django.utils import timezone
 
 from engines.userstate.models import UserProgress, UserEvent
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from engines.auth.models import User
+
+logger = structlog.get_logger(__name__)
 
 
 class ProgressService:
     """Service for computing user progress metrics."""
 
     @staticmethod
-    def get_or_create_progress(user) -> UserProgress:
+    def get_or_create_progress(user: "User") -> UserProgress:
         """Get or create user progress record."""
         progress, created = UserProgress.objects.get_or_create(user=user)
         if created:
-            logger.info(f"Progress record created: {user.email}")
+            logger.info("progress_record_created", user_email=user.email)
         return progress
 
     @staticmethod
-    def update_progress(user):
+    def update_progress(user: "User") -> UserProgress:
         """
         Update user progress from events.
 
@@ -61,12 +65,12 @@ class ProgressService:
         progress.current_streak = streak
         progress.save()
 
-        logger.info(f"Progress updated: {user.email}")
+        logger.info("progress_updated", user_email=user.email)
 
         return progress
 
     @staticmethod
-    def _calculate_streak(user) -> int:
+    def _calculate_streak(user: "User") -> int:
         """
         Calculate consecutive days active.
 
@@ -95,7 +99,7 @@ class ProgressService:
         return streak
 
     @staticmethod
-    def calculate_syllabus_coverage(user) -> float:
+    def calculate_syllabus_coverage(user: "User") -> float:
         """
         Calculate syllabus coverage percentage.
 

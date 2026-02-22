@@ -2,13 +2,15 @@
 Current Affairs Engine - Admin Interface
 """
 
+from typing import Any
+
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import CASource, CAArticle, CAChunk, CATopicLink
 
 
 @admin.register(CASource)
-class CASourceAdmin(admin.ModelAdmin):
+class CASourceAdmin(admin.ModelAdmin):  # type: ignore
     list_display = [
         "name",
         "source_type",
@@ -38,16 +40,15 @@ class CASourceAdmin(admin.ModelAdmin):
         ),
     ]
 
-    def status_indicator(self, obj):
+    @admin.display(description="Status")
+    def status_indicator(self, obj) -> Any:  # type: ignore
         if obj.is_active:
             return format_html('<span style="color: green;">●</span> Active')
         return format_html('<span style="color: red;">●</span> Inactive')
 
-    status_indicator.short_description = "Status"
-
 
 @admin.register(CAArticle)
-class CAArticleAdmin(admin.ModelAdmin):
+class CAArticleAdmin(admin.ModelAdmin):  # type: ignore
     list_display = [
         "title_short",
         "source",
@@ -92,14 +93,14 @@ class CAArticleAdmin(admin.ModelAdmin):
         ),
     ]
 
-    def title_short(self, obj):
+    @admin.display(description="Title")
+    def title_short(self, obj) -> Any:  # type: ignore
         return obj.title[:60] + ("..." if len(obj.title) > 60 else "")
-
-    title_short.short_description = "Title"
 
     actions = ["process_articles"]
 
-    def process_articles(self, request, queryset):
+    @admin.action(description="Process selected articles")
+    def process_articles(self, request, queryset) -> Any:  # type: ignore
         from .services.ca_processor import CAProcessorService
 
         processed = 0
@@ -108,11 +109,9 @@ class CAArticleAdmin(admin.ModelAdmin):
                 processed += 1
         self.message_user(request, f"Processed {processed} articles")
 
-    process_articles.short_description = "Process selected articles"
-
 
 @admin.register(CAChunk)
-class CAChunkAdmin(admin.ModelAdmin):
+class CAChunkAdmin(admin.ModelAdmin):  # type: ignore
     list_display = [
         "id_short",
         "article_title",
@@ -144,26 +143,23 @@ class CAChunkAdmin(admin.ModelAdmin):
         ),
     ]
 
-    def id_short(self, obj):
+    @admin.display(description="ID")
+    def id_short(self, obj) -> Any:  # type: ignore
         return str(obj.id)[:8]
 
-    id_short.short_description = "ID"
-
-    def article_title(self, obj):
+    @admin.display(description="Article")
+    def article_title(self, obj) -> Any:  # type: ignore
         return obj.ca_article.title[:50] + (
             "..." if len(obj.ca_article.title) > 50 else ""
         )
 
-    article_title.short_description = "Article"
-
-    def topic_count(self, obj):
+    @admin.display(description="Topics")
+    def topic_count(self, obj) -> Any:  # type: ignore
         return obj.topic_links.count()
-
-    topic_count.short_description = "Topics"
 
 
 @admin.register(CATopicLink)
-class CATopicLinkAdmin(admin.ModelAdmin):
+class CATopicLinkAdmin(admin.ModelAdmin):  # type: ignore
     list_display = [
         "id_short",
         "ca_article_title",
@@ -184,12 +180,10 @@ class CATopicLinkAdmin(admin.ModelAdmin):
         ),
     ]
 
-    def id_short(self, obj):
+    @admin.display(description="ID")
+    def id_short(self, obj) -> Any:  # type: ignore
         return str(obj.id)[:8]
 
-    id_short.short_description = "ID"
-
-    def ca_article_title(self, obj):
+    @admin.display(description="CA Article")
+    def ca_article_title(self, obj) -> Any:  # type: ignore
         return obj.ca_chunk.ca_article.title[:40]
-
-    ca_article_title.short_description = "CA Article"
