@@ -5,7 +5,6 @@
 "use client";
 
 import React from "react";
-// @ts-ignore
 import {
   LineChart as ReChartsLineChart,
   Line,

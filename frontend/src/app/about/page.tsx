@@ -7,11 +7,14 @@ import {
   Zap,
   ShieldCheck,
   Users,
-  Cpu,
   Search,
+  BookOpen,
+  Layout,
+  History,
+  CheckCircle,
+  Cpu,
   Globe,
   ArrowRight,
-  BookOpen,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

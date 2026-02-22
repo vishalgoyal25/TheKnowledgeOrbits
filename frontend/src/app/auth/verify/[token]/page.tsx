@@ -23,24 +23,24 @@ export default function VerifyEmailPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
+    const verifyEmail = async () => {
+      if (!token) return;
+      try {
+        const response = await authAPI.verifyEmail(token);
+        setStatus("success");
+        setMessage(response.message);
+
+        // Redirect to login after 3 seconds
+        setTimeout(() => {
+          router.push("/auth/login?verified=true");
+        }, 3000);
+      } catch (error: any) {
+        setStatus("error");
+        setMessage(error.response?.data?.message || "Verification failed");
+      }
+    };
     verifyEmail();
-  }, [token]);
-
-  const verifyEmail = async () => {
-    try {
-      const response = await authAPI.verifyEmail(token);
-      setStatus("success");
-      setMessage(response.message);
-
-      // Redirect to login after 3 seconds
-      setTimeout(() => {
-        router.push("/auth/login?verified=true");
-      }, 3000);
-    } catch (error: any) {
-      setStatus("error");
-      setMessage(error.response?.data?.message || "Verification failed");
-    }
-  };
+  }, [token, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-100 p-4">
