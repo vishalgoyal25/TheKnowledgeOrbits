@@ -51,7 +51,7 @@ export default function TakeQuizPage() {
   });
 
   // Question start times (for time tracking)
-  const [questionStartTime, setQuestionStartTime] = useState<number>(
+  const [questionStartTime, setQuestionStartTime] = useState<number>(() =>
     Date.now(),
   );
 
