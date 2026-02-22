@@ -7,7 +7,6 @@ Handles data aggregation from UserEvent logs.
 import logging
 from datetime import datetime, timedelta
 from django.utils import timezone
-from django.db.models import Sum, Avg, Count
 
 from engines.analytics.models import DailyAggregate
 from engines.userstate.models import UserEvent

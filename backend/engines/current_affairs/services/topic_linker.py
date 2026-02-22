@@ -5,9 +5,8 @@ Auto-links CA chunks to syllabus topics using semantic similarity
 """
 
 import logging
-from typing import List, Dict
+from typing import Dict
 import numpy as np
-from django.db.models import Q
 from sentence_transformers import SentenceTransformer
 
 from ..models import CAChunk, CATopicLink

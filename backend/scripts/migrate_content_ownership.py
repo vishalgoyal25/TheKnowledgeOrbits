@@ -14,8 +14,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.base")
 django.setup()
 
-from engines.article_generation.models import Article
-from engines.assessment.models import Quiz
+from engines.article_generation.models import Article  # noqa: E402
+from engines.assessment.models import Quiz  # noqa: E402
 
 
 def migrate_articles():

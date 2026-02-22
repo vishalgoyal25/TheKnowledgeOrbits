@@ -5,7 +5,6 @@ DRF serializers for API endpoints.
 """
 
 from rest_framework import serializers
-from django.contrib.auth.models import User
 
 from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionResponse
 from engines.knowledge.models import Topic

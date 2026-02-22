@@ -7,7 +7,7 @@ Scrapes RSS feeds from news sources
 import feedparser
 import logging
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Dict, Any
 from django.utils import timezone
 from django.db import transaction
 import requests
@@ -178,7 +178,7 @@ class RSSScraperService:
         # Create article
         try:
             with transaction.atomic():
-                article = CAArticle.objects.create(
+                CAArticle.objects.create(
                     source=source,
                     title=title,
                     url=url,
@@ -247,7 +247,7 @@ class RSSScraperService:
 
             return ""
 
-        except Exception as e:
+        except Exception:
             # Silent failure - returning empty string allows graceful degradation
             return ""
 

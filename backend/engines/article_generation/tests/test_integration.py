@@ -5,7 +5,7 @@ End-to-end article generation workflows.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from rest_framework.test import APIClient
 from rest_framework import status
 from engines.auth.models import User

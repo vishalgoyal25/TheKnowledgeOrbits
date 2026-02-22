@@ -7,7 +7,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.db.models import Q
 import structlog
 
 from engines.content.models import Document, Chunk, Embedding, Asset, IngestionJob
@@ -24,7 +23,6 @@ from engines.content.services.ingestion_service import IngestionService
 from engines.content.pagination import ContentCursorPagination, ChunkCursorPagination
 
 from engines.authorization.permissions import CanManageContent
-from engines.authorization.decorators import admin_only, content_manager_or_admin
 
 logger = structlog.get_logger(__name__)
 

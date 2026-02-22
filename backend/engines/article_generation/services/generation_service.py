@@ -264,7 +264,7 @@ Source Material:
 {context}
 
 Requirements:
-1. Structure: 
+1. Structure:
    - Introduction (100-150 words) - Set context
    - Theoretical Framework (400-500 words) - Core concepts from textbooks
    - Current Developments (200-300 words) - Recent news/events analysis

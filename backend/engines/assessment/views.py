@@ -12,9 +12,8 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Q
 
-from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionResponse
+from engines.assessment.models import Quiz, QuizAttempt, QuestionResponse
 from engines.assessment.serializers import (
     QuizListSerializer,
     QuizDetailSerializer,
@@ -27,7 +26,6 @@ from engines.assessment.services.quiz_generator import get_quiz_generator
 
 from engines.userstate.services.mastery_service import get_mastery_service
 from engines.userstate.services.activity_service import get_activity_service
-from engines.authorization.permissions import CanGenerateQuiz
 
 from engines.shared.services.visibility_service import get_visibility_service
 

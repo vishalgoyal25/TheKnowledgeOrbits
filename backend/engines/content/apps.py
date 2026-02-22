@@ -22,4 +22,3 @@ class ContentConfig(AppConfig):
         """
         # Import signals when ready (will be added in future phases)
         # import engines.content.signals
-        pass

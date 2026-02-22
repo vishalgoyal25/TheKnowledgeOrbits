@@ -2,10 +2,10 @@
 Current Affairs Engine - Views
 """
 
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.permissions import IsAdminUser, AllowAny
 from django.utils import timezone
 from datetime import timedelta
 
@@ -17,8 +17,6 @@ from .serializers import (
     CATopicLinkSerializer,
 )
 from .services.rss_scraper import RSSScraperService
-from .services.ca_processor import CAProcessorService
-from .services.topic_linker import TopicLinkerService
 
 
 class CASourceViewSet(viewsets.ModelViewSet):

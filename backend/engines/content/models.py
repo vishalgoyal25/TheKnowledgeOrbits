@@ -191,7 +191,7 @@ class Chunk(models.Model):
         return f"Chunk {self.chunk_index} from {self.document.title}"
 
 
-from pgvector.django import VectorField
+from pgvector.django import VectorField  # noqa: E402
 
 
 class Embedding(models.Model):

@@ -5,7 +5,7 @@ Tests for EmailService and TokenService.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from engines.auth.services.email_service import EmailService, get_email_service
 from engines.auth.services.token_service import TokenService, get_token_service
 from engines.auth.models import User

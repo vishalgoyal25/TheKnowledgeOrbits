@@ -3,7 +3,7 @@ Auth Engine Models (PKB-Compliant)
 
 Tables (per DATABASE_SCHEMA.md):
 - auth_user
-- auth_role  
+- auth_role
 - auth_role_assignment
 
 Note: This is the ONLY place where these models exist.

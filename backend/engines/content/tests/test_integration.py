@@ -5,7 +5,6 @@ End-to-end content ingestion workflows.
 """
 
 import pytest
-from unittest.mock import patch
 from rest_framework.test import APIClient
 from rest_framework import status
 from engines.content.models import Document, Chunk

@@ -7,7 +7,6 @@ Handles user progress computation.
 import logging
 from datetime import datetime, timedelta
 from django.utils import timezone
-from django.db.models import Count
 
 from engines.userstate.models import UserProgress, UserEvent
 

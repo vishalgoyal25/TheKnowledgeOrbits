@@ -23,7 +23,6 @@ from django.conf import settings
 from engines.content.models import Chunk
 from engines.current_affairs.models import CAChunk
 from engines.knowledge.models import Topic, ChunkTopicMap
-from engines.current_affairs.models import CATopicLink
 from engines.assessment.models import Quiz, Question
 
 logger = logging.getLogger(__name__)
@@ -496,7 +495,7 @@ Mode: {"HYBRID (Theory + Current Affairs)" if include_ca else "STATIC (Theory On
 
 2. **Assertion-Reasoning Questions**:
    Format: "Assertion (A): [Statement]. Reason (R): [Statement]"
-   Options: 
+   Options:
    A) Both A and R are true and R is the correct explanation of A
    B) Both A and R are true but R is not the correct explanation of A
    C) A is true but R is false
@@ -531,7 +530,7 @@ Return ONLY valid JSON with NO markdown formatting, NO extra text, NO preamble.
       "question_type": "multi_statement",
       "statements": [
         "Statement 1 text",
-        "Statement 2 text", 
+        "Statement 2 text",
         "Statement 3 text"
       ],
       "options": {{

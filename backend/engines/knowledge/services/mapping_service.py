@@ -6,7 +6,6 @@ Uses embedding similarity to suggest relevant chunks for topics.
 
 import structlog
 from typing import List, Dict
-from django.db.models import Q
 
 logger = structlog.get_logger(__name__)
 

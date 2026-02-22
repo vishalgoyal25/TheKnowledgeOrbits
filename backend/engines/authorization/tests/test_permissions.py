@@ -6,13 +6,11 @@ Tests for DRF permission classes.
 
 import pytest
 from rest_framework.test import APIRequestFactory
-from rest_framework.views import APIView
 from engines.auth.models import User, Role, RoleAssignment
 from engines.authorization.permissions import (
     IsAdmin,
     IsContentManager,
     IsStudent,
-    IsOwnerOrAdmin,
     CanManageContent,
     CanGenerateQuiz,
     CanGenerateArticle,

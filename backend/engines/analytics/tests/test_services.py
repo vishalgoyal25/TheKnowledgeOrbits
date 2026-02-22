@@ -70,7 +70,7 @@ class TestAnalyticsService:
         DailyAggregate.objects.create(user=user, date=today, articles_read=1)
 
         # Aggregate again
-        aggregate = service.aggregate_user_day(user, today)
+        service.aggregate_user_day(user, today)
 
         # Should update, not create duplicate
         assert DailyAggregate.objects.filter(user=user, date=today).count() == 1

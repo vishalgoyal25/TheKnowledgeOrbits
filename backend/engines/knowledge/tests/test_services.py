@@ -1,7 +1,7 @@
 """Knowledge Engine - Service Tests"""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from engines.knowledge.services.mapping_service import MappingService
 from engines.knowledge.models import Program, Subject, Module, Topic
 from engines.content.models import Document, Chunk, Embedding
