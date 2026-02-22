@@ -2,15 +2,15 @@
  * Article sources page
  */
 
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
-import { useArticle, useArticleSources } from '@/lib/hooks/use-article';
-import SourceViewer from '@/components/articles/source-viewer';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText } from 'lucide-react';
-import Link from 'next/link';
+import { useParams } from "next/navigation";
+import { useArticle, useArticleSources } from "@/lib/hooks/use-article";
+import SourceViewer from "@/components/articles/source-viewer";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, FileText } from "lucide-react";
+import Link from "next/link";
 
 export default function ArticleSourcesPage() {
   const params = useParams();
@@ -31,9 +31,7 @@ export default function ArticleSourcesPage() {
   if (error || !sourcesData) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-red-600">
-          Error loading sources.
-        </div>
+        <div className="text-center text-red-600">Error loading sources.</div>
       </div>
     );
   }
@@ -53,9 +51,7 @@ export default function ArticleSourcesPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Source Materials</h1>
-        <p className="text-gray-600">
-          {article?.title || 'Article'}
-        </p>
+        <p className="text-gray-600">{article?.title || "Article"}</p>
 
         <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
           <FileText className="h-4 w-4" />

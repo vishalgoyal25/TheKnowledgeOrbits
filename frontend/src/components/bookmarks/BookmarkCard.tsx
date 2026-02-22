@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Bookmark } from '@/types/notebook';
-import { bookmarksAPI } from '@/lib/api/bookmarks';
-import { FileText, Brain, Trash2, Edit, ExternalLink } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import RemoveBookmarkDialog from './RemoveBookmarkDialog';
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Bookmark } from "@/types/notebook";
+import { bookmarksAPI } from "@/lib/api/bookmarks";
+import { FileText, Brain, Trash2, Edit, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
+import RemoveBookmarkDialog from "./RemoveBookmarkDialog";
 
 interface Props {
   bookmark: Bookmark;
@@ -26,23 +26,26 @@ export default function BookmarkCard({ bookmark, onRemove }: Props) {
       onRemove();
       setShowRemoveDialog(false);
     } catch (error) {
-      console.error('Remove failed:', error);
+      console.error("Remove failed:", error);
     } finally {
       setIsRemoving(false);
     }
   };
 
   const handleView = () => {
-    if (bookmark.content_type === 'article') {
+    if (bookmark.content_type === "article") {
       router.push(`/articles/${bookmark.content_id}`);
-    } else if (bookmark.content_type === 'quiz') {
+    } else if (bookmark.content_type === "quiz") {
       router.push(`/assessment/quiz/${bookmark.content_id}`);
     }
   };
 
-  const icon = bookmark.content_type === 'article' 
-    ? <FileText className="h-5 w-5 text-blue-600" />
-    : <Brain className="h-5 w-5 text-green-600" />;
+  const icon =
+    bookmark.content_type === "article" ? (
+      <FileText className="h-5 w-5 text-blue-600" />
+    ) : (
+      <Brain className="h-5 w-5 text-green-600" />
+    );
 
   return (
     <>
@@ -57,7 +60,7 @@ export default function BookmarkCard({ bookmark, onRemove }: Props) {
             </div>
 
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {bookmark.content?.title || 'Untitled'}
+              {bookmark.content?.title || "Untitled"}
             </h3>
 
             {bookmark.notes && (

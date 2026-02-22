@@ -5,4 +5,4 @@
  * This file exists to satisfy TypeScript module resolution.
  * Use '@/lib/auth/useAuth' directly in new code.
  */
-export { useAuth } from '@/lib/auth/useAuth';
+export { useAuth } from "@/lib/auth/useAuth";

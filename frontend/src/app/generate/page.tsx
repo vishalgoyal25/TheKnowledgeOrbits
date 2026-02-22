@@ -1,24 +1,24 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useTopic } from '@/lib/hooks/use-topics';
-import { Topic } from '@/lib/types';
-import TopicSelector from '@/components/generate/topic-selector';
-import GenerationProgress from '@/components/generate/generation-progress';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useGenerateArticle } from '@/lib/hooks/use-article-generation';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Sparkles, Newspaper, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { useTopic } from "@/lib/hooks/use-topics";
+import { Topic } from "@/lib/types";
+import TopicSelector from "@/components/generate/topic-selector";
+import GenerationProgress from "@/components/generate/generation-progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useGenerateArticle } from "@/lib/hooks/use-article-generation";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Sparkles, Newspaper, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-import { Suspense } from 'react';
+import { Suspense } from "react";
 
 function GeneratePageContent() {
   const [includeCA, setIncludeCA] = useState(true);
   const searchParams = useSearchParams();
-  const topicIdFromUrl = searchParams.get('topic_id');
+  const topicIdFromUrl = searchParams.get("topic_id");
 
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [progress, setProgress] = useState(0);
@@ -49,7 +49,10 @@ function GeneratePageContent() {
 
   const handleGenerate = () => {
     if (!selectedTopicId) return;
-    generateMutation.mutate({ topic_id: selectedTopicId, include_ca: includeCA });
+    generateMutation.mutate({
+      topic_id: selectedTopicId,
+      include_ca: includeCA,
+    });
   };
 
   useEffect(() => {
@@ -102,15 +105,18 @@ function GeneratePageContent() {
                       onCheckedChange={setIncludeCA}
                       disabled={generateMutation.isPending}
                     />
-                    <Label htmlFor="include-ca" className="flex items-center gap-2 cursor-pointer font-medium">
+                    <Label
+                      htmlFor="include-ca"
+                      className="flex items-center gap-2 cursor-pointer font-medium"
+                    >
                       <Newspaper className="h-4 w-4 text-blue-600" />
                       Include Current Affairs (last 30 days)
                     </Label>
                   </div>
                   <p className="text-sm text-gray-600 mt-2 ml-12">
                     {includeCA
-                      ? '✓ Article will include recent news and updates related to this topic'
-                      : '× Article will only use textbook content (NCERT)'}
+                      ? "✓ Article will include recent news and updates related to this topic"
+                      : "× Article will only use textbook content (NCERT)"}
                   </p>
                 </div>
 
@@ -127,8 +133,9 @@ function GeneratePageContent() {
                     <div>
                       <p className="font-medium">Generation failed</p>
                       <p className="text-red-600 mt-0.5">
-                        {(generateMutation.error as any)?.response?.data?.error ||
-                          'Could not generate article. Please try again.'}
+                        {(generateMutation.error as any)?.response?.data
+                          ?.error ||
+                          "Could not generate article. Please try again."}
                       </p>
                     </div>
                   </div>
@@ -141,7 +148,9 @@ function GeneratePageContent() {
                   size="lg"
                   className="w-full"
                 >
-                  {generateMutation.isPending ? 'Generating...' : 'Generate Article'}
+                  {generateMutation.isPending
+                    ? "Generating..."
+                    : "Generate Article"}
                 </Button>
               </div>
             ) : (
@@ -158,7 +167,13 @@ function GeneratePageContent() {
 
 export default function GeneratePage() {
   return (
-    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-gray-500">Loading generation tools...</div>}>
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8 text-center text-gray-500">
+          Loading generation tools...
+        </div>
+      }
+    >
       <GeneratePageContent />
     </Suspense>
   );

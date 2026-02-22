@@ -26,8 +26,12 @@ from django.db import transaction
 
 from engines.auth.models import User, Role, RoleAssignment
 from engines.auth.serializers import (
-    RegisterSerializer, LoginSerializer, UserSerializer,
-    ForgotPasswordSerializer, ResetPasswordSerializer, ChangePasswordSerializer
+    RegisterSerializer,
+    LoginSerializer,
+    UserSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
+    ChangePasswordSerializer,
 )
 from engines.auth.services.email_service import get_email_service
 from engines.auth.services.token_service import get_token_service
@@ -39,18 +43,18 @@ def get_tokens_for_user(user):
     """Generate JWT tokens."""
     refresh = RefreshToken.for_user(user)
     return {
-        'refresh': str(refresh),
-        'access': str(refresh.access_token),
+        "refresh": str(refresh),
+        "access": str(refresh.access_token),
     }
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 @transaction.atomic
 def register(request):
     """
     Register new user.
-    
+
     POST /api/v1/auth/register/
     Body: {
         "email": "user@example.com",
@@ -60,129 +64,127 @@ def register(request):
     }
     """
     serializer = RegisterSerializer(data=request.data)
-    
+
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         # Create user
         user = User.objects.create_user(
-            email=serializer.validated_data['email'],
-            password=serializer.validated_data['password'],
-            full_name=serializer.validated_data.get('full_name', ''),
-            is_verified=False
+            email=serializer.validated_data["email"],
+            password=serializer.validated_data["password"],
+            full_name=serializer.validated_data.get("full_name", ""),
+            is_verified=False,
         )
-        
+
         # Assign default role (free_user)
         default_role, _ = Role.objects.get_or_create(
-            name='free_user',
-            defaults={'description': 'Free tier user'}
+            name="free_user", defaults={"description": "Free tier user"}
         )
         RoleAssignment.objects.create(user=user, role=default_role)
-        
+
         # Generate verification token
         token_service = get_token_service()
         token = token_service.generate_verification_token()
-        
+
         user.verification_token = token
         user.verification_sent_at = timezone.now()
         user.save()
-        
+
         # Send email
         email_service = get_email_service()
         email_service.send_verification_email(user, token)
-        
+
         logger.info(f"User registered: {user.email}")
-        
-        return Response({
-            'message': 'Registration successful. Check your email to verify.',
-            'user': UserSerializer(user).data
-        }, status=status.HTTP_201_CREATED)
-        
+
+        return Response(
+            {
+                "message": "Registration successful. Check your email to verify.",
+                "user": UserSerializer(user).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
     except Exception as e:
         logger.error(f"Registration failed: {str(e)}")
         return Response(
-            {'error': 'REGISTRATION_FAILED', 'message': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "REGISTRATION_FAILED", "message": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def verify_email(request, token):
     """
     Verify user email.
-    
+
     POST /api/v1/auth/verify-email/{token}/
     """
     try:
         user = User.objects.get(verification_token=token)
-        
+
         if not user.is_verification_token_valid():
             return Response(
-                {'error': 'TOKEN_EXPIRED', 'message': 'Token expired'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "TOKEN_EXPIRED", "message": "Token expired"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         user.is_verified = True
         user.verification_token = None
         user.verification_sent_at = None
         user.save()
-        
+
         logger.info(f"Email verified: {user.email}")
-        
-        return Response({'message': 'Email verified successfully'})
-        
+
+        return Response({"message": "Email verified successfully"})
+
     except User.DoesNotExist:
-        return Response(
-            {'error': 'INVALID_TOKEN'},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "INVALID_TOKEN"}, status=status.HTTP_404_NOT_FOUND)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def resend_verification(request):
     """
     Resend verification email.
-    
+
     POST /api/v1/auth/resend-verification/
     Body: {"email": "user@example.com"}
     """
-    email = request.data.get('email', '').lower()
-    
+    email = request.data.get("email", "").lower()
+
     try:
         user = User.objects.get(email=email)
-        
+
         if user.is_verified:
             return Response(
-                {'error': 'ALREADY_VERIFIED'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "ALREADY_VERIFIED"}, status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         token_service = get_token_service()
         token = token_service.generate_verification_token()
-        
+
         user.verification_token = token
         user.verification_sent_at = timezone.now()
         user.save()
-        
+
         email_service = get_email_service()
         email_service.send_verification_email(user, token)
-        
-        return Response({'message': 'Verification email sent'})
-        
+
+        return Response({"message": "Verification email sent"})
+
     except User.DoesNotExist:
         # Don't reveal if email exists
-        return Response({'message': 'If email exists, verification sent'})
+        return Response({"message": "If email exists, verification sent"})
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def login(request):
     """
     Login user.
-    
+
     POST /api/v1/auth/login/
     Body: {
         "email": "user@example.com",
@@ -190,96 +192,97 @@ def login(request):
     }
     """
     serializer = LoginSerializer(data=request.data)
-    
+
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    email = serializer.validated_data['email'].lower()
-    password = serializer.validated_data['password']
-    
+
+    email = serializer.validated_data["email"].lower()
+    password = serializer.validated_data["password"]
+
     user = authenticate(request, username=email, password=password)
-    
+
     if not user:
         return Response(
-            {'error': 'INVALID_CREDENTIALS'},
-            status=status.HTTP_401_UNAUTHORIZED
+            {"error": "INVALID_CREDENTIALS"}, status=status.HTTP_401_UNAUTHORIZED
         )
-    
+
     if not user.is_verified:
         return Response(
-            {'error': 'EMAIL_NOT_VERIFIED', 'email': user.email},
-            status=status.HTTP_403_FORBIDDEN
+            {"error": "EMAIL_NOT_VERIFIED", "email": user.email},
+            status=status.HTTP_403_FORBIDDEN,
         )
-    
+
     tokens = get_tokens_for_user(user)
-    
+
     user.last_login = timezone.now()
     user.save()
-    
+
     logger.info(f"User logged in: {user.email}")
-    
-    return Response({
-        'message': 'Login successful',
-        'user': UserSerializer(user).data,
-        'tokens': tokens
-    })
+
+    return Response(
+        {
+            "message": "Login successful",
+            "user": UserSerializer(user).data,
+            "tokens": tokens,
+        }
+    )
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout(request):
     """
     Logout user.
-    
+
     POST /api/v1/auth/logout/
     """
     logger.info(f"User logged out: {request.user.email}")
-    return Response({'message': 'Logout successful'})
+    return Response({"message": "Logout successful"})
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def forgot_password(request):
     """
     Request password reset.
-    
+
     POST /api/v1/auth/forgot-password/
     Body: {"email": "user@example.com"}
     """
     serializer = ForgotPasswordSerializer(data=request.data)
-    
+
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    email = serializer.validated_data['email'].lower()
-    
+
+    email = serializer.validated_data["email"].lower()
+
     try:
         user = User.objects.get(email=email)
-        
+
         token_service = get_token_service()
         token = token_service.generate_reset_token()
-        
+
         user.reset_token = token
         user.reset_sent_at = timezone.now()
         user.save()
-        
+
         email_service = get_email_service()
         email_service.send_password_reset_email(user, token)
-        
+
         logger.info(f"Password reset requested: {user.email}")
-        
+
     except User.DoesNotExist:
         pass  # Don't reveal if email exists
-    
-    return Response({'message': 'If email exists, reset link sent'})
+
+    return Response({"message": "If email exists, reset link sent"})
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
 def reset_password(request, token):
     """
     Reset password with token.
-    
+
     POST /api/v1/auth/reset-password/{token}/
     Body: {
         "password": "NewPass123",
@@ -287,41 +290,37 @@ def reset_password(request, token):
     }
     """
     serializer = ResetPasswordSerializer(data=request.data)
-    
+
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(reset_token=token)
-        
+
         if not user.is_reset_token_valid():
             return Response(
-                {'error': 'TOKEN_EXPIRED'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "TOKEN_EXPIRED"}, status=status.HTTP_400_BAD_REQUEST
             )
-        
-        user.set_password(serializer.validated_data['password'])
+
+        user.set_password(serializer.validated_data["password"])
         user.reset_token = None
         user.reset_sent_at = None
         user.save()
-        
+
         logger.info(f"Password reset: {user.email}")
-        
-        return Response({'message': 'Password reset successful'})
-        
+
+        return Response({"message": "Password reset successful"})
+
     except User.DoesNotExist:
-        return Response(
-            {'error': 'INVALID_TOKEN'},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({"error": "INVALID_TOKEN"}, status=status.HTTP_404_NOT_FOUND)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def change_password(request):
     """
     Change password (when logged in).
-    
+
     POST /api/v1/auth/change-password/
     Body: {
         "old_password": "OldPass123",
@@ -330,34 +329,32 @@ def change_password(request):
     }
     """
     serializer = ChangePasswordSerializer(data=request.data)
-    
+
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     user = request.user
-    
-    if not user.check_password(serializer.validated_data['old_password']):
+
+    if not user.check_password(serializer.validated_data["old_password"]):
         return Response(
-            {'error': 'INVALID_PASSWORD'},
-            status=status.HTTP_400_BAD_REQUEST
+            {"error": "INVALID_PASSWORD"}, status=status.HTTP_400_BAD_REQUEST
         )
-    
-    user.set_password(serializer.validated_data['new_password'])
+
+    user.set_password(serializer.validated_data["new_password"])
     user.save()
-    
+
     logger.info(f"Password changed: {user.email}")
-    
-    return Response({'message': 'Password changed successfully'})
+
+    return Response({"message": "Password changed successfully"})
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_current_user(request):
     """
     Get current user profile.
-    
+
     GET /api/v1/auth/me/
     """
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
-    

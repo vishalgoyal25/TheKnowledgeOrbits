@@ -2,14 +2,14 @@
  * Auth Provider - Manages Authentication State
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
-import { AuthContext } from './AuthContext';
-import { authAPI } from '@/lib/api/auth';
-import { tokenManager } from './token-manager';
-import { User, LoginRequest, RegisterRequest } from '@/lib/types';
+import { useState, useEffect, ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { AuthContext } from "./AuthContext";
+import { authAPI } from "@/lib/api/auth";
+import { tokenManager } from "./token-manager";
+import { User, LoginRequest, RegisterRequest } from "@/lib/types";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(userData);
       }
     } catch (error) {
-      console.error('Failed to load user:', error);
+      console.error("Failed to load user:", error);
       tokenManager.clearTokens();
     } finally {
       setIsLoading(false);
@@ -51,18 +51,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(response.user);
 
     // Redirect to specified path or dashboard
-    router.push(redirectTo || '/dashboard');
+    router.push(redirectTo || "/dashboard");
   };
 
   const register = async (data: RegisterRequest) => {
     await authAPI.register(data);
     // Don't login - redirect to verify email message
-    router.push('/auth/login?registered=true');
+    router.push("/auth/login?registered=true");
   };
 
   const logout = () => {
     // Call logout API (optional - token invalidation)
-    authAPI.logout().catch(() => { });
+    authAPI.logout().catch(() => {});
 
     // Clear tokens
     tokenManager.clearTokens();
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(null);
 
     // Redirect to login
-    router.push('/auth/login');
+    router.push("/auth/login");
   };
 
   const refreshUser = async () => {

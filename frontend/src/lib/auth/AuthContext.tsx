@@ -2,10 +2,10 @@
  * Auth Context - Global Authentication State
  */
 
-'use client';
+"use client";
 
-import { createContext } from 'react';
-import { User, LoginRequest, RegisterRequest } from '@/lib/types';
+import { createContext } from "react";
+import { User, LoginRequest, RegisterRequest } from "@/lib/types";
 
 export interface AuthContextType {
   user: User | null;
@@ -17,4 +17,6 @@ export interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined,
+);

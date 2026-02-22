@@ -2,14 +2,14 @@
  * React Query hooks for subjects and modules
  */
 
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { subjectsAPI } from '../api/subjects';
+import { useQuery } from "@tanstack/react-query";
+import { subjectsAPI } from "../api/subjects";
 
 export function useSubjects() {
   return useQuery({
-    queryKey: ['subjects'],
+    queryKey: ["subjects"],
     queryFn: () => subjectsAPI.list(),
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
@@ -17,7 +17,7 @@ export function useSubjects() {
 
 export function useSubject(id: string | null) {
   return useQuery({
-    queryKey: ['subject', id],
+    queryKey: ["subject", id],
     queryFn: () => subjectsAPI.getById(id!),
     enabled: !!id,
     staleTime: 15 * 60 * 1000,
@@ -26,7 +26,7 @@ export function useSubject(id: string | null) {
 
 export function useModulesBySubject(subjectId: string | null) {
   return useQuery({
-    queryKey: ['modules', 'subject', subjectId],
+    queryKey: ["modules", "subject", subjectId],
     queryFn: () => subjectsAPI.getModulesBySubject(subjectId!),
     enabled: !!subjectId,
     staleTime: 15 * 60 * 1000,

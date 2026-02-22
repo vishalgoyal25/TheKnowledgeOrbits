@@ -2,7 +2,7 @@
  * Subjects, Modules API endpoints
  */
 
-import apiClient from './client';
+import apiClient from "./client";
 
 export interface Subject {
   id: string;
@@ -25,19 +25,19 @@ export interface Module {
 export const subjectsAPI = {
   // List subjects
   list: async () => {
-    const response = await apiClient.get('/knowledge/subjects/');
+    const response = await apiClient.get("/knowledge/subjects/");
     return response.data;
   },
-  
+
   // Get subject by ID
   getById: async (id: string) => {
     const response = await apiClient.get(`/knowledge/subjects/${id}/`);
     return response.data;
   },
-  
+
   // List modules by subject
   getModulesBySubject: async (subjectId: string) => {
-    const response = await apiClient.get('/knowledge/modules/', {
+    const response = await apiClient.get("/knowledge/modules/", {
       params: { subject_id: subjectId },
     });
     return response.data;

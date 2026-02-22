@@ -2,13 +2,13 @@
  * CA Filter Bar - Date range and source filters
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Filter } from 'lucide-react';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Filter } from "lucide-react";
 
 interface CAFilterBarProps {
   onFilterChange: (filters: {
@@ -19,11 +19,14 @@ interface CAFilterBarProps {
   sources?: Array<{ id: string; name: string }>;
 }
 
-export default function CAFilterBar({ onFilterChange, sources = [] }: CAFilterBarProps) {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [sourceId, setSourceId] = useState('');
-  
+export default function CAFilterBar({
+  onFilterChange,
+  sources = [],
+}: CAFilterBarProps) {
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sourceId, setSourceId] = useState("");
+
   const handleApply = () => {
     onFilterChange({
       date_from: dateFrom || undefined,
@@ -31,31 +34,31 @@ export default function CAFilterBar({ onFilterChange, sources = [] }: CAFilterBa
       source_id: sourceId || undefined,
     });
   };
-  
+
   const handleReset = () => {
-    setDateFrom('');
-    setDateTo('');
-    setSourceId('');
+    setDateFrom("");
+    setDateTo("");
+    setSourceId("");
     onFilterChange({});
   };
-  
+
   // Quick filters
   const setLastNDays = (days: number) => {
     const today = new Date();
     const from = new Date(today);
     from.setDate(from.getDate() - days);
-    
-    setDateFrom(from.toISOString().split('T')[0]);
-    setDateTo(today.toISOString().split('T')[0]);
+
+    setDateFrom(from.toISOString().split("T")[0]);
+    setDateTo(today.toISOString().split("T")[0]);
   };
-  
+
   return (
     <div className="bg-gray-50 rounded-lg p-4 space-y-4">
       <div className="flex items-center gap-2 mb-2">
         <Filter className="h-4 w-4" />
         <span className="font-medium">Filters</span>
       </div>
-      
+
       {/* Quick filters */}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => setLastNDays(7)}>
@@ -68,7 +71,7 @@ export default function CAFilterBar({ onFilterChange, sources = [] }: CAFilterBa
           Last 90 days
         </Button>
       </div>
-      
+
       {/* Date range */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -80,7 +83,7 @@ export default function CAFilterBar({ onFilterChange, sources = [] }: CAFilterBa
             onChange={(e) => setDateFrom(e.target.value)}
           />
         </div>
-        
+
         <div>
           <Label htmlFor="date-to">To Date</Label>
           <Input
@@ -91,7 +94,7 @@ export default function CAFilterBar({ onFilterChange, sources = [] }: CAFilterBa
           />
         </div>
       </div>
-      
+
       {/* Source filter */}
       {sources.length > 0 && (
         <div>
@@ -111,7 +114,7 @@ export default function CAFilterBar({ onFilterChange, sources = [] }: CAFilterBa
           </select>
         </div>
       )}
-      
+
       {/* Actions */}
       <div className="flex gap-2">
         <Button onClick={handleApply} className="flex-1">

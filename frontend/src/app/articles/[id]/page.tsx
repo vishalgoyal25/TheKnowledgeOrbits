@@ -2,34 +2,40 @@
  * Article detail page
  */
 
-'use client';
+"use client";
 
-import { useParams, useSearchParams } from 'next/navigation';
-import { useArticle } from '@/lib/hooks/use-article';
-import { useDocumentAsArticle } from '@/lib/hooks/use-document';
-import ArticleReader from '@/components/articles/article-reader';
-import SourceAttribution from '@/components/quiz/source-attribution';
-import ErrorMessage from '@/components/shared/error-message';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Share2, BookmarkPlus } from 'lucide-react';
-import Link from 'next/link';
+import { useParams, useSearchParams } from "next/navigation";
+import { useArticle } from "@/lib/hooks/use-article";
+import { useDocumentAsArticle } from "@/lib/hooks/use-document";
+import ArticleReader from "@/components/articles/article-reader";
+import SourceAttribution from "@/components/quiz/source-attribution";
+import ErrorMessage from "@/components/shared/error-message";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, Share2, BookmarkPlus } from "lucide-react";
+import Link from "next/link";
 
 export default function ArticleDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const articleId = params.id as string;
-  const type = searchParams.get('type');
-  const chunkIndex = searchParams.get('chunk');
+  const type = searchParams.get("type");
+  const chunkIndex = searchParams.get("chunk");
 
   // Conditional hook calling
   // React requires hooks to be called in the same order, so we can't conditionally call hooks.
   // We must call both and select based on 'type'.
 
-  const articleQuery = useArticle(articleId, { enabled: type !== 'document' });
-  const docQuery = useDocumentAsArticle(articleId, chunkIndex, { enabled: type === 'document' });
+  const articleQuery = useArticle(articleId, { enabled: type !== "document" });
+  const docQuery = useDocumentAsArticle(articleId, chunkIndex, {
+    enabled: type === "document",
+  });
 
-  const { data: article, isLoading, error } = type === 'document' ? docQuery : articleQuery;
+  const {
+    data: article,
+    isLoading,
+    error,
+  } = type === "document" ? docQuery : articleQuery;
 
   if (isLoading) {
     return (
@@ -93,8 +99,11 @@ export default function ArticleDetailPage() {
           <div className="mt-8 max-w-3xl mx-auto">
             <SourceAttribution
               sources={sourceChunks.map((s) => ({
-                title: s.chunk?.chunk_text?.slice(0, 80) || s.chunk_contribution || 'Source',
-                document_title: s.chunk?.document_title || 'Knowledge Base',
+                title:
+                  s.chunk?.chunk_text?.slice(0, 80) ||
+                  s.chunk_contribution ||
+                  "Source",
+                document_title: s.chunk?.document_title || "Knowledge Base",
                 chunk_index: s.sequence_order ?? 0,
                 relevance_score: s.relevance_weight,
               }))}
@@ -102,9 +111,6 @@ export default function ArticleDetailPage() {
           </div>
         );
       })()}
-
-
-
     </div>
   );
 }

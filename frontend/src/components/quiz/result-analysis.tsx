@@ -1,15 +1,22 @@
 /**
  * Result Analysis Component
- * 
+ *
  * Comprehensive score breakdown with performance insights.
  */
 
-'use client';
+"use client";
 
-import type { QuizAttempt } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Trophy, Target, Clock, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
+import type { QuizAttempt } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Trophy,
+  Target,
+  Clock,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 
 interface ResultAnalysisProps {
   attempt: QuizAttempt;
@@ -22,36 +29,36 @@ export default function ResultAnalysis({ attempt }: ResultAnalysisProps) {
   const getPerformanceBadge = () => {
     if (percentage >= 80) {
       return {
-        text: 'Excellent! 🎉',
-        color: 'bg-green-100 text-green-800 border-green-200',
-        message: 'Outstanding performance! Keep it up!',
+        text: "Excellent! 🎉",
+        color: "bg-green-100 text-green-800 border-green-200",
+        message: "Outstanding performance! Keep it up!",
       };
     }
     if (percentage >= 60) {
       return {
-        text: 'Good Job! 👍',
-        color: 'bg-blue-100 text-blue-800 border-blue-200',
-        message: 'Solid performance. Review the concepts you missed.',
+        text: "Good Job! 👍",
+        color: "bg-blue-100 text-blue-800 border-blue-200",
+        message: "Solid performance. Review the concepts you missed.",
       };
     }
     if (percentage >= 40) {
       return {
-        text: 'Keep Practicing 💪',
-        color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-        message: 'You\'re making progress. Focus on weak areas.',
+        text: "Keep Practicing 💪",
+        color: "bg-yellow-100 text-yellow-800 border-yellow-200",
+        message: "You're making progress. Focus on weak areas.",
       };
     }
     return {
-      text: 'Needs Improvement 📚',
-      color: 'bg-red-100 text-red-800 border-red-200',
-      message: 'Don\'t worry! Review the material and try again.',
+      text: "Needs Improvement 📚",
+      color: "bg-red-100 text-red-800 border-red-200",
+      message: "Don't worry! Review the material and try again.",
     };
   };
 
   const performanceBadge = getPerformanceBadge();
 
   const formatTime = (seconds: number | null) => {
-    if (!seconds) return 'N/A';
+    if (!seconds) return "N/A";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
@@ -151,15 +158,19 @@ export default function ResultAnalysis({ attempt }: ResultAnalysisProps) {
                 key={response.id}
                 className={`flex items-center justify-center p-3 rounded-lg border-2 font-semibold ${
                   response.is_correct
-                    ? 'bg-green-50 border-green-300 text-green-700'
+                    ? "bg-green-50 border-green-300 text-green-700"
                     : response.selected_option
-                    ? 'bg-red-50 border-red-300 text-red-700'
-                    : 'bg-gray-50 border-gray-300 text-gray-500'
+                      ? "bg-red-50 border-red-300 text-red-700"
+                      : "bg-gray-50 border-gray-300 text-gray-500"
                 }`}
               >
                 <span className="text-sm">Q{idx + 1}</span>
                 <span className="ml-2">
-                  {response.is_correct ? '✓' : response.selected_option ? '✗' : '○'}
+                  {response.is_correct
+                    ? "✓"
+                    : response.selected_option
+                      ? "✗"
+                      : "○"}
                 </span>
               </div>
             ))}

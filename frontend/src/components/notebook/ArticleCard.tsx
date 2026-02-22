@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Article } from '@/types/notebook';
-import { notebookAPI } from '@/lib/api/notebook';
-import { FileText, Calendar, Clock, Trash2, Eye } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import DeleteArticleDialog from './DeleteArticleDialog';
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Article } from "@/types/notebook";
+import { notebookAPI } from "@/lib/api/notebook";
+import { FileText, Calendar, Clock, Trash2, Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import DeleteArticleDialog from "./DeleteArticleDialog";
 
 interface Props {
   article: Article;
@@ -26,7 +26,7 @@ export default function ArticleCard({ article, onDelete }: Props) {
       onDelete();
       setShowDeleteDialog(false);
     } catch (error) {
-      console.error('Delete failed:', error);
+      console.error("Delete failed:", error);
     } finally {
       setIsDeleting(false);
     }
@@ -39,10 +39,14 @@ export default function ArticleCard({ article, onDelete }: Props) {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <FileText className="h-5 w-5 text-blue-600" />
-              <h3 className="text-xl font-semibold text-gray-900">{article.title}</h3>
+              <h3 className="text-xl font-semibold text-gray-900">
+                {article.title}
+              </h3>
             </div>
 
-            <p className="text-gray-600 text-sm mb-4 line-clamp-2">{article.summary}</p>
+            <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+              {article.summary}
+            </p>
 
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1">

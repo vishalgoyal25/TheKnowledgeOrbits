@@ -18,7 +18,7 @@ export interface Article {
 
 export interface Bookmark {
   id: string;
-  content_type: 'article' | 'quiz' | 'chunk';
+  content_type: "article" | "quiz" | "chunk";
   content_id: string;
   notes: string;
   created_at: string;

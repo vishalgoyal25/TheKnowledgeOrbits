@@ -7,10 +7,10 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'jobs', views.ArticleGenerationJobViewSet, basename='generation-job')
-router.register(r'', views.ArticleViewSet, basename='article')
+router.register(r"jobs", views.ArticleGenerationJobViewSet, basename="generation-job")
+router.register(r"", views.ArticleViewSet, basename="article")
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('my-notebook/', views.my_notebook, name='my-notebook'),
+    path("", include(router.urls)),
+    path("my-notebook/", views.my_notebook, name="my-notebook"),
 ]

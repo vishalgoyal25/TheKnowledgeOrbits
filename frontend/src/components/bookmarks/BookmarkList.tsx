@@ -3,22 +3,26 @@
  * TODO: Enhance with pagination/virtualization in upcoming phase
  */
 
-'use client';
+"use client";
 
-import { Bookmark } from '@/types/notebook';
-import BookmarkCard from './BookmarkCard';
+import { Bookmark } from "@/types/notebook";
+import BookmarkCard from "./BookmarkCard";
 
 interface Props {
-    bookmarks: Bookmark[];
-    onRemove: () => void;
+  bookmarks: Bookmark[];
+  onRemove: () => void;
 }
 
 export default function BookmarkList({ bookmarks, onRemove }: Props) {
-    return (
-        <div className="space-y-4">
-            {bookmarks.map(bookmark => (
-                <BookmarkCard key={bookmark.id} bookmark={bookmark} onRemove={onRemove} />
-            ))}
-        </div>
-    );
+  return (
+    <div className="space-y-4">
+      {bookmarks.map((bookmark) => (
+        <BookmarkCard
+          key={bookmark.id}
+          bookmark={bookmark}
+          onRemove={onRemove}
+        />
+      ))}
+    </div>
+  );
 }

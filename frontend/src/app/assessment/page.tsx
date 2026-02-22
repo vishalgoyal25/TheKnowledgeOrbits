@@ -1,25 +1,25 @@
 /**
  * Quiz Listing Page
- * 
+ *
  * Browse and filter available quizzes.
  * Generate new quizzes for topics.
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useQuizzes, useGenerateQuiz } from '@/lib/hooks/use-quiz';
-import QuizCard from '@/components/quiz/quiz-card';
-import QuizFilters from '@/components/quiz/quiz-filters';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { FileQuestion, Plus, History } from 'lucide-react';
+import { useState } from "react";
+import Link from "next/link";
+import { useQuizzes, useGenerateQuiz } from "@/lib/hooks/use-quiz";
+import QuizCard from "@/components/quiz/quiz-card";
+import QuizFilters from "@/components/quiz/quiz-filters";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FileQuestion, Plus, History } from "lucide-react";
 
 export default function AssessmentPage() {
   const [filters, setFilters] = useState({
-    topic_id: '',
-    difficulty: '' as '' | 'easy' | 'medium' | 'hard',
+    topic_id: "",
+    difficulty: "" as "" | "easy" | "medium" | "hard",
     include_ca: undefined as boolean | undefined,
   });
 
@@ -69,7 +69,8 @@ export default function AssessmentPage() {
           </div>
         </div>
         <p className="text-gray-600">
-          Practice with AI-generated quizzes based on NCERT textbooks and current affairs
+          Practice with AI-generated quizzes based on NCERT textbooks and
+          current affairs
         </p>
       </div>
 

@@ -6,130 +6,135 @@
  * scroll position restore, and sub-component composition.
  */
 
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { Article } from '@/lib/types';
-import { useReadingProgress } from '@/lib/hooks/use-reading-progress';
-import ArticleHeader from './article-header';
-import ArticleContent from './article-content';
-import ReadingProgress from './reading-progress';
-import BookmarkButton from './bookmark-button';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Newspaper } from 'lucide-react';
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Article } from "@/lib/types";
+import { useReadingProgress } from "@/lib/hooks/use-reading-progress";
+import ArticleHeader from "./article-header";
+import ArticleContent from "./article-content";
+import ReadingProgress from "./reading-progress";
+import BookmarkButton from "./bookmark-button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Newspaper } from "lucide-react";
 
 interface ArticleReaderProps {
-    article: Article;
+  article: Article;
 }
 
 export default function ArticleReader({ article }: ArticleReaderProps) {
-    const router = useRouter();
-    const contentRef = useRef<HTMLDivElement>(null);
-    const { progress, updateProgress } = useReadingProgress(article.id);
+  const router = useRouter();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const { progress, updateProgress } = useReadingProgress(article.id);
 
-    // Source breakdown — use API-provided counts (source_chunks may not be populated in list view)
-    const sourceChunksArr = article.source_chunks || [];
-    const totalSources = sourceChunksArr.length || article.source_chunk_count || 0;
-    const staticSources = sourceChunksArr.filter((s) => s.chunk?.source_type === 'static').length
-        || article.static_chunk_count
-        || 0;
-    const caSources = sourceChunksArr.filter((s) => s.chunk?.source_type === 'dynamic').length
-        || article.ca_chunk_count
-        || (article as any).generation_metadata?.ca_chunks_used
-        || 0;
+  // Source breakdown — use API-provided counts (source_chunks may not be populated in list view)
+  const sourceChunksArr = article.source_chunks || [];
+  const totalSources =
+    sourceChunksArr.length || article.source_chunk_count || 0;
+  const staticSources =
+    sourceChunksArr.filter((s) => s.chunk?.source_type === "static").length ||
+    article.static_chunk_count ||
+    0;
+  const caSources =
+    sourceChunksArr.filter((s) => s.chunk?.source_type === "dynamic").length ||
+    article.ca_chunk_count ||
+    (article as any).generation_metadata?.ca_chunks_used ||
+    0;
 
+  // Track scroll position for reading progress
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!contentRef.current) return;
 
+      const element = contentRef.current;
+      const scrollTop = window.scrollY;
+      const scrollHeight = element.scrollHeight - window.innerHeight;
+      const percent = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
 
-    // Track scroll position for reading progress
-    useEffect(() => {
-        const handleScroll = () => {
-            if (!contentRef.current) return;
+      updateProgress(Math.min(Math.max(percent, 0), 100), scrollTop);
+    };
 
-            const element = contentRef.current;
-            const scrollTop = window.scrollY;
-            const scrollHeight = element.scrollHeight - window.innerHeight;
-            const percent = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [article.id, updateProgress]);
 
-            updateProgress(Math.min(Math.max(percent, 0), 100), scrollTop);
-        };
+  // Restore scroll position on mount
+  useEffect(() => {
+    if (progress?.last_position) {
+      window.scrollTo(0, progress.last_position);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, [article.id, updateProgress]);
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Fixed Reading Progress Bar */}
+      <ReadingProgress percent={progress?.percent_read || 0} />
 
-    // Restore scroll position on mount
-    useEffect(() => {
-        if (progress?.last_position) {
-            window.scrollTo(0, progress.last_position);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    return (
-        <div className="min-h-screen bg-white">
-            {/* Fixed Reading Progress Bar */}
-            <ReadingProgress percent={progress?.percent_read || 0} />
-
-            <div className="max-w-4xl mx-auto px-6 py-8">
-                {/* Top Bar: Back */}
-                <div className="flex items-center justify-between mb-6">
-                    <Button
-                        variant="ghost"
-                        onClick={() => router.back()}
-                        className="flex items-center gap-2"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back
-                    </Button>
-                </div>
-
-                {/* Article Header (title, topic, metadata) */}
-                <ArticleHeader article={article} />
-
-                {/* Article Content (with scroll tracking ref) */}
-                <div ref={contentRef}>
-                    <ArticleContent content={article.content} />
-                </div>
-
-                {/* Footer with source attribution & CA info */}
-                <footer className="mt-12 pt-8 border-t">
-                    <div className="flex items-center justify-between text-sm text-gray-600">
-                        <div>
-                            <p className="font-medium">Generated by TheKnowledgeOrbits AI</p>
-                            <p className="flex items-center gap-2 mt-1">
-                                Based on {totalSources} source material{totalSources !== 1 ? 's' : ''}
-                                {staticSources > 0 && caSources > 0 && (
-                                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                                        {staticSources} textbook + {caSources} current affairs
-                                    </span>
-                                )}
-                            </p>
-                            <p className="text-xs mt-2 text-gray-400" suppressHydrationWarning>
-                                {new Date(article.created_at).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric',
-                                })}
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Badge variant="outline">
-                                {article.generation_type.replace('_', ' ')}
-                            </Badge>
-
-                            {caSources > 0 && (
-                                <Badge className="bg-blue-100 text-blue-800 gap-1">
-                                    <Newspaper className="h-3 w-3" />
-                                    CA Integrated
-                                </Badge>
-                            )}
-                        </div>
-                    </div>
-                </footer>
-            </div>
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        {/* Top Bar: Back */}
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
         </div>
-    );
+
+        {/* Article Header (title, topic, metadata) */}
+        <ArticleHeader article={article} />
+
+        {/* Article Content (with scroll tracking ref) */}
+        <div ref={contentRef}>
+          <ArticleContent content={article.content} />
+        </div>
+
+        {/* Footer with source attribution & CA info */}
+        <footer className="mt-12 pt-8 border-t">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div>
+              <p className="font-medium">Generated by TheKnowledgeOrbits AI</p>
+              <p className="flex items-center gap-2 mt-1">
+                Based on {totalSources} source material
+                {totalSources !== 1 ? "s" : ""}
+                {staticSources > 0 && caSources > 0 && (
+                  <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                    {staticSources} textbook + {caSources} current affairs
+                  </span>
+                )}
+              </p>
+              <p
+                className="text-xs mt-2 text-gray-400"
+                suppressHydrationWarning
+              >
+                {new Date(article.created_at).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">
+                {article.generation_type.replace("_", " ")}
+              </Badge>
+
+              {caSources > 0 && (
+                <Badge className="bg-blue-100 text-blue-800 gap-1">
+                  <Newspaper className="h-3 w-3" />
+                  CA Integrated
+                </Badge>
+              )}
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
 }

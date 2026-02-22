@@ -2,17 +2,13 @@
  * Dashboard Layout
  */
 
-import React from 'react';
-import Sidebar from '@/components/layout/sidebar';
+import React from "react";
+import Sidebar from "@/components/layout/sidebar";
 
 export default function DashboardLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    return (
-        <>
-            {children}
-        </>
-    );
+  return <>{children}</>;
 }

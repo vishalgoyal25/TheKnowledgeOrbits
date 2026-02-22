@@ -2,25 +2,25 @@
  * Current Affairs Home Page
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useCAArticles, useCASources } from '@/lib/hooks/use-current-affairs';
-import CAArticleCard from '@/components/current-affairs/ca-article-card';
-import CATimeline from '@/components/current-affairs/ca-timeline';
-import CAFilterBar from '@/components/current-affairs/ca-filter-bar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { Newspaper, LayoutGrid, History, Settings } from 'lucide-react';
-import Link from 'next/link';
+import { useState } from "react";
+import { useCAArticles, useCASources } from "@/lib/hooks/use-current-affairs";
+import CAArticleCard from "@/components/current-affairs/ca-article-card";
+import CATimeline from "@/components/current-affairs/ca-timeline";
+import CAFilterBar from "@/components/current-affairs/ca-filter-bar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Newspaper, LayoutGrid, History, Settings } from "lucide-react";
+import Link from "next/link";
 
 export default function CurrentAffairsPage() {
   const [filters, setFilters] = useState({});
 
   const { data: articlesData, isLoading } = useCAArticles({
     ...filters,
-    ordering: '-published_at',
+    ordering: "-published_at",
   });
 
   const { data: sourcesData } = useCASources();
@@ -77,19 +77,23 @@ export default function CurrentAffairsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-blue-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Total Articles</div>
-          <div className="text-3xl font-bold text-blue-600">{articlesData?.count || 0}</div>
+          <div className="text-3xl font-bold text-blue-600">
+            {articlesData?.count || 0}
+          </div>
         </div>
 
         <div className="bg-green-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Active Sources</div>
           <div className="text-3xl font-bold text-green-600">
-            {sources.filter(s => s.is_active).length}
+            {sources.filter((s) => s.is_active).length}
           </div>
         </div>
 
         <div className="bg-purple-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Showing</div>
-          <div className="text-3xl font-bold text-purple-600">{articles.length}</div>
+          <div className="text-3xl font-bold text-purple-600">
+            {articles.length}
+          </div>
         </div>
       </div>
 
@@ -97,7 +101,7 @@ export default function CurrentAffairsPage() {
       <div className="mb-8">
         <CAFilterBar
           onFilterChange={setFilters}
-          sources={sources.map(s => ({ id: s.id, name: s.name }))}
+          sources={sources.map((s) => ({ id: s.id, name: s.name }))}
         />
       </div>
 

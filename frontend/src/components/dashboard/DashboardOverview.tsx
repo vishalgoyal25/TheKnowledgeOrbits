@@ -1,5 +1,5 @@
-import StatsCard from './StatsCard';
-import { BookOpen, Trophy, Flame, TrendingUp } from 'lucide-react';
+import StatsCard from "./StatsCard";
+import { BookOpen, Trophy, Flame, TrendingUp } from "lucide-react";
 
 interface Props {
   data: {
@@ -40,4 +40,3 @@ export default function DashboardOverview({ data }: Props) {
     </div>
   );
 }
-

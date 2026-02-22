@@ -2,33 +2,33 @@
  * CA Chunks Browser Page
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useCAChunks } from '@/lib/hooks/use-current-affairs';
-import CAChunkCard from '@/components/current-affairs/ca-chunk-card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Search, LayoutGrid } from 'lucide-react';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { useState } from "react";
+import { useCAChunks } from "@/lib/hooks/use-current-affairs";
+import CAChunkCard from "@/components/current-affairs/ca-chunk-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Search, LayoutGrid } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 export default function CAChunksPage() {
-  const [topicId, setTopicId] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
+  const [topicId, setTopicId] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
   const [includeExpired, setIncludeExpired] = useState(false);
-  
+
   const { data: chunksData, isLoading } = useCAChunks({
     topic_id: topicId || undefined,
     date_from: dateFrom || undefined,
     include_expired: includeExpired,
-    ordering: '-published_at',
+    ordering: "-published_at",
   });
-  
+
   const chunks = chunksData?.results || [];
-  
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -41,7 +41,7 @@ export default function CAChunksPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Back button */}
@@ -51,7 +51,7 @@ export default function CAChunksPage() {
           Back to Current Affairs
         </Button>
       </Link>
-      
+
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
@@ -62,7 +62,7 @@ export default function CAChunksPage() {
           Browse processed current affairs chunks linked to topics
         </p>
       </div>
-      
+
       {/* Filters */}
       <div className="mb-6 bg-gray-50 rounded-lg p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -79,7 +79,7 @@ export default function CAChunksPage() {
               />
             </div>
           </div>
-          
+
           <div>
             <Label htmlFor="date-from">From Date</Label>
             <Input
@@ -90,7 +90,7 @@ export default function CAChunksPage() {
             />
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -104,24 +104,20 @@ export default function CAChunksPage() {
           </Label>
         </div>
       </div>
-      
+
       {/* Stats */}
       <div className="mb-6 flex items-center justify-between">
         <div className="text-sm text-gray-600">
           Showing {chunks.length} of {chunksData?.count || 0} chunks
         </div>
-        
+
         {dateFrom && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setDateFrom('')}
-          >
+          <Button variant="outline" size="sm" onClick={() => setDateFrom("")}>
             Clear Date Filter
           </Button>
         )}
       </div>
-      
+
       {/* Chunks */}
       {chunks.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">

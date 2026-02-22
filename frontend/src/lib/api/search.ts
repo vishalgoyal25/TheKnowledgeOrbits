@@ -2,16 +2,16 @@
  * Search API endpoints
  */
 
-import apiClient from './client';
+import apiClient from "./client";
 
 export interface SearchParams {
   q: string;
-  type?: 'articles' | 'topics' | 'all';
+  type?: "articles" | "topics" | "all";
   limit?: number;
 }
 
 export interface SearchResult {
-  type: 'article' | 'topic';
+  type: "article" | "topic";
   id: string;
   title: string;
   snippet: string;
@@ -25,7 +25,7 @@ export const searchAPI = {
     const { q, limit = 10 } = params;
 
     // Call our new Unified Search Endpoint
-    const response = await apiClient.get('/knowledge/search/', {
+    const response = await apiClient.get("/knowledge/search/", {
       params: { q, limit },
     });
 

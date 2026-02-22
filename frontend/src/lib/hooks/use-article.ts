@@ -2,17 +2,21 @@
  * React Query hooks for articles
  */
 
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
-import { articlesAPI } from '../api/articles';
-import { Article, ArticleFilterParams, ArticleGenerationRequest } from '../types';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import apiClient from "@/lib/api/client";
+import { articlesAPI } from "../api/articles";
+import {
+  Article,
+  ArticleFilterParams,
+  ArticleGenerationRequest,
+} from "../types";
 
 // List articles
 export function useArticles(params?: ArticleFilterParams) {
   return useQuery({
-    queryKey: ['articles', params],
+    queryKey: ["articles", params],
     queryFn: () => articlesAPI.list(params),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -21,7 +25,7 @@ export function useArticles(params?: ArticleFilterParams) {
 // Get article by ID
 export function useArticle(articleId: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['article', articleId],
+    queryKey: ["article", articleId],
     queryFn: async () => {
       const response = await apiClient.get<Article>(`/articles/${articleId}/`);
       return response.data;
@@ -34,7 +38,7 @@ export function useArticle(articleId: string, options?: { enabled?: boolean }) {
 // Get article sources
 export function useArticleSources(id: string | null) {
   return useQuery({
-    queryKey: ['article-sources', id],
+    queryKey: ["article-sources", id],
     queryFn: () => articlesAPI.getSources(id!),
     enabled: !!id,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -42,9 +46,12 @@ export function useArticleSources(id: string | null) {
 }
 
 // List articles by topic
-export function useArticlesByTopic(topicId: string | null, params?: ArticleFilterParams) {
+export function useArticlesByTopic(
+  topicId: string | null,
+  params?: ArticleFilterParams,
+) {
   return useQuery({
-    queryKey: ['articles', 'topic', topicId, params],
+    queryKey: ["articles", "topic", topicId, params],
     queryFn: () => articlesAPI.listByTopic(topicId!, params),
     enabled: !!topicId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -59,10 +66,10 @@ export function useGenerateArticle() {
     mutationFn: (data: ArticleGenerationRequest) => articlesAPI.generate(data),
     onSuccess: (data) => {
       // Invalidate articles list
-      queryClient.invalidateQueries({ queryKey: ['articles'] });
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
 
       // Set article in cache
-      queryClient.setQueryData(['article', data.article.id], data.article);
+      queryClient.setQueryData(["article", data.article.id], data.article);
     },
   });
 }

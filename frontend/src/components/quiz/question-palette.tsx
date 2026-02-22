@@ -1,14 +1,14 @@
 /**
  * Question Palette Component
- * 
+ *
  * Grid navigation showing status of all questions.
  */
 
-'use client';
+"use client";
 
-import type { Question } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import type { Question } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface QuestionPaletteProps {
   questions: Question[];
@@ -33,25 +33,25 @@ export default function QuestionPalette({
     const isVisited = visitedQuestions.has(index);
     const isCurrent = index === currentIndex;
 
-    if (isCurrent) return 'current';
-    if (isMarked) return 'marked';
-    if (isAnswered) return 'answered';
-    if (isVisited) return 'visited';
-    return 'not-visited';
+    if (isCurrent) return "current";
+    if (isMarked) return "marked";
+    if (isAnswered) return "answered";
+    if (isVisited) return "visited";
+    return "not-visited";
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'current':
-        return 'bg-blue-600 text-white border-blue-700';
-      case 'marked':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'answered':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'visited':
-        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case "current":
+        return "bg-blue-600 text-white border-blue-700";
+      case "marked":
+        return "bg-purple-100 text-purple-800 border-purple-300";
+      case "answered":
+        return "bg-green-100 text-green-800 border-green-300";
+      case "visited":
+        return "bg-orange-100 text-orange-800 border-orange-300";
       default:
-        return 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50';
+        return "bg-white text-gray-700 border-gray-300 hover:bg-gray-50";
     }
   };
 
@@ -92,9 +92,9 @@ export default function QuestionPalette({
                 key={question.id}
                 onClick={() => onNavigate(index)}
                 className={cn(
-                  'aspect-square rounded-md border-2 font-semibold text-sm transition-all',
-                  'hover:scale-105 active:scale-95',
-                  statusColor
+                  "aspect-square rounded-md border-2 font-semibold text-sm transition-all",
+                  "hover:scale-105 active:scale-95",
+                  statusColor,
                 )}
               >
                 {index + 1}

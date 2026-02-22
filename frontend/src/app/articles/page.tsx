@@ -2,35 +2,36 @@
  * Article listing page
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useArticles } from '@/lib/hooks/use-article';
-import ArticleCard from '@/components/articles/article-card';
-import SearchBar from '@/components/search/search-bar';
-import SearchFilters from '@/components/search/search-filters';
-import ErrorMessage from '@/components/shared/error-message';
-import EmptyState from '@/components/shared/empty-state';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { useState } from "react";
+import { useArticles } from "@/lib/hooks/use-article";
+import ArticleCard from "@/components/articles/article-card";
+import SearchBar from "@/components/search/search-bar";
+import SearchFilters from "@/components/search/search-filters";
+import ErrorMessage from "@/components/shared/error-message";
+import EmptyState from "@/components/shared/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
 
 export default function ArticlesPage() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   const filterOptions = [
-    { label: 'Approved', value: 'approved' },
-    { label: 'Pending', value: 'pending' },
-    { label: 'AI Generated', value: 'ai_generated' },
+    { label: "Approved", value: "approved" },
+    { label: "Pending", value: "pending" },
+    { label: "AI Generated", value: "ai_generated" },
   ];
 
-  const filterStatus = activeFilters.find(f => ['approved', 'pending'].includes(f)) || '';
+  const filterStatus =
+    activeFilters.find((f) => ["approved", "pending"].includes(f)) || "";
 
   const { data, isLoading, error } = useArticles({
     review_status: filterStatus || undefined,
-    ordering: '-created_at',
+    ordering: "-created_at",
   });
 
   if (isLoading) {
@@ -81,7 +82,9 @@ export default function ArticlesPage() {
           activeFilters={activeFilters}
           onFilterToggle={(val) =>
             setActiveFilters((prev) =>
-              prev.includes(val) ? prev.filter((f) => f !== val) : [...prev, val]
+              prev.includes(val)
+                ? prev.filter((f) => f !== val)
+                : [...prev, val],
             )
           }
           onClearAll={() => setActiveFilters([])}
@@ -98,7 +101,11 @@ export default function ArticlesPage() {
       {articles.length === 0 ? (
         <EmptyState
           title="No articles found"
-          description={searchTerm ? `No articles match "${searchTerm}". Try a different search.` : 'No articles yet. Generate your first article to get started.'}
+          description={
+            searchTerm
+              ? `No articles match "${searchTerm}". Try a different search.`
+              : "No articles yet. Generate your first article to get started."
+          }
           icon={<Sparkles className="h-8 w-8" />}
           action={
             !searchTerm ? (

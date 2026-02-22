@@ -2,27 +2,37 @@
  * Article generation form component
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useGenerateArticle } from '@/lib/hooks/use-article';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useGenerateArticle } from "@/lib/hooks/use-article";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
 
 interface GenerationFormProps {
   topicId: string;
   topicName: string;
 }
 
-export default function GenerationForm({ topicId, topicName }: GenerationFormProps) {
+export default function GenerationForm({
+  topicId,
+  topicName,
+}: GenerationFormProps) {
   const router = useRouter();
   const [includeCA, setIncludeCA] = useState(false);
 
-  const { mutate: generateArticle, isPending, isSuccess, isError, error, data } = useGenerateArticle();
+  const {
+    mutate: generateArticle,
+    isPending,
+    isSuccess,
+    isError,
+    error,
+    data,
+  } = useGenerateArticle();
 
   const handleGenerate = () => {
     generateArticle(
@@ -34,7 +44,7 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
             router.push(`/articles/${data.article.id}`);
           }, 2000);
         },
-      }
+      },
     );
   };
 
@@ -92,7 +102,9 @@ export default function GenerationForm({ topicId, topicName }: GenerationFormPro
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            {error instanceof Error ? error.message : 'Failed to generate article'}
+            {error instanceof Error
+              ? error.message
+              : "Failed to generate article"}
           </AlertDescription>
         </Alert>
       )}

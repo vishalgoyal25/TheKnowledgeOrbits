@@ -2,16 +2,16 @@
  * React Query hooks for topics
  */
 
-'use client';
+"use client";
 
-import { useQuery } from '@tanstack/react-query';
-import { topicsAPI } from '../api/topics';
-import { PaginationParams } from '../types';
+import { useQuery } from "@tanstack/react-query";
+import { topicsAPI } from "../api/topics";
+import { PaginationParams } from "../types";
 
 // List all topics
 export function useTopics(params?: PaginationParams) {
   return useQuery({
-    queryKey: ['topics', params],
+    queryKey: ["topics", params],
     queryFn: () => topicsAPI.list(params),
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -20,7 +20,7 @@ export function useTopics(params?: PaginationParams) {
 // Get topic by ID
 export function useTopic(id: string | null) {
   return useQuery({
-    queryKey: ['topic', id],
+    queryKey: ["topic", id],
     queryFn: () => topicsAPI.getById(id!),
     enabled: !!id,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -28,9 +28,12 @@ export function useTopic(id: string | null) {
 }
 
 // List topics by module
-export function useTopicsByModule(moduleId: string | null, params?: PaginationParams) {
+export function useTopicsByModule(
+  moduleId: string | null,
+  params?: PaginationParams,
+) {
   return useQuery({
-    queryKey: ['topics', 'module', moduleId, params],
+    queryKey: ["topics", "module", moduleId, params],
     queryFn: () => topicsAPI.listByModule(moduleId!, params),
     enabled: !!moduleId,
     staleTime: 10 * 60 * 1000, // 10 minutes

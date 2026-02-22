@@ -2,10 +2,10 @@
  * Dashboard statistics cards
  */
 
-'use client';
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, BookOpen, TrendingUp, Clock } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileText, BookOpen, TrendingUp, Clock } from "lucide-react";
 
 interface StatsCardsProps {
   articlesRead?: number;
@@ -22,35 +22,35 @@ export default function StatsCards({
 }: StatsCardsProps) {
   const stats = [
     {
-      title: 'Articles Read',
+      title: "Articles Read",
       value: articlesRead,
       icon: FileText,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
     },
     {
-      title: 'Total Articles',
+      title: "Total Articles",
       value: totalArticles,
       icon: BookOpen,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
+      color: "text-green-600",
+      bgColor: "bg-green-50",
     },
     {
-      title: 'Topics Completed',
+      title: "Topics Completed",
       value: topicsCompleted,
       icon: TrendingUp,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
     },
     {
-      title: 'Hours Spent',
+      title: "Hours Spent",
       value: hoursSpent,
       icon: Clock,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
     },
   ];
-  
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {stats.map((stat) => {
