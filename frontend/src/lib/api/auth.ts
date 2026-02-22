@@ -2,7 +2,7 @@
  * Auth API Calls
  */
 
-import apiClient from './client';
+import apiClient from "./client";
 import {
   RegisterRequest,
   RegisterResponse,
@@ -12,12 +12,12 @@ import {
   ResetPasswordRequest,
   ChangePasswordRequest,
   User,
-} from '@/lib/types';
+} from "@/lib/types";
 
 export const authAPI = {
   // Register
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {
-    const response = await apiClient.post('/auth/register/', data);
+    const response = await apiClient.post("/auth/register/", data);
     return response.data;
   },
 
@@ -29,43 +29,55 @@ export const authAPI = {
 
   // Resend Verification
   resendVerification: async (email: string): Promise<{ message: string }> => {
-    const response = await apiClient.post('/auth/resend-verification/', { email });
+    const response = await apiClient.post("/auth/resend-verification/", {
+      email,
+    });
     return response.data;
   },
 
   // Login
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response = await apiClient.post('/auth/login/', data);
+    const response = await apiClient.post("/auth/login/", data);
     return response.data;
   },
 
   // Logout
   logout: async (): Promise<{ message: string }> => {
-    const response = await apiClient.post('/auth/logout/');
+    const response = await apiClient.post("/auth/logout/");
     return response.data;
   },
 
   // Get Current User
   getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get('/auth/me/');
+    const response = await apiClient.get("/auth/me/");
     return response.data;
   },
 
   // Forgot Password
-  forgotPassword: async (data: ForgotPasswordRequest): Promise<{ message: string }> => {
-    const response = await apiClient.post('/auth/forgot-password/', data);
+  forgotPassword: async (
+    data: ForgotPasswordRequest,
+  ): Promise<{ message: string }> => {
+    const response = await apiClient.post("/auth/forgot-password/", data);
     return response.data;
   },
 
   // Reset Password
-  resetPassword: async (token: string, data: ResetPasswordRequest): Promise<{ message: string }> => {
-    const response = await apiClient.post(`/auth/reset-password/${token}/`, data);
+  resetPassword: async (
+    token: string,
+    data: ResetPasswordRequest,
+  ): Promise<{ message: string }> => {
+    const response = await apiClient.post(
+      `/auth/reset-password/${token}/`,
+      data,
+    );
     return response.data;
   },
 
   // Change Password
-  changePassword: async (data: ChangePasswordRequest): Promise<{ message: string }> => {
-    const response = await apiClient.post('/auth/change-password/', data);
+  changePassword: async (
+    data: ChangePasswordRequest,
+  ): Promise<{ message: string }> => {
+    const response = await apiClient.post("/auth/change-password/", data);
     return response.data;
   },
 };

@@ -1,14 +1,16 @@
 """
 Global pytest fixtures for TheKnowledgeOrbits.
 """
+
 import os
 import pytest
 
 # CRITICAL: Set Django settings BEFORE any Django imports
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.dev')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
 
 # Import Django and setup
 import django
+
 django.setup()
 
 # NOW it's safe to import Django/DRF components
@@ -29,4 +31,3 @@ def db_fixture(db):
     Database fixture - ensures test database is available.
     """
     return db
-    

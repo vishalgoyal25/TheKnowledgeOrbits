@@ -1,20 +1,20 @@
 /**
  * Results Analysis Page
- * 
+ *
  * Detailed breakdown with explanations and source citations.
  */
 
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { useAttemptResult } from '@/lib/hooks/use-quiz';
-import ResultAnalysis from '@/components/quiz/result-analysis';
-import QuestionDisplay from '@/components/quiz/question-display';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, RotateCcw, BookOpen } from 'lucide-react';
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useAttemptResult } from "@/lib/hooks/use-quiz";
+import ResultAnalysis from "@/components/quiz/result-analysis";
+import QuestionDisplay from "@/components/quiz/question-display";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, RotateCcw, BookOpen } from "lucide-react";
 
 export default function QuizResultsPage() {
   const params = useParams();
@@ -45,10 +45,14 @@ export default function QuizResultsPage() {
   }
 
   // Build answer map for displaying user's choices
-  const answerMap = attempt.responses?.reduce((acc, response) => {
-    acc[response.question] = response.selected_option;
-    return acc;
-  }, {} as Record<string, string>) || {};
+  const answerMap =
+    attempt.responses?.reduce(
+      (acc, response) => {
+        acc[response.question] = response.selected_option;
+        return acc;
+      },
+      {} as Record<string, string>,
+    ) || {};
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -77,25 +81,26 @@ export default function QuizResultsPage() {
         <div className="mt-6 space-y-8">
           {attempt.questions_with_answers?.map((question, idx) => {
             const response = attempt.responses?.find(
-              (r) => r.question === question.id
+              (r) => r.question === question.id,
             );
 
             return (
               <Card
                 key={question.id}
-                className={`border-l-4 ${response?.is_correct
-                  ? 'border-l-green-500'
-                  : response?.selected_option
-                    ? 'border-l-red-500'
-                    : 'border-l-gray-300'
-                  }`}
+                className={`border-l-4 ${
+                  response?.is_correct
+                    ? "border-l-green-500"
+                    : response?.selected_option
+                      ? "border-l-red-500"
+                      : "border-l-gray-300"
+                }`}
               >
                 <CardContent className="pt-6">
                   <QuestionDisplay
                     question={question}
                     questionNumber={idx + 1}
-                    selectedAnswer={answerMap[question.id] || ''}
-                    onAnswerChange={() => { }}
+                    selectedAnswer={answerMap[question.id] || ""}
+                    onAnswerChange={() => {}}
                     showAnswer={true}
                     showExplanation={true}
                     readOnly={true}
@@ -104,7 +109,7 @@ export default function QuizResultsPage() {
                   {/* Time spent */}
                   {response && response.time_spent > 0 && (
                     <p className="text-xs text-gray-500 mt-4">
-                      Time spent: {Math.floor(response.time_spent / 60)}m{' '}
+                      Time spent: {Math.floor(response.time_spent / 60)}m{" "}
                       {response.time_spent % 60}s
                     </p>
                   )}

@@ -1,20 +1,20 @@
 /**
  * Exam Interface Page
- * 
+ *
  * The "Exam Hall" - Take quiz with timer, question palette, navigation.
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useQuiz, useStartQuiz, useSubmitQuiz } from '@/lib/hooks/use-quiz';
-import QuestionDisplay from '@/components/quiz/question-display';
-import QuestionPalette from '@/components/quiz/question-palette';
-import Timer from '@/components/quiz/timer';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useQuiz, useStartQuiz, useSubmitQuiz } from "@/lib/hooks/use-quiz";
+import QuestionDisplay from "@/components/quiz/question-display";
+import QuestionPalette from "@/components/quiz/question-palette";
+import Timer from "@/components/quiz/timer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,10 +24,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { ArrowLeft, ArrowRight, Flag, Send } from 'lucide-react';
-import Link from 'next/link';
-import type { QuizState } from '@/lib/types';
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, ArrowRight, Flag, Send } from "lucide-react";
+import Link from "next/link";
+import type { QuizState } from "@/lib/types";
 
 export default function TakeQuizPage() {
   const params = useParams();
@@ -51,7 +51,9 @@ export default function TakeQuizPage() {
   });
 
   // Question start times (for time tracking)
-  const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
+  const [questionStartTime, setQuestionStartTime] = useState<number>(
+    Date.now(),
+  );
 
   // Start quiz on mount
   useEffect(() => {
@@ -70,12 +72,15 @@ export default function TakeQuizPage() {
   }, [state.currentQuestionIndex]);
 
   // Handlers
-  const handleAnswerChange = useCallback((questionId: string, answer: string) => {
-    setState((prev) => ({
-      ...prev,
-      answers: { ...prev.answers, [questionId]: answer },
-    }));
-  }, []);
+  const handleAnswerChange = useCallback(
+    (questionId: string, answer: string) => {
+      setState((prev) => ({
+        ...prev,
+        answers: { ...prev.answers, [questionId]: answer },
+      }));
+    },
+    [],
+  );
 
   const handleMarkForReview = useCallback((questionId: string) => {
     setState((prev) => {
@@ -89,23 +94,28 @@ export default function TakeQuizPage() {
     });
   }, []);
 
-  const navigateToQuestion = useCallback((index: number) => {
-    // Save time spent on current question
-    const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
-    const currentQuestionId = quiz?.questions?.[state.currentQuestionIndex]?.id;
+  const navigateToQuestion = useCallback(
+    (index: number) => {
+      // Save time spent on current question
+      const timeSpent = Math.floor((Date.now() - questionStartTime) / 1000);
+      const currentQuestionId =
+        quiz?.questions?.[state.currentQuestionIndex]?.id;
 
-    if (currentQuestionId) {
-      setState((prev) => ({
-        ...prev,
-        questionTimes: {
-          ...prev.questionTimes,
-          [currentQuestionId]: (prev.questionTimes[currentQuestionId] || 0) + timeSpent,
-        },
-        currentQuestionIndex: index,
-        visitedQuestions: new Set([...prev.visitedQuestions, index]),
-      }));
-    }
-  }, [quiz, state.currentQuestionIndex, questionStartTime]);
+      if (currentQuestionId) {
+        setState((prev) => ({
+          ...prev,
+          questionTimes: {
+            ...prev.questionTimes,
+            [currentQuestionId]:
+              (prev.questionTimes[currentQuestionId] || 0) + timeSpent,
+          },
+          currentQuestionIndex: index,
+          visitedQuestions: new Set([...prev.visitedQuestions, index]),
+        }));
+      }
+    },
+    [quiz, state.currentQuestionIndex, questionStartTime],
+  );
 
   const handlePrevious = () => {
     if (state.currentQuestionIndex > 0) {
@@ -128,13 +138,14 @@ export default function TakeQuizPage() {
 
     const finalTimes = { ...state.questionTimes };
     if (currentQuestionId) {
-      finalTimes[currentQuestionId] = (finalTimes[currentQuestionId] || 0) + timeSpent;
+      finalTimes[currentQuestionId] =
+        (finalTimes[currentQuestionId] || 0) + timeSpent;
     }
 
     // Build answers array
     const answers = quiz.questions!.map((q) => ({
       question_id: q.id,
-      selected_option: state.answers[q.id] || '',
+      selected_option: state.answers[q.id] || "",
       time_spent: finalTimes[q.id] || 0,
       marked_for_review: state.markedForReview.has(q.id),
     }));
@@ -145,7 +156,7 @@ export default function TakeQuizPage() {
         onSuccess: (result) => {
           router.push(`/assessment/results/${result.id}`);
         },
-      }
+      },
     );
   };
 
@@ -171,7 +182,9 @@ export default function TakeQuizPage() {
   }
 
   const currentQuestion = quiz.questions?.[state.currentQuestionIndex];
-  const answeredCount = Object.keys(state.answers).filter(k => state.answers[k]).length;
+  const answeredCount = Object.keys(state.answers).filter(
+    (k) => state.answers[k],
+  ).length;
   const markedCount = state.markedForReview.size;
 
   return (
@@ -191,7 +204,8 @@ export default function TakeQuizPage() {
             <div>
               <CardTitle className="text-2xl">{quiz.title}</CardTitle>
               <p className="text-sm text-gray-600 mt-1">
-                Question {state.currentQuestionIndex + 1} of {quiz.question_count}
+                Question {state.currentQuestionIndex + 1} of{" "}
+                {quiz.question_count}
               </p>
             </div>
 
@@ -228,7 +242,7 @@ export default function TakeQuizPage() {
             <QuestionDisplay
               question={currentQuestion}
               questionNumber={state.currentQuestionIndex + 1}
-              selectedAnswer={state.answers[currentQuestion.id] || ''}
+              selectedAnswer={state.answers[currentQuestion.id] || ""}
               isMarked={state.markedForReview.has(currentQuestion.id)}
               onAnswerChange={(answer) =>
                 handleAnswerChange(currentQuestion.id, answer)
@@ -311,7 +325,7 @@ export default function TakeQuizPage() {
               onClick={handleSubmit}
               disabled={submitQuizMutation.isPending}
             >
-              {submitQuizMutation.isPending ? 'Submitting...' : 'Submit'}
+              {submitQuizMutation.isPending ? "Submitting..." : "Submit"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

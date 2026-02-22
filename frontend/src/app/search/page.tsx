@@ -2,24 +2,28 @@
  * Search results page
  */
 
-'use client';
+"use client";
 
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useSearch } from '@/lib/hooks/use-search';
-import Link from 'next/link';
-import SearchResults from '@/components/search/search-results';
-import ErrorMessage from '@/components/shared/error-message';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Search, FileText, Folder } from 'lucide-react';
+import { useSearchParams, useRouter } from "next/navigation";
+import { useSearch } from "@/lib/hooks/use-search";
+import Link from "next/link";
+import SearchResults from "@/components/search/search-results";
+import ErrorMessage from "@/components/shared/error-message";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Search, FileText, Folder } from "lucide-react";
 
-import { Suspense } from 'react';
+import { Suspense } from "react";
 
 function SearchPageContent() {
   const searchParams = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const query = searchParams.get("q") || "";
 
-  const { data: results, isLoading, error } = useSearch({ q: query }, query.length >= 2);
+  const {
+    data: results,
+    isLoading,
+    error,
+  } = useSearch({ q: query }, query.length >= 2);
 
   if (!query || query.length < 2) {
     return (
@@ -38,7 +42,8 @@ function SearchPageContent() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Search Results</h1>
         <p className="text-gray-600">
-          Showing results for <span className="font-medium">&quot;{query}&quot;</span>
+          Showing results for{" "}
+          <span className="font-medium">&quot;{query}&quot;</span>
         </p>
       </div>
 
@@ -68,7 +73,9 @@ function SearchPageContent() {
           {results.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No results found for &quot;{query}&quot;</p>
+              <p className="text-gray-600">
+                No results found for &quot;{query}&quot;
+              </p>
               <p className="text-sm text-gray-500 mt-2">
                 Try different keywords or browse topics
               </p>
@@ -78,7 +85,10 @@ function SearchPageContent() {
               {results.map((result: any) => (
                 <Link
                   key={`${result.type}-${result.id}`}
-                  href={result.url || (result.type === 'article' ? `/articles/${result.id}` : '#')}
+                  href={
+                    result.url ||
+                    (result.type === "article" ? `/articles/${result.id}` : "#")
+                  }
                   className="block group"
                 >
                   <Card className="hover:shadow-md transition-shadow border-slate-200">
@@ -86,16 +96,27 @@ function SearchPageContent() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            {result.type === 'article' && <FileText className="h-4 w-4 text-blue-500" />}
-                            {result.type === 'topic' && <Folder className="h-4 w-4 text-purple-500" />}
-                            {result.type === 'current_affair' && <div className="h-4 w-4 rounded-full bg-emerald-500" />}
+                            {result.type === "article" && (
+                              <FileText className="h-4 w-4 text-blue-500" />
+                            )}
+                            {result.type === "topic" && (
+                              <Folder className="h-4 w-4 text-purple-500" />
+                            )}
+                            {result.type === "current_affair" && (
+                              <div className="h-4 w-4 rounded-full bg-emerald-500" />
+                            )}
 
-                            <Badge variant={
-                              result.type === 'topic' ? 'default' :
-                                result.type === 'current_affair' ? 'secondary' :
-                                  'outline'
-                            } className="uppercase text-[10px] tracking-wider">
-                              {result.type.replace('_', ' ')}
+                            <Badge
+                              variant={
+                                result.type === "topic"
+                                  ? "default"
+                                  : result.type === "current_affair"
+                                    ? "secondary"
+                                    : "outline"
+                              }
+                              className="uppercase text-[10px] tracking-wider"
+                            >
+                              {result.type.replace("_", " ")}
                             </Badge>
                           </div>
 
@@ -114,22 +135,34 @@ function SearchPageContent() {
                       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 border-t pt-3">
                         {result.metadata?.source && (
                           <span className="flex items-center gap-1">
-                            <span className="font-semibold text-slate-700">Source:</span> {result.metadata.source}
+                            <span className="font-semibold text-slate-700">
+                              Source:
+                            </span>{" "}
+                            {result.metadata.source}
                           </span>
                         )}
                         {result.metadata?.chapter && (
                           <span className="flex items-center gap-1">
-                            <span className="font-semibold text-slate-700">Chapter:</span> {result.metadata.chapter}
+                            <span className="font-semibold text-slate-700">
+                              Chapter:
+                            </span>{" "}
+                            {result.metadata.chapter}
                           </span>
                         )}
                         {result.metadata?.subject && (
                           <span className="flex items-center gap-1">
-                            <span className="font-semibold text-slate-700">Subject:</span> {result.metadata.subject}
+                            <span className="font-semibold text-slate-700">
+                              Subject:
+                            </span>{" "}
+                            {result.metadata.subject}
                           </span>
                         )}
                         {result.metadata?.date && (
                           <span className="flex items-center gap-1">
-                            <span className="font-semibold text-slate-700">Date:</span> {result.metadata.date}
+                            <span className="font-semibold text-slate-700">
+                              Date:
+                            </span>{" "}
+                            {result.metadata.date}
                           </span>
                         )}
                       </div>
@@ -147,7 +180,13 @@ function SearchPageContent() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="container mx-auto px-4 py-8 text-center text-gray-500">Loading search...</div>}>
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8 text-center text-gray-500">
+          Loading search...
+        </div>
+      }
+    >
       <SearchPageContent />
     </Suspense>
   );

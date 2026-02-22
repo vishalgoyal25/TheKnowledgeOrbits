@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
-import { FileX } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { FileX } from "lucide-react";
 
 interface Props {
   title: string;
@@ -8,7 +8,12 @@ interface Props {
   onAction?: () => void;
 }
 
-export default function EmptyState({ title, description, actionLabel, onAction }: Props) {
+export default function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: Props) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <FileX className="h-16 w-16 text-gray-300 mb-4" />

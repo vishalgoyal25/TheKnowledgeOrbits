@@ -12,9 +12,9 @@ export interface Article {
   topic: Topic;
   word_count: number;
   read_time: number;
-  generation_type: 'ai_generated' | 'human_curated' | 'ai_assisted';
+  generation_type: "ai_generated" | "human_curated" | "ai_assisted";
   quality_score: number;
-  review_status: 'draft' | 'pending' | 'approved' | 'rejected';
+  review_status: "draft" | "pending" | "approved" | "rejected";
   is_published: boolean;
   published_at: string | null;
   source_chunk_count: number;
@@ -44,7 +44,7 @@ export interface ArticleSourceMap {
 
   // Flattened fields for UI convenience
   chunk_text?: string;
-  source_type?: 'static' | 'dynamic';
+  source_type?: "static" | "dynamic";
   page_number?: number;
   chapter_name?: string;
   article_title?: string;
@@ -63,11 +63,11 @@ export interface Chunk {
   chunk_text: string;
   chunk_index: number;
   page_number: number | null;
-  source_type: 'static' | 'dynamic';
+  source_type: "static" | "dynamic";
   document: string;
   document_title: string;
   chapter_name: string;
-  quality_flag: 'high' | 'medium' | 'low' | 'needs_review';
+  quality_flag: "high" | "medium" | "low" | "needs_review";
   confidence_score: number;
   created_at: string;
 }
@@ -91,8 +91,8 @@ export interface Topic {
   subject: string;
   subject_name: string;
   parent_topic: string | null;
-  topic_type: 'syllabus' | 'custom';
-  difficulty_level: 'easy' | 'medium' | 'hard';
+  topic_type: "syllabus" | "custom";
+  difficulty_level: "easy" | "medium" | "hard";
   order_index: number;
   is_active: boolean;
   created_at: string;
@@ -165,7 +165,6 @@ export interface ArticleFilterParams extends PaginationParams {
   ordering?: string;
 }
 
-
 /**
  * Current Affairs Types
  */
@@ -196,7 +195,7 @@ export interface CAArticle {
   published_at: string;
   author: string;
   categories: string[];
-  processing_status: 'pending' | 'processing' | 'completed' | 'failed';
+  processing_status: "pending" | "processing" | "completed" | "failed";
   word_count: number;
   chunk_count: number;
   created_at: string;
@@ -214,7 +213,7 @@ export interface CAChunk {
   published_at: string;
   expiry_date: string;
   is_expired: boolean;
-  quality_flag: 'high' | 'medium' | 'low' | 'needs_review';
+  quality_flag: "high" | "medium" | "low" | "needs_review";
   confidence_score: number;
   topic_count: number;
   created_at: string;
@@ -229,7 +228,7 @@ export interface CATopicLink {
   chunk_text: string;
   article_title: string;
   relevance_score: number;
-  link_method: 'auto' | 'manual';
+  link_method: "auto" | "manual";
   created_at: string;
 }
 
@@ -264,7 +263,7 @@ export interface CATopicLinkListResponse {
 
 /**
  * Assessment Engine Types
- * 
+ *
  * Complete TypeScript definitions for quiz system.
  */
 
@@ -274,7 +273,7 @@ export interface Quiz {
   id: string;
   title: string;
   topic: Topic;
-  difficulty_level: 'easy' | 'medium' | 'hard';
+  difficulty_level: "easy" | "medium" | "hard";
   include_ca: boolean;
   question_count: number;
   time_limit: number | null;
@@ -286,7 +285,7 @@ export interface Quiz {
 export interface Question {
   id: string;
   question_text: string;
-  question_type: 'single_mcq' | 'multi_statement' | 'assertion_reasoning';
+  question_type: "single_mcq" | "multi_statement" | "assertion_reasoning";
   statements: string[];
   options: {
     A: string;
@@ -294,9 +293,9 @@ export interface Question {
     C: string;
     D: string;
   };
-  correct_answer?: string;  // Only present after submission
+  correct_answer?: string; // Only present after submission
   explanation?: string;
-  difficulty_level: 'easy' | 'medium' | 'hard';
+  difficulty_level: "easy" | "medium" | "hard";
   order_index: number;
   has_static_sources?: boolean;
   has_ca_sources?: boolean;
@@ -306,7 +305,7 @@ export interface QuizAttempt {
   id: string;
   quiz: Quiz;
   user: string | null;
-  status: 'active' | 'submitted' | 'abandoned' | 'expired';
+  status: "active" | "submitted" | "abandoned" | "expired";
   score: number | null;
   accuracy: number;
   correct_count: number;
@@ -344,7 +343,7 @@ export interface TopicMastery {
 
 export interface QuizGenerateRequest {
   topic_id: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: "easy" | "medium" | "hard";
   include_ca: boolean;
   question_count: number;
 }
@@ -375,7 +374,6 @@ export interface TimerState {
   isExpired: boolean;
 }
 
-
 /**
  * Type Definitions for Authentication
  */
@@ -386,7 +384,7 @@ export interface User {
   email: string;
   full_name: string;
   is_verified: boolean;
-  subscription_tier: 'free' | 'premium' | 'enterprise';
+  subscription_tier: "free" | "premium" | "enterprise";
   roles: string[];
   created_at: string;
   last_login: string | null;

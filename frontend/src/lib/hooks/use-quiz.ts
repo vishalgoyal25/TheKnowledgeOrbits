@@ -1,35 +1,37 @@
 /**
  * Quiz React Query Hooks
- * 
+ *
  * Custom hooks for quiz operations with caching and optimistic updates.
  */
 
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { quizAPI } from '../api/quiz';
-import { QuizGenerateRequest, QuizSubmitRequest } from '../types';
-import { toast } from '@/hooks/use-toast';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { quizAPI } from "../api/quiz";
+import { QuizGenerateRequest, QuizSubmitRequest } from "../types";
+import { toast } from "@/hooks/use-toast";
 
 // ===== Query Keys =====
 
 export const quizKeys = {
-  all: ['quizzes'] as const,
-  lists: () => [...quizKeys.all, 'list'] as const,
-  list: (filters: Record<string, any>) => [...quizKeys.lists(), filters] as const,
-  details: () => [...quizKeys.all, 'detail'] as const,
+  all: ["quizzes"] as const,
+  lists: () => [...quizKeys.all, "list"] as const,
+  list: (filters: Record<string, any>) =>
+    [...quizKeys.lists(), filters] as const,
+  details: () => [...quizKeys.all, "detail"] as const,
   detail: (id: string) => [...quizKeys.details(), id] as const,
-  attempts: () => [...quizKeys.all, 'attempts'] as const,
+  attempts: () => [...quizKeys.all, "attempts"] as const,
   attempt: (id: string) => [...quizKeys.attempts(), id] as const,
-  myAttempts: (filters: Record<string, any>) => [...quizKeys.attempts(), 'my', filters] as const,
-  mastery: () => ['mastery'] as const,
+  myAttempts: (filters: Record<string, any>) =>
+    [...quizKeys.attempts(), "my", filters] as const,
+  mastery: () => ["mastery"] as const,
 };
 
 // ===== List Quizzes =====
 
 export function useQuizzes(params?: {
   topic_id?: string;
-  difficulty?: 'easy' | 'medium' | 'hard';
+  difficulty?: "easy" | "medium" | "hard";
   include_ca?: boolean;
 }) {
   return useQuery({
@@ -62,15 +64,15 @@ export function useGenerateQuiz() {
       queryClient.invalidateQueries({ queryKey: quizKeys.lists() });
 
       toast({
-        title: 'Quiz generated successfully!',
+        title: "Quiz generated successfully!",
         description: `${newQuiz.question_count} questions created`,
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Failed to generate quiz',
-        description: error.response?.data?.message || 'Please try again',
-        variant: 'destructive',
+        title: "Failed to generate quiz",
+        description: error.response?.data?.message || "Please try again",
+        variant: "destructive",
       });
     },
   });
@@ -88,16 +90,16 @@ export function useStartQuiz() {
       queryClient.setQueryData(quizKeys.attempt(attempt.id), attempt);
 
       toast({
-        title: 'Quiz started!',
-        description: 'Good luck!',
+        title: "Quiz started!",
+        description: "Good luck!",
       });
     },
     onError: (error: any) => {
-      const message = error.response?.data?.message || 'Failed to start quiz';
+      const message = error.response?.data?.message || "Failed to start quiz";
       toast({
-        title: 'Cannot start quiz',
+        title: "Cannot start quiz",
         description: message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     },
   });
@@ -121,15 +123,15 @@ export function useSubmitQuiz() {
       queryClient.invalidateQueries({ queryKey: quizKeys.mastery() });
 
       toast({
-        title: 'Quiz submitted!',
+        title: "Quiz submitted!",
         description: `You scored ${result.score?.toFixed(1)}%`,
       });
     },
     onError: (error: any) => {
       toast({
-        title: 'Failed to submit quiz',
-        description: error.response?.data?.message || 'Please try again',
-        variant: 'destructive',
+        title: "Failed to submit quiz",
+        description: error.response?.data?.message || "Please try again",
+        variant: "destructive",
       });
     },
   });
@@ -153,9 +155,9 @@ export function useAttemptResult(attemptId: string | null) {
 export function useMyAttempts(
   params?: {
     quiz_id?: string;
-    status?: 'active' | 'submitted' | 'abandoned';
+    status?: "active" | "submitted" | "abandoned";
   },
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean },
 ) {
   return useQuery({
     queryKey: quizKeys.myAttempts(params || {}),

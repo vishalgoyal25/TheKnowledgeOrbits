@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useBookmarks } from '@/lib/hooks/use-bookmarks';
-import BookmarkCard from '@/components/bookmarks/BookmarkCard';
-import EmptyState from '@/components/notebook/EmptyState';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Loader2, BookMarked, BookOpen } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useBookmarks } from "@/lib/hooks/use-bookmarks";
+import BookmarkCard from "@/components/bookmarks/BookmarkCard";
+import EmptyState from "@/components/notebook/EmptyState";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Loader2, BookMarked, BookOpen } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function BookmarksPage() {
   const router = useRouter();
   // Only fetch 'article' bookmarks as requested
-  const { data: bookmarks, isLoading, refetch } = useBookmarks('article');
+  const { data: bookmarks, isLoading, refetch } = useBookmarks("article");
 
   if (isLoading) {
     return (
@@ -31,7 +31,9 @@ export default function BookmarksPage() {
               <BookMarked className="h-8 w-8 text-blue-600" />
               Bookmarked Articles
             </h1>
-            <p className="text-gray-600 mt-1">Your curated collection of saved articles.</p>
+            <p className="text-gray-600 mt-1">
+              Your curated collection of saved articles.
+            </p>
           </div>
           <Link href="/articles">
             <Button className="gap-2">
@@ -44,7 +46,7 @@ export default function BookmarksPage() {
         {/* Bookmarks List (Articles Only) */}
         {bookmarks && bookmarks.length > 0 ? (
           <div className="space-y-4">
-            {bookmarks.map(bookmark => (
+            {bookmarks.map((bookmark) => (
               <BookmarkCard
                 key={bookmark.id}
                 bookmark={bookmark}
@@ -57,7 +59,7 @@ export default function BookmarksPage() {
             title="No bookmarked articles"
             description="Bookmark insightful articles from the library to save them here."
             actionLabel="Browse Articles"
-            onAction={() => router.push('/articles')}
+            onAction={() => router.push("/articles")}
           />
         )}
       </div>

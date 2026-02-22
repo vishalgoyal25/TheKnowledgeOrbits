@@ -1,11 +1,13 @@
-import apiClient from './client';
-import { Bookmark } from '@/types/notebook';
+import apiClient from "./client";
+import { Bookmark } from "@/types/notebook";
 
 export const bookmarksAPI = {
   // Get all bookmarks
-  getBookmarks: async (contentType?: 'article' | 'quiz'): Promise<Bookmark[]> => {
+  getBookmarks: async (
+    contentType?: "article" | "quiz",
+  ): Promise<Bookmark[]> => {
     const params = contentType ? { content_type: contentType } : {};
-    const response = await apiClient.get('/userstate/bookmarks/', { params });
+    const response = await apiClient.get("/userstate/bookmarks/", { params });
     return response.data;
   },
 
@@ -15,7 +17,7 @@ export const bookmarksAPI = {
     content_id: string;
     notes?: string;
   }): Promise<Bookmark> => {
-    const response = await apiClient.post('/userstate/bookmarks/add/', data);
+    const response = await apiClient.post("/userstate/bookmarks/add/", data);
     return response.data;
   },
 
@@ -26,7 +28,10 @@ export const bookmarksAPI = {
 
   // Update notes (custom endpoint - may need backend update)
   updateNotes: async (bookmarkId: string, notes: string): Promise<Bookmark> => {
-    const response = await apiClient.patch(`/userstate/bookmarks/${bookmarkId}/notes/`, { notes });
+    const response = await apiClient.patch(
+      `/userstate/bookmarks/${bookmarkId}/notes/`,
+      { notes },
+    );
     return response.data;
   },
 };

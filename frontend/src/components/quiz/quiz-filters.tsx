@@ -1,26 +1,29 @@
 /**
  * Quiz Filters Component
- * 
+ *
  * Filter quizzes by topic, difficulty, CA inclusion.
  */
 
-'use client';
+"use client";
 
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 
 interface QuizFiltersProps {
   filters: {
     topic_id: string;
-    difficulty: '' | 'easy' | 'medium' | 'hard';
+    difficulty: "" | "easy" | "medium" | "hard";
     include_ca: boolean | undefined;
   };
   onFilterChange: (filters: any) => void;
 }
 
-export default function QuizFilters({ filters, onFilterChange }: QuizFiltersProps) {
+export default function QuizFilters({
+  filters,
+  onFilterChange,
+}: QuizFiltersProps) {
   return (
     <Card className="mb-8">
       <CardHeader>
@@ -86,8 +89,8 @@ export default function QuizFilters({ filters, onFilterChange }: QuizFiltersProp
             <button
               onClick={() =>
                 onFilterChange({
-                  topic_id: '',
-                  difficulty: '',
+                  topic_id: "",
+                  difficulty: "",
                   include_ca: undefined,
                 })
               }

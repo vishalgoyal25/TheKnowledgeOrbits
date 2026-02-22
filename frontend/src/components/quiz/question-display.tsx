@@ -1,18 +1,18 @@
 /**
  * Question Display Component
- * 
+ *
  * Renders question with options, handles multi-statement format.
  */
 
-'use client';
+"use client";
 
-import type { Question } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Flag, CheckCircle2, XCircle } from 'lucide-react';
+import type { Question } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Flag, CheckCircle2, XCircle } from "lucide-react";
 
 interface QuestionDisplayProps {
   question: Question;
@@ -38,7 +38,10 @@ export default function QuestionDisplay({
   readOnly = false,
 }: QuestionDisplayProps) {
   const renderQuestionText = () => {
-    if (question.question_type === 'multi_statement' && question.statements.length > 0) {
+    if (
+      question.question_type === "multi_statement" &&
+      question.statements.length > 0
+    ) {
       return (
         <div className="space-y-3">
           <p className="font-medium">Consider the following statements:</p>
@@ -63,18 +66,20 @@ export default function QuestionDisplay({
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <CardTitle className="text-lg">Question {questionNumber}</CardTitle>
+              <CardTitle className="text-lg">
+                Question {questionNumber}
+              </CardTitle>
               <Badge variant="outline" className="text-xs">
-                {question.question_type.replace('_', ' ')}
+                {question.question_type.replace("_", " ")}
               </Badge>
               <Badge
                 variant="outline"
                 className={`text-xs ${
-                  question.difficulty_level === 'hard'
-                    ? 'border-red-200 text-red-700'
-                    : question.difficulty_level === 'medium'
-                    ? 'border-yellow-200 text-yellow-700'
-                    : 'border-green-200 text-green-700'
+                  question.difficulty_level === "hard"
+                    ? "border-red-200 text-red-700"
+                    : question.difficulty_level === "medium"
+                      ? "border-yellow-200 text-yellow-700"
+                      : "border-green-200 text-green-700"
                 }`}
               >
                 {question.difficulty_level}
@@ -85,13 +90,13 @@ export default function QuestionDisplay({
 
           {!readOnly && onMarkToggle && (
             <Button
-              variant={isMarked ? 'default' : 'outline'}
+              variant={isMarked ? "default" : "outline"}
               size="sm"
               onClick={onMarkToggle}
               className="gap-2"
             >
-              <Flag className={`h-4 w-4 ${isMarked ? 'fill-current' : ''}`} />
-              {isMarked ? 'Marked' : 'Mark'}
+              <Flag className={`h-4 w-4 ${isMarked ? "fill-current" : ""}`} />
+              {isMarked ? "Marked" : "Mark"}
             </Button>
           )}
         </div>
@@ -114,12 +119,12 @@ export default function QuestionDisplay({
                 key={key}
                 className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-colors ${
                   isCorrect
-                    ? 'bg-green-50 border-green-300'
+                    ? "bg-green-50 border-green-300"
                     : isWrong
-                    ? 'bg-red-50 border-red-300'
-                    : isSelected
-                    ? 'border-blue-300 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      ? "bg-red-50 border-red-300"
+                      : isSelected
+                        ? "border-blue-300 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                 }`}
               >
                 <RadioGroupItem

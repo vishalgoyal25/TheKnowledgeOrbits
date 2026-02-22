@@ -1,17 +1,23 @@
 /**
  * Quiz Card Component
- * 
+ *
  * Preview card showing quiz details.
  */
 
-'use client';
+"use client";
 
-import Link from 'next/link';
-import type { Quiz } from '@/lib/types';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Clock, FileQuestion, Target, Newspaper } from 'lucide-react';
+import Link from "next/link";
+import type { Quiz } from "@/lib/types";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Clock, FileQuestion, Target, Newspaper } from "lucide-react";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -20,14 +26,14 @@ interface QuizCardProps {
 export default function QuizCard({ quiz }: QuizCardProps) {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'hard':
-        return 'bg-red-100 text-red-800 border-red-200';
+      case "easy":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "hard":
+        return "bg-red-100 text-red-800 border-red-200";
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 

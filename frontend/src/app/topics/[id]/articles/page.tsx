@@ -2,30 +2,34 @@
  * Articles by topic page
  */
 
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
-import { useTopic } from '@/lib/hooks/use-topics';
-import { useArticlesByTopic } from '@/lib/hooks/use-article';
-import ArticleCard from '@/components/articles/article-card';
-import BreadcrumbNav from '@/components/topics/breadcrumb-nav';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkles, FileText, Newspaper } from 'lucide-react';
-import Link from 'next/link';
-import { getDifficultyColor } from '@/lib/utils'; // Keep this import
+import { useParams } from "next/navigation";
+import { useTopic } from "@/lib/hooks/use-topics";
+import { useArticlesByTopic } from "@/lib/hooks/use-article";
+import ArticleCard from "@/components/articles/article-card";
+import BreadcrumbNav from "@/components/topics/breadcrumb-nav";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Sparkles, FileText, Newspaper } from "lucide-react";
+import Link from "next/link";
+import { getDifficultyColor } from "@/lib/utils"; // Keep this import
 
-import { useCAChunksForTopic } from '@/lib/hooks/use-current-affairs';
-import CATopicBadge from '@/components/current-affairs/ca-topic-badge';
+import { useCAChunksForTopic } from "@/lib/hooks/use-current-affairs";
+import CATopicBadge from "@/components/current-affairs/ca-topic-badge";
 
 export default function TopicArticlesPage() {
   const params = useParams();
   const topicId = params.id as string;
 
   const { data: topic, isLoading: topicLoading } = useTopic(topicId);
-  const { data: articlesData, isLoading: articlesLoading } = useArticlesByTopic(topicId);
-  const { data: caChunks, isLoading: caChunksLoading } = useCAChunksForTopic(topicId, 30);
+  const { data: articlesData, isLoading: articlesLoading } =
+    useArticlesByTopic(topicId);
+  const { data: caChunks, isLoading: caChunksLoading } = useCAChunksForTopic(
+    topicId,
+    30,
+  );
 
   if (topicLoading) {
     return (
