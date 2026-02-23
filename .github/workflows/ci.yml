@@ -14,6 +14,8 @@ jobs:
   backend-lint:
     name: Backend Audit (Quality & Security)
     runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: mock-key-for-linting
     steps:
       - uses: actions/checkout@v4
 
