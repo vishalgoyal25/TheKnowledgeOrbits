@@ -111,8 +111,27 @@ export function createLogger(namespace: string): Logger {
                 ...args,
             );
         } else {
-            // Node / SSR: plain text (no %c support)
-            CONSOLE_METHODS[level](prefix, message, ...args);
+            // Node / SSR: use Chalk for terminal colours
+            // Note: Chalk is imported dynamically to avoid breaking browser builds
+            try {
+                // We use a hacky way to get chalk since it's ESM only and this might be CJS/SSR transpiled
+                // In modern Next.js this usually works fine.
+                const chalk = require("chalk");
+                const levelColours: Record<LogLevel, any> = {
+                    debug: chalk.gray,
+                    info: chalk.blue.bold,
+                    warn: chalk.yellow.bold,
+                    error: chalk.red.bold,
+                };
+
+                const formattedPrefix = chalk.hex(colour).bold(prefix);
+                const formattedMessage = levelColours[level](message);
+
+                CONSOLE_METHODS[level](formattedPrefix, formattedMessage, ...args);
+            } catch (e) {
+                // Fallback to plain text if chalk is unavailable
+                CONSOLE_METHODS[level](prefix, message, ...args);
+            }
         }
     }
 

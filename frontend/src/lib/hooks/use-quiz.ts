@@ -67,10 +67,11 @@ export function useQuiz(quizId: string | null) {
   });
 }
 
-// ===== Generate Quiz =====
-
 /**
  * Hook to trigger the AI generation of a new quiz based on parameters.
+ * 
+ * Handles submission to the backend engine and automatic cache invalidation
+ * to ensure new quizzes appear in the list immediately.
  */
 export function useGenerateQuiz() {
   const queryClient = useQueryClient();
