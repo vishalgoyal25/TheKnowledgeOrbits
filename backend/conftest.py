@@ -67,8 +67,8 @@ def mock_ml_models(monkeypatch: Any) -> None:
     monkeypatch.setattr("sentence_transformers.SentenceTransformer", mock_st)
 
     # 2. Mock OpenAI/Groq if needed (prevent network calls)
-    import openai
     import groq
+    import openai
 
     mock_openai = MagicMock()
     monkeypatch.setattr(openai, "OpenAI", mock_openai)
