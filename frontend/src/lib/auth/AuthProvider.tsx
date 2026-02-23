@@ -10,6 +10,9 @@ import { AuthContext } from "./AuthContext";
 import { authAPI } from "@/lib/api/auth";
 import { tokenManager } from "./token-manager";
 import { User, LoginRequest, RegisterRequest } from "@/lib/types";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("Auth");
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -34,7 +37,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(userData);
       }
     } catch (error) {
-      console.error("Failed to load user:", error);
+      logger.error("Failed to load user:", error);
       tokenManager.clearTokens();
     } finally {
       setIsLoading(false);
@@ -62,7 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     // Call logout API (optional - token invalidation)
-    authAPI.logout().catch(() => {});
+    authAPI.logout().catch(() => { });
 
     // Clear tokens
     tokenManager.clearTokens();

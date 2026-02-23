@@ -1,6 +1,6 @@
 "use client";
 
-import { useReadingHistory } from "@/lib/hooks/use-reading-progress";
+import { useReadingHistory, ReadingHistoryItem } from "@/lib/hooks/use-reading-progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,8 +9,14 @@ import { History, BookOpen, Clock, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
+/**
+ * ReadingHistoryPage - Displays a personalized timeline of articles read by the user.
+ * Shows progress bars, completion status, and direct links to continue reading.
+ */
 export default function ReadingHistoryPage() {
   const { data: history, isLoading } = useReadingHistory();
+
+  // Loading skeleton state
 
   if (isLoading) {
     return (
@@ -58,7 +64,7 @@ export default function ReadingHistoryPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {history.map((item: any) => {
+          {history.map((item: ReadingHistoryItem) => {
             const isCompleted = item.percent_read >= 75;
             return (
               <Card
@@ -117,8 +123,8 @@ export default function ReadingHistoryPage() {
                       Last read{" "}
                       {item.updated_at
                         ? formatDistanceToNow(new Date(item.updated_at), {
-                            addSuffix: true,
-                          })
+                          addSuffix: true,
+                        })
                         : "recently"}
                     </span>
                   </div>

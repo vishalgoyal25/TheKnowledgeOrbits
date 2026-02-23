@@ -12,6 +12,7 @@ import ErrorMessage from "@/components/shared/error-message";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, FileText, Folder } from "lucide-react";
+import { SearchResult } from "@/lib/api/search";
 
 import { Suspense } from "react";
 
@@ -66,8 +67,6 @@ function SearchPageContent() {
         <>
           <div className="mb-6 text-sm text-gray-600">
             Found {results.length} results
-            {/* Debug helper: REMOVE IN PRODUCTION */}
-            <span className="hidden">{JSON.stringify(results)}</span>
           </div>
 
           {results.length === 0 ? (
@@ -82,7 +81,7 @@ function SearchPageContent() {
             </div>
           ) : (
             <div className="space-y-4">
-              {results.map((result: any) => (
+              {results.map((result: SearchResult) => (
                 <Link
                   key={`${result.type}-${result.id}`}
                   href={
@@ -133,7 +132,7 @@ function SearchPageContent() {
                       </p>
 
                       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 border-t pt-3">
-                        {result.metadata?.source && (
+                        {typeof result.metadata?.source === "string" && (
                           <span className="flex items-center gap-1">
                             <span className="font-semibold text-slate-700">
                               Source:
@@ -141,7 +140,7 @@ function SearchPageContent() {
                             {result.metadata.source}
                           </span>
                         )}
-                        {result.metadata?.chapter && (
+                        {typeof result.metadata?.chapter === "string" && (
                           <span className="flex items-center gap-1">
                             <span className="font-semibold text-slate-700">
                               Chapter:
@@ -149,7 +148,7 @@ function SearchPageContent() {
                             {result.metadata.chapter}
                           </span>
                         )}
-                        {result.metadata?.subject && (
+                        {typeof result.metadata?.subject === "string" && (
                           <span className="flex items-center gap-1">
                             <span className="font-semibold text-slate-700">
                               Subject:
@@ -157,7 +156,7 @@ function SearchPageContent() {
                             {result.metadata.subject}
                           </span>
                         )}
-                        {result.metadata?.date && (
+                        {typeof result.metadata?.date === "string" && (
                           <span className="flex items-center gap-1">
                             <span className="font-semibold text-slate-700">
                               Date:

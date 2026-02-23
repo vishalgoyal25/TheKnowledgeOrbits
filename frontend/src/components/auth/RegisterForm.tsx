@@ -4,7 +4,13 @@ import { useAuth } from "@/lib/auth/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
+import { AxiosError } from "axios";
+import { ApiError } from "@/lib/types";
 
+/**
+ * RegisterForm - User registration interface.
+ * Validates password matching and handles backend registration errors.
+ */
 export default function RegisterForm() {
   const { register } = useAuth();
   const [formData, setFormData] = useState({
@@ -16,6 +22,10 @@ export default function RegisterForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Handles form submission, performs client-side validation,
+   * and triggers registration API.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -28,8 +38,9 @@ export default function RegisterForm() {
     setLoading(true);
     try {
       await register(formData);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Registration failed");
+    } catch (err) {
+      const axiosError = err as AxiosError<ApiError>;
+      setError(axiosError.response?.data?.message || axiosError.response?.data?.error || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }

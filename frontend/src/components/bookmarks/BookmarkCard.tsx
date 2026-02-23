@@ -8,6 +8,9 @@ import { bookmarksAPI } from "@/lib/api/bookmarks";
 import { FileText, Brain, Trash2, Edit, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import RemoveBookmarkDialog from "./RemoveBookmarkDialog";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("Bookmarks");
 
 interface Props {
   bookmark: Bookmark;
@@ -26,7 +29,7 @@ export default function BookmarkCard({ bookmark, onRemove }: Props) {
       onRemove();
       setShowRemoveDialog(false);
     } catch (error) {
-      console.error("Remove failed:", error);
+      logger.error("Remove failed:", error);
     } finally {
       setIsRemoving(false);
     }

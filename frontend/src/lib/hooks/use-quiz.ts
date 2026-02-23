@@ -7,28 +7,38 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { quizAPI } from "../api/quiz";
-import { QuizGenerateRequest, QuizSubmitRequest } from "../types";
+import { QuizGenerateRequest, QuizSubmitRequest, ApiError, Quiz, QuizAttempt, TopicMastery } from "../types";
 import { toast } from "@/hooks/use-toast";
 
 // ===== Query Keys =====
 
+/**
+ * Centrally managed query keys for the quiz engine.
+ * Ensures consistent cache invalidation across the app.
+ */
 export const quizKeys = {
   all: ["quizzes"] as const,
   lists: () => [...quizKeys.all, "list"] as const,
-  list: (filters: Record<string, any>) =>
+  list: (filters: Record<string, string | number | boolean | undefined>) =>
     [...quizKeys.lists(), filters] as const,
   details: () => [...quizKeys.all, "detail"] as const,
   detail: (id: string) => [...quizKeys.details(), id] as const,
   attempts: () => [...quizKeys.all, "attempts"] as const,
   attempt: (id: string) => [...quizKeys.attempts(), id] as const,
-  myAttempts: (filters: Record<string, any>) =>
+  myAttempts: (filters: Record<string, string | number | boolean | undefined>) =>
     [...quizKeys.attempts(), "my", filters] as const,
   mastery: () => ["mastery"] as const,
 };
 
 // ===== List Quizzes =====
 
+/**
+ * Hook to fetch a list of available quizzes with optional filtering.
+ *
+ * @param params - Filter parameters (topic, difficulty, current affairs)
+ */
 export function useQuizzes(params?: {
   topic_id?: string;
   difficulty?: "easy" | "medium" | "hard";
@@ -43,6 +53,11 @@ export function useQuizzes(params?: {
 
 // ===== Get Quiz Detail =====
 
+/**
+ * Hook to fetch complete details of a specific quiz.
+ *
+ * @param quizId - The UUID of the quiz to fetch
+ */
 export function useQuiz(quizId: string | null) {
   return useQuery({
     queryKey: quizKeys.detail(quizId!),
@@ -54,13 +69,16 @@ export function useQuiz(quizId: string | null) {
 
 // ===== Generate Quiz =====
 
+/**
+ * Hook to trigger the AI generation of a new quiz based on parameters.
+ */
 export function useGenerateQuiz() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (data: QuizGenerateRequest) => quizAPI.generateQuiz(data),
-    onSuccess: (newQuiz) => {
-      // Invalidate quiz lists
+    onSuccess: (newQuiz: Quiz) => {
+      // Invalidate quiz lists to show the new quiz
       queryClient.invalidateQueries({ queryKey: quizKeys.lists() });
 
       toast({
@@ -68,10 +86,10 @@ export function useGenerateQuiz() {
         description: `${newQuiz.question_count} questions created`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<ApiError>) => {
       toast({
         title: "Failed to generate quiz",
-        description: error.response?.data?.message || "Please try again",
+        description: error.response?.data?.message || error.response?.data?.error || "Please try again",
         variant: "destructive",
       });
     },
@@ -80,13 +98,16 @@ export function useGenerateQuiz() {
 
 // ===== Start Quiz =====
 
+/**
+ * Hook to create a new quiz attempt (starts the timer on backend).
+ */
 export function useStartQuiz() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (quizId: string) => quizAPI.startQuiz(quizId),
-    onSuccess: (attempt) => {
-      // Cache the attempt
+    onSuccess: (attempt: QuizAttempt) => {
+      // Cache the attempt data immediately
       queryClient.setQueryData(quizKeys.attempt(attempt.id), attempt);
 
       toast({
@@ -94,8 +115,8 @@ export function useStartQuiz() {
         description: "Good luck!",
       });
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.message || "Failed to start quiz";
+    onError: (error: AxiosError<ApiError>) => {
+      const message = error.response?.data?.message || error.response?.data?.error || "Failed to start quiz";
       toast({
         title: "Cannot start quiz",
         description: message,
@@ -107,30 +128,31 @@ export function useStartQuiz() {
 
 // ===== Submit Quiz =====
 
+/**
+ * Hook to submit answers for a quiz attempt and calculate results.
+ */
 export function useSubmitQuiz() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (data: QuizSubmitRequest) => quizAPI.submitQuiz(data),
-    onSuccess: (result) => {
-      // Update attempt cache
+    onSuccess: (result: QuizAttempt) => {
+      // Update specific attempt cache with final results
       queryClient.setQueryData(quizKeys.attempt(result.id), result);
 
-      // Invalidate attempts list
+      // Invalidate all related lists to ensure UI consistency
       queryClient.invalidateQueries({ queryKey: quizKeys.attempts() });
-
-      // Invalidate mastery (will be updated)
       queryClient.invalidateQueries({ queryKey: quizKeys.mastery() });
 
       toast({
         title: "Quiz submitted!",
-        description: `You scored ${result.score?.toFixed(1)}%`,
+        description: `You scored ${result.score?.toFixed(1) ?? 0}%`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<ApiError>) => {
       toast({
         title: "Failed to submit quiz",
-        description: error.response?.data?.message || "Please try again",
+        description: error.response?.data?.message || error.response?.data?.error || "Please try again",
         variant: "destructive",
       });
     },
@@ -139,19 +161,23 @@ export function useSubmitQuiz() {
 
 // ===== Get Attempt Result =====
 
+/**
+ * Hook to fetch the results of a completed quiz attempt.
+ */
 export function useAttemptResult(attemptId: string | null) {
   return useQuery({
     queryKey: quizKeys.attempt(attemptId!),
     queryFn: () => quizAPI.getAttemptResult(attemptId!),
     enabled: !!attemptId,
-    staleTime: Infinity, // Results don't change
+    staleTime: Infinity, // Completion results are immutable
   });
 }
 
 // ===== List My Attempts =====
 
-// ===== List My Attempts =====
-
+/**
+ * Hook to list all quiz attempts for the current user.
+ */
 export function useMyAttempts(
   params?: {
     quiz_id?: string;
@@ -169,6 +195,9 @@ export function useMyAttempts(
 
 // ===== Get Topic Mastery =====
 
+/**
+ * Hook to get the user's mastery level for a specific topic or all topics.
+ */
 export function useTopicMastery(params?: { topic_id?: string }) {
   return useQuery({
     queryKey: [...quizKeys.mastery(), params || {}],
@@ -176,3 +205,4 @@ export function useTopicMastery(params?: { topic_id?: string }) {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
+

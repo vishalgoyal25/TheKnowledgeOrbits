@@ -8,6 +8,9 @@ import { notebookAPI } from "@/lib/api/notebook";
 import { FileText, Calendar, Clock, Trash2, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import DeleteArticleDialog from "./DeleteArticleDialog";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("Notebook");
 
 interface Props {
   article: Article;
@@ -26,7 +29,7 @@ export default function ArticleCard({ article, onDelete }: Props) {
       onDelete();
       setShowDeleteDialog(false);
     } catch (error) {
-      console.error("Delete failed:", error);
+      logger.error("Delete failed:", error);
     } finally {
       setIsDeleting(false);
     }

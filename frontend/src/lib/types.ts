@@ -23,6 +23,11 @@ export interface Article {
   created_at: string;
   updated_at: string;
   source_chunks?: ArticleSourceMap[];
+  generation_metadata?: {
+    ca_chunks_used?: number;
+    static_chunks_used?: number;
+    [key: string]: unknown;
+  };
 }
 
 // Article List Response
@@ -123,7 +128,7 @@ export interface Program {
   id: string;
   name: string;
   description: string;
-  exam_pattern: Record<string, any>;
+  exam_pattern: Record<string, unknown>;
   is_active: boolean;
 }
 
@@ -440,5 +445,5 @@ export interface ApiError {
   error?: string;
   message?: string;
   detail?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }

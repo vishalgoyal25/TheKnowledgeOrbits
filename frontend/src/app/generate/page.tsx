@@ -12,9 +12,16 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Sparkles, Newspaper, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AxiosError } from "axios";
+import { ApiError } from "@/lib/types";
 
 import { Suspense } from "react";
 
+/**
+ * GeneratePageContent - Handles the interactive state for RAG-based article generation.
+ * Manages topic selection, Current Affairs (CA) toggles, and artificial progress simulation
+ * during the asynchronous generation process.
+ */
 function GeneratePageContent() {
   const [includeCA, setIncludeCA] = useState(true);
   const searchParams = useSearchParams();
@@ -27,14 +34,14 @@ function GeneratePageContent() {
   const generateMutation = useGenerateArticle();
   const selectedTopicId = selectedTopic?.id;
 
-  // Simulate progress while generating
+  // Simulate progress while generating to manage user expectations during long RAG cycles
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (generateMutation.isPending) {
       setProgress(5);
       interval = setInterval(() => {
         setProgress((prev) => {
-          if (prev >= 90) return prev; // Hold at 90 until done
+          if (prev >= 90) return prev; // Hold at 90% until backend confirms completion
           return prev + Math.random() * 12;
         });
       }, 1200);
@@ -47,6 +54,9 @@ function GeneratePageContent() {
     return () => clearInterval(interval);
   }, [generateMutation.isPending, generateMutation.isSuccess]);
 
+  /**
+   * Initiates the AI article generation request.
+   */
   const handleGenerate = () => {
     if (!selectedTopicId) return;
     generateMutation.mutate({
@@ -55,6 +65,7 @@ function GeneratePageContent() {
     });
   };
 
+  // Pre-select topic if ID is provided in URL (e.g., from Syllabus page)
   useEffect(() => {
     if (topicFromUrl && !selectedTopic) {
       setSelectedTopic(topicFromUrl);
@@ -126,16 +137,21 @@ function GeneratePageContent() {
                   progress={Math.min(progress, 100)}
                 />
 
-                {/* Error */}
+                {/* Error Block */}
                 {generateMutation.isError && (
                   <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                     <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                     <div>
                       <p className="font-medium">Generation failed</p>
                       <p className="text-red-600 mt-0.5">
-                        {(generateMutation.error as any)?.response?.data
-                          ?.error ||
-                          "Could not generate article. Please try again."}
+                        {(() => {
+                          const axiosError = generateMutation.error as AxiosError<ApiError>;
+                          return (
+                            axiosError.response?.data?.error ||
+                            axiosError.response?.data?.message ||
+                            "Could not generate article. Please try again."
+                          );
+                        })()}
                       </p>
                     </div>
                   </div>

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useGenerateQuiz } from "@/lib/hooks/use-quiz";
-import { Topic, QuizGenerateRequest } from "@/lib/types";
+import { Topic, QuizGenerateRequest, ApiError } from "@/lib/types";
+import { AxiosError } from "axios";
 import TopicSelector from "@/components/generate/topic-selector";
 import {
   Card,
@@ -32,6 +33,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("QuizGenerator");
 
 export default function QuizGeneratorPage() {
   const router = useRouter();
@@ -60,7 +64,7 @@ export default function QuizGeneratorPage() {
         router.push(`/assessment/${quiz.id}`);
       },
       onError: (error) => {
-        console.error("Quiz generation failed:", error);
+        logger.error("Quiz generation failed:", error);
       },
     });
   };
@@ -214,8 +218,14 @@ export default function QuizGeneratorPage() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Generation Failed</AlertTitle>
                   <AlertDescription>
-                    {(generateQuizMutation.error as any)?.response?.data
-                      ?.message || "Something went wrong. Please try again."}
+                    {(() => {
+                      const axiosError = generateQuizMutation.error as AxiosError<ApiError>;
+                      return (
+                        axiosError.response?.data?.message ||
+                        axiosError.response?.data?.error ||
+                        "Something went wrong. Please try again."
+                      );
+                    })()}
                   </AlertDescription>
                 </Alert>
               )}

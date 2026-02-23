@@ -11,15 +11,24 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 
+/**
+ * QuizFiltersProps - Types for the quiz filter component.
+ */
 interface QuizFiltersProps {
+  /** The current active filters state. */
   filters: {
     topic_id: string;
     difficulty: "" | "easy" | "medium" | "hard";
     include_ca: boolean | undefined;
   };
-  onFilterChange: (filters: any) => void;
+  /** Callback triggered whenever any filter value changes. */
+  onFilterChange: (filters: QuizFiltersProps["filters"]) => void;
 }
 
+/**
+ * QuizFilters component - Provides UI controls to filter the quiz list.
+ * Includes topic search, difficulty selection, and a Current Affairs toggle.
+ */
 export default function QuizFilters({
   filters,
   onFilterChange,
@@ -53,7 +62,7 @@ export default function QuizFilters({
               onChange={(e) =>
                 onFilterChange({
                   ...filters,
-                  difficulty: e.target.value as any,
+                  difficulty: e.target.value as "easy" | "medium" | "hard" | "",
                 })
               }
               className="w-full border rounded-md px-3 py-2 text-sm"

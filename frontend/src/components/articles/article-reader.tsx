@@ -40,7 +40,7 @@ export default function ArticleReader({ article }: ArticleReaderProps) {
   const caSources =
     sourceChunksArr.filter((s) => s.chunk?.source_type === "dynamic").length ||
     article.ca_chunk_count ||
-    (article as any).generation_metadata?.ca_chunks_used ||
+    article.generation_metadata?.ca_chunks_used ||
     0;
 
   // Track scroll position for reading progress

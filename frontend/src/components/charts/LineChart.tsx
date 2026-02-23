@@ -16,25 +16,49 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+/**
+ * Represents a single point of data in the chart.
+ * Values can be strings (labels), numbers (metrics), or booleans.
+ */
 interface DataPoint {
-  [key: string]: any;
+  [key: string]: string | number | boolean | null;
 }
 
+/**
+ * Configuration for a single data series (line) in the chart.
+ */
 interface Series {
+  /** The matching key in the DataPoint object. */
   key: string;
+  /** Human-readable name for the legend. */
   name: string;
+  /** CSS color string for the line. */
   color: string;
+  /** Optional reference to a specific Y-axis. */
   yAxisId?: string;
 }
 
+/**
+ * Props for the LineChart component.
+ */
 interface LineChartProps {
+  /** Array of data objects to visualize. */
   data: DataPoint[];
+  /** The property in data to use for the X-axis labels. */
   xAxisKey: string;
+  /** List of series configurations to plot as lines. */
   series: Series[];
+  /** Fixed height or percentage for the chart container. Defaults to 300. */
   height?: number | string;
+  /** Optional additional CSS classes. */
   className?: string;
 }
 
+/**
+ * LineChart - A premium, reusable wrapper around Recharts for consistent
+ * data visualization across the dashboard. Includes automatic legend,
+ * tooltips, and support for dual Y-axes.
+ */
 export default function LineChart({
   data,
   xAxisKey,

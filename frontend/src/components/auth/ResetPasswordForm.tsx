@@ -7,10 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+import { AxiosError } from "axios";
+import { ApiError } from "@/lib/types";
+
+/**
+ * Props for the ResetPasswordForm component.
+ */
 interface ResetPasswordFormProps {
+  /** The unique reset token extracted from the URL. */
   token: string;
 }
 
+/**
+ * ResetPasswordForm - Final step in the password recovery flow.
+ * Allows users to set a new password using a verified token.
+ */
 export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -20,6 +31,10 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   >("idle");
   const [message, setMessage] = useState("");
 
+  /**
+   * Validates matching passwords and submits the reset request.
+   * On success, briefly shows a confirmation before redirecting to login.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -40,12 +55,14 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       setStatus("success");
       setMessage(response.message || "Password has been reset successfully.");
 
+      // Redirect after a short delay so the user sees the success state
       setTimeout(() => {
         router.push("/auth/login");
       }, 3000);
-    } catch (err: any) {
+    } catch (err) {
+      const axiosError = err as AxiosError<ApiError>;
       setStatus("error");
-      setMessage(err.response?.data?.message || "Failed to reset password.");
+      setMessage(axiosError.response?.data?.message || axiosError.response?.data?.error || "Failed to reset password. The link may be expired or invalid.");
     }
   };
 

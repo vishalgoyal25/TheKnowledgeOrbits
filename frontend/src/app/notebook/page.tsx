@@ -22,6 +22,17 @@ import {
   Bookmark,
 } from "lucide-react";
 
+/**
+ * NotebookPage - The primary personal study hub for the user.
+ * 
+ * Provides a unified interface to access:
+ * 1. AI-Generated Articles (Knowledge Orbits)
+ * 2. Recent Quiz Attempts & Performance
+ * 3. Saved Bookmarks & Notes
+ * 
+ * Features integrated search filtering across all tabs and fast switching
+ * between content types via a Tabbed UI.
+ */
 export default function NotebookPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("articles"); // articles | quizzes | bookmarks
@@ -60,8 +71,9 @@ export default function NotebookPage() {
   );
 
   const filteredBookmarks = bookmarks?.filter((b) => {
-    // Assuming bookmark has content_data with title, or directly title if flattened
-    const title = (b as any).title || (b as any).content_data?.title || "";
+    // Safely extract title from dynamic content structure
+    const content = b.content as Record<string, any>;
+    const title = content?.title || b.notes || "Untitled Bookmark";
     return title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 

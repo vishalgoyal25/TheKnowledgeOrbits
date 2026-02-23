@@ -34,7 +34,14 @@ import {
 import { Label } from "@/components/ui/label";
 import { supportAPI, FeedbackData } from "@/lib/api/support";
 import { useToast } from "@/hooks/use-toast";
+import { AxiosError } from "axios";
+import { ApiError } from "@/lib/types";
 
+/**
+ * FeedbackButton - A floating action button (FAB) that opens a comprehensive
+ * feedback dialog. Supports deep-linking via #feedback hash and provides
+ * a multi-field form for user suggestions.
+ */
 export default function FeedbackButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,6 +96,11 @@ export default function FeedbackButton() {
     message: "",
   });
 
+  /**
+   * Submits feedback data to the support API.
+   * On success: shows toast and resets form.
+   * On error: notifies user with specific message if available.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -120,9 +132,10 @@ export default function FeedbackButton() {
       });
       setIsOpen(false);
     } catch (error) {
+      const axiosError = error as AxiosError<ApiError>;
       toast({
         title: "Submission Failed",
-        description: "Something went wrong. Please try again later.",
+        description: axiosError.response?.data?.message || axiosError.response?.data?.error || "Something went wrong. Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -240,7 +253,7 @@ export default function FeedbackButton() {
               </Label>
               <Select
                 value={formData.user_type}
-                onValueChange={(value: any) =>
+                onValueChange={(value: FeedbackData["user_type"]) =>
                   setFormData({ ...formData, user_type: value })
                 }
               >
