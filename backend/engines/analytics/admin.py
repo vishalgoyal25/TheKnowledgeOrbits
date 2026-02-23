@@ -5,6 +5,7 @@ Analytics Engine Admin
 from typing import Any
 
 from django.contrib import admin
+
 from engines.analytics.models import DailyAggregate, Insight
 
 

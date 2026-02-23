@@ -4,12 +4,15 @@ Current Affairs Engine - Model Tests
 Tests for CASource, CAArticle, CAChunk, CATopicLink models.
 """
 
-import pytest
 import uuid
 from datetime import timedelta
+
 from django.utils import timezone
-from engines.current_affairs.models import CASource, CAArticle, CAChunk, CATopicLink
-from engines.knowledge.models import Program, Subject, Module, Topic
+
+import pytest
+
+from engines.current_affairs.models import CAArticle, CAChunk, CASource, CATopicLink
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 
 @pytest.fixture

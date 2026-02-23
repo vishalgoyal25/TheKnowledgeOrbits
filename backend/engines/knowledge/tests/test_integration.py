@@ -1,10 +1,12 @@
 """Knowledge Engine - Integration Tests"""
 
-import pytest
 from rest_framework.test import APIClient
-from engines.knowledge.models import Program, Subject, Module, Topic, ChunkTopicMap
-from engines.content.models import Document, Chunk
+
+import pytest
+
 from engines.auth.models import User
+from engines.content.models import Chunk, Document
+from engines.knowledge.models import ChunkTopicMap, Module, Program, Subject, Topic
 
 
 @pytest.fixture

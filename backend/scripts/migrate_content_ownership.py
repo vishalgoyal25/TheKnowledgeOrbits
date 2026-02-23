@@ -4,10 +4,10 @@ Data Migration: Set Existing Content as Public.
 Run this script ONCE after applying ownership migrations.
 """
 
-from typing import Any
-
 import os
 import sys
+from typing import Any
+
 import django
 
 # Add project root to sys.path
@@ -16,11 +16,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.base")
 django.setup()
 
+from rich.console import Console  # noqa: E402
+
 from engines.article_generation.models import Article  # noqa: E402
 from engines.assessment.models import Quiz  # noqa: E402
-
-
-from rich.console import Console  # noqa: E402
 
 console = Console()
 

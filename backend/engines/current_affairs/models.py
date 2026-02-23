@@ -8,10 +8,10 @@ Tables:
 - CATopicLink: CA chunk to topic mapping
 """
 
-from typing import Any
-
 import uuid
 from datetime import timedelta
+from typing import Any
+
 from django.db import models
 
 

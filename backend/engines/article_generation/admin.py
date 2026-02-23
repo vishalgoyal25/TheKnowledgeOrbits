@@ -5,9 +5,10 @@ Article Generation Engine Admin Interface
 from typing import Any
 
 from django.contrib import admin
-from django.utils.html import format_html
 from django.urls import reverse
-from .models import Article, ArticleSourceMap, ArticleGenerationJob
+from django.utils.html import format_html
+
+from .models import Article, ArticleGenerationJob, ArticleSourceMap
 
 
 @admin.register(Article)

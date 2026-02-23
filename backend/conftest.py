@@ -2,18 +2,19 @@
 Global pytest fixtures for TheKnowledgeOrbits.
 """
 
+import os
 from typing import Any
 
-import os
 import pytest
 
 # CRITICAL: Set Django settings BEFORE any Django imports
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
 
-# Import Django and setup
-import django  # noqa: E402
 import sys  # noqa: E402
 from unittest.mock import MagicMock  # noqa: E402
+
+# Import Django and setup
+import django  # noqa: E402
 
 # Safe mock for ML libraries to avoid 3GB+ downloads in CI
 try:
@@ -24,10 +25,10 @@ except ImportError:
     logger = MagicMock()
     sys.modules["sentence_transformers.SentenceTransformer"] = MagicMock()
 
-import numpy as np  # noqa: E402
-
 # NOW it's safe to import Django/DRF components
 from rest_framework.test import APIClient  # noqa: E402
+
+import numpy as np  # noqa: E402
 
 django.setup()
 

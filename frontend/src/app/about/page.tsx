@@ -2,16 +2,11 @@
 
 import React from "react";
 import {
-  Sparkles,
   Target,
   Zap,
   ShieldCheck,
   Users,
-  Search,
   BookOpen,
-  Layout,
-  History,
-  CheckCircle,
   Cpu,
   Globe,
   ArrowRight,

@@ -1,10 +1,12 @@
 """Knowledge Engine - View Tests"""
 
-import pytest
-from rest_framework.test import APIClient
 from rest_framework import status
-from engines.knowledge.models import Program, Subject, Module, Topic
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.auth.models import User
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 
 @pytest.fixture

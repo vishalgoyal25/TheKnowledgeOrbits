@@ -4,9 +4,12 @@ Mastery Service
 Handles topic mastery computation.
 """
 
-import structlog
 from typing import TYPE_CHECKING
+
 from django.db.models import QuerySet
+
+import structlog
+
 from engines.userstate.models import TopicMastery
 
 if TYPE_CHECKING:

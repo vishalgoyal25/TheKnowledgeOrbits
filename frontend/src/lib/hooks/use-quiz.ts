@@ -15,7 +15,6 @@ import {
   ApiError,
   Quiz,
   QuizAttempt,
-  TopicMastery,
 } from "../types";
 import { toast } from "@/hooks/use-toast";
 

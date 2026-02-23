@@ -2,8 +2,9 @@
 Development settings for TheKnowledgeOrbits.
 """
 
-from .base import *  # noqa: F403, F401
 import os
+
+from .base import *  # noqa: F403, F401
 
 DEBUG = True
 

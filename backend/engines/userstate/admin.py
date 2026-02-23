@@ -5,12 +5,13 @@ User State Engine Admin
 from typing import Any
 
 from django.contrib import admin
+
 from engines.userstate.models import (
-    UserEvent,
-    UserProgress,
-    TopicMastery,
     Bookmark,
     ReadingProgress,
+    TopicMastery,
+    UserEvent,
+    UserProgress,
 )
 
 

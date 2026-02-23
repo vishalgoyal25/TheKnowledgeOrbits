@@ -1,4 +1,5 @@
 from typing import Any
+
 import sentry_sdk
 
 """
@@ -7,8 +8,8 @@ Content Engine Celery Tasks
 Async tasks for content processing.
 """
 
-from celery import shared_task
 import structlog
+from celery import shared_task
 
 logger = structlog.get_logger(__name__)
 

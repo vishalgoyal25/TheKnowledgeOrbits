@@ -5,7 +5,8 @@ Tests for PermissionService.
 """
 
 import pytest
-from engines.auth.models import User, Role, RoleAssignment
+
+from engines.auth.models import Role, RoleAssignment, User
 from engines.authorization.services.permission_service import PermissionService
 
 

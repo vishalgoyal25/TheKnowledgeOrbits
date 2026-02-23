@@ -4,11 +4,13 @@ Insights Service
 Generates actionable insights for users.
 """
 
-import structlog
 from datetime import timedelta
 from typing import TYPE_CHECKING, List
-from django.utils import timezone
+
 from django.db import models
+from django.utils import timezone
+
+import structlog
 
 from engines.analytics.models import Insight
 from engines.userstate.models import TopicMastery, UserEvent

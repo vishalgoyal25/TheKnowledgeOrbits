@@ -4,10 +4,13 @@ Auth Engine - Model Tests
 Tests for User, Role, and RoleAssignment models.
 """
 
-import pytest
-from django.utils import timezone
 from datetime import timedelta
-from engines.auth.models import User, Role, RoleAssignment
+
+from django.utils import timezone
+
+import pytest
+
+from engines.auth.models import Role, RoleAssignment, User
 
 
 @pytest.mark.django_db

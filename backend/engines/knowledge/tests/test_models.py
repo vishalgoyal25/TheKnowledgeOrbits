@@ -1,14 +1,9 @@
 """Knowledge Engine - Model Tests"""
 
 import pytest
-from engines.knowledge.models import (
-    Program,
-    Subject,
-    Module,
-    Topic,
-    ChunkTopicMap,
-)
-from engines.content.models import Document, Chunk
+
+from engines.content.models import Chunk, Document
+from engines.knowledge.models import ChunkTopicMap, Module, Program, Subject, Topic
 
 
 @pytest.mark.django_db

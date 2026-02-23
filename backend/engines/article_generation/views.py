@@ -1,28 +1,30 @@
 from typing import Any
+
 import sentry_sdk
 
 """
 Article Generation Engine Views
 """
 
-import structlog
-from rest_framework import viewsets, status
+from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+
+import structlog
+
+from engines.shared.services.visibility_service import get_visibility_service
+from engines.userstate.services.activity_service import get_activity_service
 
 from .models import Article, ArticleGenerationJob
 from .serializers import (
-    ArticleListSerializer,
     ArticleDetailSerializer,
-    ArticleGenerationRequestSerializer,
     ArticleGenerationJobSerializer,
+    ArticleGenerationRequestSerializer,
+    ArticleListSerializer,
     ArticleSourceMapSerializer,
 )
 from .services.generation_service import ArticleGenerationService
-from engines.userstate.services.activity_service import get_activity_service
-
-from engines.shared.services.visibility_service import get_visibility_service
 
 logger = structlog.get_logger(__name__)
 

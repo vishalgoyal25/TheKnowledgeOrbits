@@ -13,19 +13,21 @@ Key Features:
 - Groq LLM integration for generation
 """
 
-import structlog
 import json
-from typing import List, Dict, Any, Optional
 from datetime import timedelta
+from typing import Any, Dict, List, Optional
+
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from groq import Groq
-from django.conf import settings
 
+import structlog
+from groq import Groq
+
+from engines.assessment.models import Question, Quiz
 from engines.content.models import Chunk
 from engines.current_affairs.models import CAChunk
-from engines.knowledge.models import Topic, ChunkTopicMap
-from engines.assessment.models import Quiz, Question
+from engines.knowledge.models import ChunkTopicMap, Topic
 
 logger = structlog.get_logger(__name__)
 
@@ -206,9 +208,10 @@ class QuizGeneratorService:
 
         # --- STRATEGY 2: Semantic Vector Search (Fill the gap) ---
         try:
-            from engines.content.services.embedding_service import EmbeddingService
-            from engines.content.models import Embedding
             from pgvector.django import CosineDistance
+
+            from engines.content.models import Embedding
+            from engines.content.services.embedding_service import EmbeddingService
 
             # Generate topic embedding
             query_vector = EmbeddingService.generate_embedding(topic.name)

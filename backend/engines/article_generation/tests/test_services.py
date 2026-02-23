@@ -4,14 +4,16 @@ Article Generation Engine - Service Tests
 Tests for ArticleGenerationService (mocked GROQ calls).
 """
 
-import pytest
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from engines.article_generation.services.generation_service import (
     ArticleGenerationService,
 )
-from engines.knowledge.models import Program, Subject, Module, Topic
 from engines.content.models import Chunk, Document
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 
 @pytest.fixture

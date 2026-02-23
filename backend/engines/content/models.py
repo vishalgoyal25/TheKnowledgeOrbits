@@ -6,8 +6,9 @@ Principle: Chunks are the foundation. Articles are generated from chunks, never 
 """
 
 import uuid
+
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Document(models.Model):

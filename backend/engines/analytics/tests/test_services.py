@@ -4,15 +4,18 @@ Analytics Engine - Service Tests
 Tests for AnalyticsService, DashboardService, InsightsService.
 """
 
-import pytest
 from datetime import timedelta
+
 from django.utils import timezone
-from engines.auth.models import User
+
+import pytest
+
 from engines.analytics.models import DailyAggregate, Insight
 from engines.analytics.services.analytics_service import AnalyticsService
 from engines.analytics.services.dashboard_service import DashboardService
 from engines.analytics.services.insights_service import InsightsService
-from engines.userstate.models import UserEvent, UserProgress, TopicMastery
+from engines.auth.models import User
+from engines.userstate.models import TopicMastery, UserEvent, UserProgress
 
 
 @pytest.fixture
@@ -24,7 +27,7 @@ def user():
 @pytest.fixture
 def topic():
     """Create test topic with full hierarchy."""
-    from engines.knowledge.models import Program, Subject, Module, Topic
+    from engines.knowledge.models import Module, Program, Subject, Topic
 
     program = Program.objects.create(name="UPSC CSE")
     subject = Subject.objects.create(name="Test", program=program)

@@ -4,16 +4,18 @@ Authorization Engine - Permission Class Tests
 Tests for DRF permission classes.
 """
 
-import pytest
 from rest_framework.test import APIRequestFactory
-from engines.auth.models import User, Role, RoleAssignment
+
+import pytest
+
+from engines.auth.models import Role, RoleAssignment, User
 from engines.authorization.permissions import (
+    CanGenerateArticle,
+    CanGenerateQuiz,
+    CanManageContent,
     IsAdmin,
     IsContentManager,
     IsStudent,
-    CanManageContent,
-    CanGenerateQuiz,
-    CanGenerateArticle,
 )
 
 

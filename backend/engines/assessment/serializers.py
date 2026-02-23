@@ -8,7 +8,7 @@ from typing import Any
 
 from rest_framework import serializers
 
-from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionResponse
+from engines.assessment.models import Question, QuestionResponse, Quiz, QuizAttempt
 from engines.knowledge.models import Topic
 
 

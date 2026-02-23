@@ -2,16 +2,19 @@
 Unified Search Service using pgvector
 """
 
-import sentry_sdk
+from typing import Any, Dict, List
+
 from django.db.models import Q
-from typing import List, Dict, Any
+
+import sentry_sdk
 import structlog
 from pgvector.django import CosineDistance
-from engines.content.services.embedding_service import EmbeddingService
-from engines.content.models import Chunk, Embedding
-from engines.knowledge.models import Topic
-from engines.current_affairs.models import CAArticle
+
 from engines.article_generation.models import Article as GeneratedArticle
+from engines.content.models import Chunk, Embedding
+from engines.content.services.embedding_service import EmbeddingService
+from engines.current_affairs.models import CAArticle
+from engines.knowledge.models import Topic
 
 logger = structlog.get_logger(__name__)
 

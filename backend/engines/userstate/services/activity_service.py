@@ -4,8 +4,10 @@ Activity Service
 Handles event logging (event sourcing pattern).
 """
 
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
 import structlog
-from typing import Dict, Any, Optional, TYPE_CHECKING
+
 from engines.userstate.models import UserEvent
 
 if TYPE_CHECKING:

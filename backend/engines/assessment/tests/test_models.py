@@ -4,11 +4,13 @@ Assessment Engine - Model Tests
 Tests for Quiz, Question, QuizAttempt, QuestionResponse models.
 """
 
-import pytest
 import uuid
-from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionResponse
+
+import pytest
+
+from engines.assessment.models import Question, QuestionResponse, Quiz, QuizAttempt
 from engines.auth.models import User
-from engines.knowledge.models import Program, Subject, Module, Topic
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 
 @pytest.fixture

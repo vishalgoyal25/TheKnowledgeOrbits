@@ -1,9 +1,12 @@
 """User State Engine Integration Tests."""
 
-import pytest
 import uuid
-from rest_framework.test import APIClient
+
 from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.auth.models import User
 
 
@@ -87,7 +90,7 @@ class TestMasteryTracking:
     def test_quiz_updates_mastery(self, authenticated_user_client):
         """Test quiz completion updates topic mastery."""
         client, user = authenticated_user_client
-        from engines.knowledge.models import Program, Subject, Module, Topic
+        from engines.knowledge.models import Module, Program, Subject, Topic
         from engines.userstate.services.mastery_service import MasteryService
 
         # Create topic with full hierarchy

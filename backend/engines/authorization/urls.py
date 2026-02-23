@@ -3,6 +3,7 @@ Authorization Engine URLs
 """
 
 from django.urls import path
+
 from engines.authorization import views
 
 app_name = "authorization"

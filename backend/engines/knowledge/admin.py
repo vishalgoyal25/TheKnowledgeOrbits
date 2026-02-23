@@ -5,15 +5,16 @@ Knowledge Engine Admin Interface
 from typing import Any
 
 from django.contrib import admin
+
 from engines.knowledge.models import (
+    ChunkRelation,
+    ChunkTopicMap,
+    Module,
     Program,
     Subject,
-    Module,
-    Topic,
-    ChunkTopicMap,
     Theme,
     ThemeTopicMap,
-    ChunkRelation,
+    Topic,
 )
 
 
@@ -137,6 +138,7 @@ class TopicAdmin(admin.ModelAdmin):  # type: ignore
     def suggest_chunks_view(self, request, object_id) -> Any:  # type: ignore
         """Custom admin view for suggesting chunks."""
         from django.shortcuts import render
+
         from engines.knowledge.services.mapping_service import MappingService
 
         topic = self.get_object(request, object_id)

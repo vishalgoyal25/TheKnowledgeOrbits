@@ -6,7 +6,8 @@ Preserves context with chapter/page metadata.
 """
 
 import re
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 import structlog
 
 logger = structlog.get_logger(__name__)

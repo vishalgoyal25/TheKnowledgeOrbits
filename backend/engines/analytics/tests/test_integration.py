@@ -4,15 +4,19 @@ Analytics Engine - Integration Tests
 End-to-end analytics workflow tests.
 """
 
-import pytest
 from datetime import timedelta
-from rest_framework.test import APIClient
-from rest_framework import status
+
 from django.utils import timezone
-from engines.auth.models import User
+
+from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.analytics.models import DailyAggregate
 from engines.analytics.services.analytics_service import AnalyticsService
-from engines.userstate.models import UserProgress, TopicMastery
+from engines.auth.models import User
+from engines.userstate.models import TopicMastery, UserProgress
 
 
 @pytest.fixture
@@ -69,7 +73,7 @@ class TestInsightsGenerationFlow:
     def test_weak_topic_insight_generation(self, authenticated_user):
         """Test generating insights for weak topics."""
         client, user = authenticated_user
-        from engines.knowledge.models import Program, Subject, Module, Topic
+        from engines.knowledge.models import Module, Program, Subject, Topic
 
         # Step 1: Create weak mastery
         program = Program.objects.create(name="UPSC CSE")

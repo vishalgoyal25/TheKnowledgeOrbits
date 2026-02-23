@@ -6,18 +6,20 @@ Article Generation Service
 RAG-based article generation using GROQ with integrated Contextual Analysis.
 """
 
-from typing import TYPE_CHECKING, List, Dict, Any, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-import structlog
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from django.conf import settings
+
+import structlog
 from groq import Groq
 
 from engines.content.models import Chunk, Embedding
-from engines.knowledge.models import Topic, ChunkTopicMap
-from engines.current_affairs.models import CAChunk, CATopicLink
 from engines.content.services.embedding_service import EmbeddingService
+from engines.current_affairs.models import CAChunk, CATopicLink
+from engines.knowledge.models import ChunkTopicMap, Topic
+
 from ..models import Article, ArticleSourceMap
 
 if TYPE_CHECKING:

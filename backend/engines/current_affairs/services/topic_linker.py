@@ -6,14 +6,16 @@ Topic Linker Service
 Auto-links CA chunks to syllabus topics using semantic similarity
 """
 
-import structlog
-from typing import Dict, List, Any, cast
+from typing import Any, Dict, List, cast
+
 import numpy as np
+import structlog
 from sentence_transformers import SentenceTransformer
 
-from ..models import CAChunk, CATopicLink
-from engines.knowledge.models import Topic
 from engines.content.models import Embedding
+from engines.knowledge.models import Topic
+
+from ..models import CAChunk, CATopicLink
 
 logger = structlog.get_logger(__name__)
 

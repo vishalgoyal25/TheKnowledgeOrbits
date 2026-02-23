@@ -6,33 +6,34 @@ Assessment Engine Views
 API endpoints for quiz operations.
 """
 
-import structlog
 from typing import cast
+
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.request import Request
-from django.shortcuts import get_object_or_404
-from engines.auth.models import User
-from django.utils import timezone
-from django.db import transaction
+from rest_framework.response import Response
 
-from engines.assessment.models import Quiz, QuizAttempt, QuestionResponse
+import structlog
+
+from engines.assessment.models import QuestionResponse, Quiz, QuizAttempt
 from engines.assessment.serializers import (
-    QuizListSerializer,
+    QuestionDetailSerializer,
+    QuizAttemptSerializer,
     QuizDetailSerializer,
     QuizGenerateSerializer,
-    QuizAttemptSerializer,
+    QuizListSerializer,
     QuizSubmitSerializer,
-    QuestionDetailSerializer,
 )
 from engines.assessment.services.quiz_generator import get_quiz_generator
-
-from engines.userstate.services.mastery_service import get_mastery_service
-from engines.userstate.services.activity_service import get_activity_service
-
+from engines.auth.models import User
 from engines.shared.services.visibility_service import get_visibility_service
+from engines.userstate.services.activity_service import get_activity_service
+from engines.userstate.services.mastery_service import get_mastery_service
 
 logger = structlog.get_logger(__name__)
 

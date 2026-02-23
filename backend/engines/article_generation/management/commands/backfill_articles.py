@@ -1,10 +1,13 @@
 from typing import Any
-import sentry_sdk
+
 from django.core.management.base import BaseCommand
-from engines.article_generation.models import Article
-from engines.content.services.embedding_service import EmbeddingService
-from engines.content.models import Embedding
+
+import sentry_sdk
 import structlog
+
+from engines.article_generation.models import Article
+from engines.content.models import Embedding
+from engines.content.services.embedding_service import EmbeddingService
 
 logger = structlog.get_logger(__name__)
 

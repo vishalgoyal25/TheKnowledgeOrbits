@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Document, Chunk, Embedding, Asset, IngestionJob
+
+from .models import Asset, Chunk, Document, Embedding, IngestionJob
 
 
 @admin.register(Document)

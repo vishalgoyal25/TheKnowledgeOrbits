@@ -1,9 +1,11 @@
 """User State Engine Service Tests."""
 
-import pytest
 import uuid
+
+import pytest
+
 from engines.auth.models import User
-from engines.userstate.models import UserEvent, Bookmark, TopicMastery
+from engines.userstate.models import Bookmark, TopicMastery, UserEvent
 from engines.userstate.services.activity_service import ActivityService
 from engines.userstate.services.bookmark_service import BookmarkService
 from engines.userstate.services.mastery_service import MasteryService
@@ -19,7 +21,7 @@ def user():
 @pytest.fixture
 def topic():
     """Create test topic with full hierarchy."""
-    from engines.knowledge.models import Program, Subject, Module, Topic
+    from engines.knowledge.models import Module, Program, Subject, Topic
 
     program = Program.objects.create(name="Test Program")
     subject = Subject.objects.create(name="Test Subject", program=program)

@@ -4,11 +4,13 @@ Content Engine - Integration Tests
 End-to-end content ingestion workflows.
 """
 
-import pytest
-from rest_framework.test import APIClient
 from rest_framework import status
-from engines.content.models import Document, Chunk
-from engines.auth.models import User, Role, RoleAssignment
+from rest_framework.test import APIClient
+
+import pytest
+
+from engines.auth.models import Role, RoleAssignment, User
+from engines.content.models import Chunk, Document
 
 
 @pytest.fixture

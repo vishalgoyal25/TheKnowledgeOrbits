@@ -5,7 +5,7 @@ from typing import Any
 from django.contrib import admin
 from django.utils.html import format_html
 
-from engines.assessment.models import Quiz, Question, QuizAttempt, QuestionResponse
+from engines.assessment.models import Question, QuestionResponse, Quiz, QuizAttempt
 
 
 @admin.register(Quiz)

@@ -5,12 +5,12 @@ Stores generated articles and their source attribution.
 Articles are RAG-generated from chunks, never ingested directly.
 """
 
+import uuid
 from typing import Any
 
-import uuid
+from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
-from django.conf import settings
 
 
 class Article(models.Model):

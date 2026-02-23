@@ -4,9 +4,11 @@ Bookmark Service
 Handles bookmark CRUD operations.
 """
 
-import structlog
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
+
 from django.db import transaction
+
+import structlog
 
 from engines.userstate.models import Bookmark
 from engines.userstate.services.activity_service import get_activity_service

@@ -4,8 +4,9 @@ Permission Service
 Centralized permission checking logic.
 """
 
+from typing import TYPE_CHECKING, List
+
 import structlog
-from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from engines.auth.models import User

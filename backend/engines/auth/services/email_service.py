@@ -10,11 +10,12 @@ Handles email sending for:
 
 from typing import TYPE_CHECKING
 
-import structlog
+from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-from django.conf import settings
 from django.utils.html import strip_tags
+
+import structlog
 
 if TYPE_CHECKING:
     from engines.auth.models import User

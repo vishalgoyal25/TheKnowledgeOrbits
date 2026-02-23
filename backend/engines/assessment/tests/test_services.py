@@ -4,12 +4,14 @@ Assessment Engine - Service Tests
 Tests for QuizGeneratorService (mocked GROQ).
 """
 
-import pytest
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from engines.assessment.services.quiz_generator import QuizGeneratorService
-from engines.knowledge.models import Program, Subject, Module, Topic, ChunkTopicMap
 from engines.content.models import Chunk, Document
+from engines.knowledge.models import ChunkTopicMap, Module, Program, Subject, Topic
 
 
 @pytest.fixture

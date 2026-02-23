@@ -1,10 +1,12 @@
 """Knowledge Engine - Service Tests"""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
+from engines.content.models import Chunk, Document, Embedding
+from engines.knowledge.models import Module, Program, Subject, Topic
 from engines.knowledge.services.mapping_service import MappingService
-from engines.knowledge.models import Program, Subject, Module, Topic
-from engines.content.models import Document, Chunk, Embedding
 
 
 @pytest.fixture

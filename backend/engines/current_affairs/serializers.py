@@ -5,8 +5,10 @@ Current Affairs Engine - Serializers
 from typing import Any
 
 from rest_framework import serializers
-from .models import CASource, CAArticle, CAChunk, CATopicLink
+
 from engines.knowledge.serializers import TopicSerializer
+
+from .models import CAArticle, CAChunk, CASource, CATopicLink
 
 
 class CASourceSerializer(serializers.ModelSerializer):  # type: ignore

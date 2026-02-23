@@ -4,9 +4,11 @@ Visibility Service
 Filters content based on ownership and public/private status.
 """
 
-import structlog
-from typing import Optional, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
+
 from django.db.models import Q, QuerySet
+
+import structlog
 
 if TYPE_CHECKING:
     from engines.auth.models import User

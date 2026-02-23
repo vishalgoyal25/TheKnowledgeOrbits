@@ -5,6 +5,7 @@ Article Generation Engine App Configuration
 from typing import Any
 
 from django.apps import AppConfig
+
 import structlog
 
 logger = structlog.get_logger(__name__)

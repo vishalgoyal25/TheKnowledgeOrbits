@@ -6,10 +6,12 @@ Analytics Service
 Handles data aggregation from UserEvent logs.
 """
 
-import structlog
-from datetime import datetime, date, timedelta
-from typing import TYPE_CHECKING, Dict, Any
+from datetime import date, datetime, timedelta
+from typing import TYPE_CHECKING, Any, Dict
+
 from django.utils import timezone
+
+import structlog
 
 from engines.analytics.models import DailyAggregate
 from engines.userstate.models import UserEvent

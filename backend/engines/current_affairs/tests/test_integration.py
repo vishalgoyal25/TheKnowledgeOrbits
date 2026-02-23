@@ -4,12 +4,15 @@ Current Affairs Engine - Integration Tests
 End-to-end CA workflows.
 """
 
-import pytest
-from rest_framework.test import APIClient
 from django.utils import timezone
-from engines.current_affairs.models import CASource, CAArticle, CAChunk
-from engines.current_affairs.services.ca_processor import CAProcessorService
+
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.auth.models import User
+from engines.current_affairs.models import CAArticle, CAChunk, CASource
+from engines.current_affairs.services.ca_processor import CAProcessorService
 
 
 @pytest.fixture

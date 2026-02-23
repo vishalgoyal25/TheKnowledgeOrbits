@@ -4,10 +4,12 @@ Authorization Engine - View Tests
 Tests for role management API endpoints.
 """
 
-import pytest
-from rest_framework.test import APIClient
 from rest_framework import status
-from engines.auth.models import User, Role, RoleAssignment
+from rest_framework.test import APIClient
+
+import pytest
+
+from engines.auth.models import Role, RoleAssignment, User
 
 
 @pytest.fixture

@@ -4,12 +4,14 @@ Progress Service
 Handles user progress computation.
 """
 
-import structlog
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
+
 from django.utils import timezone
 
-from engines.userstate.models import UserProgress, UserEvent
+import structlog
+
+from engines.userstate.models import UserEvent, UserProgress
 
 if TYPE_CHECKING:
     from engines.auth.models import User

@@ -6,7 +6,8 @@ from typing import Any
 
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import CASource, CAArticle, CAChunk, CATopicLink
+
+from .models import CAArticle, CAChunk, CASource, CATopicLink
 
 
 @admin.register(CASource)

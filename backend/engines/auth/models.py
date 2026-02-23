@@ -11,15 +11,16 @@ No UserProfile, UserEvent, or UserBookmark here (those belong to other engines).
 """
 
 import uuid
-from django.db import models
+from datetime import timedelta
+from typing import Any, Optional, cast
+
 from django.contrib.auth.models import (
     AbstractBaseUser,
     BaseUserManager,
     PermissionsMixin,
 )
+from django.db import models
 from django.utils import timezone
-from datetime import timedelta
-from typing import Any, Optional, cast
 
 
 class UserManager(BaseUserManager):  # type: ignore

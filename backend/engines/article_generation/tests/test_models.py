@@ -4,16 +4,18 @@ Article Generation Engine - Model Tests
 Tests for Article, ArticleSourceMap, ArticleGenerationJob models.
 """
 
-import pytest
 import uuid
+
+import pytest
+
 from engines.article_generation.models import (
     Article,
-    ArticleSourceMap,
     ArticleGenerationJob,
+    ArticleSourceMap,
 )
 from engines.auth.models import User
-from engines.knowledge.models import Program, Subject, Module, Topic
-from engines.content.models import Document, Chunk
+from engines.content.models import Chunk, Document
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 
 @pytest.fixture
