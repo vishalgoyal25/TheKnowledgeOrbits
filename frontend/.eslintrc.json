@@ -39,7 +39,8 @@
     {
       "files": ["src/lib/logger.ts"],
       "rules": {
-        "no-console": "off"
+        "no-console": "off",
+        "@typescript-eslint/no-var-requires": "off"
       }
     }
   ]
