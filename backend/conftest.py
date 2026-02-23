@@ -25,6 +25,17 @@ except ImportError:
     logger = MagicMock()
     sys.modules["sentence_transformers.SentenceTransformer"] = MagicMock()
 
+# Mock OpenAI and Groq to avoid import errors in CI
+try:
+    import openai  # noqa: F401
+except ImportError:
+    sys.modules["openai"] = MagicMock()
+
+try:
+    import groq  # noqa: F401
+except ImportError:
+    sys.modules["groq"] = MagicMock()
+
 # NOW it's safe to import Django/DRF components
 from rest_framework.test import APIClient  # noqa: E402
 
@@ -56,8 +67,14 @@ def mock_ml_models(monkeypatch: Any) -> None:
     monkeypatch.setattr("sentence_transformers.SentenceTransformer", mock_st)
 
     # 2. Mock OpenAI/Groq if needed (prevent network calls)
+    import openai
+    import groq
+
     mock_openai = MagicMock()
-    monkeypatch.setattr("openai.OpenAI", mock_openai)
+    monkeypatch.setattr(openai, "OpenAI", mock_openai)
+
+    mock_groq = MagicMock()
+    monkeypatch.setattr(groq, "Groq", mock_groq)
 
     # 3. Suppress heavy logging during tests
     import structlog
