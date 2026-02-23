@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { bookmarksAPI } from "@/lib/api/bookmarks";
 import { useQueryClient } from "@tanstack/react-query";
 import { tokenManager } from "@/lib/auth/token-manager";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("Bookmarks");
 
 export function useBookmarkToggle(
   contentType: "article" | "quiz",
@@ -26,7 +29,7 @@ export function useBookmarkToggle(
           setBookmarkId(existing.id);
         }
       } catch (error) {
-        console.error("Failed to check bookmark:", error);
+        logger.error("Failed to check bookmark:", error);
       }
     };
     checkBookmark();
@@ -57,7 +60,7 @@ export function useBookmarkToggle(
       // Invalidate bookmarks cache
       queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
     } catch (error) {
-      console.error("Bookmark toggle failed:", error);
+      logger.error("Bookmark toggle failed:", error);
     } finally {
       setIsLoading(false);
     }

@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 
+import { AxiosError } from "axios";
+import { ApiError } from "@/lib/types";
+
+/**
+ * VerifyEmailPage - Automated landing page for email verification links.
+ * Extracts the token from the URL and calls the verification API on mount.
+ */
 export default function VerifyEmailPage() {
   const params = useParams();
   const router = useRouter();
@@ -22,6 +29,9 @@ export default function VerifyEmailPage() {
   );
   const [message, setMessage] = useState("");
 
+  /**
+   * Effect hook to trigger verification as soon as the component loads.
+   */
   useEffect(() => {
     const verifyEmail = async () => {
       if (!token) return;
@@ -30,13 +40,14 @@ export default function VerifyEmailPage() {
         setStatus("success");
         setMessage(response.message);
 
-        // Redirect to login after 3 seconds
+        // Redirect to login after 3 seconds so user can read the success message
         setTimeout(() => {
           router.push("/auth/login?verified=true");
         }, 3000);
-      } catch (error: any) {
+      } catch (error) {
+        const axiosError = error as AxiosError<ApiError>;
         setStatus("error");
-        setMessage(error.response?.data?.message || "Verification failed");
+        setMessage(axiosError.response?.data?.message || axiosError.response?.data?.error || "Verification failed. The link may be expired or invalid.");
       }
     };
     verifyEmail();

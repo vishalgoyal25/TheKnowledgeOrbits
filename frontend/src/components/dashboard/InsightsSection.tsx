@@ -21,13 +21,16 @@ export default function InsightsSection({ insights }: Props) {
           <p className="text-gray-500">No insights yet. Keep studying!</p>
         ) : (
           <div className="space-y-3">
-            {insights.map((insight, idx) => (
-              <Alert key={idx} className="bg-blue-50 border-blue-200">
-                <AlertDescription className="text-sm">
-                  {insight.data.message}
-                </AlertDescription>
-              </Alert>
-            ))}
+            {insights.map((insight, idx) => {
+              const data = insight.data as Record<string, any>;
+              return (
+                <Alert key={idx} className="bg-blue-50 border-blue-200">
+                  <AlertDescription className="text-sm">
+                    {data.message || "New insight available"}
+                  </AlertDescription>
+                </Alert>
+              );
+            })}
           </div>
         )}
       </CardContent>

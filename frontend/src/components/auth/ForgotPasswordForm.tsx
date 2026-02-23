@@ -7,6 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2 } from "lucide-react";
 
+import { AxiosError } from "axios";
+import { ApiError } from "@/lib/types";
+
+/**
+ * ForgotPasswordForm - Initiates the password recovery workflow.
+ * Collects the user's email and triggers the backend reset link generator.
+ */
 export default function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<
@@ -14,6 +21,11 @@ export default function ForgotPasswordForm() {
   >("idle");
   const [message, setMessage] = useState("");
 
+  /**
+   * Submits the recovery request.
+   * On success, shows a confirmation message.
+   * On failure, displays the specific backend error for the user.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("loading");
@@ -23,9 +35,10 @@ export default function ForgotPasswordForm() {
       const response = await authAPI.forgotPassword({ email });
       setStatus("success");
       setMessage(response.message || "Password reset link sent to your email.");
-    } catch (err: any) {
+    } catch (err) {
+      const axiosError = err as AxiosError<ApiError>;
       setStatus("error");
-      setMessage(err.response?.data?.message || "Failed to send reset link.");
+      setMessage(axiosError.response?.data?.message || axiosError.response?.data?.error || "Failed to send reset link. Please verify your email.");
     }
   };
 

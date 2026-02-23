@@ -25,21 +25,24 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
   };
 
   const getMessage = (activity: ActivityType) => {
+    // Cast data safely for rendering
+    const data = activity.event_data as Record<string, any>;
+
     switch (activity.event_type) {
       case "article_read":
         return (
           <p className="text-sm text-gray-700">
             Read{" "}
-            <span className="font-semibold">{activity.event_data.title}</span>
+            <span className="font-semibold">{data.title || "an article"}</span>
           </p>
         );
       case "quiz_completed":
         return (
           <p className="text-sm text-gray-700">
             Completed{" "}
-            <span className="font-semibold">{activity.event_data.title}</span>{" "}
+            <span className="font-semibold">{data.title || "a quiz"}</span>{" "}
             with score{" "}
-            <span className="font-bold">{activity.event_data.score}%</span>
+            <span className="font-bold">{data.score ?? 0}%</span>
           </p>
         );
       default:

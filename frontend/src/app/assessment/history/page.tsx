@@ -7,6 +7,13 @@ import { History, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
+/**
+ * QuizHistoryPage - A dedicated dashboard for tracking user assessment performance.
+ * 
+ * Lists all previous quiz attempts in reverse chronological order, allowing the user
+ * to review scores, analyze mistakes, and jump back into unfinished sessions.
+ * Provides a clean empty state to encourage the user to generate their first quiz.
+ */
 export default function QuizHistoryPage() {
   const { data: attempts, isLoading } = useMyAttempts();
 

@@ -25,7 +25,13 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/useAuth";
 import UserMenu from "@/components/auth/UserMenu";
 import { useSearch } from "@/lib/hooks/use-search";
+import { SearchResult } from "@/lib/api/search";
 
+/**
+ * Header component — the primary navigation and global command center.
+ * Features a semantic search bar with real-time AI results, responsive
+ * horizontal navigation, and user authentication menus.
+ */
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -33,21 +39,24 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
 
-  // Use debounced search query
+  // Use debounced search query to prevent excessive API calls
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  // Debounce logic
+  // Debounce logic: wait 300ms after last keystroke
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch results using our new hook
+  // Fetch results using our semantic search hook
   const { data: searchResults, isLoading: isSearching } = useSearch(
     { q: debouncedQuery, limit: 5 },
     debouncedQuery.length >= 2,
   );
 
+  /**
+   * Redirects user to the full search page on enter.
+   */
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
@@ -137,7 +146,7 @@ export default function Header() {
                       <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
                         Top Results
                       </div>
-                      {searchResults.map((result: any) => (
+                      {searchResults.map((result: SearchResult) => (
                         <Link
                           key={result.id}
                           href={result.url || "#"}
@@ -170,12 +179,12 @@ export default function Header() {
                                 {result.snippet}
                               </p>
                               <div className="flex gap-2 mt-1.5">
-                                {result.metadata?.subject && (
+                                {typeof result.metadata?.subject === "string" && (
                                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
                                     {result.metadata.subject}
                                   </span>
                                 )}
-                                {result.metadata?.date && (
+                                {typeof result.metadata?.date === "string" && (
                                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
                                     {result.metadata.date}
                                   </span>

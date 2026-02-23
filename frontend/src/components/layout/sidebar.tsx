@@ -24,17 +24,26 @@ import {
   GraduationCap,
   LifeBuoy,
   FileQuestion,
+  LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/lib/auth/useAuth";
 import { useSidebar } from "@/components/providers/sidebar-provider";
 
+/**
+ * Interface for navigation items in the sidebar.
+ */
 interface NavItem {
+  /** The text displayed in the sidebar. */
   title: string;
+  /** The destination route. */
   href: string;
-  icon: any;
+  /** The Lucide icon component to render. */
+  icon: LucideIcon;
+  /** UI variant for the button. */
   variant: "ghost" | "default";
+  /** Grouping category for organization. */
   category: "primary" | "secondary" | "tools";
 }
 

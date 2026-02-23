@@ -12,34 +12,50 @@ interface RecentQuizzesProps {
   isGuest?: boolean;
 }
 
-const MOCK_ATTEMPTS: any[] = [
-  {
-    id: "mock-1",
-    quiz: {
-      id: "mock-q1",
-      title: "Indian Polity: Preamble",
-      topic: { name: "Polity" },
-      question_count: 10,
-    },
-    status: "submitted",
-    score: 80,
-    started_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "mock-2",
-    quiz: {
-      id: "mock-q2",
-      title: "Modern History: Gandhian Era",
-      topic: { name: "History" },
-      question_count: 15,
-    },
-    status: "active",
-    score: null,
-    started_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
+/**
+ * RecentQuizzes - Dashboard widget to display user's recent quiz attempts.
+ * Supports a guest mode showing static mock data.
+ */
 export default function RecentQuizzes({ isGuest = false }: RecentQuizzesProps) {
+  /** Static mock data for guests or landing page demonstration. */
+  const MOCK_ATTEMPTS: QuizAttempt[] = [
+    {
+      id: "mock-1",
+      quiz: {
+        id: "mock-q1",
+        title: "Indian Polity: Preamble",
+        topic: { name: "Polity" } as unknown as any, // Using unknown as bridge
+        question_count: 10,
+      } as unknown as any,
+      status: "submitted",
+      score: 80,
+      accuracy: 80,
+      correct_count: 8,
+      wrong_count: 2,
+      unanswered_count: 0,
+      started_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+      submitted_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+      time_spent: 600,
+    } as unknown as QuizAttempt,
+    {
+      id: "mock-2",
+      quiz: {
+        id: "mock-q2",
+        title: "Modern History: Gandhian Era",
+        topic: { name: "History" } as unknown as any,
+        question_count: 15,
+      } as unknown as any,
+      status: "active",
+      score: null,
+      accuracy: 0,
+      correct_count: 0,
+      wrong_count: 0,
+      unanswered_count: 15,
+      started_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      submitted_at: null,
+      time_spent: 120,
+    } as unknown as QuizAttempt,
+  ];
   // Only fetch if not guest
   const { data: attempts, isLoading } = useMyAttempts(undefined, {
     enabled: !isGuest,

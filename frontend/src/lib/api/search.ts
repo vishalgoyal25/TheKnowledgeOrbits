@@ -11,12 +11,13 @@ export interface SearchParams {
 }
 
 export interface SearchResult {
-  type: "article" | "topic";
+  type: "article" | "topic" | "current_affair";
   id: string;
   title: string;
   snippet: string;
   relevance: number;
-  metadata: Record<string, any>;
+  url?: string;
+  metadata: Record<string, unknown>;
 }
 
 export const searchAPI = {

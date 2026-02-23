@@ -44,12 +44,12 @@ export interface TopicMastery {
 
 export interface Activity {
   event_type: string;
-  event_data: any;
+  event_data: Record<string, unknown>;
   created_at: string;
 }
 
 export interface Insight {
   type: string;
-  data: any;
+  data: Record<string, unknown>;
   generated_at: string;
 }

@@ -8,6 +8,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { bookmarksAPI } from "@/lib/api/bookmarks";
+import { createLogger } from "@/lib/logger";
+
+const logger = createLogger("Bookmarks");
 
 interface Props {
   open: boolean;
@@ -36,7 +39,7 @@ export default function EditNotesDialog({
       onSaved();
       onClose();
     } catch (error) {
-      console.error("Save notes failed:", error);
+      logger.error("Save notes failed:", error);
     } finally {
       setIsSaving(false);
     }

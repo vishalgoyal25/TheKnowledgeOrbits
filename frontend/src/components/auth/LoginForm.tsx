@@ -6,7 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { AxiosError } from "axios";
+import { ApiError } from "@/lib/types";
 
+/**
+ * LoginForm - Standard login interface for the platform.
+ * Supports email/password authentication and handles redirects
+ * after successful login.
+ */
 export default function LoginForm() {
   const { login } = useAuth();
   const searchParams = useSearchParams();
@@ -18,6 +25,11 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Handles the login form submission.
+   * On success, the user is redirected (handled by login hook).
+   * On failure, displays the backend error message or a generic fallback.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -25,8 +37,9 @@ export default function LoginForm() {
 
     try {
       await login({ email, password }, redirectTo);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Login failed");
+    } catch (err) {
+      const axiosError = err as AxiosError<ApiError>;
+      setError(axiosError.response?.data?.message || axiosError.response?.data?.error || "Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
