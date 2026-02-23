@@ -3,44 +3,39 @@ Global pytest fixtures for TheKnowledgeOrbits.
 """
 
 import os
+import sys  # noqa: E402
 from typing import Any
-
-import pytest
+from unittest.mock import MagicMock  # noqa: E402
 
 # CRITICAL: Set Django settings BEFORE any Django imports
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
 
-import sys  # noqa: E402
-from unittest.mock import MagicMock  # noqa: E402
-
-# Import Django and setup
 import django  # noqa: E402
+
+from rest_framework.test import APIClient  # noqa: E402
+
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
 
 # Safe mock for ML libraries to avoid 3GB+ downloads in CI
 try:
     import sentence_transformers  # noqa: F401
 except ImportError:
-    mock_module = MagicMock()
-    sys.modules["sentence_transformers"] = mock_module
-    logger = MagicMock()
+    sys.modules["sentence_transformers"] = MagicMock()
     sys.modules["sentence_transformers.SentenceTransformer"] = MagicMock()
 
 # Mock OpenAI and Groq to avoid import errors in CI
-try:
-    import openai  # noqa: F401
-except ImportError:
-    sys.modules["openai"] = MagicMock()
-
 try:
     import groq  # noqa: F401
 except ImportError:
     sys.modules["groq"] = MagicMock()
 
-# NOW it's safe to import Django/DRF components
-from rest_framework.test import APIClient  # noqa: E402
+try:
+    import openai  # noqa: F401
+except ImportError:
+    sys.modules["openai"] = MagicMock()
 
-import numpy as np  # noqa: E402
-
+# Initialize Django
 django.setup()
 
 # ===== ML Mocking for High-Velocity Testing =====
@@ -67,14 +62,15 @@ def mock_ml_models(monkeypatch: Any) -> None:
     monkeypatch.setattr("sentence_transformers.SentenceTransformer", mock_st)
 
     # 2. Mock OpenAI/Groq if needed (prevent network calls)
-    import groq
-    import openai
+    # Use already-handled sys.modules values, do NOT re-import here to avoid F811
+    openai_module = sys.modules["openai"]
+    groq_module = sys.modules["groq"]
 
     mock_openai = MagicMock()
-    monkeypatch.setattr(openai, "OpenAI", mock_openai)
+    monkeypatch.setattr(openai_module, "OpenAI", mock_openai)
 
     mock_groq = MagicMock()
-    monkeypatch.setattr(groq, "Groq", mock_groq)
+    monkeypatch.setattr(groq_module, "Groq", mock_groq)
 
     # 3. Suppress heavy logging during tests
     import structlog
