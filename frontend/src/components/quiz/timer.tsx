@@ -42,7 +42,9 @@ export default function Timer({ initialSeconds, onExpire }: TimerProps) {
   const formatTime = (totalSeconds: number) => {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    return `${minutes.toString().padStart(2, "0")}:${seconds
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   // Visual urgency classes
@@ -54,7 +56,9 @@ export default function Timer({ initialSeconds, onExpire }: TimerProps) {
 
   return (
     <div
-      className={`flex items-center gap-2 text-lg ${getTimerColor(secondsRemaining)}`}
+      className={`flex items-center gap-2 text-lg ${getTimerColor(
+        secondsRemaining,
+      )}`}
     >
       <Clock className="h-5 w-5" />
       <span className="tabular-nums tracking-wider">

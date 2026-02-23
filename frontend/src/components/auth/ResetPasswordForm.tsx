@@ -62,7 +62,11 @@ export default function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     } catch (err) {
       const axiosError = err as AxiosError<ApiError>;
       setStatus("error");
-      setMessage(axiosError.response?.data?.message || axiosError.response?.data?.error || "Failed to reset password. The link may be expired or invalid.");
+      setMessage(
+        axiosError.response?.data?.message ||
+          axiosError.response?.data?.error ||
+          "Failed to reset password. The link may be expired or invalid.",
+      );
     }
   };
 

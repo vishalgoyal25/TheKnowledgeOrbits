@@ -179,7 +179,8 @@ export default function Header() {
                                 {result.snippet}
                               </p>
                               <div className="flex gap-2 mt-1.5">
-                                {typeof result.metadata?.subject === "string" && (
+                                {typeof result.metadata?.subject ===
+                                  "string" && (
                                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
                                     {result.metadata.subject}
                                   </span>

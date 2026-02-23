@@ -1,8 +1,4 @@
-"""
-User State Engine - Service Tests
-
-Tests for ActivityService, BookmarkService, MasteryService, ProgressService.
-"""
+"""User State Engine Service Tests."""
 
 import pytest
 import uuid

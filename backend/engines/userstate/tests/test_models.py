@@ -1,8 +1,4 @@
-"""
-User State Engine - Model Tests
-
-Tests for UserEvent, UserProgress, TopicMastery, Bookmark, ReadingProgress models.
-"""
+"""User State Engine Model Tests."""
 
 import pytest
 import uuid

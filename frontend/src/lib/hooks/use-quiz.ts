@@ -9,7 +9,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { quizAPI } from "../api/quiz";
-import { QuizGenerateRequest, QuizSubmitRequest, ApiError, Quiz, QuizAttempt, TopicMastery } from "../types";
+import {
+  QuizGenerateRequest,
+  QuizSubmitRequest,
+  ApiError,
+  Quiz,
+  QuizAttempt,
+  TopicMastery,
+} from "../types";
 import { toast } from "@/hooks/use-toast";
 
 // ===== Query Keys =====
@@ -27,8 +34,9 @@ export const quizKeys = {
   detail: (id: string) => [...quizKeys.details(), id] as const,
   attempts: () => [...quizKeys.all, "attempts"] as const,
   attempt: (id: string) => [...quizKeys.attempts(), id] as const,
-  myAttempts: (filters: Record<string, string | number | boolean | undefined>) =>
-    [...quizKeys.attempts(), "my", filters] as const,
+  myAttempts: (
+    filters: Record<string, string | number | boolean | undefined>,
+  ) => [...quizKeys.attempts(), "my", filters] as const,
   mastery: () => ["mastery"] as const,
 };
 
@@ -69,7 +77,7 @@ export function useQuiz(quizId: string | null) {
 
 /**
  * Hook to trigger the AI generation of a new quiz based on parameters.
- * 
+ *
  * Handles submission to the backend engine and automatic cache invalidation
  * to ensure new quizzes appear in the list immediately.
  */
@@ -90,7 +98,10 @@ export function useGenerateQuiz() {
     onError: (error: AxiosError<ApiError>) => {
       toast({
         title: "Failed to generate quiz",
-        description: error.response?.data?.message || error.response?.data?.error || "Please try again",
+        description:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Please try again",
         variant: "destructive",
       });
     },
@@ -117,7 +128,10 @@ export function useStartQuiz() {
       });
     },
     onError: (error: AxiosError<ApiError>) => {
-      const message = error.response?.data?.message || error.response?.data?.error || "Failed to start quiz";
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to start quiz";
       toast({
         title: "Cannot start quiz",
         description: message,
@@ -153,7 +167,10 @@ export function useSubmitQuiz() {
     onError: (error: AxiosError<ApiError>) => {
       toast({
         title: "Failed to submit quiz",
-        description: error.response?.data?.message || error.response?.data?.error || "Please try again",
+        description:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Please try again",
         variant: "destructive",
       });
     },
@@ -206,4 +223,3 @@ export function useTopicMastery(params?: { topic_id?: string }) {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
-

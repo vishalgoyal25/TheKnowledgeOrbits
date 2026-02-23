@@ -1,3 +1,5 @@
+"""Content Engine Pagination."""
+
 from rest_framework.pagination import CursorPagination
 
 

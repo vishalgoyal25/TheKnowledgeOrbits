@@ -38,7 +38,11 @@ export default function ForgotPasswordForm() {
     } catch (err) {
       const axiosError = err as AxiosError<ApiError>;
       setStatus("error");
-      setMessage(axiosError.response?.data?.message || axiosError.response?.data?.error || "Failed to send reset link. Please verify your email.");
+      setMessage(
+        axiosError.response?.data?.message ||
+          axiosError.response?.data?.error ||
+          "Failed to send reset link. Please verify your email.",
+      );
     }
   };
 

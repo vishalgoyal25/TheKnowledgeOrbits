@@ -135,7 +135,10 @@ export default function FeedbackButton() {
       const axiosError = error as AxiosError<ApiError>;
       toast({
         title: "Submission Failed",
-        description: axiosError.response?.data?.message || axiosError.response?.data?.error || "Something went wrong. Please try again later.",
+        description:
+          axiosError.response?.data?.message ||
+          axiosError.response?.data?.error ||
+          "Something went wrong. Please try again later.",
         variant: "destructive",
       });
     } finally {

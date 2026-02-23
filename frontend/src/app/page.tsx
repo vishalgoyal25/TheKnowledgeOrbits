@@ -51,7 +51,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      {/* 
+      {/*
           WRAPPER FOR TOP SECTIONS (Pushed by Sidebar)
           Only applies padding for the sections within the sidebar's typical reach.
       */}

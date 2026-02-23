@@ -40,7 +40,11 @@ export default function RegisterForm() {
       await register(formData);
     } catch (err) {
       const axiosError = err as AxiosError<ApiError>;
-      setError(axiosError.response?.data?.message || axiosError.response?.data?.error || "Registration failed. Please try again.");
+      setError(
+        axiosError.response?.data?.message ||
+          axiosError.response?.data?.error ||
+          "Registration failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,5 @@
 """
-Content Engine Services Package
-
-Business logic for content ingestion, chunking, and embedding generation.
+Provide content engine services for ingestion, chunking, and embedding generation.
 """
 
 from .chunking_service import ChunkingService

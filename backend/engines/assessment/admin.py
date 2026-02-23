@@ -1,6 +1,4 @@
-"""
-Assessment Engine Admin Interface
-"""
+"""Assessment Engine Admin Interface"""
 
 from typing import Any
 
@@ -123,10 +121,12 @@ class QuizAttemptAdmin(admin.ModelAdmin):  # type: ignore
 
     @admin.display(description="User")
     def user_display(self, obj) -> Any:  # type: ignore
+        """Display user email or Guest label."""
         return obj.user.email if obj.user else "Guest"
 
     @admin.display(description="Score")
     def score_display(self, obj) -> Any:  # type: ignore
+        """Display score with color coding."""
         if obj.score is not None:
             color = (
                 "green" if obj.score >= 70 else "orange" if obj.score >= 50 else "red"
@@ -142,6 +142,7 @@ class QuizAttemptAdmin(admin.ModelAdmin):  # type: ignore
 
     @admin.display(description="Time")
     def time_spent_display(self, obj) -> Any:  # type: ignore
+        """Display time spent in MM:SS format."""
         if obj.time_spent:
             minutes = obj.time_spent // 60
             seconds = obj.time_spent % 60

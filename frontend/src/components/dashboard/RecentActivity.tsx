@@ -40,9 +40,8 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
         return (
           <p className="text-sm text-gray-700">
             Completed{" "}
-            <span className="font-semibold">{data.title || "a quiz"}</span>{" "}
-            with score{" "}
-            <span className="font-bold">{data.score ?? 0}%</span>
+            <span className="font-semibold">{data.title || "a quiz"}</span> with
+            score <span className="font-bold">{data.score ?? 0}%</span>
           </p>
         );
       default:
