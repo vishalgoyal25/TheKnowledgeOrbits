@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Layers, TrendingUp } from "lucide-react";
+import { FileText, Layers } from "lucide-react";
 import { getDifficultyColor } from "@/lib/utils";
 
 interface TopicCardProps {

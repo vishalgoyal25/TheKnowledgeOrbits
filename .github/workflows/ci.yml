@@ -23,8 +23,9 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install Linting Tools
+      - name: Install Dependencies
         run: |
+          pip install -r backend/requirements/base.txt
           pip install -r backend/requirements/dev.txt
 
       - name: Black Check
