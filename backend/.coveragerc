@@ -1,0 +1,25 @@
+[run]
+source = engines
+omit =
+    */migrations/*
+    */tests/*
+    */test_*.py
+    */__init__.py
+    */admin.py
+    */apps.py
+
+[report]
+precision = 2
+skip_covered = False
+skip_empty = True
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG:
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+
+[html]
+directory = htmlcov
