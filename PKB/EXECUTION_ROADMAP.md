@@ -1,5 +1,7 @@
 # EXECUTION_ROADMAP.md
+
 ## TheKnowledgeOrbits — Execution Roadmap
+
 **PKB File #12 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -7,6 +9,7 @@
 ## 1. PURPOSE
 
 This file is the ONLY source of truth for:
+
 - What gets built when
 - Which tools activate at each phase
 - What success criteria must pass before the next phase begins
@@ -21,9 +24,11 @@ This file is the ONLY source of truth for:
 ## 2. PHASE 0 — SETUP (Week 1)
 
 ### Goal
+
 Environment, skeleton, CI. Zero business logic.
 
 ### Deliverables
+
 - Mono-repo structure (backend/ + frontend/ + PKB/)
 - Django 5 + DRF skeleton (`core/` project, `engines/` package)
 - Next.js 16 + TypeScript skeleton (App Router)
@@ -36,25 +41,27 @@ Environment, skeleton, CI. Zero business logic.
 - Justfile with: `just dev`, `just test`, `just migrate`
 
 ### Tools Activated This Phase
-| Tool | Why now |
-|------|---------|
-| Django 5 + DRF | Core backend |
-| Next.js 16 + TypeScript | Core frontend |
-| PostgreSQL 16 + pgvector | Database |
-| Redis 7.0 | Celery broker (needed Phase 1) |
-| Docker + Docker Compose | Local multi-service |
-| GitHub Actions | CI from day one |
-| structlog + rich | Logging from day one |
-| chalk | Frontend logging from day one |
-| Sentry | Error tracking from day one |
-| pytest + factory_boy + faker | Testing from day one |
-| direnv + pre-commit + commitlint | Workflow from day one |
-| Conda (myvenv) | Python env management |
-| pgcli + DBeaver | DB interaction |
-| HTTPie + Postman | API testing |
-| Bandit | Python security scan |
+
+| Tool                             | Why now                        |
+| -------------------------------- | ------------------------------ |
+| Django 5 + DRF                   | Core backend                   |
+| Next.js 16 + TypeScript          | Core frontend                  |
+| PostgreSQL 16 + pgvector         | Database                       |
+| Redis 7.0                        | Celery broker (needed Phase 1) |
+| Docker + Docker Compose          | Local multi-service            |
+| GitHub Actions                   | CI from day one                |
+| structlog + rich                 | Logging from day one           |
+| chalk                            | Frontend logging from day one  |
+| Sentry                           | Error tracking from day one    |
+| pytest + factory_boy + faker     | Testing from day one           |
+| direnv + pre-commit + commitlint | Workflow from day one          |
+| Conda (myvenv)                   | Python env management          |
+| pgcli + DBeaver                  | DB interaction                 |
+| HTTPie + Postman                 | API testing                    |
+| Bandit                           | Python security scan           |
 
 ### Success Criteria (all must pass)
+
 - ✅ `python manage.py runserver` → 200 on `/api/v1/health`
 - ✅ `npm run dev` → Next.js compiles clean
 - ✅ `just test` → pytest finds and runs (0 failures)
@@ -62,6 +69,7 @@ Environment, skeleton, CI. Zero business logic.
 - ✅ `.env` never committed (verified by pre-commit)
 
 ### Go/No-Go Gate
+
 All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 
 ---
@@ -69,11 +77,13 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 ## 3. PHASE 1 — CORE ENGINES (Weeks 2–4)
 
 ### Goal
+
 5 core engines + Auth/Authorization. MVP backend functional. No frontend yet.
 
 ### Week 2: Content Engine + Auth Engine
 
 **Content Engine deliverables:**
+
 - PDF upload endpoint
 - Text extraction (pdfplumber)
 - Chunking service (1200 chars)
@@ -82,6 +92,7 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 - Tables: content_document, content_chunk, content_embedding, content_asset, content_ingestion_job
 
 **Auth Engine deliverables:**
+
 - Register, login, verify-email, refresh-token
 - Argon2 password hashing
 - JWT issuance (access 5 min, refresh 7 days)
@@ -107,6 +118,7 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 ### Week 3: Knowledge Engine
 
 **Deliverables:**
+
 - Program / Subject / Module / Topic CRUD
 - Chunk-topic mapping (many-to-many)
 - Basic text search across topics + chunks
@@ -119,12 +131,14 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 ### Week 4: Assessment Engine + User State Engine + Analytics Engine
 
 **Assessment Engine deliverables:**
+
 - Quiz generation from chunks (GROQ MCQ generation)
 - Quiz start / submit-answer / submit-quiz flow
 - Auto-grading + explanation generation
 - Tables: assessment_quiz, assessment_question, assessment_quiz_attempt, assessment_question_response
 
 **User State Engine deliverables:**
+
 - Event recording (append-only)
 - Progress computation
 - Topic mastery tracking
@@ -132,6 +146,7 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 - Tables: userstate_event, userstate_progress, userstate_topic_mastery, userstate_bookmark, userstate_reading_progress
 
 **Analytics Engine deliverables:**
+
 - Daily aggregation skeleton (cron stub)
 - Insight table + basic weak_topic detection logic
 - Tables: analytics_daily_aggregate, analytics_insight
@@ -144,6 +159,7 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 **Tests:** 30+ passing (Assessment + User State + Analytics combined)
 
 ### Phase 1 Success Criteria
+
 - ✅ Upload PDF → chunks appear in DB with embeddings
 - ✅ Map chunk to topic → query returns linked chunks
 - ✅ Generate quiz for topic → quiz + questions created
@@ -153,6 +169,7 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 - ✅ 65+ tests passing total
 
 ### Go/No-Go Gate
+
 All criteria pass → Phase 2 begins. **MVP backend is functional.**
 
 ---
@@ -160,9 +177,11 @@ All criteria pass → Phase 2 begins. **MVP backend is functional.**
 ## 4. PHASE 2 — ARTICLE GENERATION + CURRENT AFFAIRS (Weeks 5–7)
 
 ### Goal
+
 RAG pipeline live. Articles generated from chunks. CA ingestion running.
 
 ### Week 5: Article Generation Engine (Static)
+
 - Chunk selection by topic (via Knowledge Engine API)
 - RAG: retrieve chunks → GROQ generates narrative
 - Source attribution (article_source_map)
@@ -170,6 +189,7 @@ RAG pipeline live. Articles generated from chunks. CA ingestion running.
 - Tables: article_article, article_source_map
 
 ### Week 6: Current Affairs Engine
+
 - RSS scraping (The Hindu, Indian Express)
 - CA chunking + embedding (same 384-dim space)
 - Semantic topic classification → ca_topic_link
@@ -178,6 +198,7 @@ RAG pipeline live. Articles generated from chunks. CA ingestion running.
 - Cron: RSS scrape 6 AM IST, CA expiry cleanup 6:30 AM IST
 
 ### Week 7: Integrated Article Generation
+
 - Merge static chunks + CA chunks for same topic
 - Context blending in GROQ prompt
 - Integrated article output with source types marked
@@ -185,6 +206,7 @@ RAG pipeline live. Articles generated from chunks. CA ingestion running.
 - Event: `ca_chunks_classified` emitted after daily scrape
 
 ### Phase 2 Success Criteria
+
 - ✅ Upload NCERT PDF → chunk → map → generate article → article readable
 - ✅ RSS scrape runs → CA articles chunked → topics auto-linked
 - ✅ Integrated article contains both static theory + CA examples
@@ -192,6 +214,7 @@ RAG pipeline live. Articles generated from chunks. CA ingestion running.
 - ✅ Events fire correctly (article_generated, ca_chunks_classified)
 
 ### Go/No-Go Gate
+
 All criteria pass → Phase 3 begins. **Core product value is proven.**
 
 ---
@@ -199,34 +222,40 @@ All criteria pass → Phase 3 begins. **Core product value is proven.**
 ## 5. PHASE 3 — FRONTEND (Weeks 8–10)
 
 ### Goal
+
 User-facing Next.js app consuming all Phase 1–2 APIs.
 
 ### Week 8: Core UI
+
 - Auth pages: login, register, email verify
 - Article listing (topic-filtered)
 - Article reader (with source attribution toggle)
 - Progress dashboard (basic stats)
 
 ### Week 9: Quiz UI
+
 - Quiz listing (by topic, difficulty)
 - Quiz taking: timed interface, answer selection
 - Results page: score, correct/incorrect, explanations
 - Frontend fires `article_read` event on article completion
 
 ### Week 10: Search + Polish
+
 - Search bar → Knowledge Engine search API
 - Mobile responsive layout
 - Error boundaries + loading states
 - Toast notifications for feedback
 
 ### Tools Activated This Phase
-| Tool | Why now |
-|------|---------|
-| shadcn/ui | UI components |
-| Tailwind CSS | Styling |
+
+| Tool           | Why now                    |
+| -------------- | -------------------------- |
+| shadcn/ui      | UI components              |
+| Tailwind CSS   | Styling                    |
 | TanStack Query | Server state + retry logic |
 
 ### Phase 3 Success Criteria
+
 - ✅ Full auth flow works in browser (register → verify → login → dashboard)
 - ✅ Articles render with source attribution
 - ✅ Quiz flow end-to-end in browser (start → answer → submit → results)
@@ -235,6 +264,7 @@ User-facing Next.js app consuming all Phase 1–2 APIs.
 - ✅ Mobile layout passes basic responsive check
 
 ### Go/No-Go Gate
+
 All criteria pass → Phase 4 begins.
 
 ---
@@ -242,9 +272,11 @@ All criteria pass → Phase 4 begins.
 ## 6. PHASE 4 — LAUNCH (Weeks 11–12)
 
 ### Goal
+
 Content-populated, production-deployed, monitored. PUBLIC BETA.
 
 ### Week 11: Content Population
+
 - Ingest 5 NCERT books (History, Polity, Geography, Economy, Science)
 - Map all chunks to syllabus topics
 - Generate 100+ articles (static + integrated)
@@ -252,6 +284,7 @@ Content-populated, production-deployed, monitored. PUBLIC BETA.
 - CA scraping live and running
 
 ### Week 12: Production Deploy
+
 - E2E test suite passes
 - Deploy backend → Render
 - Deploy frontend → Vercel
@@ -261,17 +294,19 @@ Content-populated, production-deployed, monitored. PUBLIC BETA.
 - Uptime Kuma monitoring configured
 
 ### Tools Activated This Phase
-| Tool | Why now |
-|------|---------|
-| Render | Backend production hosting |
-| Vercel | Frontend production hosting |
-| Cloudinary | Production CDN |
-| Uptime Kuma | Production uptime monitoring |
-| Trivy | Container vulnerability scan before deploy |
-| Fail2Ban | SSH brute-force protection |
-| Watchtower | Auto-update containers |
+
+| Tool        | Why now                                    |
+| ----------- | ------------------------------------------ |
+| Render      | Backend production hosting                 |
+| Vercel      | Frontend production hosting                |
+| Cloudinary  | Production CDN                             |
+| Uptime Kuma | Production uptime monitoring               |
+| Trivy       | Container vulnerability scan before deploy |
+| Fail2Ban    | SSH brute-force protection                 |
+| Watchtower  | Auto-update containers                     |
 
 ### Phase 4 Success Criteria
+
 - ✅ 100+ articles live and readable
 - ✅ 50+ quizzes playable
 - ✅ CA scraping updates daily
@@ -280,6 +315,7 @@ Content-populated, production-deployed, monitored. PUBLIC BETA.
 - ✅ 0 critical security issues in Trivy scan
 
 ### Go/No-Go Gate
+
 All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabilization.
 
 ---
@@ -287,6 +323,7 @@ All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabi
 ## 7. PHASE 5 — MONETIZATION (Weeks 13–15)
 
 ### Engines Built
+
 - Commerce Engine (subscriptions, Razorpay, invoicing)
 - Search Engine (Elasticsearch full-text + pgvector semantic)
 - Notification Engine (email, push, in-app)
@@ -294,9 +331,10 @@ All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabi
 - Cache Engine (Redis query cache, rate limiting)
 
 ### Tools Activated
-| Tool | Why now |
-|------|---------|
-| Razorpay SDK | Payment processing |
+
+| Tool          | Why now                                       |
+| ------------- | --------------------------------------------- |
+| Razorpay SDK  | Payment processing                            |
 | Elasticsearch | Full-text search (or fallback: pgvector-only) |
 
 ---
@@ -304,11 +342,13 @@ All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabi
 ## 8. PHASE 6 — ENGAGEMENT (Weeks 16–19)
 
 ### Engines Built
+
 - Gamification Engine (badges, leaderboards, challenges)
 - Revision Engine (SM-2 spaced repetition, flashcards)
 - Collaboration Engine (forums, study groups)
 
 ### Events Activated
+
 - `streak_broken`, `flashcard_due`, `achievement_unlocked`
 
 ---
@@ -316,18 +356,21 @@ All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabi
 ## 9. PHASE 7 — INTELLIGENCE (Weeks 20–24)
 
 ### Engines Built
+
 - Personalization Engine (learning paths, weak area prioritization)
 - Prediction Engine (score forecasting, risk alerts)
 - AI Tutor Engine (RAG-grounded conversational Q&A)
 - Mock Test Engine (full exam simulation, rank prediction)
 
 ### Tools Activated
-| Tool | Why now |
-|------|---------|
+
+| Tool      | Why now                 |
+| --------- | ----------------------- |
 | LangGraph | AgenticAI dev workflows |
-| LangChain | Agent tooling layer |
+| LangChain | Agent tooling layer     |
 
 ### Events Activated
+
 - `learning_path_updated`, `doubt_resolved`, `mock_test_completed`
 
 ---
@@ -335,29 +378,33 @@ All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabi
 ## 10. PHASE 8 — ADVANCED CONTENT (Weeks 25–28)
 
 ### Engines Built
+
 - Video Engine (upload, YouTube, Whisper transcription)
 - NLP Engine (descriptive grading, essay scoring)
 - Computer Vision Engine (diagram analysis, handwriting)
 - Voice Engine (speech-to-text, pronunciation)
 
 ### Tools Activated
-| Tool | Why now |
-|------|---------|
-| Whisper API | Video transcription |
+
+| Tool          | Why now                            |
+| ------------- | ---------------------------------- |
+| Whisper API   | Video transcription                |
 | OpenTelemetry | Distributed tracing across engines |
-| Locust | Load/performance testing |
-| Grafana | Metrics dashboards |
+| Locust        | Load/performance testing           |
+| Grafana       | Metrics dashboards                 |
 
 ---
 
 ## 11. PHASE 9 — GROWTH (Weeks 29–32)
 
 ### Engines Built
+
 - Marketing Engine (referrals, campaigns, A/B tests)
 - Onboarding Engine (welcome flow, tutorials)
 - Retention Engine (churn prediction, win-back, loyalty)
 
 ### Events Activated
+
 - `subscription_activated`, `churn_risk_detected`
 
 ---
@@ -365,6 +412,7 @@ All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabi
 ## 12. PHASE 10 — ENTERPRISE (Weeks 33–36)
 
 ### Engines Built
+
 - Marketplace Engine (third-party content, seller portal)
 - White-label Engine (multi-tenant, custom branding)
 - Content Moderation Engine (screening, plagiarism)
@@ -372,43 +420,44 @@ All criteria pass → **PUBLIC BETA LAUNCHES.** Phase 5 begins post-launch stabi
 - Reporting Engine (admin dashboards, financial reports)
 
 ### Tools Activated
-| Tool | Why now |
-|------|---------|
-| MkDocs | PKB documentation site |
-| Danger.js | PR validation automation |
-| CodeRabbit | AI code review |
+
+| Tool       | Why now                  |
+| ---------- | ------------------------ |
+| MkDocs     | PKB documentation site   |
+| Danger.js  | PR validation automation |
+| CodeRabbit | AI code review           |
 
 ---
 
 ## 13. TOOL ACTIVATION SUMMARY
 
-| Tool | Phase Activated | Reason |
-|------|-----------------|--------|
-| Django 5 + DRF | 0 | Core |
-| Next.js 16 + TypeScript | 0 | Core |
-| PostgreSQL 16 + pgvector | 0 | Core |
-| Redis 7.0 | 0 | Celery broker |
-| Docker + Docker Compose | 0 | Local infra |
-| GitHub Actions | 0 | CI |
-| structlog + rich + chalk | 0 | Logging |
-| Sentry | 0 | Error tracking |
-| pytest + factory_boy + faker | 0 | Testing |
-| direnv + pre-commit + commitlint | 0 | Workflow |
-| Celery 5.0 + Flower | 1 | Async tasks |
-| sentence-transformers | 1 | Embeddings |
-| pdfplumber + Tesseract + PaddleOCR | 1 | PDF processing |
-| simplejwt + argon2 | 1 | Auth |
-| Schemathesis | 1 | API testing |
-| GROQ API | 1 | LLM generation |
-| shadcn/ui + Tailwind + TanStack Query | 3 | Frontend |
-| Render + Vercel + Supabase + Cloudinary | 4 | Production |
-| Uptime Kuma + Trivy + Fail2Ban + Watchtower | 4 | Production ops |
-| Razorpay | 5 | Payments |
-| LangGraph + LangChain | 7 | AgenticAI |
-| Whisper API | 8 | Transcription |
-| OpenTelemetry + Grafana | 8 | Tracing + metrics |
-| Locust | 8 | Load testing |
-| MkDocs + Danger.js + CodeRabbit | 10 | Enterprise docs |
+| Tool                                        | Phase Activated | Reason            |
+| ------------------------------------------- | --------------- | ----------------- |
+| Django 5 + DRF                              | 0               | Core              |
+| Next.js 16 + TypeScript                     | 0               | Core              |
+| PostgreSQL 16 + pgvector                    | 0               | Core              |
+| Redis 7.0                                   | 0               | Celery broker     |
+| Docker + Docker Compose                     | 0               | Local infra       |
+| GitHub Actions                              | 0               | CI                |
+| structlog + rich + chalk                    | 0               | Logging           |
+| Sentry                                      | 0               | Error tracking    |
+| pytest + factory_boy + faker                | 0               | Testing           |
+| direnv + pre-commit + commitlint            | 0               | Workflow          |
+| Celery 5.0 + Flower                         | 1               | Async tasks       |
+| sentence-transformers                       | 1               | Embeddings        |
+| pdfplumber + Tesseract + PaddleOCR          | 1               | PDF processing    |
+| simplejwt + argon2                          | 1               | Auth              |
+| Schemathesis                                | 1               | API testing       |
+| GROQ API                                    | 1               | LLM generation    |
+| shadcn/ui + Tailwind + TanStack Query       | 3               | Frontend          |
+| Render + Vercel + Supabase + Cloudinary     | 4               | Production        |
+| Uptime Kuma + Trivy + Fail2Ban + Watchtower | 4               | Production ops    |
+| Razorpay                                    | 5               | Payments          |
+| LangGraph + LangChain                       | 7               | AgenticAI         |
+| Whisper API                                 | 8               | Transcription     |
+| OpenTelemetry + Grafana                     | 8               | Tracing + metrics |
+| Locust                                      | 8               | Load testing      |
+| MkDocs + Danger.js + CodeRabbit             | 10              | Enterprise docs   |
 
 ---
 

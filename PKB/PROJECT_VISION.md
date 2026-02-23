@@ -1,5 +1,7 @@
 # PROJECT_VISION.md
+
 ## TheKnowledgeOrbits — Engine-First EdTech Platform
+
 **PKB File #1 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -96,29 +98,30 @@ Phase 10 (Weeks 33-36)→ Enterprise engines
 
 ## 7. SECURITY STACK (MANDATORY — NO EXCEPTIONS)
 
-| Concern              | Solution                        |
-|---------------------|---------------------------------|
-| Password Hashing    | Argon2 only                     |
-| Authentication      | JWT (stateless, simplejwt)      |
-| Authorization       | RBAC via middleware + JWT claims |
-| Token Storage       | HttpOnly cookies                |
-| Secrets             | direnv + .env (never hardcoded) |
+| Concern          | Solution                         |
+| ---------------- | -------------------------------- |
+| Password Hashing | Argon2 only                      |
+| Authentication   | JWT (stateless, simplejwt)       |
+| Authorization    | RBAC via middleware + JWT claims |
+| Token Storage    | HttpOnly cookies                 |
+| Secrets          | direnv + .env (never hardcoded)  |
 
 ---
 
 ## 8. OBSERVABILITY STACK (MANDATORY)
 
-| Concern              | Tool                            |
-|---------------------|---------------------------------|
-| Python Logging      | structlog (prod) + rich (dev)   |
-| Node.js Logging     | chalk                           |
-| Error Tracking      | Sentry                          |
-| Tracing (future)    | OpenTelemetry                   |
-| Async Task Monitor  | Flower (Celery dashboard)       |
-| Uptime Monitor      | Uptime Kuma                     |
-| Metrics Dashboard   | Grafana                         |
+| Concern            | Tool                          |
+| ------------------ | ----------------------------- |
+| Python Logging     | structlog (prod) + rich (dev) |
+| Node.js Logging    | chalk                         |
+| Error Tracking     | Sentry                        |
+| Tracing (future)   | OpenTelemetry                 |
+| Async Task Monitor | Flower (Celery dashboard)     |
+| Uptime Monitor     | Uptime Kuma                   |
+| Metrics Dashboard  | Grafana                       |
 
 **Hard Rules:**
+
 - ❌ No `print()` anywhere in Python
 - ❌ No `console.log()` anywhere in Node.js
 - ✅ Every module initializes a logger
@@ -131,12 +134,14 @@ Phase 10 (Weeks 33-36)→ Enterprise engines
 **Development-time only.** Never runtime.
 
 AgenticAI = controlled code generator that follows PKB rules.
+
 - Generates one file at a time
 - Human reviews and approves every output
 - PKB is read-only for agents
 - Cannot change architecture or invent tools
 
 **Two agent classes (isolated, never mixed):**
+
 1. Dev-time agents → scaffold engines, generate code, run tests
 2. Runtime agents → content orchestration, learning path planning (Phase 7+)
 

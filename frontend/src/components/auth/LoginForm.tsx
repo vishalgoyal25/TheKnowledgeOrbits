@@ -39,7 +39,11 @@ export default function LoginForm() {
       await login({ email, password }, redirectTo);
     } catch (err) {
       const axiosError = err as AxiosError<ApiError>;
-      setError(axiosError.response?.data?.message || axiosError.response?.data?.error || "Login failed. Please check your credentials.");
+      setError(
+        axiosError.response?.data?.message ||
+          axiosError.response?.data?.error ||
+          "Login failed. Please check your credentials.",
+      );
     } finally {
       setLoading(false);
     }

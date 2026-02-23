@@ -1,5 +1,7 @@
 # AGENTIC_DEVELOPMENT.md
+
 ## TheKnowledgeOrbits — Agentic Development System
+
 **PKB File #15 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -7,6 +9,7 @@
 ## 1. PURPOSE
 
 This file defines:
+
 - The two-tier agent model (human-in-the-loop vs autonomous)
 - When each tier activates
 - What each agent does, can do, and cannot do
@@ -26,6 +29,7 @@ This file defines:
 The project uses two distinct modes of AI-assisted development. They are isolated and never mixed.
 
 ### Tier 1: Human-in-the-Loop (Phases 0–6)
+
 ```
 This is the active mode from project start through Phase 6.
 
@@ -52,6 +56,7 @@ What this is NOT:
 ```
 
 ### Tier 2: Autonomous Agent System (Phase 7+)
+
 ```
 This activates ONLY at Phase 7. Until then, agentic_dev/ is not used.
 
@@ -81,6 +86,7 @@ What this is NOT:
 ```
 
 ### Why Two Tiers?
+
 ```
 Phases 0–4 establish the patterns.
   → Content Engine is built manually first
@@ -99,6 +105,7 @@ By Phase 7, the pattern is proven and locked in PKB.
 Every agent — in both tiers — must follow this protocol before generating any output.
 
 ### What to Read, When
+
 ```
 ALWAYS read (before any engine work):
   - WORKING_RULES.md          → behavioral constraints
@@ -117,6 +124,7 @@ READ BEFORE specific tasks:
 ```
 
 ### Self-Validation Checklist (before showing output)
+
 ```
 1. Does this code follow CODING_STANDARDS.md naming + patterns?
 2. Does this model use UUID PK + help_text + created_at/updated_at?
@@ -133,6 +141,7 @@ READ BEFORE specific tasks:
 ## 4. THE FIVE AGENTS
 
 ### 4.1 Planner Agent
+
 ```
 File:         agentic_dev/agents/planner_agent.py
 Responsibility: Reads the task, reads PKB, produces a step-by-step plan
@@ -146,6 +155,7 @@ Constraints:
 ```
 
 ### 4.2 Architect Agent
+
 ```
 File:         agentic_dev/agents/architect_agent.py
 Responsibility: Generates engine skeleton (folder structure + empty files)
@@ -163,6 +173,7 @@ Constraints:
 ```
 
 ### 4.3 Engine Builder (Codegen Agent)
+
 ```
 File:         agentic_dev/agents/codegen_agent.py
 Responsibility: Generates ONE implementation file at a time
@@ -179,6 +190,7 @@ Constraints:
 ```
 
 ### 4.4 Test Agent
+
 ```
 File:         agentic_dev/agents/test_agent.py
 Responsibility: Generates tests for approved code only
@@ -196,6 +208,7 @@ Constraints:
 ```
 
 ### 4.5 Review Agent
+
 ```
 File:         agentic_dev/agents/review_agent.py
 Responsibility: Validates generated code against PKB compliance. Report only.
@@ -214,6 +227,7 @@ Constraints:
 ## 5. THE THREE TOOLS
 
 ### 5.1 Filesystem Tool
+
 ```
 File:   agentic_dev/tools/filesystem.py
 Can do:
@@ -228,6 +242,7 @@ Cannot do:
 ```
 
 ### 5.2 Shell Tool
+
 ```
 File:   agentic_dev/tools/shell.py
 Can do:
@@ -243,6 +258,7 @@ Cannot do:
 ```
 
 ### 5.3 Git Tool
+
 ```
 File:   agentic_dev/tools/git.py
 Can do:
@@ -311,6 +327,7 @@ This is the stateful workflow that runs inside `agentic_dev/workflows/engine_bui
 ```
 
 ### State Persistence
+
 ```
 agentic_dev/memory/task_state.json tracks:
   - Current engine being built
@@ -329,6 +346,7 @@ This survives process restarts. The workflow can resume from where it left off.
 These are product-side agents, NOT development agents. They run inside the platform at runtime to serve users.
 
 ### 7.1 Content Orchestration Agent
+
 ```
 Purpose:     Decides which chunks to retrieve for article/quiz generation
 Lives in:    engines/article_gen/services.py (orchestration layer)
@@ -337,6 +355,7 @@ Boundary:    Cannot write articles autonomously. Generates draft → quality che
 ```
 
 ### 7.2 Learning Path Agent
+
 ```
 Purpose:     Plans daily study path based on mastery + time remaining
 Lives in:    engines/personalization/services.py
@@ -346,6 +365,7 @@ Boundary:    Cannot modify user data. Produces recommendations only.
 ```
 
 ### Rules (runtime agents)
+
 - ✅ Always RAG-grounded — zero hallucination tolerance
 - ✅ Human-curated knowledge structure is the source of truth
 - ✅ Agents produce drafts/recommendations — system applies after validation
@@ -357,19 +377,19 @@ Boundary:    Cannot modify user data. Produces recommendations only.
 
 ## 8. AGENT vs HUMAN RESPONSIBILITY MATRIX
 
-| Decision | Who Decides |
-|---|---|
-| What engine to build next | Human (EXECUTION_ROADMAP.md) |
-| What the engine's schema looks like | Human (DATABASE_SCHEMA.md) |
-| What APIs the engine exposes | Human (API_REFERENCE.md) |
-| How to implement a model | Agent proposes, Human approves |
-| How to implement a view | Agent proposes, Human approves |
-| Whether tests pass | Shell Tool (automated) |
-| Whether code is PKB-compliant | Review Agent reports, Human decides |
-| Whether to merge to main | Human only |
-| Whether an engine is stable | Human only |
-| What tools/libraries to use | Human (TECH_STACK.md) |
-| Whether to add a new engine | Human only |
+| Decision                            | Who Decides                         |
+| ----------------------------------- | ----------------------------------- |
+| What engine to build next           | Human (EXECUTION_ROADMAP.md)        |
+| What the engine's schema looks like | Human (DATABASE_SCHEMA.md)          |
+| What APIs the engine exposes        | Human (API_REFERENCE.md)            |
+| How to implement a model            | Agent proposes, Human approves      |
+| How to implement a view             | Agent proposes, Human approves      |
+| Whether tests pass                  | Shell Tool (automated)              |
+| Whether code is PKB-compliant       | Review Agent reports, Human decides |
+| Whether to merge to main            | Human only                          |
+| Whether an engine is stable         | Human only                          |
+| What tools/libraries to use         | Human (TECH_STACK.md)               |
+| Whether to add a new engine         | Human only                          |
 
 ---
 

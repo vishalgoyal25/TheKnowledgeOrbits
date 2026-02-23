@@ -1,8 +1,8 @@
 # PHASE 0 - PROJECT SETUP GUIDE
 
-**Complements:** ENGINE_BASED_EDTECH_COMPLETE_ARCHITECTURE.md  
-**Purpose:** Week 1 setup instructions  
-**Goal:** Get development environment ready  
+**Complements:** ENGINE_BASED_EDTECH_COMPLETE_ARCHITECTURE.md
+**Purpose:** Week 1 setup instructions
+**Goal:** Get development environment ready
 
 ---
 
@@ -76,6 +76,7 @@ knowledgeorbit_v2/
 ## BACKEND SETUP
 
 ### 1. Create Project (PowerShell)
+
 ```powershell
 # Navigate to projects folder
 cd D:\AI_Projects\
@@ -99,6 +100,7 @@ python -m pip install --upgrade pip
 ```
 
 ### 2. Install Dependencies
+
 ```powershell
 # Create requirements.txt
 New-Item requirements.txt
@@ -125,6 +127,7 @@ pip install -r requirements.txt
 ```
 
 ### 3. Initialize Django
+
 ```powershell
 # Create project
 django-admin startproject config .
@@ -142,6 +145,7 @@ python manage.py startapp content engines/content
 ### 4. Configure Settings
 
 **config/settings/base.py:**
+
 ```python
 import os
 from pathlib import Path
@@ -161,12 +165,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third-party
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    
+
     # Engines
     'engines.content',
     'engines.knowledge',
@@ -214,6 +218,7 @@ CORS_ALLOWED_ORIGINS = [
 ```
 
 **config/settings/development.py:**
+
 ```python
 from .base import *
 
@@ -222,6 +227,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 ```
 
 **config/settings/production.py:**
+
 ```python
 from .base import *
 
@@ -232,6 +238,7 @@ ALLOWED_HOSTS = [os.getenv('ALLOWED_HOSTS', '').split(',')]
 ### 5. Environment Variables
 
 **Create .env:**
+
 ```powershell
 New-Item .env
 
@@ -247,6 +254,7 @@ GROQ_API_KEY=your-groq-key
 ```
 
 ### 6. Database Setup (PostgreSQL)
+
 ```powershell
 # Connect to PostgreSQL
 psql -U postgres
@@ -264,6 +272,7 @@ python manage.py createsuperuser
 ```
 
 ### 7. Test Server
+
 ```powershell
 # Run server
 python manage.py runserver
@@ -276,6 +285,7 @@ python manage.py runserver
 ## FRONTEND SETUP
 
 ### 1. Create Next.js App
+
 ```powershell
 # Open new terminal
 cd D:\AI_Projects\knowledgeorbit_v2
@@ -294,11 +304,13 @@ npx shadcn-ui@latest init
 ### 2. Environment Variables
 
 **Create .env.local:**
+
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ### 3. Test Frontend
+
 ```powershell
 npm run dev
 
@@ -310,6 +322,7 @@ npm run dev
 ## CRITICAL RULES
 
 ### Database Migrations
+
 ```powershell
 # ALWAYS run in this order:
 python manage.py makemigrations
@@ -320,6 +333,7 @@ python manage.py migrate
 ```
 
 ### Coding Standards
+
 - UUID primary keys (ALWAYS)
 - Type hints (ALWAYS)
 - Docstrings (ALWAYS)
@@ -327,6 +341,7 @@ python manage.py migrate
 - Table names: enginename_modelname
 
 ### Git Setup
+
 ```powershell
 git init
 git add .
@@ -334,6 +349,7 @@ git commit -m "feat: initial project setup"
 ```
 
 **.gitignore:**
+
 ```
 # Python
 *.pyc
@@ -356,17 +372,20 @@ node_modules/
 ## VERIFICATION CHECKLIST
 
 **Backend:**
+
 - [ ] Django server runs (http://localhost:8000)
 - [ ] Admin accessible (http://localhost:8000/admin)
 - [ ] Database connected (no errors)
 - [ ] Migrations applied
 
 **Frontend:**
+
 - [ ] Next.js runs (http://localhost:3000)
 - [ ] API URL configured (.env.local)
 - [ ] Tailwind working
 
 **Structure:**
+
 - [ ] engines/ folder exists
 - [ ] config/settings/ structure correct
 - [ ] .env files created (not committed)
@@ -377,6 +396,7 @@ node_modules/
 ## NEXT STEPS
 
 **After setup complete:**
+
 1. Read CONTENT_ENGINE_IMPLEMENTATION.md
 2. Build Content Engine models (Week 2)
 3. Implement ingestion service
@@ -387,6 +407,7 @@ node_modules/
 ## TROUBLESHOOTING
 
 **PostgreSQL connection error:**
+
 ```powershell
 # Check PostgreSQL is running
 # Verify credentials in .env
@@ -394,6 +415,7 @@ node_modules/
 ```
 
 **Migration conflicts:**
+
 ```powershell
 # Nuclear option (development only):
 python manage.py migrate --fake
@@ -401,6 +423,7 @@ python manage.py migrate --fake
 ```
 
 **Import errors:**
+
 ```powershell
 # Ensure virtual environment activated
 # Reinstall requirements: pip install -r requirements.txt

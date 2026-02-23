@@ -60,8 +60,8 @@ export function useArticlesByTopic(
 
 /**
  * Hook to trigger the AI generation of a new article.
- * 
- * Submits a RAG-based generation request to the backend and updates 
+ *
+ * Submits a RAG-based generation request to the backend and updates
  * the local articles cache upon success.
  */
 export function useGenerateArticle() {

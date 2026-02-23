@@ -1,5 +1,7 @@
 # CODING_STANDARDS.md
+
 ## TheKnowledgeOrbits — Coding Standards
+
 **PKB File #4 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -17,18 +19,21 @@
 ## 2. PYTHON STANDARDS
 
 ### Naming:
+
 - Variables/functions: `snake_case`
 - Classes: `PascalCase`
 - Constants: `UPPER_SNAKE_CASE`
 - Files: `snake_case.py`
 
 ### Mandatory in every file:
+
 - Type hints on all functions
 - Docstrings on all classes and functions
 - Logger initialization: `logger = structlog.get_logger(__name__)`
 - No `print()` anywhere
 
 ### Function signature pattern:
+
 ```python
 def function_name(param: str, count: int = 0) -> dict[str, Any]:
     """One-line description of what this does."""
@@ -37,6 +42,7 @@ def function_name(param: str, count: int = 0) -> dict[str, Any]:
 ```
 
 ### Error handling pattern:
+
 ```python
 try:
     result = some_operation()
@@ -54,17 +60,20 @@ except Exception as e:
 ## 3. TYPESCRIPT / NEXT.JS STANDARDS
 
 ### Naming:
+
 - Variables/functions: `camelCase`
 - Components/Classes: `PascalCase`
 - Constants: `UPPER_SNAKE_CASE`
 - Files: `kebab-case.tsx`
 
 ### Mandatory:
+
 - Type/interface on all props and return types
 - No `console.log()` — use chalk
 - JSDoc on all exported functions/components
 
 ### Component pattern:
+
 ```typescript
 import chalk from 'chalk';
 
@@ -113,6 +122,7 @@ class EngineModelName(models.Model):
 ```
 
 ### Rules:
+
 - ❌ No auto-increment IDs. UUID only
 - ❌ No hardcoded values in models
 - ✅ `help_text` on ALL fields
@@ -125,6 +135,7 @@ class EngineModelName(models.Model):
 ## 5. SECURITY PATTERNS (MANDATORY)
 
 ### JWT Authentication:
+
 ```python
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -135,6 +146,7 @@ class ProtectedView(APIView):
 ```
 
 ### Argon2 Password Hashing:
+
 ```python
 from django.contrib.auth.hashers import make_password, check_password
 
@@ -143,6 +155,7 @@ is_valid = check_password(raw_password, hashed)  # Verify
 ```
 
 ### RBAC Decorator:
+
 ```python
 from engines.authorization.decorators import require_role
 
@@ -152,6 +165,7 @@ def admin_only_view(request):
 ```
 
 ### Rules:
+
 - ❌ No bcrypt / pbkdf2 — Argon2 only
 - ❌ No session-based auth
 - ❌ No `alg=none` in JWT
@@ -164,6 +178,7 @@ def admin_only_view(request):
 ## 6. LOGGING PATTERNS
 
 ### Python (structlog):
+
 ```python
 import structlog
 logger = structlog.get_logger(__name__)
@@ -174,8 +189,9 @@ logger.error("error_event", error=str(e))
 ```
 
 ### Node.js (chalk):
+
 ```typescript
-import chalk from 'chalk';
+import chalk from "chalk";
 
 console.log(chalk.green("[INFO]"), "message");
 console.log(chalk.yellow("[WARN]"), "message");
@@ -183,6 +199,7 @@ console.log(chalk.red("[ERROR]"), "message");
 ```
 
 ### Log schema (every log must include):
+
 - `timestamp` (auto)
 - `level`
 - `engine_name`
@@ -205,6 +222,7 @@ console.log(chalk.red("[ERROR]"), "message");
 ## 8. GIT STANDARDS
 
 ### Commit format (conventional commits):
+
 ```
 type(scope): short description
 
@@ -218,6 +236,7 @@ test(assessment): add quiz generation tests
 ```
 
 ### Rules:
+
 - ❌ No force-push to main/develop
 - ✅ Feature branches only: `feature/engine-name-description`
 - ✅ commitlint enforced via pre-commit

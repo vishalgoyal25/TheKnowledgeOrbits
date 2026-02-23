@@ -1,6 +1,4 @@
-"""
-Content Engine Serializers
-"""
+"""Content Engine Serializers."""
 
 from rest_framework import serializers
 from engines.content.models import Document, Chunk, Embedding, Asset, IngestionJob

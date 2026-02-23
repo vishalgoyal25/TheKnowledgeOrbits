@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-from typing import Any
-
 """Django's command-line utility for administrative tasks."""
+
+from typing import Any
 import os
 import sys
 

@@ -1,6 +1,4 @@
-"""
-User State Engine URLs
-"""
+"""User State Engine URLs."""
 
 from django.urls import path
 from engines.userstate import views

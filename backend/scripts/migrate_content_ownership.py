@@ -1,5 +1,5 @@
 """
-Data Migration: Set Existing Content as Public
+Data Migration: Set Existing Content as Public.
 
 Run this script ONCE after applying ownership migrations.
 """
@@ -27,7 +27,6 @@ console = Console()
 
 def migrate_articles() -> Any:
     """Mark all existing articles as public."""
-
     # Articles without created_by are system/admin articles
     articles = Article.objects.filter(created_by__isnull=True)
     count = articles.count()
@@ -40,7 +39,6 @@ def migrate_articles() -> Any:
 
 def migrate_quizzes() -> Any:
     """Mark all existing quizzes as public."""
-
     # Quizzes without created_by are system/admin quizzes
     quizzes = Quiz.objects.filter(created_by__isnull=True)
     count = quizzes.count()

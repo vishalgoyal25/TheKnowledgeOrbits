@@ -219,7 +219,8 @@ export default function QuizGeneratorPage() {
                   <AlertTitle>Generation Failed</AlertTitle>
                   <AlertDescription>
                     {(() => {
-                      const axiosError = generateQuizMutation.error as AxiosError<ApiError>;
+                      const axiosError =
+                        generateQuizMutation.error as AxiosError<ApiError>;
                       return (
                         axiosError.response?.data?.message ||
                         axiosError.response?.data?.error ||

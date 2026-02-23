@@ -1,6 +1,9 @@
 "use client";
 
-import { useReadingHistory, ReadingHistoryItem } from "@/lib/hooks/use-reading-progress";
+import {
+  useReadingHistory,
+  ReadingHistoryItem,
+} from "@/lib/hooks/use-reading-progress";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,7 +99,9 @@ export default function ReadingHistoryPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm items-center">
                       <span
-                        className={`flex items-center gap-1.5 font-medium ${isCompleted ? "text-green-600" : "text-blue-600"}`}
+                        className={`flex items-center gap-1.5 font-medium ${
+                          isCompleted ? "text-green-600" : "text-blue-600"
+                        }`}
                       >
                         {isCompleted ? (
                           <>
@@ -113,7 +118,9 @@ export default function ReadingHistoryPage() {
                     </div>
                     <Progress
                       value={item.percent_read}
-                      className={`h-2 ${isCompleted ? "bg-green-100" : "bg-blue-100"}`}
+                      className={`h-2 ${
+                        isCompleted ? "bg-green-100" : "bg-blue-100"
+                      }`}
                     />
                   </div>
 
@@ -123,8 +130,8 @@ export default function ReadingHistoryPage() {
                       Last read{" "}
                       {item.updated_at
                         ? formatDistanceToNow(new Date(item.updated_at), {
-                          addSuffix: true,
-                        })
+                            addSuffix: true,
+                          })
                         : "recently"}
                     </span>
                   </div>

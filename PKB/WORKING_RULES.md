@@ -1,5 +1,7 @@
 # WORKING_RULES.md
+
 ## TheKnowledgeOrbits — Working Rules (Highest Authority)
+
 **PKB File #5 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -21,17 +23,20 @@
 ## 2. AGENTICAI BEHAVIORAL RULES
 
 ### One-Step Rule:
+
 - AI generates ONE file only per turn
 - Shows output → waits for "Done"
 - No multi-file generation ever
 
 ### Approval Checkpoints (mandatory):
+
 - After every file generation
 - After every migration
 - After every engine skeleton
 - Before any merge to main branch
 
 ### AI Cannot:
+
 - ❌ Modify PKB files
 - ❌ Invent tools or libraries not in TECH_STACK.md
 - ❌ Change engine boundaries or architecture
@@ -40,6 +45,7 @@
 - ❌ Generate multiple files at once
 
 ### AI Must:
+
 - ✅ Read relevant PKB files before generating
 - ✅ Explain what and why for every output
 - ✅ Self-validate against PKB before showing output
@@ -50,6 +56,7 @@
 ## 3. SECURITY ENFORCEMENT (Mandatory in ALL generated code)
 
 ### Authentication:
+
 - JWT only. No sessions. No plaintext tokens.
 - Library: djangorestframework-simplejwt
 - Access token: 5 min expiry
@@ -57,16 +64,19 @@
 - Tokens stored: HttpOnly cookies only
 
 ### Password Hashing:
+
 - Argon2 only. No bcrypt. No pbkdf2. No default Django hasher.
 - Never store plaintext passwords
 
 ### Authorization:
+
 - RBAC via middleware. Never inside views.
 - Roles extracted from verified JWT claims only
 - Decorator: `@require_role("role_name")`
 - Roles: admin, content_manager, student, free_user
 
 ### Rules:
+
 - ❌ No `alg=none` in JWT
 - ❌ No permission checks inside view logic
 - ❌ No secrets hardcoded anywhere
@@ -78,6 +88,7 @@
 ## 4. TOOLING ENFORCEMENT (Mandatory)
 
 ### Logging (no exceptions):
+
 - Python prod: structlog
 - Python dev: rich
 - Node.js: chalk
@@ -87,16 +98,19 @@
 - ✅ Every TS module: import chalk, use chalk.green/yellow/red
 
 ### Error Reporting:
+
 - Sentry SDK initialized in every engine
 - All unhandled exceptions auto-reported
 - ❌ No silent exception swallowing
 
 ### Environment:
+
 - direnv mandatory for all env variables
 - ❌ No hardcoded secrets anywhere in code
 - ✅ `.env` in .gitignore always
 
 ### Workflow Enforcement:
+
 - pre-commit hooks active on all repos
 - commitlint enforced (conventional commits)
 - ❌ No force-push to main/develop
@@ -107,6 +121,7 @@
 ## 5. ENGINE DEVELOPMENT RULES
 
 ### Each engine must have:
+
 - Own folder: `engines/<engine_name>/`
 - Own models, serializers, views, services, urls, tests
 - Own DB tables (no shared tables)
@@ -114,12 +129,14 @@
 - Sentry reporting enabled
 
 ### Communication:
+
 - ✅ Engine A → HTTP call → Engine B API
 - ✅ Engine A → emit event → Engine B listens
 - ❌ Engine A imports Engine B's models
 - ❌ Engine A queries Engine B's DB tables directly
 
 ### Lifecycle (every engine follows this):
+
 1. Declared in ENGINE_CATALOG.md
 2. Schema defined in DATABASE_SCHEMA.md
 3. Skeleton generated (Architect Agent)

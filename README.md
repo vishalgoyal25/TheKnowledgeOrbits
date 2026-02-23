@@ -1,7 +1,7 @@
 # 🌍 TheKnowledgeOrbits
 
-**AI-Powered Ed-Tech Platform for UPSC Aspirants**  
-*Engine-First Architecture | Scalable to 10M+ Users | Built by Solo Developer*
+**AI-Powered Ed-Tech Platform for UPSC Aspirants**
+_Engine-First Architecture | Scalable to 10M+ Users | Built by Solo Developer_
 
 ---
 
@@ -12,12 +12,14 @@ TheKnowledgeOrbits is a next-generation educational platform designed specifical
 ### 🎯 Core Innovation
 
 **Chunk-Based Content Architecture:**
+
 - All content (PDFs, articles, news) broken into semantic chunks
 - AI generates articles by combining static chunks + current affairs chunks
 - Quizzes generated from chunks, not articles
 - Enables dynamic, context-aware content generation
 
 **33-Engine Architecture:**
+
 - Each engine = one clear responsibility
 - Engines communicate via events, not direct calls
 - Independently scalable and testable
@@ -28,34 +30,40 @@ TheKnowledgeOrbits is a next-generation educational platform designed specifical
 ## ✨ Key Features
 
 ### 📚 Content Management
+
 - **Smart Ingestion:** PDF upload with OCR support (scanned documents)
 - **Semantic Chunking:** Intelligent 1200-character chunks with context preservation
 - **Multi-Format Support:** PDFs, videos, web content, audio
 
 ### 📰 Current Affairs Integration
+
 - **Daily News Scraping:** Automated RSS monitoring (The Hindu, Indian Express)
 - **Contextual Linking:** AI links current affairs to static syllabus topics
 - **Integrated Articles:** Theory from NCERT + Recent examples from news
 
 ### 🧠 AI-Powered Learning
+
 - **Article Generation:** GROQ-powered narrative creation from chunks
 - **Quiz Generation:** MCQs with explanations from source chunks
 - **Personalized Paths:** Learning paths based on weak areas
 - **AI Tutor:** Conversational doubt resolution
 
 ### 📊 Progress Tracking
+
 - **Event Sourcing:** Complete audit trail of user actions
 - **Topic Mastery:** Per-topic skill scoring (0-100)
 - **Adaptive Difficulty:** Questions calibrated to user level
 - **Streak Management:** Daily learning habit tracking
 
 ### 🎓 Assessment System
+
 - **Practice Quizzes:** Topic-wise MCQ practice
 - **Mock Tests:** Full exam simulation with timing
 - **Detailed Analytics:** Section-wise performance breakdown
 - **Rank Prediction:** ML-based rank forecasting
 
 ### 🎮 Engagement Features
+
 - **Gamification:** Achievements, badges, leaderboards
 - **Spaced Repetition:** Flashcards with SM-2 algorithm
 - **Collaboration:** Discussion forums, study groups
@@ -68,6 +76,7 @@ TheKnowledgeOrbits is a next-generation educational platform designed specifical
 ### Technology Stack
 
 **Backend:**
+
 - Python 3.11+
 - Django 5.0 + Django REST Framework 3.15
 - PostgreSQL 16 + pgvector (vector search)
@@ -75,18 +84,21 @@ TheKnowledgeOrbits is a next-generation educational platform designed specifical
 - Celery 5.0 (async tasks)
 
 **AI/ML:**
+
 - GROQ API (article/quiz generation)
 - sentence-transformers (embeddings)
 - Whisper API (transcription)
 - Tesseract/PaddleOCR (OCR)
 
 **Frontend:**
+
 - Next.js 16 (App Router)
 - TypeScript
 - shadcn/ui + Tailwind CSS
 - TanStack Query
 
 **Infrastructure:**
+
 - Backend: Render
 - Frontend: Vercel
 - Database: Supabase
@@ -97,35 +109,43 @@ TheKnowledgeOrbits is a next-generation educational platform designed specifical
 ### 33 Engines (Organized by Layer)
 
 **L0 - Data Ingestion:**
+
 - Content Engine
 - Current Affairs Engine
 
 **L1 - Organization:**
+
 - Knowledge Engine
 - Search Engine
 
 **L2 - Generation:**
+
 - Article Generation Engine
 - Assessment Engine
 - Video Engine
 
 **L3 - User Tracking:**
+
 - User State Engine
 
 **L4 - Analysis:**
+
 - Analytics Engine
 
 **L5 - Intelligence:**
+
 - Personalization Engine
 - Prediction Engine
 - AI Tutor Engine
 
 **L6 - Engagement:**
+
 - Gamification Engine
 - Collaboration Engine
 - Revision Engine
 
 **L7 - Operations:**
+
 - Authentication Engine
 - Authorization Engine
 - Notification Engine
@@ -133,18 +153,21 @@ TheKnowledgeOrbits is a next-generation educational platform designed specifical
 - Cache Engine
 
 **L8 - Growth:**
+
 - Commerce Engine
 - Marketing Engine
 - Onboarding Engine
 - Retention Engine
 
 **L9 - Advanced:**
+
 - Mock Test Engine
 - NLP Engine
 - Computer Vision Engine
 - Voice Engine
 
 **L10 - Enterprise:**
+
 - Marketplace Engine
 - White-label Engine
 - Content Moderation Engine
@@ -235,12 +258,14 @@ Comprehensive documentation available in `/docs`:
 ## 🛣️ Development Roadmap
 
 ### Phase 0: Setup (Week 1) ✅
+
 - Repository structure
 - Django + DRF skeleton
 - Next.js + TypeScript skeleton
 - Docker development environment
 
 ### Phase 1: Core Engines (Weeks 2-4) 🔄
+
 - Content Engine (PDF ingestion, chunking)
 - Knowledge Engine (syllabus, topics)
 - Assessment Engine (quiz generation)
@@ -248,22 +273,26 @@ Comprehensive documentation available in `/docs`:
 - Analytics Engine (aggregation)
 
 ### Phase 2: Generation (Weeks 5-7)
+
 - Article Generation Engine
 - Current Affairs Engine
 - Integrated article generation
 
 ### Phase 3: Frontend (Weeks 8-10)
+
 - Authentication UI
 - Article reading interface
 - Quiz interface
 - Dashboard
 
 ### Phase 4: Launch (Weeks 11-12)
+
 - Content population (NCERT books)
 - Production deployment
 - Public beta launch
 
 ### Phase 5-10: Advanced Features (Weeks 13-36)
+
 - Monetization (Commerce Engine)
 - Engagement (Gamification, Collaboration)
 - Intelligence (Personalization, AI Tutor)
@@ -276,20 +305,25 @@ Comprehensive documentation available in `/docs`:
 ## 🎯 Project Vision
 
 ### Problem Statement
+
 UPSC aspirants struggle with:
+
 - Disconnected static content and current affairs
 - Generic study materials (not personalized)
 - Lack of progress tracking and adaptive learning
 - Time-consuming manual content organization
 
 ### Solution
+
 TheKnowledgeOrbits provides:
+
 - **Integrated Learning:** Static theory + current affairs in one narrative
 - **AI-Powered Personalization:** Learning paths based on weak areas
 - **Complete Tracking:** Event-sourced progress with topic mastery
 - **Scalable Architecture:** Engine-first design for 10M+ users
 
 ### Target Users
+
 - UPSC Civil Services aspirants
 - State PSC candidates
 - Competitive exam students
@@ -302,6 +336,7 @@ TheKnowledgeOrbits provides:
 We welcome contributions! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 ### Development Workflow
+
 1. Fork the repository
 2. Create feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit changes (`git commit -m 'Add amazing feature'`)
@@ -309,6 +344,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for
 5. Open Pull Request
 
 ### Code Standards
+
 - Follow [CODING_STANDARDS.md](docs/CODING_STANDARDS.md)
 - Write tests for all new features
 - Maintain >80% code coverage
@@ -319,10 +355,10 @@ We welcome contributions! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for
 
 ## 📊 Current Status
 
-**Version:** 0.1.0-alpha  
-**Phase:** Phase 0 Complete, Phase 1 In Progress  
-**Test Coverage:** 85%  
-**Engines Built:** 5/33  
+**Version:** 0.1.0-alpha
+**Phase:** Phase 0 Complete, Phase 1 In Progress
+**Test Coverage:** 85%
+**Engines Built:** 5/33
 **Status:** MVP Development
 
 ---
@@ -335,8 +371,8 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ## 👤 Author
 
-**Developed by:** Solo Developer  
-**Project Start:** January 2026  
+**Developed by:** Solo Developer
+**Project Start:** January 2026
 **Goal:** Production-ready platform for 10M+ users
 
 ---
@@ -368,4 +404,4 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 **Built with ❤️ for UPSC aspirants worldwide**
 
-*Empowering learners through intelligent, contextual education*
+_Empowering learners through intelligent, contextual education_

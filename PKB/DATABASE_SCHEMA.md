@@ -1,5 +1,7 @@
 # DATABASE_SCHEMA.md
+
 ## TheKnowledgeOrbits — Database Schema
+
 **PKB File #6 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -78,6 +80,7 @@ CREATE TABLE content_ingestion_job (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_chunk_document ON content_chunk(document_id);
 CREATE INDEX idx_chunk_source_type ON content_chunk(source_type);
@@ -141,6 +144,7 @@ CREATE TABLE knowledge_chunk_topic_map (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_subject_program ON knowledge_subject(program_id);
 CREATE INDEX idx_module_subject ON knowledge_module(subject_id);
@@ -204,6 +208,7 @@ CREATE TABLE assessment_question_response (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_quiz_topic ON assessment_quiz(topic_id);
 CREATE INDEX idx_question_topic ON assessment_question(topic_id);
@@ -268,6 +273,7 @@ CREATE TABLE userstate_reading_progress (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_event_user ON userstate_event(user_id);
 CREATE INDEX idx_event_created ON userstate_event(created_at DESC);
@@ -305,6 +311,7 @@ CREATE TABLE analytics_insight (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_aggregate_user ON analytics_daily_aggregate(user_id);
 CREATE INDEX idx_aggregate_date ON analytics_daily_aggregate(date);
@@ -345,6 +352,7 @@ CREATE TABLE auth_role_assignment (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_role_assignment_user ON auth_role_assignment(user_id);
 CREATE INDEX idx_role_assignment_role ON auth_role_assignment(role_id);
@@ -383,6 +391,7 @@ CREATE TABLE article_source_map (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_article_topic ON article_article(topic_id);
 CREATE INDEX idx_article_slug ON article_article(slug);
@@ -439,6 +448,7 @@ CREATE TABLE ca_topic_link (
 ```
 
 **Indexes:**
+
 ```sql
 CREATE INDEX idx_ca_article_source ON ca_article(source_id);
 CREATE INDEX idx_ca_chunk_article ON ca_chunk(ca_article_id);

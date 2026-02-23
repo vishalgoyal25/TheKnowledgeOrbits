@@ -24,12 +24,12 @@ import {
 
 /**
  * NotebookPage - The primary personal study hub for the user.
- * 
+ *
  * Provides a unified interface to access:
  * 1. AI-Generated Articles (Knowledge Orbits)
  * 2. Recent Quiz Attempts & Performance
  * 3. Saved Bookmarks & Notes
- * 
+ *
  * Features integrated search filtering across all tabs and fast switching
  * between content types via a Tabbed UI.
  */

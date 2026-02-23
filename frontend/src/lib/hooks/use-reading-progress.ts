@@ -98,7 +98,9 @@ export function useReadingHistory() {
   return useQuery<ReadingHistoryItem[]>({
     queryKey: ["reading-history"],
     queryFn: async () => {
-      const response = await apiClient.get<ReadingHistoryItem[]>("/userstate/reading-progress/");
+      const response = await apiClient.get<ReadingHistoryItem[]>(
+        "/userstate/reading-progress/",
+      );
       return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -1,8 +1,4 @@
-"""
-User State Engine - Integration Tests
-
-End-to-end user flow tests.
-"""
+"""User State Engine Integration Tests."""
 
 import pytest
 import uuid
@@ -13,13 +9,13 @@ from engines.auth.models import User
 
 @pytest.fixture
 def api_client():
-    """API client."""
+    """Return API client."""
     return APIClient()
 
 
 @pytest.fixture
 def authenticated_user_client(api_client):
-    """Authenticated user and client."""
+    """Return an authenticated user and client."""
     user = User.objects.create_user(email="test@example.com", password="pass")
     user.is_verified = True
     user.save()

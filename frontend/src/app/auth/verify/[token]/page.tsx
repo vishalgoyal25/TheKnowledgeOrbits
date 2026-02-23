@@ -47,7 +47,11 @@ export default function VerifyEmailPage() {
       } catch (error) {
         const axiosError = error as AxiosError<ApiError>;
         setStatus("error");
-        setMessage(axiosError.response?.data?.message || axiosError.response?.data?.error || "Verification failed. The link may be expired or invalid.");
+        setMessage(
+          axiosError.response?.data?.message ||
+            axiosError.response?.data?.error ||
+            "Verification failed. The link may be expired or invalid.",
+        );
       }
     };
     verifyEmail();

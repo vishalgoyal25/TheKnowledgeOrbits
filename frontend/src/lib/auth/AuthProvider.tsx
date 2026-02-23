@@ -65,7 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = () => {
     // Call logout API (optional - token invalidation)
-    authAPI.logout().catch(() => { });
+    authAPI.logout().catch(() => {});
 
     // Clear tokens
     tokenManager.clearTokens();

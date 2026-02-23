@@ -1,10 +1,6 @@
 {
   "parser": "@typescript-eslint/parser",
-  "plugins": [
-    "react",
-    "react-hooks",
-    "@typescript-eslint"
-  ],
+  "plugins": ["react", "react-hooks", "@typescript-eslint"],
   "extends": [
     "eslint:recommended",
     "plugin:react/recommended",
@@ -35,20 +31,13 @@
     "no-console": [
       "error",
       {
-        "allow": [
-          "warn",
-          "error",
-          "debug",
-          "info"
-        ]
+        "allow": ["warn", "error", "debug", "info"]
       }
     ]
   },
   "overrides": [
     {
-      "files": [
-        "src/lib/logger.ts"
-      ],
+      "files": ["src/lib/logger.ts"],
       "rules": {
         "no-console": "off"
       }

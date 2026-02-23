@@ -11,3 +11,4 @@ black>=24.10.0
 flake8>=7.1.1
 mypy>=1.13.0
 bandit>=1.8.0
+pre-commit>=3.7.1

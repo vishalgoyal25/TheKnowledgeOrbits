@@ -1,5 +1,7 @@
 # COMPLETE_FOLDER_STRUCTURE.md
+
 ## TheKnowledgeOrbits — Project Folder Structure
+
 **PKB File #7 | Version: 1.0 | Date: Feb 2026**
 
 ---

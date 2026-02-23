@@ -1,5 +1,7 @@
 # MIGRATION_STRATEGY.md
+
 ## TheKnowledgeOrbits — Migration Strategy
+
 **PKB File #14 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -18,6 +20,7 @@ Both are critical. Schema discipline keeps the live system stable during develop
 ## 2. SCHEMA MIGRATION DISCIPLINE
 
 ### Core Rules (from WORKING_RULES.md — non-negotiable)
+
 ```
 ✅ One migration per logical change. Never squash in dev.
 ✅ Tests written and passing BEFORE migration runs.
@@ -28,6 +31,7 @@ Both are critical. Schema discipline keeps the live system stable during develop
 ```
 
 ### Migration Lifecycle (every engine follows this)
+
 ```
 1. Model code written + reviewed
 2. Model tests written + passing (90% coverage)
@@ -41,6 +45,7 @@ Both are critical. Schema discipline keeps the live system stable during develop
 ```
 
 ### What "One Logical Change" Means
+
 ```
 ✅ GOOD — one migration per:
   - Adding a new model
@@ -56,6 +61,7 @@ Both are critical. Schema discipline keeps the live system stable during develop
 ```
 
 ### Naming Convention
+
 ```
 Django auto-generates: 0001_initial.py, 0002_add_quality_flag.py
 Each engine starts at 0001. Never renumber.
@@ -79,6 +85,7 @@ engines/knowledge/migrations/
 Migrations must run in an order that satisfies FK dependencies. This graph is derived from DATABASE_SCHEMA.md Section 3 (Relationship Summary).
 
 ### Tier 0 — No dependencies (run first)
+
 ```
 auth_user
 auth_role
@@ -86,6 +93,7 @@ knowledge_program
 ```
 
 ### Tier 1 — Depends on Tier 0
+
 ```
 auth_role_assignment    → auth_user, auth_role
 knowledge_subject       → knowledge_program
@@ -93,6 +101,7 @@ content_document        → knowledge_subject (optional FK)
 ```
 
 ### Tier 2 — Depends on Tier 1
+
 ```
 knowledge_module        → knowledge_subject
 content_embedding       → (standalone, but referenced by Tier 3)
@@ -100,6 +109,7 @@ content_chunk           → content_document, content_embedding
 ```
 
 ### Tier 3 — Depends on Tier 2
+
 ```
 knowledge_topic         → knowledge_module, knowledge_subject, knowledge_topic (self-ref)
 content_asset           → content_chunk
@@ -107,6 +117,7 @@ content_ingestion_job   → content_document
 ```
 
 ### Tier 4 — Depends on Tier 3
+
 ```
 knowledge_chunk_topic_map   → content_chunk, knowledge_topic
 assessment_quiz             → knowledge_topic
@@ -115,6 +126,7 @@ userstate_topic_mastery     → auth_user, knowledge_topic
 ```
 
 ### Tier 5 — Depends on Tier 4
+
 ```
 assessment_quiz_attempt     → assessment_quiz, auth_user
 assessment_question_response → assessment_quiz_attempt, assessment_question
@@ -127,6 +139,7 @@ analytics_insight           → auth_user
 ```
 
 ### Tier 6 — Phase 2 tables (depend on Tier 3–4)
+
 ```
 article_article             → knowledge_topic
 article_source_map          → article_article, content_chunk
@@ -137,6 +150,7 @@ ca_topic_link               → ca_chunk, knowledge_topic
 ```
 
 ### Rule
+
 ```
 Never run a Tier N migration before all Tier N-1 migrations are complete.
 Django handles this via dependencies[] in migration files — but humans must verify.
@@ -149,17 +163,19 @@ Django handles this via dependencies[] in migration files — but humans must ve
 Some migrations are destructive (drop column, rename table, change type). These require extra care.
 
 ### Allowed Destructive Operations
-| Operation | Allowed? | Guard |
-|---|---|---|
-| Add column (nullable) | ✅ Yes | No guard needed — nullable is safe |
-| Add column (NOT NULL + default) | ✅ Yes | Default must be a valid sentinel |
-| Add index | ✅ Yes | Use `CONCURRENTLY` in production |
-| Drop column | ⚠️ Conditional | Only if zero code references it. Verified by grep + test run |
-| Rename column | ❌ Never | Use add-new + backfill + drop-old pattern instead |
-| Rename table | ❌ Never | Use new table + data copy + drop old pattern |
-| Change column type | ❌ Never in-place | Use add-new-type column + backfill + drop old |
+
+| Operation                       | Allowed?          | Guard                                                        |
+| ------------------------------- | ----------------- | ------------------------------------------------------------ |
+| Add column (nullable)           | ✅ Yes            | No guard needed — nullable is safe                           |
+| Add column (NOT NULL + default) | ✅ Yes            | Default must be a valid sentinel                             |
+| Add index                       | ✅ Yes            | Use `CONCURRENTLY` in production                             |
+| Drop column                     | ⚠️ Conditional    | Only if zero code references it. Verified by grep + test run |
+| Rename column                   | ❌ Never          | Use add-new + backfill + drop-old pattern instead            |
+| Rename table                    | ❌ Never          | Use new table + data copy + drop old pattern                 |
+| Change column type              | ❌ Never in-place | Use add-new-type column + backfill + drop old                |
 
 ### The Add-Backfill-Drop Pattern (for renames / type changes)
+
 ```
 Migration 0001: Add new column/table (nullable)
 Migration 0002: Backfill data from old → new (data migration, not schema)
@@ -169,6 +185,7 @@ Each is a separate migration. Each is reviewed separately. Each can be rolled ba
 ```
 
 ### Production Index Creation
+
 ```
 # NEVER do this in production (locks table):
 # CREATE INDEX idx_name ON table(column);
@@ -186,17 +203,20 @@ Each is a separate migration. Each is reviewed separately. Each can be rolled ba
 Every migration must be rollback-safe. Django supports this natively for most operations, but some require manual attention.
 
 ### Auto-Rollback Safe (Django handles)
+
 - Add model → rollback drops table
 - Add field → rollback drops column
 - Add index → rollback drops index
 - Add constraint → rollback drops constraint
 
 ### Manual Rollback Required
+
 - Data migrations (RunPython) → must provide reverse function
 - RunSQL → must provide reverse SQL
 - If reverse is impossible → migration must be marked `atomic = False` and documented
 
 ### Rollback Pattern for Data Migrations
+
 ```python
 from django.db import migrations
 
@@ -227,6 +247,7 @@ class Migration(migrations.Migration):
 This is a one-time migration at launch. It does NOT apply to ongoing schema evolution (that's Sections 2–5).
 
 ### Phase A: Data Audit (During Development Week 1)
+
 ```
 What to export from old system:
   ✅ Users (email, name, password_hash — if compatible)
@@ -248,6 +269,7 @@ Why discard content:
 ```
 
 ### Phase B: Transformation Mapping
+
 ```
 Old Table          →  New Table                    →  Transform
 ─────────────────────────────────────────────────────────────────
@@ -259,6 +281,7 @@ old_content        →  (discard)                    →  Re-ingest from source 
 ```
 
 ### Phase C: Migration Execution (Week 13 — after MVP launches)
+
 ```
 Step 1: Export
   → Dump old DB tables identified in Phase A
@@ -281,6 +304,7 @@ Step 4: Verify
 ```
 
 ### Phase D: Soft Launch (Weeks 14–15)
+
 ```
 - 100 migrated users invited to beta
 - Both old and new systems running in parallel
@@ -290,6 +314,7 @@ Step 4: Verify
 ```
 
 ### Phase E: Full Cutover (Week 16)
+
 ```
 1. Freeze old database (set read-only)
 2. Final incremental sync (any writes since Phase C)
@@ -307,6 +332,7 @@ Step 4: Verify
 Production seed data is separate from migration data. It populates the knowledge structure before any user content exists.
 
 ### What Gets Seeded (before any user signs up)
+
 ```
 knowledge_program:   UPSC CSE, State PSC (Karnataka, Maharashtra, Tamil Nadu)
 knowledge_subject:   Polity, History, Geography, Economy, Environment, Science & Tech
@@ -316,12 +342,14 @@ auth_role:           admin, content_manager, student, free_user
 ```
 
 ### Seed Script Location
+
 ```
 scripts/seed_data.py   →  Populates knowledge hierarchy + roles
 scripts/ingest_ncert.py →  Ingests NCERT PDFs → chunks → embeddings → topic mapping
 ```
 
 ### Rules
+
 - Seed data runs ONCE at initial deploy (Phase 4, Week 11)
 - Seed script is idempotent — safe to run multiple times
 - Knowledge hierarchy is the FIRST thing seeded — everything else depends on it

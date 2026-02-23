@@ -68,7 +68,9 @@ apiClient.interceptors.response.use(
 
         // Call refresh endpoint
         const response = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/v1/auth/token/refresh/`,
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
+          }/api/v1/auth/token/refresh/`,
           { refresh: refreshToken },
         );
 
@@ -92,7 +94,10 @@ apiClient.interceptors.response.use(
       }
     }
 
-    logger.error(`Response error [${error.response?.status}]:`, error.response?.data || error.message);
+    logger.error(
+      `Response error [${error.response?.status}]:`,
+      error.response?.data || error.message,
+    );
     return Promise.reject(error);
   },
 );
@@ -127,7 +132,10 @@ export const getErrorMessage = (error: unknown): string => {
       // Handle validation errors (objects)
       if (typeof data.detail === "object" && data.detail !== null) {
         return Object.entries(data.detail)
-          .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
+          .map(
+            ([key, value]) =>
+              `${key}: ${Array.isArray(value) ? value.join(", ") : value}`,
+          )
           .join(" | ");
       }
 

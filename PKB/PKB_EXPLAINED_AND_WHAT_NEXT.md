@@ -1,4 +1,5 @@
 # TheKnowledgeOrbits — PKB Explained + What Next
+
 ## Your Complete Understanding Guide
 
 ---
@@ -6,6 +7,7 @@
 ## 🔴 REDFLAG FIX FIRST — Knowledge Base Feature
 
 ### What the error means:
+
 The 15 .md files you generated need to be uploaded into the
 **Project Knowledge Base** inside your Claude Project so that
 every future chat in that project automatically has access to them.
@@ -27,12 +29,14 @@ Without this, every new chat starts blank — no PKB context.
 ```
 
 ### If the "Project knowledge" panel is missing entirely:
+
 - You need a PAID plan (Pro, Max, Team, or Enterprise)
 - Free plans do not get the Knowledge Base upload panel
 - Check: Settings → Plan → upgrade if needed
 - After upgrading, re-open the project → the panel appears
 
 ### Important note:
+
 - Continue this project work IN THE SAME PROJECT
 - Do NOT open a new tab outside the project
 - Context stays only inside the project where files are uploaded
@@ -70,13 +74,15 @@ the single source of truth that governs everything.
 ## 📖 EACH FILE EXPLAINED — PLAIN ENGLISH
 
 ### FILE #1 — PROJECT_VISION.md
+
 **"What are we building and why?"**
 
 This is the north star. One sentence summary:
-  Raw content (PDFs, news) → Chunks → RAG → AI articles + Quizzes
-  → User learns → Progress tracked → Personalized path
+Raw content (PDFs, news) → Chunks → RAG → AI articles + Quizzes
+→ User learns → Progress tracked → Personalized path
 
 It defines:
+
 - Platform name: TheKnowledgeOrbits
 - Target: Indian students preparing for UPSC CSE
 - Scale: 10 million+ users
@@ -86,12 +92,14 @@ It defines:
 ---
 
 ### FILE #2 — TECH_STACK.md
+
 **"What tools are we allowed to use?"**
 
 Every single library, framework, and service used in the project
 is listed here. Nothing outside this list gets added without approval.
 
 Key tools:
+
 - Backend: Django 5 + PostgreSQL 16
 - Frontend: Next.js 16 + TypeScript + Tailwind
 - AI: GROQ (article/quiz generation), sentence-transformers (embeddings)
@@ -101,6 +109,7 @@ Key tools:
 ---
 
 ### FILE #3 — ARCHITECTURE.md
+
 **"What does the system look like structurally?"**
 
 The 33 engines organized in 11 layers (L0 through L10):
@@ -124,9 +133,11 @@ Golden rule: Engines never talk directly. They use APIs or events.
 ---
 
 ### FILE #4 — CODING_STANDARDS.md
+
 **"How do we write code?"**
 
 The style guide. Every line of code must follow these rules:
+
 - Python: snake_case, type hints required, docstrings required
 - Django Models: UUID primary keys ONLY, help_text on every field
 - Database tables named: enginename_modelname (e.g. content_chunk)
@@ -136,12 +147,14 @@ The style guide. Every line of code must follow these rules:
 ---
 
 ### FILE #5 — WORKING_RULES.md
+
 **"The rules that CANNOT be broken."**
 
 This is the highest authority file. If any other file conflicts
 with this one, this one wins.
 
 Critical rules:
+
 - One file at a time. One step at a time.
 - Human approves everything. AI proposes only.
 - Engine boundaries are sacred — no cross-engine database access
@@ -150,6 +163,7 @@ Critical rules:
 ---
 
 ### FILE #6 — DATABASE_SCHEMA.md
+
 **"What tables exist and how do they connect?"**
 
 The complete SQL schema for all engines. Every table, every column,
@@ -157,6 +171,7 @@ every index, every foreign key. This is the source of truth for
 "what data does the system store?"
 
 Key relationships:
+
 - auth_user is the ROOT — everything references it
 - knowledge_topic is the SHARED HUB — articles, quizzes, mastery all point here
 - content_chunk is the FOUNDATION — articles and quizzes are generated FROM chunks
@@ -164,15 +179,17 @@ Key relationships:
 ---
 
 ### FILE #7 — COMPLETE_FOLDER_STRUCTURE.md
+
 **"Where does every file live on disk?"**
 
 The exact directory tree for backend/, frontend/, agentic_dev/, PKB/.
 Every engine has the same internal structure:
-  models.py → serializers.py → views.py → services.py → tests/
+models.py → serializers.py → views.py → services.py → tests/
 
 ---
 
 ### FILE #8 — ENGINE_CATALOG.md
+
 **"What does each engine do? Who can use it?"**
 
 Each of the 33 engines has a one-line responsibility, its allowed
@@ -180,34 +197,36 @@ roles (admin, student, etc.), whether it's sync or async, and
 what the AI agent is allowed to do inside it.
 
 Example: Assessment Engine
-  → Responsibility: Generate quizzes from chunks, evaluate responses
-  → Who generates: admin, content_manager
-  → Who takes quizzes: student, free_user
+→ Responsibility: Generate quizzes from chunks, evaluate responses
+→ Who generates: admin, content_manager
+→ Who takes quizzes: student, free_user
 
 ---
 
 ### FILE #9 — API_REFERENCE.md
+
 **"How does the frontend talk to the backend?"**
 
 Every single endpoint. Method, URL, auth requirement, request body,
 response shape, error codes, side effects.
 
 Example:
-  POST /api/v1/assessment/submit-quiz
-  → Returns score + explanations
-  → Side effect: fires quiz_completed event → User State updates mastery
+POST /api/v1/assessment/submit-quiz
+→ Returns score + explanations
+→ Side effect: fires quiz_completed event → User State updates mastery
 
 ---
 
 ### FILE #10 — DATA_FLOW_PATTERNS.md
+
 **"How does data move between engines?"**
 
 4 canonical flows that everything else follows:
 
-  Flow A: Ingest → Organize → Generate  (Content Pipeline)
-  Flow B: User Action → Event → State   (Tracking Pipeline)
-  Flow C: News → Context Merge          (Current Affairs Pipeline)
-  Flow D: Assessment → Mastery → Insight (Learning Loop)
+Flow A: Ingest → Organize → Generate (Content Pipeline)
+Flow B: User Action → Event → State (Tracking Pipeline)
+Flow C: News → Context Merge (Current Affairs Pipeline)
+Flow D: Assessment → Mastery → Insight (Learning Loop)
 
 Also defines: retry rules, failure handling, idempotency contracts,
 and which operations are safe to call twice without breaking things.
@@ -215,15 +234,16 @@ and which operations are safe to call twice without breaking things.
 ---
 
 ### FILE #11 — EVENT_DRIVEN_ARCHITECTURE.md
+
 **"How do engines communicate asynchronously?"**
 
 Engines don't call each other directly. They emit EVENTS.
 Other engines LISTEN to those events and react.
 
 Example:
-  Assessment Engine finishes grading → emits "quiz_completed"
-  User State Engine hears it → updates mastery score
-  Analytics Engine hears it → updates daily aggregate
+Assessment Engine finishes grading → emits "quiz_completed"
+User State Engine hears it → updates mastery score
+Analytics Engine hears it → updates daily aggregate
 
 Events go through Redis → Celery workers → listeners process independently.
 If a listener fails, it retries 3 times, then goes to a Dead Letter Queue.
@@ -231,9 +251,11 @@ If a listener fails, it retries 3 times, then goes to a Dead Letter Queue.
 ---
 
 ### FILE #12 — EXECUTION_ROADMAP.md
+
 **"What gets built when?"**
 
 The 36-week plan broken into 11 phases. Each phase has:
+
 - Exact deliverables
 - Which tools activate
 - Success criteria (all must pass)
@@ -251,16 +273,18 @@ Phase 5-10            → Monetization → Enterprise (Weeks 13-36)
 ---
 
 ### FILE #13 — TESTING_STRATEGY.md
+
 **"How do we prove the code works?"**
 
 Coverage targets that cannot be skipped:
-  Models: 90% | Services: 85% | Views: 80%
+Models: 90% | Services: 85% | Views: 80%
 
 Every endpoint gets tested for:
-  - No token → 401
-  - Wrong role → 403
-  - Correct role → 200
-  - Expired token → 401
+
+- No token → 401
+- Wrong role → 403
+- Correct role → 200
+- Expired token → 401
 
 Idempotency tests prove that calling an endpoint twice doesn't
 create duplicates. Event emission tests prove events actually fire.
@@ -268,9 +292,11 @@ create duplicates. Event emission tests prove events actually fire.
 ---
 
 ### FILE #14 — MIGRATION_STRATEGY.md
+
 **"How does the database change safely over time?"**
 
 Two concerns:
+
 1. Schema discipline — one migration per logical change, never squash,
    tests must pass before migration runs, rollback-safe always.
 2. Data migration — how user data moves from old LearningHub to new
@@ -282,19 +308,22 @@ in the right sequence. auth_user first. Everything else after.
 ---
 
 ### FILE #15 — AGENTIC_DEVELOPMENT.md
+
 **"How does AI help build this platform?"**
 
 Two tiers:
+
 - Phases 0-6: Human-in-the-loop. Claude proposes one file. You approve.
-- Phase 7+:   Autonomous agent system (LangGraph). 5 agents work together.
-              But EVERY step still pauses for human approval.
+- Phase 7+: Autonomous agent system (LangGraph). 5 agents work together.
+  But EVERY step still pauses for human approval.
 
 5 agents: Planner, Architect, Engine Builder, Test, Review
-3 tools:  Filesystem, Shell (pytest/migrations), Git
+3 tools: Filesystem, Shell (pytest/migrations), Git
 
 Runtime agents (Phase 7+) also exist INSIDE the product:
-  - Content Orchestration Agent → picks chunks for RAG
-  - Learning Path Agent → plans daily study schedules
+
+- Content Orchestration Agent → picks chunks for RAG
+- Learning Path Agent → plans daily study schedules
 
 ---
 
@@ -389,6 +418,6 @@ Answer: **Stay in this Project. New chats within it are fine.**
 - Do NOT leave the Project to work on this — context lives in the Project
 
 The workflow from here:
-  → Say "Done" to this explanation
-  → Say "Start Phase 0 setup"
-  → We build the mono-repo skeleton, one file at a time
+→ Say "Done" to this explanation
+→ Say "Start Phase 0 setup"
+→ We build the mono-repo skeleton, one file at a time

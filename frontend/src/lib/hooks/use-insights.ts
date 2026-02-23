@@ -43,7 +43,10 @@ export function useInsights() {
     onError: (error: AxiosError<ApiError>) => {
       toast({
         title: "Analysis Failed",
-        description: error.response?.data?.message || error.response?.data?.error || "Failed to generate new insights. Please try again later.",
+        description:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Failed to generate new insights. Please try again later.",
         variant: "destructive",
       });
     },

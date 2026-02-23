@@ -1,10 +1,11 @@
 # 🏗️ COMPLETE ENGINE-BASED ED-TECH ARCHITECTURE
+
 ## Knowledge Orbit - Comprehensive Rebuild Blueprint
 
-**Document Version:** 2.0  
-**Date:** January 13, 2026  
-**Purpose:** Complete architectural redesign from scratch using engine-first approach  
-**Target:** 10M+ users, scalable, maintainable, future-proof  
+**Document Version:** 2.0
+**Date:** January 13, 2026
+**Purpose:** Complete architectural redesign from scratch using engine-first approach
+**Target:** 10M+ users, scalable, maintainable, future-proof
 
 ---
 
@@ -30,6 +31,7 @@ This document provides complete architectural specifications for rebuilding Know
 ### Why Rebuild?
 
 **Current System Issues:**
+
 - 38 ingestion services (architectural failure)
 - Organic growth without strategic plan
 - Features tightly coupled
@@ -37,6 +39,7 @@ This document provides complete architectural specifications for rebuilding Know
 - Uncertain if core value works
 
 **Engine-First Benefits:**
+
 - Each engine = one clear responsibility
 - Products are thin layers on engines
 - Easy to add features (compose engines)
@@ -48,35 +51,43 @@ This document provides complete architectural specifications for rebuilding Know
 **33 Engines organized in layers:**
 
 **L0 - Data Ingestion:**
+
 - Content Engine (PDFs, videos, web)
 - Current Affairs Engine (daily news)
 
 **L1 - Organization:**
+
 - Knowledge Engine (syllabus, topics, graph)
 - Search Engine (full-text + semantic)
 
 **L2 - Generation:**
+
 - Article Generation Engine
 - Assessment Engine (quizzes, tests)
 - Video Engine
 
 **L3 - User Tracking:**
+
 - User State Engine (events, progress)
 
 **L4 - Analysis:**
+
 - Analytics Engine (aggregation, insights)
 
 **L5 - Intelligence:**
+
 - Personalization Engine (learning paths)
 - Prediction Engine (score forecasts)
 - AI Tutor Engine (conversational)
 
 **L6 - Engagement:**
+
 - Gamification Engine
 - Collaboration Engine
 - Revision Engine (spaced repetition)
 
 **L7 - Operations:**
+
 - Authentication Engine
 - Authorization Engine
 - Notification Engine
@@ -84,18 +95,21 @@ This document provides complete architectural specifications for rebuilding Know
 - Cache Engine
 
 **L8 - Growth:**
+
 - Commerce Engine (subscriptions)
 - Marketing Engine (referrals, campaigns)
 - Onboarding Engine
 - Retention Engine
 
 **L9 - Advanced:**
+
 - Mock Test Engine
 - NLP Engine (descriptive grading)
 - Computer Vision Engine
 - Voice Engine
 
 **L10 - Enterprise:**
+
 - Marketplace Engine
 - White-label Engine
 - Content Moderation Engine
@@ -104,17 +118,17 @@ This document provides complete architectural specifications for rebuilding Know
 
 ### Timeline
 
-**Phase 0:** Setup (Week 1)  
-**Phase 1:** Core 5 Engines (Weeks 2-4) → MVP  
-**Phase 2:** Article Gen + CA (Weeks 5-7)  
-**Phase 3:** Frontend (Weeks 8-10)  
-**Phase 4:** Launch (Weeks 11-12) → PUBLIC BETA  
-**Phase 5:** Monetization (Weeks 13-15)  
-**Phase 6:** Engagement (Weeks 16-19)  
-**Phase 7:** Intelligence (Weeks 20-24)  
-**Phase 8:** Advanced Content (Weeks 25-28)  
-**Phase 9:** Growth (Weeks 29-32)  
-**Phase 10:** Enterprise (Weeks 33-36)  
+**Phase 0:** Setup (Week 1)
+**Phase 1:** Core 5 Engines (Weeks 2-4) → MVP
+**Phase 2:** Article Gen + CA (Weeks 5-7)
+**Phase 3:** Frontend (Weeks 8-10)
+**Phase 4:** Launch (Weeks 11-12) → PUBLIC BETA
+**Phase 5:** Monetization (Weeks 13-15)
+**Phase 6:** Engagement (Weeks 16-19)
+**Phase 7:** Intelligence (Weeks 20-24)
+**Phase 8:** Advanced Content (Weeks 25-28)
+**Phase 9:** Growth (Weeks 29-32)
+**Phase 10:** Enterprise (Weeks 33-36)
 
 ---
 
@@ -123,26 +137,31 @@ This document provides complete architectural specifications for rebuilding Know
 ### Engine-First Principles
 
 **1. Single Responsibility**
+
 - One engine = one job
 - Clear boundaries
 - No cross-engine database access
 
 **2. Composition Over Inheritance**
+
 - Products compose multiple engines
 - Engines don't inherit from each other
 - Loose coupling
 
 **3. Event-Driven Communication**
+
 - Engines communicate via events
 - Async where possible
 - No direct method calls across engines
 
 **4. Data Ownership**
+
 - Each engine owns its tables
 - No shared tables
 - Well-defined interfaces
 
 **5. Independent Scalability**
+
 - Each engine can scale separately
 - Microservices-ready (but start monolith)
 - Caching per engine
@@ -154,23 +173,23 @@ User reads article:
 
 1. Frontend calls Content Engine
    GET /api/v1/content/articles/:id
-   
+
 2. Content Engine returns article
    (From its own tables: articles, article_chunks)
-   
+
 3. Frontend calls User State Engine
    POST /api/v1/user-state/event
    Body: { event_type: 'article_read', article_id: ... }
-   
+
 4. User State Engine:
    - Stores event
    - Updates progress
    - Fires 'article_completed' event
-   
+
 5. Analytics Engine (listens to events):
    - Receives 'article_completed'
    - Updates aggregates
-   
+
 6. Personalization Engine (listens to events):
    - Receives 'article_completed'
    - Recalculates recommendations
@@ -189,6 +208,7 @@ All async, no blocking, no coupling.
 **Responsibility:** Ingest, process, normalize ALL content
 
 **Components:**
+
 - PDF Processor (native + scanned)
 - OCR Service (Tesseract + PaddleOCR)
 - Web Scraper (RSS, websites)
@@ -198,6 +218,7 @@ All async, no blocking, no coupling.
 - Versioning (edition tracking)
 
 **Tables:**
+
 - chunks
 - documents
 - assets
@@ -205,11 +226,13 @@ All async, no blocking, no coupling.
 - source_versions
 
 **APIs:**
+
 - POST /api/v1/content/upload
 - GET /api/v1/content/chunks
 - GET /api/v1/content/assets
 
 **Key Innovation:**
+
 - Chunks are foundation (not articles)
 - Static + CA chunks same structure
 - Embeddings generated per chunk
@@ -221,12 +244,14 @@ All async, no blocking, no coupling.
 **Responsibility:** Organize content into knowledge structure
 
 **Components:**
+
 - Syllabus Manager (programs, subjects, modules, topics)
 - Content Linking (chunk-topic mapping)
 - Knowledge Graph (concept relationships)
 - Search & Discovery
 
 **Tables:**
+
 - programs (UPSC, State PSC)
 - subjects (Polity, Geography)
 - modules (Fundamental Rights)
@@ -235,6 +260,7 @@ All async, no blocking, no coupling.
 - concept_relationships
 
 **APIs:**
+
 - GET /api/v1/knowledge/subjects
 - GET /api/v1/knowledge/topics
 - POST /api/v1/knowledge/map-chunk
@@ -247,22 +273,26 @@ All async, no blocking, no coupling.
 **Responsibility:** Generate, deliver, evaluate assessments
 
 **Components:**
+
 - Quiz Generator (MCQ from chunks)
 - Test Builder (pattern matching)
 - Evaluator (auto-grading)
 - Question Bank
 
 **Tables:**
+
 - quizzes
 - questions
 - quiz_attempts
 - question_responses
 
 **APIs:**
+
 - POST /api/v1/assessment/generate-quiz
 - POST /api/v1/assessment/submit
 
 **Key Features:**
+
 - Generates from CHUNKS (not articles)
 - Difficulty calibration
 - Explanation generation
@@ -275,12 +305,14 @@ All async, no blocking, no coupling.
 **Responsibility:** Track ALL user interactions
 
 **Components:**
+
 - Event Tracker (all actions)
 - Progress Calculator
 - Mastery Scorer (per-topic)
 - Streak Manager
 
 **Tables:**
+
 - user_events (event sourcing)
 - user_progress (computed)
 - topic_mastery
@@ -288,11 +320,13 @@ All async, no blocking, no coupling.
 - reading_progress
 
 **APIs:**
+
 - GET /api/v1/user-state/progress
 - POST /api/v1/user-state/bookmark
 - POST /api/v1/user-state/event
 
 **Key Innovation:**
+
 - Event-sourced (complete audit trail)
 - Progress is computed, not stored raw
 - Enables time-travel debugging
@@ -304,17 +338,20 @@ All async, no blocking, no coupling.
 **Responsibility:** Aggregate and analyze data
 
 **Components:**
+
 - Data Aggregator (daily rollups)
 - Performance Analyzer
 - Insight Generator
 - Reporting
 
 **Tables:**
+
 - daily_aggregates
 - performance_snapshots
 - insights
 
 **APIs:**
+
 - GET /api/v1/analytics/dashboard
 - GET /api/v1/analytics/performance
 
@@ -327,21 +364,25 @@ All async, no blocking, no coupling.
 **Responsibility:** Create high-quality articles from chunks
 
 **Components:**
+
 - Static Article Generator
 - Current Affairs Integrator
 - Multi-Format Generator (text, infographic, timeline)
 - Quality Control
 
 **Tables:**
+
 - articles
 - article_chunks (source map)
 - generation_logs
 
 **APIs:**
+
 - POST /api/v1/articles/generate
 - GET /api/v1/articles/:id/sources
 
 **Key Features:**
+
 - Combines static + CA chunks
 - GROQ-powered narrative
 - Source attribution (ArticleSourceMap)
@@ -354,22 +395,26 @@ All async, no blocking, no coupling.
 **Responsibility:** Ingest and contextualize daily news
 
 **Components:**
+
 - News Scraper (RSS monitoring)
 - CA Chunker
 - Contextualizer (link to syllabus)
 - Expiry Manager
 
 **Tables:**
+
 - ca_sources (RSS feeds)
 - ca_articles (raw news)
 - ca_chunks (processed)
 - ca_topic_links (static mapping)
 
 **APIs:**
+
 - GET /api/v1/ca/articles
 - POST /api/v1/ca/link-topic
 
 **Key Innovation:**
+
 - CA chunks same structure as static
 - Automatic topic classification
 - Relevance decay over time
@@ -381,27 +426,27 @@ All async, no blocking, no coupling.
 
 #### 8. PERSONALIZATION ENGINE
 
-**Tables:** learning_paths, recommendations, study_schedules  
+**Tables:** learning_paths, recommendations, study_schedules
 **Features:** Learning path generation, adaptive difficulty, study scheduling
 
 #### 9. PREDICTION ENGINE
 
-**Tables:** predictions, risk_scores, goal_tracking  
+**Tables:** predictions, risk_scores, goal_tracking
 **Features:** Score prediction, mastery forecasting, risk detection
 
 #### 10. AI TUTOR ENGINE
 
-**Tables:** tutor_conversations, doubt_history, study_plans  
+**Tables:** tutor_conversations, doubt_history, study_plans
 **Features:** Q&A, concept explanation, study planning
 
 #### 11. MOCK TEST ENGINE
 
-**Tables:** mock_tests, mock_attempts, mock_analysis, rank_predictions  
+**Tables:** mock_tests, mock_attempts, mock_analysis, rank_predictions
 **Features:** Full exam simulation, detailed analysis, rank prediction
 
 #### 12. REVISION ENGINE
 
-**Tables:** flashcards, card_reviews, revision_schedule  
+**Tables:** flashcards, card_reviews, revision_schedule
 **Features:** Spaced repetition (SM-2), flashcard generation
 
 ---
@@ -410,22 +455,22 @@ All async, no blocking, no coupling.
 
 #### 13. VIDEO ENGINE
 
-**Tables:** videos, transcripts, video_chunks  
+**Tables:** videos, transcripts, video_chunks
 **Features:** Video upload/YouTube, transcript generation (Whisper), searchable segments
 
 #### 14. NLP ENGINE
 
-**Tables:** nlp_evaluations, language_profiles, rubrics  
+**Tables:** nlp_evaluations, language_profiles, rubrics
 **Features:** Descriptive answer grading, essay scoring, language proficiency
 
 #### 15. COMPUTER VISION ENGINE
 
-**Tables:** image_analysis, diagram_index, image_tags  
+**Tables:** image_analysis, diagram_index, image_tags
 **Features:** Diagram analysis, handwriting recognition, image search
 
 #### 16. VOICE ENGINE
 
-**Tables:** voice_samples, transcriptions, pronunciation_scores  
+**Tables:** voice_samples, transcriptions, pronunciation_scores
 **Features:** Speech-to-text, text-to-speech, pronunciation checking
 
 ---
@@ -434,12 +479,12 @@ All async, no blocking, no coupling.
 
 #### 17. GAMIFICATION ENGINE
 
-**Tables:** achievements, user_achievements, leaderboards, challenges  
+**Tables:** achievements, user_achievements, leaderboards, challenges
 **Features:** Badges, leaderboards, challenges, rewards
 
 #### 18. COLLABORATION ENGINE
 
-**Tables:** discussion_threads, discussion_posts, study_groups  
+**Tables:** discussion_threads, discussion_posts, study_groups
 **Features:** Forums, study groups, peer review, mentorship
 
 ---
@@ -448,32 +493,32 @@ All async, no blocking, no coupling.
 
 #### 19. SEARCH ENGINE
 
-**Tables:** search_index (Elasticsearch), search_queries  
+**Tables:** search_index (Elasticsearch), search_queries
 **Features:** Full-text, semantic, faceted, auto-complete
 
 #### 20. STORAGE ENGINE
 
-**Tables:** files, file_versions, cdn_mappings  
+**Tables:** files, file_versions, cdn_mappings
 **Features:** Cloudinary integration, CDN, optimization, versioning
 
 #### 21. CACHE ENGINE
 
-**Tables:** cache_keys (Redis), rate_limits  
+**Tables:** cache_keys (Redis), rate_limits
 **Features:** Query cache, session management, rate limiting
 
 #### 22. AUTHENTICATION ENGINE
 
-**Tables:** users, user_credentials, auth_sessions  
+**Tables:** users, user_credentials, auth_sessions
 **Features:** JWT, email/phone verification, password reset
 
 #### 23. AUTHORIZATION ENGINE
 
-**Tables:** roles, permissions, role_assignments  
+**Tables:** roles, permissions, role_assignments
 **Features:** RBAC, feature gating, subscription gating
 
 #### 24. NOTIFICATION ENGINE
 
-**Tables:** notifications, notification_templates, delivery_logs  
+**Tables:** notifications, notification_templates, delivery_logs
 **Features:** Email, push, in-app, SMS
 
 ---
@@ -482,22 +527,22 @@ All async, no blocking, no coupling.
 
 #### 25. COMMERCE ENGINE
 
-**Tables:** plans, subscriptions, payments, invoices  
+**Tables:** plans, subscriptions, payments, invoices
 **Features:** Razorpay integration, subscription management, invoicing
 
 #### 26. MARKETING ENGINE
 
-**Tables:** referral_codes, campaigns, ab_tests  
+**Tables:** referral_codes, campaigns, ab_tests
 **Features:** Referral system, campaigns, A/B testing
 
 #### 27. ONBOARDING ENGINE
 
-**Tables:** onboarding_progress, tutorials, feature_hints  
+**Tables:** onboarding_progress, tutorials, feature_hints
 **Features:** Welcome flow, tutorials, feature discovery
 
 #### 28. RETENTION ENGINE
 
-**Tables:** churn_scores, retention_campaigns, loyalty_tiers  
+**Tables:** churn_scores, retention_campaigns, loyalty_tiers
 **Features:** Churn prediction, win-back campaigns, loyalty program
 
 ---
@@ -506,12 +551,12 @@ All async, no blocking, no coupling.
 
 #### 29. MARKETPLACE ENGINE
 
-**Tables:** marketplace_sellers, marketplace_listings, marketplace_purchases  
+**Tables:** marketplace_sellers, marketplace_listings, marketplace_purchases
 **Features:** Seller portal, content review, revenue sharing
 
 #### 30. WHITE-LABEL ENGINE
 
-**Tables:** tenants, tenant_configs, tenant_branding  
+**Tables:** tenants, tenant_configs, tenant_branding
 **Features:** Multi-tenant, branding customization, feature configurator
 
 ---
@@ -520,17 +565,17 @@ All async, no blocking, no coupling.
 
 #### 31. CONTENT MODERATION ENGINE
 
-**Tables:** moderation_queue, moderation_decisions, quality_scores  
+**Tables:** moderation_queue, moderation_decisions, quality_scores
 **Features:** Automated screening, review queue, plagiarism detection
 
 #### 32. PRIVACY ENGINE
 
-**Tables:** consent_records, data_exports, deletion_requests  
+**Tables:** consent_records, data_exports, deletion_requests
 **Features:** GDPR compliance, data export, right to be forgotten
 
 #### 33. REPORTING ENGINE
 
-**Tables:** report_definitions, report_snapshots, dashboard_widgets  
+**Tables:** report_definitions, report_snapshots, dashboard_widgets
 **Features:** Admin dashboards, financial reports, usage reports
 
 ---
@@ -542,26 +587,31 @@ All async, no blocking, no coupling.
 #### CONTENT FEATURES
 
 **Static Content Ingestion:**
+
 - Engine: Content Engine
 - Features: PDF upload, OCR, chunking, metadata extraction
 - Tables: documents, chunks, assets
 
 **Current Affairs Ingestion:**
+
 - Engine: Current Affairs Engine
 - Features: RSS scraping, CA chunking, topic linking
 - Tables: ca_sources, ca_articles, ca_chunks
 
 **Article Generation (Static):**
+
 - Engine: Article Generation Engine
 - Features: Chunk selection, GROQ generation, source attribution
 - Tables: articles, article_chunks
 
 **Article Generation (Static + CA):**
+
 - Engine: Article Generation Engine + CA Engine
 - Features: Context merging, date-aware relevance
 - Tables: articles, article_chunks, ca_chunks
 
 **Video Content:**
+
 - Engine: Video Engine
 - Features: Upload, transcription, searchable segments
 - Tables: videos, transcripts, video_chunks
@@ -571,37 +621,44 @@ All async, no blocking, no coupling.
 #### LEARNING FEATURES
 
 **Quiz Generation (Chunk-Based):**
+
 - Engine: Assessment Engine
 - Features: MCQ generation from chunks, difficulty calibration
 - Tables: quizzes, questions
 - Note: Generates from CHUNKS not articles
 
 **Quiz Taking:**
+
 - Engine: Assessment Engine + User State Engine
 - Features: Timed interface, auto-grading, progress update
 - Tables: quiz_attempts, question_responses, user_events
 
 **Mock Tests:**
+
 - Engine: Mock Test Engine
 - Features: Pattern matching, full simulation, detailed analysis
 - Tables: mock_tests, mock_attempts, mock_analysis
 
 **Test Series:**
+
 - Engine: Mock Test Engine + Assessment Engine
 - Features: Series of tests, progress tracking, comparison
 - Implementation: Multiple mock tests grouped
 
 **Progress Tracking:**
+
 - Engine: User State Engine
 - Features: Topic completion, mastery calculation, streak tracking
 - Tables: user_progress, topic_mastery
 
 **Personalized Learning Path:**
+
 - Engine: Personalization Engine
 - Features: Weak area prioritization, adaptive difficulty
 - Tables: learning_paths, recommendations
 
 **Spaced Repetition:**
+
 - Engine: Revision Engine
 - Features: Flashcard generation, SM-2 algorithm, due card alerts
 - Tables: flashcards, card_reviews, revision_schedule
@@ -611,21 +668,25 @@ All async, no blocking, no coupling.
 #### SEARCH & DISCOVERY
 
 **Full-Text Search:**
+
 - Engine: Search Engine
 - Features: Keyword search, typo tolerance, filters
 - Implementation: Elasticsearch
 
 **Semantic Search:**
+
 - Engine: Search Engine + Content Engine
 - Features: Vector similarity, embeddings-based
 - Implementation: pgvector
 
 **Topic Navigation:**
+
 - Engine: Knowledge Engine
 - Features: Syllabus tree, topic hierarchy
 - Tables: programs, subjects, modules, topics
 
 **Recommendations:**
+
 - Engine: Personalization Engine
 - Features: Next article, similar content, peer-based
 - Tables: recommendations
@@ -635,30 +696,37 @@ All async, no blocking, no coupling.
 #### ENGAGEMENT FEATURES
 
 **Bookmarks:**
+
 - Engine: User State Engine
 - Tables: bookmarks
 
 **Reading Progress:**
+
 - Engine: User State Engine
 - Tables: reading_progress
 
 **Achievements:**
+
 - Engine: Gamification Engine
 - Tables: achievements, user_achievements
 
 **Leaderboards:**
+
 - Engine: Gamification Engine
 - Tables: leaderboards
 
 **Discussion Forums:**
+
 - Engine: Collaboration Engine
 - Tables: discussion_threads, discussion_posts
 
 **Study Groups:**
+
 - Engine: Collaboration Engine
 - Tables: study_groups, group_members
 
 **AI Doubt Resolution:**
+
 - Engine: AI Tutor Engine
 - Tables: tutor_conversations, doubt_history
 
@@ -667,19 +735,23 @@ All async, no blocking, no coupling.
 #### MONETIZATION FEATURES
 
 **Subscription Plans:**
+
 - Engine: Commerce Engine
 - Tables: plans, subscriptions
 
 **Payment Processing:**
+
 - Engine: Commerce Engine
 - Integration: Razorpay
 - Tables: payments, invoices
 
 **Referral System:**
+
 - Engine: Marketing Engine
 - Tables: referral_codes
 
 **Coupons:**
+
 - Engine: Commerce Engine
 - Tables: coupons
 
@@ -688,22 +760,26 @@ All async, no blocking, no coupling.
 #### FUTURE FEATURES
 
 **Live Classes:**
+
 - Engine: Video Engine (extended)
 - Features: Live streaming, chat, Q&A
 - Implementation: Integrate with Zoom/YouTube Live API
 - Tables: live_sessions, session_participants
 
 **Advanced Analytics:**
+
 - Engine: Analytics Engine + Prediction Engine
 - Features: Performance trends, peer comparison, score prediction
 - Tables: daily_aggregates, predictions
 
 **Marketplace:**
+
 - Engine: Marketplace Engine
 - Features: Third-party content, seller portal, revenue sharing
 - Tables: marketplace_sellers, marketplace_listings
 
 **White-label:**
+
 - Engine: White-label Engine
 - Features: Multi-tenant, custom branding
 - Tables: tenants, tenant_configs
@@ -722,34 +798,34 @@ All async, no blocking, no coupling.
    - Chunk (1200 chars)
    - Generate embeddings
    - Store: documents, chunks, embeddings
-   
+
 2. Admin maps chunks to topics
    ↓
    Knowledge Engine
    - Create chunk-topic links
    - Store: chunk_topic_map
-   
+
 3. System generates article
    ↓
    Article Generation Engine
    - Fetch chunks for topic
    - GROQ generates narrative
    - Store: articles, article_chunks
-   
+
 4. User reads article
    ↓
    User State Engine
    - Track event
    - Update progress
    - Store: user_events, reading_progress
-   
+
 5. User requests quiz
    ↓
    Assessment Engine
    - Fetch chunks for topic
    - Generate MCQs (GROQ)
    - Store: quizzes, questions
-   
+
 6. User takes quiz
    ↓
    Assessment Engine + User State Engine
@@ -769,21 +845,21 @@ All async, no blocking, no coupling.
    - Scrape RSS feeds (The Hindu, Indian Express)
    - Extract articles
    - Store: ca_articles
-   
+
 2. Process CA articles
    ↓
    Current Affairs Engine
    - Chunk CA content
    - Generate embeddings
    - Store: ca_chunks, embeddings
-   
+
 3. Auto-classify CA chunks
    ↓
    Knowledge Engine
    - Semantic similarity to topics
    - Create ca-topic links
    - Store: ca_topic_links
-   
+
 4. Generate integrated article
    ↓
    Article Generation Engine
@@ -792,7 +868,7 @@ All async, no blocking, no coupling.
    - Merge contexts
    - GROQ generates narrative
    - Store: articles (with CA sources marked)
-   
+
 5. User reads integrated article
    ↓
    Sees: Theory from NCERT + Recent examples from news
@@ -808,14 +884,14 @@ All async, no blocking, no coupling.
    User State Engine
    - Stores all events: article_read, quiz_completed
    - Computes topic_mastery scores
-   
+
 2. Daily aggregation (midnight cron)
    ↓
    Analytics Engine
    - Aggregates daily stats
    - Identifies weak/strong topics
    - Store: daily_aggregates, insights
-   
+
 3. User opens app (morning)
    ↓
    Personalization Engine
@@ -826,7 +902,7 @@ All async, no blocking, no coupling.
      * Order by prerequisites
      * Pace by time remaining
    - Store: learning_paths
-   
+
 4. User sees daily plan
    ↓
    Dashboard displays:
@@ -846,13 +922,13 @@ All async, no blocking, no coupling.
    Mock Test Engine
    - Assembles 100 questions (pattern matched)
    - Timed interface (2 hours)
-   
+
 2. User completes test
    ↓
    Assessment Engine
    - Auto-grades all MCQs
    - Calculates section-wise scores
-   
+
 3. Detailed analysis
    ↓
    Mock Test Engine
@@ -860,7 +936,7 @@ All async, no blocking, no coupling.
    - Time per question
    - Comparison with toppers
    - Store: mock_analysis
-   
+
 4. Rank prediction
    ↓
    Prediction Engine
@@ -868,7 +944,7 @@ All async, no blocking, no coupling.
    - ML model predicts rank range
    - Estimates cut-off clearance
    - Store: rank_predictions
-   
+
 5. User sees report
    ↓
    Dashboard displays:
@@ -885,6 +961,7 @@ All async, no blocking, no coupling.
 ### Phase 0: Setup (Week 1)
 
 **Deliverables:**
+
 - Repository structure (mono-repo)
 - Django + DRF skeleton
 - Next.js + TypeScript skeleton
@@ -893,6 +970,7 @@ All async, no blocking, no coupling.
 - CI/CD pipeline (GitHub Actions)
 
 **Success Criteria:**
+
 - ✅ `python manage.py runserver` works
 - ✅ `npm run dev` works
 - ✅ Basic health check API responds
@@ -904,6 +982,7 @@ All async, no blocking, no coupling.
 **Week 2: Content Engine (MVP)**
 
 Deliverables:
+
 - PDF upload
 - Text extraction (pdfplumber)
 - Basic chunking (1200 chars)
@@ -911,6 +990,7 @@ Deliverables:
 - Tables: chunks, documents, ingestion_jobs
 
 APIs:
+
 - POST /api/v1/content/upload
 - GET /api/v1/content/chunks
 
@@ -921,12 +1001,14 @@ Tests: 20+ passing
 **Week 3: Knowledge Engine (MVP)**
 
 Deliverables:
+
 - Subject/Module/Topic CRUD
 - Chunk-topic mapping
 - Basic search (text-based)
 - Tables: programs, subjects, modules, topics, chunk_topic_map
 
 APIs:
+
 - GET /api/v1/knowledge/subjects
 - POST /api/v1/knowledge/map-chunk
 - GET /api/v1/knowledge/search
@@ -938,6 +1020,7 @@ Tests: 15+ passing
 **Week 4: Assessment + User State Engines (MVP)**
 
 Deliverables:
+
 - Quiz generation (simple MCQs)
 - Quiz taking + grading
 - Event tracking
@@ -945,6 +1028,7 @@ Deliverables:
 - Tables: quizzes, questions, quiz_attempts, user_events, user_progress
 
 APIs:
+
 - POST /api/v1/assessment/generate-quiz
 - POST /api/v1/assessment/submit
 - GET /api/v1/user-state/progress
@@ -960,6 +1044,7 @@ Tests: 30+ passing
 **Week 5: Article Generation Engine (Static)**
 
 Deliverables:
+
 - Chunk selection by topic
 - GROQ integration
 - Narrative generation
@@ -968,6 +1053,7 @@ Deliverables:
 **Week 6: Current Affairs Engine**
 
 Deliverables:
+
 - RSS scraping (daily cron)
 - CA chunking
 - Topic classification
@@ -975,6 +1061,7 @@ Deliverables:
 **Week 7: Integrated Article Generation**
 
 Deliverables:
+
 - Static + CA merging
 - Context blending
 - Multi-format output
@@ -984,15 +1071,18 @@ Deliverables:
 ### Phase 3: Frontend (Weeks 8-10)
 
 **Week 8: Core UI**
+
 - Authentication pages
 - Article listing/reading
 - Progress dashboard
 
 **Week 9: Quiz UI**
+
 - Quiz listing/taking
 - Timer, results
 
 **Week 10: Search + Polish**
+
 - Search interface
 - Mobile responsive
 - Error handling
@@ -1002,12 +1092,14 @@ Deliverables:
 ### Phase 4: Launch Preparation (Weeks 11-12)
 
 **Week 11: Content Population**
+
 - Ingest 5 NCERT books
 - Generate 100+ articles
 - Create 50+ quizzes
 - Setup CA scraping
 
 **Week 12: Deploy**
+
 - E2E testing
 - Production deploy (Render + Vercel)
 - Monitoring (Sentry)
@@ -1018,12 +1110,12 @@ Deliverables:
 
 ### Phase 5-10 (Weeks 13-36)
 
-Week 13-15: Monetization (Commerce Engine)  
-Week 16-19: Engagement (Gamification, Revision, Collaboration)  
-Week 20-24: Intelligence (Personalization, Prediction, AI Tutor, Mock Test)  
-Week 25-28: Advanced Content (Video, NLP, CV, Voice)  
-Week 29-32: Growth (Marketing, Onboarding, Retention)  
-Week 33-36: Enterprise (Marketplace, White-label, Compliance)  
+Week 13-15: Monetization (Commerce Engine)
+Week 16-19: Engagement (Gamification, Revision, Collaboration)
+Week 20-24: Intelligence (Personalization, Prediction, AI Tutor, Mock Test)
+Week 25-28: Advanced Content (Video, NLP, CV, Voice)
+Week 29-32: Growth (Marketing, Onboarding, Retention)
+Week 33-36: Enterprise (Marketplace, White-label, Compliance)
 
 ---
 
@@ -1040,18 +1132,18 @@ CREATE TABLE chunks (
     chunk_index INTEGER,
     page_number INTEGER,
     source_type VARCHAR(50), -- 'static' or 'dynamic'
-    
+
     -- Relations
     document_id UUID REFERENCES documents(id),
     chapter_name VARCHAR(200),
-    
+
     -- Quality
     quality_flag VARCHAR(20),
     confidence_score FLOAT,
-    
+
     -- Embeddings
     embedding_id UUID REFERENCES embeddings(id),
-    
+
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -1065,16 +1157,16 @@ CREATE TABLE documents (
     title VARCHAR(500),
     file_path TEXT,
     source_type VARCHAR(50),
-    
+
     -- Versioning
     source_edition VARCHAR(50),
     source_version VARCHAR(20),
     isbn VARCHAR(20),
     publication_year INTEGER,
-    
+
     -- Relations
     subject_id UUID REFERENCES subjects(id),
-    
+
     metadata JSONB,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -1395,6 +1487,7 @@ POST   /api/v1/user-state/event
 ## TECHNOLOGY STACK
 
 ### Backend
+
 - Python 3.11+
 - Django 5.0
 - Django REST Framework 3.15
@@ -1403,12 +1496,14 @@ POST   /api/v1/user-state/event
 - Celery 5.0 (optional async tasks)
 
 ### AI/ML
+
 - GROQ API (article/quiz generation)
 - sentence-transformers (embeddings)
 - Whisper API (transcription)
 - Tesseract/PaddleOCR (OCR)
 
 ### Frontend
+
 - Next.js 16 (App Router)
 - TypeScript
 - shadcn/ui
@@ -1416,6 +1511,7 @@ POST   /api/v1/user-state/event
 - TanStack Query
 
 ### Infrastructure
+
 - Backend: Render
 - Frontend: Vercel
 - Database: Supabase
@@ -1428,25 +1524,30 @@ POST   /api/v1/user-state/event
 ## MIGRATION STRATEGY
 
 ### Phase 1: Data Audit (Week 1)
+
 - Export current users, progress, bookmarks
 - Identify critical vs throwaway data
 
 ### Phase 2: Build New System (Weeks 2-12)
+
 - Clean slate implementation
 - No code reuse from old system
 - Parallel development
 
 ### Phase 3: Data Transformation (Week 13)
+
 - Transform users (preserve accounts)
 - Transform progress (map to new schema)
 - Fresh content ingestion (re-ingest NCERTs)
 
 ### Phase 4: Soft Launch (Week 14-15)
+
 - Beta test with 100 users
 - Collect feedback
 - Fix critical bugs
 
 ### Phase 5: Full Migration (Week 16)
+
 - Freeze old database
 - Run migration scripts
 - Switch DNS
@@ -1459,6 +1560,7 @@ POST   /api/v1/user-state/event
 This document provides complete specifications for rebuilding Knowledge Orbit using engine-first architecture.
 
 **Key Takeaways:**
+
 - 33 engines (clear responsibilities)
 - Every feature mapped to engines
 - 36-week roadmap (MVP in 12 weeks)
@@ -1467,6 +1569,7 @@ This document provides complete specifications for rebuilding Knowledge Orbit us
 - Migration strategy
 
 **Next Steps:**
+
 1. Validate core (article generation test)
 2. If pass → Start Week 1 setup
 3. Follow roadmap phase-by-phase
@@ -1478,9 +1581,9 @@ This document provides complete specifications for rebuilding Knowledge Orbit us
 
 **END OF DOCUMENT**
 
-Total Engines: 33  
-Total Weeks: 36  
-Total Tables: 100+  
-Total APIs: 200+  
+Total Engines: 33
+Total Weeks: 36
+Total Tables: 100+
+Total APIs: 200+
 
 Status: READY FOR IMPLEMENTATION ✅

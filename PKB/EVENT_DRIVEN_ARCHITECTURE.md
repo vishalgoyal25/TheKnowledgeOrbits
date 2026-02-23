@@ -1,5 +1,7 @@
 # EVENT_DRIVEN_ARCHITECTURE.md
+
 ## TheKnowledgeOrbits — Event-Driven Architecture
+
 **PKB File #11 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -8,6 +10,7 @@
 
 Events are the ONLY sanctioned way engines communicate asynchronously.
 This file defines:
+
 - The event bus contract (how events move)
 - Every registered event (name, payload, emitter, listeners)
 - Event lifecycle (emit → deliver → process → ack)
@@ -19,6 +22,7 @@ This file defines:
 ## 2. EVENT BUS CONTRACT
 
 ### Core Rules
+
 ```
 1. Every event has a NAME (snake_case string)
 2. Every event has a PAYLOAD (JSON-serializable dict)
@@ -30,6 +34,7 @@ This file defines:
 ```
 
 ### shared/event_bus.py Interface
+
 ```python
 # Emit — called by the engine that owns the action
 event_bus.emit(
@@ -45,6 +50,7 @@ def handle_quiz_completed(payload: dict) -> None:
 ```
 
 ### Rules
+
 - ❌ No engine calls another engine's listener directly
 - ❌ No engine emits events it does not own
 - ✅ Payload must be JSON-serializable (no model instances, no ORM objects)
@@ -58,6 +64,7 @@ def handle_quiz_completed(payload: dict) -> None:
 ### Phase 1 Events
 
 #### quiz_completed
+
 ```
 Emitter:  Assessment Engine (POST /assessment/submit-quiz)
 Payload:  {
@@ -77,6 +84,7 @@ Listeners:
 ```
 
 #### article_read
+
 ```
 Emitter:  Frontend (POST /user-state/event with event_type="article_read")
 Payload:  {
@@ -92,6 +100,7 @@ Listeners:
 ```
 
 #### content_ingested
+
 ```
 Emitter:  Content Engine (after ingestion_job completes successfully)
 Payload:  {
@@ -106,6 +115,7 @@ Listeners:
 ```
 
 #### bookmark_added
+
 ```
 Emitter:  User State Engine (POST /user-state/bookmark)
 Payload:  {
@@ -123,6 +133,7 @@ Listeners:
 ### Phase 2 Events
 
 #### article_generated
+
 ```
 Emitter:  Article Gen Engine (after async generation completes)
 Payload:  {
@@ -138,6 +149,7 @@ Listeners:
 ```
 
 #### ca_chunks_classified
+
 ```
 Emitter:  Current Affairs Engine (after daily scrape + embed completes)
 Payload:  {
@@ -153,16 +165,16 @@ Listeners:
 
 ### Phase 6+ Events (Reserved)
 
-| Event Name | Emitter | Listeners | Phase |
-|---|---|---|---|
-| streak_broken | User State Engine | Notification, Retention | 6 |
-| flashcard_due | Revision Engine | Notification | 6 |
-| achievement_unlocked | Gamification Engine | Notification, Analytics | 6 |
-| learning_path_updated | Personalization Engine | Notification | 7 |
-| doubt_resolved | AI Tutor Engine | Analytics | 7 |
-| mock_test_completed | Mock Test Engine | Prediction, Analytics | 8 |
-| subscription_activated | Commerce Engine | Onboarding, Analytics | 5 |
-| churn_risk_detected | Retention Engine | Notification | 9 |
+| Event Name             | Emitter                | Listeners               | Phase |
+| ---------------------- | ---------------------- | ----------------------- | ----- |
+| streak_broken          | User State Engine      | Notification, Retention | 6     |
+| flashcard_due          | Revision Engine        | Notification            | 6     |
+| achievement_unlocked   | Gamification Engine    | Notification, Analytics | 6     |
+| learning_path_updated  | Personalization Engine | Notification            | 7     |
+| doubt_resolved         | AI Tutor Engine        | Analytics               | 7     |
+| mock_test_completed    | Mock Test Engine       | Prediction, Analytics   | 8     |
+| subscription_activated | Commerce Engine        | Onboarding, Analytics   | 5     |
+| churn_risk_detected    | Retention Engine       | Notification            | 9     |
 
 ---
 
@@ -185,6 +197,7 @@ Listeners:
 ```
 
 ### Guarantees
+
 - **At-least-once delivery** — event may be processed more than once on retry
 - **Listeners must be idempotent** — duplicate processing must not corrupt state
 - **Order not guaranteed** — listeners cannot assume event arrival order

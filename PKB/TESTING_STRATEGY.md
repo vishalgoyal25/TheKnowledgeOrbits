@@ -1,5 +1,7 @@
 # TESTING_STRATEGY.md
+
 ## TheKnowledgeOrbits — Testing Strategy
+
 **PKB File #13 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -7,6 +9,7 @@
 ## 1. PURPOSE
 
 This file defines:
+
 - How every engine is tested (structure, patterns, tooling)
 - Coverage targets that are non-negotiable
 - What must be tested before an engine is marked stable
@@ -21,13 +24,13 @@ This file defines:
 
 ## 2. TEST TOOLING (Locked per TECH_STACK.md)
 
-| Tool | Phase | Purpose |
-|------|-------|---------|
-| pytest | 0 | Test runner — all phases |
-| factory_boy | 0 | Fixture factories — all phases |
-| faker | 0 | Fake data generation — all phases |
-| Schemathesis | 1 | API property-based testing — Phase 1+ |
-| Locust | 8 | Load/performance testing — Phase 8+ |
+| Tool         | Phase | Purpose                               |
+| ------------ | ----- | ------------------------------------- |
+| pytest       | 0     | Test runner — all phases              |
+| factory_boy  | 0     | Fixture factories — all phases        |
+| faker        | 0     | Fake data generation — all phases     |
+| Schemathesis | 1     | API property-based testing — Phase 1+ |
+| Locust       | 8     | Load/performance testing — Phase 8+   |
 
 ❌ No test tool outside this list without human approval
 ✅ pytest is the ONLY runner. No unittest discovery, no nose
@@ -49,6 +52,7 @@ engines/<engine_name>/tests/
 ```
 
 ### Rules:
+
 - ❌ No test file outside this structure
 - ❌ No test imports models from another engine
 - ❌ No test queries another engine's DB tables directly
@@ -59,27 +63,30 @@ engines/<engine_name>/tests/
 
 ## 4. COVERAGE TARGETS (Non-Negotiable)
 
-| Layer | Target | Measured by |
-|-------|--------|-------------|
-| Models | 90% | All fields, constraints, Meta, __str__, indexes |
-| Services | 85% | All business logic paths, edge cases, error branches |
-| Views | 80% | All endpoints, auth states, RBAC roles, error codes |
+| Layer    | Target | Measured by                                          |
+| -------- | ------ | ---------------------------------------------------- |
+| Models   | 90%    | All fields, constraints, Meta, **str**, indexes      |
+| Services | 85%    | All business logic paths, edge cases, error branches |
+| Views    | 80%    | All endpoints, auth states, RBAC roles, error codes  |
 
 ### What counts toward coverage:
+
 - Models: field validation, ForeignKey cascades, UNIQUE constraints, default values, help_text presence
 - Services: happy path, error path, boundary inputs, side-effect triggers (event emissions)
 - Views: 200/201 success, 400 validation, 401 unauthenticated, 403 wrong role, 404 not found, 409 conflict
 
 ### What does NOT count:
+
 - ❌ Admin panel (Django admin is not tested)
 - ❌ Migration files (migrations are not unit-tested)
-- ❌ __init__.py files
+- ❌ **init**.py files
 
 ---
 
 ## 5. NAMING + AAA PATTERN (Mandatory)
 
 ### Naming Convention
+
 ```
 test_{what}_{condition}_{expected}
 
@@ -91,6 +98,7 @@ Examples:
 ```
 
 ### AAA Pattern (every test)
+
 ```python
 def test_topic_mastery_updates_after_quiz_completion():
     # ARRANGE
@@ -116,6 +124,7 @@ def test_topic_mastery_updates_after_quiz_completion():
 ```
 
 ### Rules:
+
 - ❌ No arrange/act/assert comments required — but structure must follow the pattern
 - ❌ No test longer than 40 lines — extract helpers if needed
 - ✅ Each test asserts exactly ONE thing (single assertion principle)
@@ -128,6 +137,7 @@ def test_topic_mastery_updates_after_quiz_completion():
 Every engine defines its own factories in `engines/<engine_name>/tests/factories.py`.
 
 ### Base Factory Pattern
+
 ```python
 import factory
 import uuid
@@ -146,7 +156,9 @@ class <ModelName>Factory(DjangoModelFactory):
 ```
 
 ### Cross-Engine Factory Rule
+
 When Engine A's test needs a user (owned by Auth Engine):
+
 ```python
 # engines/assessment/tests/factories.py
 
@@ -162,8 +174,9 @@ class QuizAttemptFactory(DjangoModelFactory):
 ```
 
 ### Rules:
+
 - ✅ Factories MAY import other engines' factories (fixture wiring)
-- ❌ Test code (test_*.py) may NEVER import another engine's models or factories directly
+- ❌ Test code (test\_\*.py) may NEVER import another engine's models or factories directly
 - ❌ No hardcoded UUIDs in factories — always `factory.LazyFunction(uuid.uuid4)`
 - ✅ Use `faker` for realistic string data (names, emails, paragraphs)
 
@@ -174,6 +187,7 @@ class QuizAttemptFactory(DjangoModelFactory):
 Engines are isolated. Tests must respect that boundary. When Engine A calls Engine B's API in production, tests mock that call at the HTTP layer.
 
 ### Pattern: Mock External Engine Calls
+
 ```python
 from unittest.mock import patch
 
@@ -194,6 +208,7 @@ def test_article_generation_assembles_chunks_correctly(mock_get_chunks):
 ```
 
 ### Rules:
+
 - ✅ Mock at the HTTP client boundary — not at the DB level
 - ✅ Mock returns must match the actual API response shape (from API_REFERENCE.md)
 - ❌ No test spins up another engine's actual DB or service
@@ -206,6 +221,7 @@ def test_article_generation_assembles_chunks_correctly(mock_get_chunks):
 Every operation marked as idempotent in DATA_FLOW_PATTERNS.md MUST have a dedicated test proving it.
 
 ### Test Pattern: Idempotent Endpoint
+
 ```python
 def test_bookmark_duplicate_call_returns_existing_not_error():
     # ARRANGE
@@ -231,6 +247,7 @@ def test_bookmark_duplicate_call_returns_existing_not_error():
 ```
 
 ### Test Pattern: Idempotent Event Listener
+
 ```python
 def test_quiz_completed_listener_processes_duplicate_event_safely():
     # ARRANGE
@@ -257,15 +274,16 @@ def test_quiz_completed_listener_processes_duplicate_event_safely():
 ```
 
 ### Mandatory idempotency tests for:
-| Endpoint / Listener | Idempotency Key |
-|---|---|
-| POST /content/upload | title + source_edition |
-| POST /knowledge/map-chunk | chunk_id + topic_id |
-| POST /user-state/bookmark | user_id + content_type + content_id |
-| POST /assessment/submit-quiz | attempt_id |
-| POST /ca/link-topic | ca_chunk_id + topic_id |
-| handle_quiz_completed listener | attempt_id |
-| handle_article_read listener | user_id + article_id + read_at |
+
+| Endpoint / Listener            | Idempotency Key                     |
+| ------------------------------ | ----------------------------------- |
+| POST /content/upload           | title + source_edition              |
+| POST /knowledge/map-chunk      | chunk_id + topic_id                 |
+| POST /user-state/bookmark      | user_id + content_type + content_id |
+| POST /assessment/submit-quiz   | attempt_id                          |
+| POST /ca/link-topic            | ca_chunk_id + topic_id              |
+| handle_quiz_completed listener | attempt_id                          |
+| handle_article_read listener   | user_id + article_id + read_at      |
 
 ---
 
@@ -274,6 +292,7 @@ def test_quiz_completed_listener_processes_duplicate_event_safely():
 Every endpoint that emits an event (per EVENT_DRIVEN_ARCHITECTURE.md) must have a test verifying the emission.
 
 ### Pattern
+
 ```python
 from unittest.mock import patch
 
@@ -298,13 +317,14 @@ def test_submit_quiz_fires_quiz_completed_event(mock_emit):
 ```
 
 ### Mandatory event emission tests:
-| Endpoint | Event Emitted |
-|---|---|
-| POST /assessment/submit-quiz | quiz_completed |
-| POST /user-state/bookmark | bookmark_added |
-| Content ingestion job completion | content_ingested |
-| POST /articles/generate (completion) | article_generated |
-| CA daily scrape completion | ca_chunks_classified |
+
+| Endpoint                             | Event Emitted        |
+| ------------------------------------ | -------------------- |
+| POST /assessment/submit-quiz         | quiz_completed       |
+| POST /user-state/bookmark            | bookmark_added       |
+| Content ingestion job completion     | content_ingested     |
+| POST /articles/generate (completion) | article_generated    |
+| CA daily scrape completion           | ca_chunks_classified |
 
 ---
 
@@ -313,6 +333,7 @@ def test_submit_quiz_fires_quiz_completed_event(mock_emit):
 Every view endpoint must be tested across all relevant auth states.
 
 ### Mandatory Auth Test Matrix (per endpoint)
+
 ```
 | State                  | Expected Result |
 |------------------------|-----------------|
@@ -323,6 +344,7 @@ Every view endpoint must be tested across all relevant auth states.
 ```
 
 ### Pattern
+
 ```python
 class TestContentUpload:
     """Tests for POST /api/v1/content/upload."""
@@ -350,16 +372,16 @@ class TestContentUpload:
 
 These counts are go/no-go gates per EXECUTION_ROADMAP.md.
 
-| Phase | Engine(s) | Minimum Tests | Breakdown |
-|---|---|---|---|
-| 0 | Setup | 1 | Health check endpoint |
-| 1 (Week 2) | Content + Auth | 35+ | Content: 20+, Auth: 15+ |
-| 1 (Week 3) | Knowledge | 15+ | CRUD + mapping + search |
-| 1 (Week 4) | Assessment + User State + Analytics | 30+ | Combined across all three |
-| 1 (Total) | All Phase 1 | 65+ | Gate before Phase 2 |
-| 2 | Article Gen + Current Affairs | 25+ | RAG flow + CA pipeline + events |
-| 3 | Frontend | N/A | Covered by E2E (Phase 4) |
-| 4 | E2E | 10+ | Full user journey tests |
+| Phase      | Engine(s)                           | Minimum Tests | Breakdown                       |
+| ---------- | ----------------------------------- | ------------- | ------------------------------- |
+| 0          | Setup                               | 1             | Health check endpoint           |
+| 1 (Week 2) | Content + Auth                      | 35+           | Content: 20+, Auth: 15+         |
+| 1 (Week 3) | Knowledge                           | 15+           | CRUD + mapping + search         |
+| 1 (Week 4) | Assessment + User State + Analytics | 30+           | Combined across all three       |
+| 1 (Total)  | All Phase 1                         | 65+           | Gate before Phase 2             |
+| 2          | Article Gen + Current Affairs       | 25+           | RAG flow + CA pipeline + events |
+| 3          | Frontend                            | N/A           | Covered by E2E (Phase 4)        |
+| 4          | E2E                                 | 10+           | Full user journey tests         |
 
 ---
 
@@ -388,6 +410,7 @@ Tier 4: E2E Tests (Phase 4+)
 ```
 
 ### Rules:
+
 - Tier 1 runs on every commit (CI)
 - Tier 2 runs on every PR
 - Tier 3 runs on every PR (Phase 2+)
@@ -435,6 +458,7 @@ def student_token(student_user):
 ```
 
 ### Rules:
+
 - ✅ Only auth-related fixtures in global conftest (every engine needs users)
 - ❌ No engine-specific fixtures in global conftest
 - ✅ Each engine can have its own `tests/conftest.py` for engine-local fixtures

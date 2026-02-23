@@ -1,8 +1,8 @@
 # CONTENT ENGINE - IMPLEMENTATION GUIDE
 
-**Complements:** ENGINE_BASED_EDTECH_COMPLETE_ARCHITECTURE.md  
-**Purpose:** Detailed chunking & ingestion implementation  
-**Principle:** Text-only, simple, scalable  
+**Complements:** ENGINE_BASED_EDTECH_COMPLETE_ARCHITECTURE.md
+**Purpose:** Detailed chunking & ingestion implementation
+**Principle:** Text-only, simple, scalable
 
 ---
 
@@ -17,6 +17,7 @@ Reason: Previous 38-service approach over-engineered. Text chunking alone genera
 ## CHUNKING STRATEGY
 
 ### Fixed Parameters
+
 ```python
 CHUNK_SIZE = 1200  # characters
 CHUNK_OVERLAP = 200  # characters for context continuity
@@ -24,6 +25,7 @@ MIN_CHUNK_SIZE = 300  # discard smaller chunks
 ```
 
 ### Algorithm
+
 ```
 1. Extract full text from PDF (native or OCR)
 2. Split by chunk size with overlap
@@ -38,6 +40,7 @@ MIN_CHUNK_SIZE = 300  # discard smaller chunks
 ```
 
 ### Chapter Detection (Simple)
+
 ```python
 # Heuristic: First 100 chars of page, look for "Chapter N" pattern
 import re
@@ -55,11 +58,13 @@ def detect_chapter(text: str) -> str:
 ## STATIC CONTENT INGESTION (NCERT/Books)
 
 ### Input
+
 - PDF file path
 - Subject name
 - Source edition/version
 
 ### Process
+
 ```
 1. Check if native or scanned PDF
    - Native: Use pdfplumber.extract_text()
@@ -83,19 +88,22 @@ def detect_chapter(text: str) -> str:
 ```
 
 ### What NOT to Do
-❌ Don't extract tables/diagrams (over-engineering)  
-❌ Don't create 38 services (single ingestion service)  
-❌ Don't try perfect layout detection (simple text extraction)  
-❌ Don't process images (text-only for MVP)  
+
+❌ Don't extract tables/diagrams (over-engineering)
+❌ Don't create 38 services (single ingestion service)
+❌ Don't try perfect layout detection (simple text extraction)
+❌ Don't process images (text-only for MVP)
 
 ---
 
 ## CURRENT AFFAIRS INGESTION
 
 ### Input
+
 - RSS feed URLs (The Hindu, Indian Express)
 
 ### Process
+
 ```
 1. Daily cron (6 AM): Fetch RSS feeds
 
@@ -120,16 +128,18 @@ def detect_chapter(text: str) -> str:
 ```
 
 ### What NOT to Do
-❌ Don't do NER/entity extraction (over-engineering)  
-❌ Don't scrape images from news (text-only)  
-❌ Don't classify sentiment (unnecessary)  
-❌ Don't process videos (text-only)  
+
+❌ Don't do NER/entity extraction (over-engineering)
+❌ Don't scrape images from news (text-only)
+❌ Don't classify sentiment (unnecessary)
+❌ Don't process videos (text-only)
 
 ---
 
 ## EMBEDDING GENERATION
 
 ### Model
+
 ```python
 from sentence_transformers import SentenceTransformer
 
@@ -139,15 +149,16 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 ```
 
 ### Batch Processing
+
 ```python
 # Generate embeddings in batches (100 chunks at a time)
 def generate_embeddings(chunks: List[Chunk]):
     texts = [chunk.chunk_text for chunk in chunks]
-    
+
     for i in range(0, len(texts), 100):
         batch = texts[i:i+100]
         vectors = model.encode(batch)
-        
+
         for j, vector in enumerate(vectors):
             Embedding.objects.create(
                 content_type='chunk',
@@ -162,6 +173,7 @@ def generate_embeddings(chunks: List[Chunk]):
 ## DATABASE TABLES
 
 ### chunks
+
 ```sql
 CREATE TABLE chunks (
     id UUID PRIMARY KEY,
@@ -169,14 +181,14 @@ CREATE TABLE chunks (
     chunk_index INTEGER,
     page_number INTEGER,
     source_type VARCHAR(50), -- 'static' or 'dynamic'
-    
+
     document_id UUID REFERENCES documents(id),
     chapter_name VARCHAR(200),
     book_name VARCHAR(200),
-    
+
     quality_flag VARCHAR(20),
     confidence_score FLOAT,
-    
+
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -186,6 +198,7 @@ CREATE INDEX idx_chunks_chapter ON chunks(chapter_name);
 ```
 
 ### embeddings
+
 ```sql
 CREATE TABLE embeddings (
     id UUID PRIMARY KEY,
@@ -196,22 +209,23 @@ CREATE TABLE embeddings (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_embeddings_vector ON embeddings 
+CREATE INDEX idx_embeddings_vector ON embeddings
 USING ivfflat (vector vector_cosine_ops);
 ```
 
 ### ca_chunks (same structure as chunks)
+
 ```sql
 CREATE TABLE ca_chunks (
     id UUID PRIMARY KEY,
     chunk_text TEXT NOT NULL,
     chunk_index INTEGER,
     source_type VARCHAR(50) DEFAULT 'dynamic',
-    
+
     ca_article_id UUID REFERENCES ca_articles(id),
     published_at TIMESTAMP,
     expiry_date TIMESTAMP,
-    
+
     created_at TIMESTAMP DEFAULT NOW()
 );
 ```
@@ -221,9 +235,11 @@ CREATE TABLE ca_chunks (
 ## VERSIONING (CRITICAL)
 
 ### Why Important
+
 NCERT updates editions every 2-3 years. Need to ingest multiple editions side-by-side.
 
 ### Implementation
+
 ```python
 # documents table
 source_edition = models.CharField(max_length=50)  # 'NCERT 2024'
@@ -233,6 +249,7 @@ publication_year = models.IntegerField()
 ```
 
 ### Usage
+
 ```bash
 python manage.py ingest_pdf \
     --file="ncert_polity_2024.pdf" \
@@ -246,6 +263,7 @@ python manage.py ingest_pdf \
 ## LESSONS FROM PREVIOUS FAILURE
 
 ### What Went Wrong
+
 1. ❌ 38 services for single engine (over-engineering)
 2. ❌ Asset extraction with 90 false positives (wasted effort)
 3. ❌ Complex OCR pipeline with multiple detection layers (slow, buggy)
@@ -253,6 +271,7 @@ python manage.py ingest_pdf \
 5. ❌ Migration conflicts from constant model changes (DB hell)
 
 ### What to Do Instead
+
 1. ✅ Single ingestion service (simple pipeline)
 2. ✅ Text-only extraction (no assets)
 3. ✅ Simple OCR: Tesseract for scanned pages only
@@ -264,6 +283,7 @@ python manage.py ingest_pdf \
 ## IMPLEMENTATION CHECKLIST
 
 **Phase 1 (Week 2):**
+
 - [ ] PDF text extraction (native + OCR)
 - [ ] Chunking service (1200 chars)
 - [ ] Chapter detection (simple regex)
@@ -271,12 +291,14 @@ python manage.py ingest_pdf \
 - [ ] Generate embeddings (batch)
 
 **Phase 2 (Week 6):**
+
 - [ ] RSS scraping (2 feeds)
 - [ ] CA chunking (same logic)
 - [ ] Auto-topic linking (vector similarity)
 - [ ] Expiry management
 
 **Quality Checks:**
+
 - [ ] Test: 12-page PDF → 200+ chunks
 - [ ] Verify: All chunks have embeddings
 - [ ] Validate: chapter_detected = true for most chunks

@@ -11,18 +11,18 @@
 import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
-    dsn: process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN,
+  dsn: process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-    // ── Environment ───────────────────────────────────────────────────────────
-    environment: process.env.NODE_ENV,
+  // ── Environment ───────────────────────────────────────────────────────────
+  environment: process.env.NODE_ENV,
 
-    // ── Performance Monitoring ────────────────────────────────────────────────
-    /**
-     * 10 % sampling in production keeps costs low while preserving signal.
-     * 100 % in dev / staging so nothing is missed during testing.
-     */
-    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+  // ── Performance Monitoring ────────────────────────────────────────────────
+  /**
+   * 10 % sampling in production keeps costs low while preserving signal.
+   * 100 % in dev / staging so nothing is missed during testing.
+   */
+  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 
-    // ── Debug ─────────────────────────────────────────────────────────────────
-    debug: false,
+  // ── Debug ─────────────────────────────────────────────────────────────────
+  debug: false,
 });

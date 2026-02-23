@@ -145,7 +145,8 @@ function GeneratePageContent() {
                       <p className="font-medium">Generation failed</p>
                       <p className="text-red-600 mt-0.5">
                         {(() => {
-                          const axiosError = generateMutation.error as AxiosError<ApiError>;
+                          const axiosError =
+                            generateMutation.error as AxiosError<ApiError>;
                           return (
                             axiosError.response?.data?.error ||
                             axiosError.response?.data?.message ||

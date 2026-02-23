@@ -26,22 +26,37 @@ export default function ArticleContent({ content }: ArticleContentProps) {
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ ...props }) => (
-            <h1 className="text-3xl font-bold mt-8 mb-4 text-slate-900" {...props} />
+            <h1
+              className="text-3xl font-bold mt-8 mb-4 text-slate-900"
+              {...props}
+            />
           ),
           h2: ({ ...props }) => (
-            <h2 className="text-2xl font-bold mt-6 mb-3 text-slate-800" {...props} />
+            <h2
+              className="text-2xl font-bold mt-6 mb-3 text-slate-800"
+              {...props}
+            />
           ),
           h3: ({ ...props }) => (
-            <h3 className="text-xl font-bold mt-4 mb-2 text-slate-800" {...props} />
+            <h3
+              className="text-xl font-bold mt-4 mb-2 text-slate-800"
+              {...props}
+            />
           ),
           p: ({ ...props }) => (
             <p className="mb-4 leading-relaxed text-slate-700" {...props} />
           ),
           ul: ({ ...props }) => (
-            <ul className="list-disc pl-6 mb-4 space-y-2 text-slate-700" {...props} />
+            <ul
+              className="list-disc pl-6 mb-4 space-y-2 text-slate-700"
+              {...props}
+            />
           ),
           ol: ({ ...props }) => (
-            <ol className="list-decimal pl-6 mb-4 space-y-2 text-slate-700" {...props} />
+            <ol
+              className="list-decimal pl-6 mb-4 space-y-2 text-slate-700"
+              {...props}
+            />
           ),
           blockquote: ({ ...props }) => (
             <blockquote
@@ -49,7 +64,10 @@ export default function ArticleContent({ content }: ArticleContentProps) {
               {...props}
             />
           ),
-          code: ({ inline, ...props }: { inline?: boolean } & React.HTMLAttributes<HTMLElement>) =>
+          code: ({
+            inline,
+            ...props
+          }: { inline?: boolean } & React.HTMLAttributes<HTMLElement>) =>
             inline ? (
               <code
                 className="bg-slate-100 px-1 py-0.5 rounded text-sm font-mono text-blue-600"

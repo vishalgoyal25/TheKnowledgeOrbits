@@ -1,8 +1,4 @@
-"""
-User State Engine - View Tests
-
-Tests for all 8 API endpoints.
-"""
+"""User State Engine View Tests."""
 
 import pytest
 import uuid
@@ -14,7 +10,7 @@ from engines.userstate.models import UserEvent, Bookmark
 
 @pytest.fixture
 def api_client():
-    """API client fixture."""
+    """Return API client fixture."""
     return APIClient()
 
 
@@ -29,7 +25,7 @@ def user():
 
 @pytest.fixture
 def authenticated_client(api_client, user):
-    """Authenticated API client."""
+    """Return an authenticated API client."""
     api_client.force_authenticate(user=user)
     return api_client, user
 

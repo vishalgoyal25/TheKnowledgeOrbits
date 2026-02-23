@@ -52,7 +52,9 @@ export default function SearchResults({
         <div
           key={result.id}
           onClick={() => onResultClick?.(result)}
-          className={`p-4 hover:bg-gray-50 transition-colors ${onResultClick ? "cursor-pointer" : ""}`}
+          className={`p-4 hover:bg-gray-50 transition-colors ${
+            onResultClick ? "cursor-pointer" : ""
+          }`}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">

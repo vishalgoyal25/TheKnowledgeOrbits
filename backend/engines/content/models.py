@@ -394,6 +394,7 @@ class IngestionJob(models.Model):
         verbose_name_plural = "Ingestion Jobs"
 
     def __str__(self) -> str:
+        """Return a string representation of the job."""
         doc_name = self.document.title if self.document else "Unknown Document"
         return f"{self.status.upper()}: {doc_name}"
 

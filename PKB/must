@@ -24,15 +24,15 @@
 
 The workflow — step by step:
 Stage A: Build the Rulebook (PKB) — 15 files, one at a time
-We create each .md file here. You copy it into your PKB/ folder. No code runs yet. 
-This is pure planning and documentation. 
+We create each .md file here. You copy it into your PKB/ folder. No code runs yet.
+This is pure planning and documentation.
 Order matters — we start with vision, then architecture, then standards, then engine-specific rules, then agentic rules last.
 
 <!-- ================================================== -->
 
 
 Stage B: Setup (Phase 0) — Environment ready
-You set up the project folder, install Django, Next.js, PostgreSQL, Docker. 
+You set up the project folder, install Django, Next.js, PostgreSQL, Docker.
 
 I guide you command by command in PowerShell. One step at a time.
 

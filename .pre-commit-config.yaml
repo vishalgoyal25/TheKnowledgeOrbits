@@ -1,0 +1,49 @@
+# Pre-commit configuration for TheKnowledgeOrbits
+# Focus: Automated formatting and basic quality checks (Frustration-Free)
+
+repos:
+  # 1. General File Sanity
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  # 2. Backend (Python) formatting with Black
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        args: [--line-length=88]
+
+  # 3. Backend (Python) linting with Flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ["--config=backend/.flake8"]
+
+  # 4. Frontend (TypeScript/React/CSS) formatting with Prettier
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, css, scss, markdown, json]
+        # Skip node_modules and build artifacts
+        exclude: |
+          (?x)^(
+            frontend/\.next/|
+            frontend/node_modules/|
+            backend/staticfiles/|
+            backend/media/
+          )
+
+  # 5. Conventional Commits (Commitlint)
+  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+    rev: v9.16.0
+    hooks:
+      - id: commitlint
+        stages: [commit-msg]
+        additional_dependencies: ["@commitlint/config-conventional"]

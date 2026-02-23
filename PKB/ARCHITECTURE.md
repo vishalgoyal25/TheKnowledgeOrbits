@@ -1,5 +1,7 @@
 # ARCHITECTURE.md
+
 ## TheKnowledgeOrbits — System Architecture
+
 **PKB File #3 | Version: 1.0 | Date: Feb 2026**
 
 ---
@@ -57,6 +59,7 @@ L10 Enterprise          → Marketplace, White-label, Moderation, Privacy, Repor
 ## 4. AUTHENTICATION & AUTHORIZATION ARCHITECTURE
 
 ### JWT Flow:
+
 ```
 Client → POST /auth/login (email + password)
       ↓
@@ -74,6 +77,7 @@ RBAC middleware checks role against endpoint permission
 ```
 
 ### RBAC Model:
+
 ```
 User → assigned Role(s) → Role contains Permission(s)
 Permission = (resource, action)
@@ -83,6 +87,7 @@ Roles: admin, content_manager, student, free_user
 ```
 
 ### Trust Boundaries:
+
 - Each engine trusts JWT claims only
 - No engine accesses another engine's DB directly
 - Cross-engine calls via internal APIs or events only
@@ -93,6 +98,7 @@ Roles: admin, content_manager, student, free_user
 ## 5. OBSERVABILITY ARCHITECTURE
 
 ### Log Flow:
+
 ```
 Application Code
       ↓ structlog (prod) / rich (dev)
@@ -102,6 +108,7 @@ Grafana Dashboard
 ```
 
 ### Error Flow:
+
 ```
 Unhandled Exception
       ↓
@@ -111,6 +118,7 @@ Sentry Dashboard → alerts
 ```
 
 ### Trace Flow (Phase 8+):
+
 ```
 Request arrives → trace_id assigned
       ↓
@@ -126,11 +134,13 @@ OpenTelemetry → Grafana (full request trace)
 ## 6. ASYNC FAILURE MODEL
 
 ### Retry Rules:
+
 - Transient failures (network, external API) → retry with exponential backoff (max 3 attempts)
 - Fatal failures (validation, auth) → fail immediately, no retry
 - Celery task failures → bounded retry → DLQ after max retries
 
 ### Backoff Strategy:
+
 ```
 Attempt 1: immediate
 Attempt 2: wait 1s
@@ -139,6 +149,7 @@ After 3 failures: move to Dead Letter Queue → notify admin
 ```
 
 ### Hard-fail vs Soft-fail:
+
 ```
 Hard-fail (stop immediately):
   - Auth failures (401/403)

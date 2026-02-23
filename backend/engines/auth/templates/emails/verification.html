@@ -17,13 +17,13 @@
     <div class="content">
         <h2>Hello {{ user.full_name|default:user.email }},</h2>
         <p>Thank you for registering. Please verify your email address.</p>
-        
+
         <p style="text-align: center;">
             <a href="{{ verification_url }}" class="button">Verify Email</a>
         </p>
-        
+
         <p>Or copy this link: <br><span style="word-break: break-all; color: #667eea;">{{ verification_url }}</span></p>
-        
+
         <p><strong>Link expires in 24 hours.</strong></p>
     </div>
     <div class="footer">

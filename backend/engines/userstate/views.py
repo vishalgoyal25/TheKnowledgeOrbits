@@ -1,19 +1,6 @@
+"""User State Engine Views."""
+
 import sentry_sdk
-
-"""
-User State Engine Views
-
-8 Endpoints:
-1. GET /progress/
-2. GET /mastery/
-3. GET /events/
-4. GET /bookmarks/
-5. POST /bookmarks/
-6. DELETE /bookmarks/{id}/
-7. GET /reading-progress/{article_id}/
-8. PUT /reading-progress/{article_id}/
-"""
-
 import structlog
 from typing import cast
 from rest_framework import status
