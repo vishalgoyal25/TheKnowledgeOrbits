@@ -73,8 +73,11 @@ next-env.d.ts
 htmlcov/
 .pytest_cache/
 .tox/
+.hypothesis/
 
 # --- Project Specific (Ignored) ---
 # Add large datasets or temporary files here
 docs/
 new_docs/
+.ipynb_checkpoints/
+*.db
