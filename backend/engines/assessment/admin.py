@@ -131,10 +131,12 @@ class QuizAttemptAdmin(admin.ModelAdmin):  # type: ignore
             color = (
                 "green" if obj.score >= 70 else "orange" if obj.score >= 50 else "red"
             )
+            # Pre-format to 1 decimal place to avoid format_html/SafeString issues
+            score_formatted = f"{obj.score:.1f}%"
             return format_html(
-                '<span style="color: {}; font-weight: bold;">{:.1f}%</span>',
+                '<span style="color: {}; font-weight: bold;">{}</span>',
                 color,
-                obj.score,
+                score_formatted,
             )
         return "-"
 
