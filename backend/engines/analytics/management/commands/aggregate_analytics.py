@@ -8,11 +8,11 @@ Usage:
     python manage.py aggregate_analytics --date 2026-02-14
 """
 
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from datetime import datetime, timedelta
 
 from engines.analytics.services.analytics_service import get_analytics_service
 

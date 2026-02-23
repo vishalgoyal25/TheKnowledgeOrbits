@@ -5,9 +5,11 @@ Article Generation Engine Serializers
 from typing import Any
 
 from rest_framework import serializers
-from .models import Article, ArticleSourceMap, ArticleGenerationJob
-from engines.knowledge.serializers import TopicSerializer
+
 from engines.content.serializers import ChunkSerializer
+from engines.knowledge.serializers import TopicSerializer
+
+from .models import Article, ArticleGenerationJob, ArticleSourceMap
 
 
 class ArticleSourceMapSerializer(serializers.ModelSerializer):  # type: ignore

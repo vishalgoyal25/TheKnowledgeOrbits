@@ -8,8 +8,9 @@ Usage:
 from typing import Any
 
 from django.core.management.base import BaseCommand
-from engines.current_affairs.services.rss_scraper import RSSScraperService
+
 from engines.current_affairs.services.ca_processor import CAProcessorService
+from engines.current_affairs.services.rss_scraper import RSSScraperService
 from engines.current_affairs.services.topic_linker import TopicLinkerService
 
 

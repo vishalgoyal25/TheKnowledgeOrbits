@@ -3,6 +3,7 @@ Analytics Engine URLs
 """
 
 from django.urls import path
+
 from engines.analytics import views
 
 app_name = "analytics"

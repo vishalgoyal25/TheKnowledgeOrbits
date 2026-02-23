@@ -4,14 +4,17 @@ Assessment Engine - View Tests
 Tests for quiz generation and attempt endpoints.
 """
 
-import pytest
 import uuid
-from unittest.mock import patch, MagicMock
-from rest_framework.test import APIClient
+from unittest.mock import MagicMock, patch
+
 from rest_framework import status
-from engines.assessment.models import Quiz, Question, QuizAttempt
+from rest_framework.test import APIClient
+
+import pytest
+
+from engines.assessment.models import Question, Quiz, QuizAttempt
 from engines.auth.models import User
-from engines.knowledge.models import Program, Subject, Module, Topic
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 
 @pytest.fixture

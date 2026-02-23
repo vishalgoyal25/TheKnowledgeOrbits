@@ -47,7 +47,7 @@ export const userStateAPI = {
   },
 
   // Get syllabus coverage details
-  getSyllabusCoverage: async (): Promise<any> => {
+  getSyllabusCoverage: async (): Promise<Record<string, unknown>> => {
     const response = await apiClient.get("/users/me/syllabus-coverage/");
     return response.data;
   },

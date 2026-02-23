@@ -5,19 +5,19 @@ Tests for Document, Chunk, Embedding, Asset, and IngestionJob models.
 Target: 90% model coverage.
 """
 
-import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
-from engines.content.models import Document, Chunk, Asset, IngestionJob
+import pytest
+
+from engines.content.models import Asset, Chunk, Document, IngestionJob
 from engines.content.tests.factories import (
-    DocumentFactory,
-    ChunkFactory,
-    EmbeddingFactory,
     AssetFactory,
+    ChunkFactory,
+    DocumentFactory,
+    EmbeddingFactory,
     IngestionJobFactory,
 )
-
 
 # ============================================================================
 # DOCUMENT MODEL TESTS

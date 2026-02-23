@@ -1,7 +1,8 @@
 """Content Engine Serializers."""
 
 from rest_framework import serializers
-from engines.content.models import Document, Chunk, Embedding, Asset, IngestionJob
+
+from engines.content.models import Asset, Chunk, Document, Embedding, IngestionJob
 
 
 class DocumentSerializer(serializers.ModelSerializer):  # type: ignore

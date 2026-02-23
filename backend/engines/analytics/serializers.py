@@ -3,6 +3,7 @@ Analytics Engine Serializers
 """
 
 from rest_framework import serializers
+
 from engines.analytics.models import DailyAggregate, Insight
 
 

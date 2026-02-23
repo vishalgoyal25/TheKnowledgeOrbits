@@ -4,12 +4,13 @@ Content Engine Test Factories
 Using factory_boy to create test fixtures for all Content Engine models.
 """
 
-import factory
 import uuid
+
+import factory
 from factory.django import DjangoModelFactory
 from faker import Faker
 
-from engines.content.models import Document, Chunk, Embedding, Asset, IngestionJob
+from engines.content.models import Asset, Chunk, Document, Embedding, IngestionJob
 
 fake = Faker()
 

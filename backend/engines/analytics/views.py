@@ -9,20 +9,23 @@ Dashboard API Endpoints:
 5. POST /generate-insights/
 """
 
-import structlog
 from typing import cast
+
+from django.core.cache import cache
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.request import Request
-from django.core.cache import cache
-from engines.auth.models import User
+from rest_framework.response import Response
 
-from engines.analytics.services.dashboard_service import get_dashboard_service
-from engines.analytics.services.analytics_service import get_analytics_service
-from engines.analytics.services.insights_service import get_insights_service
+import structlog
+
 from engines.analytics.serializers import InsightSerializer
+from engines.analytics.services.analytics_service import get_analytics_service
+from engines.analytics.services.dashboard_service import get_dashboard_service
+from engines.analytics.services.insights_service import get_insights_service
+from engines.auth.models import User
 
 logger = structlog.get_logger(__name__)
 

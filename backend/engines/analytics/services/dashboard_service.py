@@ -4,12 +4,14 @@ Dashboard Service
 Assembles complete dashboard data from multiple sources.
 """
 
+from typing import TYPE_CHECKING, Any, Dict
+
 import structlog
-from typing import TYPE_CHECKING, Dict, Any
-from engines.userstate.services.progress_service import get_progress_service
-from engines.userstate.models import TopicMastery, UserEvent
+
 from engines.analytics.services.analytics_service import get_analytics_service
 from engines.analytics.services.insights_service import get_insights_service
+from engines.userstate.models import TopicMastery, UserEvent
+from engines.userstate.services.progress_service import get_progress_service
 
 if TYPE_CHECKING:
     from engines.auth.models import User

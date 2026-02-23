@@ -8,7 +8,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 
-from engines.auth.models import User, Role, RoleAssignment
+from engines.auth.models import Role, RoleAssignment, User
 
 
 @admin.register(User)

@@ -4,10 +4,13 @@ Analytics Engine - Model Tests
 Tests for DailyAggregate and Insight models.
 """
 
-import pytest
 import uuid
 from datetime import date, timedelta
+
 from django.utils import timezone
+
+import pytest
+
 from engines.analytics.models import DailyAggregate, Insight
 from engines.auth.models import User
 

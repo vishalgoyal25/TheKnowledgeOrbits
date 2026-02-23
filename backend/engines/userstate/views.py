@@ -1,24 +1,26 @@
 """User State Engine Views."""
 
-import sentry_sdk
-import structlog
 from typing import cast
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.request import Request
-from engines.auth.models import User
+from rest_framework.response import Response
 
+import sentry_sdk
+import structlog
+
+from engines.auth.models import User
 from engines.userstate.models import ReadingProgress, UserEvent, UserProgress
 from engines.userstate.serializers import (
-    UserProgressSerializer,
-    TopicMasterySerializer,
-    UserEventSerializer,
-    BookmarkSerializer,
     BookmarkCreateSerializer,
+    BookmarkSerializer,
     ReadingProgressSerializer,
     ReadingProgressUpdateSerializer,
+    TopicMasterySerializer,
+    UserEventSerializer,
+    UserProgressSerializer,
 )
 from engines.userstate.services.bookmark_service import get_bookmark_service
 from engines.userstate.services.progress_service import get_progress_service

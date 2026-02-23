@@ -4,10 +4,13 @@ Auth Engine - View Tests
 Tests for all 9 API endpoints.
 """
 
-import pytest
 from django.utils import timezone
-from rest_framework.test import APIClient
+
 from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.auth.models import User
 
 

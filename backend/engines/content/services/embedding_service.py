@@ -5,7 +5,8 @@ Generates 384-dimensional embeddings using sentence-transformers.
 Used for semantic search and RAG retrieval.
 """
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import structlog
 
 logger = structlog.get_logger(__name__)

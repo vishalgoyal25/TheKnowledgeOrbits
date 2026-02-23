@@ -4,14 +4,17 @@ Article Generation Engine - View Tests
 Tests for article viewset endpoints.
 """
 
-import pytest
 import uuid
 from unittest.mock import patch
-from rest_framework.test import APIClient
+
 from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.article_generation.models import Article
 from engines.auth.models import User
-from engines.knowledge.models import Program, Subject, Module, Topic
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 
 @pytest.fixture

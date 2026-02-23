@@ -4,9 +4,10 @@ AI-Assisted Chunk-Topic Mapping Service
 Uses embedding similarity to suggest relevant chunks for topics.
 """
 
+from typing import Any, Dict, List, cast
+
 import sentry_sdk
 import structlog
-from typing import List, Dict, cast, Any
 
 logger = structlog.get_logger(__name__)
 
@@ -32,9 +33,9 @@ class MappingService:
         Returns:
             List of dicts with chunk info and relevance scores
         """
-        from engines.knowledge.models import Topic, ChunkTopicMap
         from engines.content.models import Chunk, Embedding
         from engines.content.services.embedding_service import EmbeddingService
+        from engines.knowledge.models import ChunkTopicMap, Topic
 
         try:
             # Get topic
@@ -147,9 +148,9 @@ class MappingService:
         Returns:
             Result dict with created count
         """
-        from engines.knowledge.models import Topic, ChunkTopicMap
-        from engines.content.models import Chunk
         from engines.auth.models import User
+        from engines.content.models import Chunk
+        from engines.knowledge.models import ChunkTopicMap, Topic
 
         try:
             topic = Topic.objects.get(id=topic_id)

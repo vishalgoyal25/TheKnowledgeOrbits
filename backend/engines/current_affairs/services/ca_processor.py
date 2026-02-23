@@ -6,14 +6,17 @@ CA Processor Service
 Processes CA articles into chunks and generates embeddings
 """
 
-import structlog
 from typing import List
-from django.utils import timezone
+
 from django.db import transaction
+from django.utils import timezone
+
+import structlog
 from sentence_transformers import SentenceTransformer
 
-from ..models import CAArticle, CAChunk
 from engines.content.models import Embedding
+
+from ..models import CAArticle, CAChunk
 
 logger = structlog.get_logger(__name__)
 

@@ -4,14 +4,18 @@ Analytics Engine - View Tests
 Tests for all 5 API endpoints.
 """
 
-import pytest
 from datetime import timedelta
-from rest_framework.test import APIClient
-from rest_framework import status
+
 from django.core.cache import cache
 from django.utils import timezone
-from engines.auth.models import User
+
+from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.analytics.models import DailyAggregate, Insight
+from engines.auth.models import User
 from engines.userstate.models import UserEvent
 
 

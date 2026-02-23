@@ -4,11 +4,13 @@ Auth Engine - Service Tests
 Tests for EmailService and TokenService.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
+
+from engines.auth.models import User
 from engines.auth.services.email_service import EmailService, get_email_service
 from engines.auth.services.token_service import TokenService, get_token_service
-from engines.auth.models import User
 
 
 @pytest.mark.django_db

@@ -4,13 +4,16 @@ Current Affairs Engine - Service Tests
 Tests for RSSScraperService, CAProcessorService, TopicLinkerService.
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
 from django.utils import timezone
-from engines.current_affairs.models import CASource, CAArticle
-from engines.current_affairs.services.rss_scraper import RSSScraperService
+
+import pytest
+
+from engines.current_affairs.models import CAArticle, CASource
 from engines.current_affairs.services.ca_processor import CAProcessorService
+from engines.current_affairs.services.rss_scraper import RSSScraperService
 from engines.current_affairs.services.topic_linker import TopicLinkerService
 
 

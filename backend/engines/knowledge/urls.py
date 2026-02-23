@@ -2,16 +2,18 @@
 Knowledge Engine URLs
 """
 
-from django.urls import path, include
+from django.urls import include, path
+
 from rest_framework.routers import DefaultRouter
+
 from engines.knowledge.views import (
-    ProgramViewSet,
-    SubjectViewSet,
-    ModuleViewSet,
-    TopicViewSet,
     ChunkTopicMapViewSet,
-    ThemeViewSet,
+    ModuleViewSet,
+    ProgramViewSet,
     SearchViewSet,
+    SubjectViewSet,
+    ThemeViewSet,
+    TopicViewSet,
 )
 
 router = DefaultRouter()

@@ -15,26 +15,29 @@ Auth Engine Views (PKB-Compliant)
 9. GET /me/
 """
 
-import structlog
 from typing import Any, cast
+
+from django.contrib.auth import authenticate
+from django.db import transaction
+from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
 from rest_framework.request import Request
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
-from django.utils import timezone
-from django.db import transaction
+from rest_framework.response import Response
 
-from engines.auth.models import User, Role, RoleAssignment
+import structlog
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from engines.auth.models import Role, RoleAssignment, User
 from engines.auth.serializers import (
-    RegisterSerializer,
-    LoginSerializer,
-    UserSerializer,
-    ForgotPasswordSerializer,
-    ResetPasswordSerializer,
     ChangePasswordSerializer,
+    ForgotPasswordSerializer,
+    LoginSerializer,
+    RegisterSerializer,
+    ResetPasswordSerializer,
+    UserSerializer,
 )
 from engines.auth.services.email_service import get_email_service
 from engines.auth.services.token_service import get_token_service

@@ -11,21 +11,24 @@ Role management API (admin only).
 5. GET /user-roles/{user_id}/
 """
 
-import structlog
 from typing import cast
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.request import Request
+
 from django.shortcuts import get_object_or_404
 
-from engines.authorization.permissions import IsAdmin
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.request import Request
+from rest_framework.response import Response
+
+import structlog
+
 from engines.auth.models import Role, RoleAssignment, User
+from engines.authorization.permissions import IsAdmin
 from engines.authorization.serializers import (
-    RoleSerializer,
-    RoleAssignmentSerializer,
     AssignRoleSerializer,
     RemoveRoleSerializer,
+    RoleAssignmentSerializer,
+    RoleSerializer,
     UserRolesSerializer,
 )
 

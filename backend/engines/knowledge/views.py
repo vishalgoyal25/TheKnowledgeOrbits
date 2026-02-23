@@ -4,33 +4,36 @@ import sentry_sdk
 Knowledge Engine Views
 """
 
+from typing import Any, Optional, cast
+
 from django.db.models import QuerySet
-from rest_framework import viewsets, status
+
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.request import Request
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from typing import Optional, Any, cast
-from engines.auth.models import User
+from rest_framework.request import Request
+from rest_framework.response import Response
+
 import structlog
 
+from engines.auth.models import User
+from engines.content.pagination import ContentCursorPagination
 from engines.knowledge.models import (
+    ChunkTopicMap,
+    Module,
     Program,
     Subject,
-    Module,
-    Topic,
-    ChunkTopicMap,
     Theme,
+    Topic,
 )
 from engines.knowledge.serializers import (
+    ChunkTopicMapSerializer,
+    ModuleSerializer,
     ProgramSerializer,
     SubjectSerializer,
-    ModuleSerializer,
-    TopicSerializer,
-    ChunkTopicMapSerializer,
     ThemeSerializer,
+    TopicSerializer,
 )
-from engines.content.pagination import ContentCursorPagination
 from engines.knowledge.services.mapping_service import MappingService
 from engines.knowledge.services.search_service import SearchService
 

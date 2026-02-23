@@ -1,11 +1,14 @@
 """User State Engine View Tests."""
 
-import pytest
 import uuid
-from rest_framework.test import APIClient
+
 from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.auth.models import User
-from engines.userstate.models import UserEvent, Bookmark
+from engines.userstate.models import Bookmark, UserEvent
 
 
 @pytest.fixture

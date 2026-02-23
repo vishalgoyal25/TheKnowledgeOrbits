@@ -2,11 +2,15 @@
 Auth Engine Serializers (PKB-Compliant)
 """
 
-from typing import Dict, Any, List
-import structlog
-from rest_framework import serializers
+from typing import Any, Dict, List
+
 from django.contrib.auth.password_validation import validate_password
-from engines.auth.models import User, Role
+
+from rest_framework import serializers
+
+import structlog
+
+from engines.auth.models import Role, User
 
 logger = structlog.get_logger(__name__)
 

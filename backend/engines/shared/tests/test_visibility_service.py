@@ -5,14 +5,15 @@ Tests for VisibilityService (public/private content filtering).
 """
 
 import pytest
+
+from engines.article_generation.models import Article
+from engines.assessment.models import Quiz
+from engines.auth.models import User
+from engines.knowledge.models import Module, Program, Subject, Topic
 from engines.shared.services.visibility_service import (
     VisibilityService,
     get_visibility_service,
 )
-from engines.auth.models import User
-from engines.article_generation.models import Article
-from engines.assessment.models import Quiz
-from engines.knowledge.models import Program, Subject, Module, Topic
 
 
 @pytest.fixture

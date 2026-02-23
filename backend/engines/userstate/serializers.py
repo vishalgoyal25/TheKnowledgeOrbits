@@ -1,4 +1,5 @@
 from typing import Any
+
 import sentry_sdk
 
 """
@@ -6,12 +7,13 @@ User State Engine Serializers
 """
 
 from rest_framework import serializers
+
 from engines.userstate.models import (
-    UserEvent,
-    UserProgress,
-    TopicMastery,
     Bookmark,
     ReadingProgress,
+    TopicMastery,
+    UserEvent,
+    UserProgress,
 )
 
 

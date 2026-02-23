@@ -4,9 +4,11 @@ Auth Engine - Integration Tests
 End-to-end user flow tests.
 """
 
-import pytest
-from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.auth.models import User
 
 
@@ -145,6 +147,7 @@ class TestAuthenticationEdgeCases:
     def test_expired_tokens_rejected(self, api_client):
         """Test expired verification token is rejected."""
         from datetime import timedelta
+
         from django.utils import timezone
 
         # Create user with expired token

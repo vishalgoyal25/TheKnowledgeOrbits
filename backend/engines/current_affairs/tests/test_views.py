@@ -4,12 +4,15 @@ Current Affairs Engine - View Tests
 Tests for CA viewsets.
 """
 
-import pytest
-from rest_framework.test import APIClient
-from rest_framework import status
 from django.utils import timezone
-from engines.current_affairs.models import CASource, CAArticle, CAChunk
+
+from rest_framework import status
+from rest_framework.test import APIClient
+
+import pytest
+
 from engines.auth.models import User
+from engines.current_affairs.models import CAArticle, CAChunk, CASource
 
 
 @pytest.fixture

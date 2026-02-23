@@ -5,14 +5,15 @@ Knowledge Engine Serializers
 from typing import Any
 
 from rest_framework import serializers
+
 from engines.knowledge.models import (
+    ChunkTopicMap,
+    Module,
     Program,
     Subject,
-    Module,
-    Topic,
-    ChunkTopicMap,
     Theme,
     ThemeTopicMap,
+    Topic,
 )
 
 

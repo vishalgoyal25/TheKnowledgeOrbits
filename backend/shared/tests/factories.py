@@ -1,13 +1,16 @@
 """Shared Factories for TheKnowledgeOrbits."""
 
-import factory
 import uuid
-from factory.django import DjangoModelFactory
+
 from django.contrib.auth import get_user_model
-from engines.knowledge.models import Program, Subject, Module, Topic
-from engines.current_affairs.models import CASource, CAArticle, CAChunk
-from engines.assessment.models import Quiz, Question, QuizAttempt
+
+import factory
+from factory.django import DjangoModelFactory
+
 from engines.article_generation.models import Article
+from engines.assessment.models import Question, Quiz, QuizAttempt
+from engines.current_affairs.models import CAArticle, CAChunk, CASource
+from engines.knowledge.models import Module, Program, Subject, Topic
 
 User = get_user_model()
 

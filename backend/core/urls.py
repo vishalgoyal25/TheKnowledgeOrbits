@@ -5,7 +5,8 @@ URL configuration for TheKnowledgeOrbits.
 from typing import Any
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny

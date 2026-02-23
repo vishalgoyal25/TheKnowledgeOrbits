@@ -2,13 +2,15 @@
 Django Base settings for TheKnowledgeOrbits.
 """
 
-import os
 import logging
-from pathlib import Path
-import environ
+import os
 from datetime import timedelta
+from pathlib import Path
+from typing import Any, Dict
+
 from django.core.exceptions import ImproperlyConfigured
-from typing import Dict, Any
+
+import environ
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -262,9 +264,9 @@ LOGGING: Dict[str, Any] = {
 SENTRY_DSN = env("SENTRY_DSN", default="")
 if SENTRY_DSN:
     import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
     from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk.integrations.logging import LoggingIntegration
-    from sentry_sdk.integrations.celery import CeleryIntegration
 
     sentry_sdk.init(
         dsn=SENTRY_DSN,

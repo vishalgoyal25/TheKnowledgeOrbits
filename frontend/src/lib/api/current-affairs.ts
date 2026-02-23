@@ -7,7 +7,6 @@ import {
   CASource,
   CAArticle,
   CAChunk,
-  CATopicLink,
   CAArticleListResponse,
   CAChunkListResponse,
   CASourceListResponse,

@@ -6,8 +6,8 @@ Handles token generation for:
 - Password reset
 """
 
-import uuid
 import secrets
+import uuid
 
 
 class TokenService:

@@ -5,15 +5,16 @@ Tests for ChunkingService, EmbeddingService, and IngestionService.
 Target: 85% service coverage.
 """
 
-import pytest
 from unittest.mock import Mock, patch
+
 from django.core.files.uploadedfile import SimpleUploadedFile
 
+import pytest
+
+from engines.content.models import Chunk, Document, IngestionJob
 from engines.content.services.chunking_service import ChunkingService
 from engines.content.services.embedding_service import EmbeddingService
 from engines.content.services.ingestion_service import IngestionService
-from engines.content.models import Document, Chunk, IngestionJob
-
 
 # ============================================================================
 # CHUNKING SERVICE TESTS

@@ -11,14 +11,17 @@ Orchestrates the full ingestion pipeline:
 5. Store in database
 """
 
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from django.core.files.uploadedfile import UploadedFile
 from django.utils import timezone
+
 import structlog
+
+from engines.content.models import Chunk, Document, IngestionJob
 
 from .chunking_service import ChunkingService
 from .embedding_service import EmbeddingService
-from engines.content.models import Document, Chunk, IngestionJob
 
 logger = structlog.get_logger(__name__)
 
@@ -224,8 +227,9 @@ class IngestionService:
                 logger.info("extracting_pdf_file", file_name=file.name)
 
                 try:
-                    import pdfplumber
                     from io import BytesIO
+
+                    import pdfplumber
                 except ImportError:
                     logger.error("pdfplumber_not_installed")
                     raise ValueError(
@@ -343,8 +347,9 @@ class IngestionService:
             elif file_name.endswith(".pdf"):
                 logger.info("extracting_pdf_file", file_name=file.name)
 
-                import pdfplumber
                 from io import BytesIO
+
+                import pdfplumber
 
                 pdf_bytes = BytesIO(file.read())
                 current_chapter = "Unknown Chapter"

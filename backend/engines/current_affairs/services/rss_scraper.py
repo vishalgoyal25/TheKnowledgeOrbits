@@ -6,16 +6,18 @@ RSS Scraper Service
 Scrapes RSS feeds from news sources
 """
 
-import feedparser
-import structlog
 from datetime import datetime
-from typing import Dict, Any
-from django.utils import timezone
+from typing import Any, Dict
+
 from django.db import transaction
+from django.utils import timezone
+
+import feedparser
 import requests
+import structlog
 from bs4 import BeautifulSoup
 
-from ..models import CASource, CAArticle
+from ..models import CAArticle, CASource
 
 logger = structlog.get_logger(__name__)
 

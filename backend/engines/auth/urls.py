@@ -3,7 +3,9 @@ Auth Engine URLs
 """
 
 from django.urls import path
+
 from rest_framework_simplejwt.views import TokenRefreshView
+
 from engines.auth import views
 
 app_name = "auth"
