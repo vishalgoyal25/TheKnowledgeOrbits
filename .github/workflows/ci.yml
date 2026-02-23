@@ -1,0 +1,156 @@
+name: TheKnowledgeOrbits - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ============================================
+  # JOB 1: Backend Integrity (Lint + Security)
+  # ============================================
+  backend-lint:
+    name: Backend Audit (Quality & Security)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Linting Tools
+        run: |
+          pip install -r backend/requirements/dev.txt
+
+      - name: Black Check
+        working-directory: ./backend
+        run: black --check .
+
+      - name: Isort Check
+        working-directory: ./backend
+        run: isort --check-only --diff .
+
+      - name: Flake8 Check
+        working-directory: ./backend
+        run: flake8 . --config=.flake8
+
+      - name: Mypy Type Check
+        working-directory: ./backend
+        run: mypy .
+
+      - name: Bandit Security Scan
+        working-directory: ./backend
+        run: bandit -r . -ll
+
+  # ============================================
+  # JOB 2: Backend Logic (342 Tests)
+  # ============================================
+  backend-tests:
+    name: Backend Laboratory (Pytest)
+    needs: backend-lint
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: test_theknowledgeorbits
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements/base.txt
+
+      - name: Install Dependencies
+        working-directory: ./backend
+        run: |
+          pip install -r requirements/base.txt
+          pip install -r requirements/dev.txt
+          pip install pytest-xdist pytest-timeout
+
+      - name: Create CI Env File
+        working-directory: ./backend
+        run: |
+          cat > .env << 'EOF'
+          DJANGO_SETTINGS_MODULE=core.settings.dev
+          SECRET_KEY=ci-test-key-not-for-production
+          DEBUG=False
+          DB_NAME=test_theknowledgeorbits
+          DB_USER=postgres
+          DB_PASSWORD=postgres
+          DB_HOST=localhost
+          DB_PORT=5432
+          GROQ_API_KEY=mock-key-for-ci
+          EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+          SENTRY_DSN=
+          EOF
+
+      - name: Run Migrations
+        working-directory: ./backend
+        run: python manage.py migrate --noinput
+
+      - name: Execute 342 Tests (Parallel)
+        working-directory: ./backend
+        run: |
+          pytest -n auto --cov=engines --cov-report=xml --maxfail=10
+
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  # ============================================
+  # JOB 3: Frontend Integrity (TS + Build)
+  # ============================================
+  frontend-integrity:
+    name: Frontend Architect (Build & Types)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint Check
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: TypeScript Validation
+        working-directory: ./frontend
+        run: npm run type-check
+
+      - name: Production Build Check
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SENTRY_DSN: ""
+          SENTRY_AUTH_TOKEN: ""

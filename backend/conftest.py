@@ -12,7 +12,18 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
 
 # Import Django and setup
 import django  # noqa: E402
+import sys  # noqa: E402
 from unittest.mock import MagicMock  # noqa: E402
+
+# Safe mock for ML libraries to avoid 3GB+ downloads in CI
+try:
+    import sentence_transformers  # noqa: F401
+except ImportError:
+    mock_module = MagicMock()
+    sys.modules["sentence_transformers"] = mock_module
+    logger = MagicMock()
+    sys.modules["sentence_transformers.SentenceTransformer"] = MagicMock()
+
 import numpy as np  # noqa: E402
 
 # NOW it's safe to import Django/DRF components
