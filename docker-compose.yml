@@ -54,6 +54,27 @@ services:
     networks:
       - app_network
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+      args:
+        INSTALL_DEV: "true"
+        INSTALL_ML: "true"
+    container_name: TheKnowledgeOrbits_worker
+    command: python manage.py process_tasks
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - backend/.env
+    environment:
+      - DB_HOST=postgres
+    networks:
+      - app_network
+
   frontend:
     build:
       context: .

@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "corsheaders",
     "pgvector",
+    "background_task",
     # Local engines (will be added as we build them)
     "engines.content",
     "engines.knowledge",

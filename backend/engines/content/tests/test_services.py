@@ -220,11 +220,11 @@ class TestEmbeddingService:
         """Test embedding generation returns 384-dimensional vector."""
         # ARRANGE
         mock_model = Mock()
-        mock_model.encode.return_value = Mock(tolist=lambda: [0.1] * 384)
+        mock_model.encode.return_value = [Mock(tolist=lambda: [0.1] * 384)]
         mock_class.return_value = mock_model
 
         # Force reload or manually set model to ensure mock is used
-        EmbeddingService._model = None
+        EmbeddingService._local_model = None
 
         text = "Test sentence for embedding."
 
@@ -240,11 +240,11 @@ class TestEmbeddingService:
         """Test embedding service calls model.encode()."""
         # ARRANGE
         mock_model = Mock()
-        mock_model.encode.return_value = Mock(tolist=lambda: [0.1] * 384)
+        mock_model.encode.return_value = [Mock(tolist=lambda: [0.1] * 384)]
         mock_class.return_value = mock_model
 
         # Reset singleton
-        EmbeddingService._model = None
+        EmbeddingService._local_model = None
 
         text = "Test text"
 
@@ -266,19 +266,41 @@ class TestEmbeddingService:
         assert len(embedding) == 384
         assert all(x == 0.0 for x in embedding)
 
+    @patch("requests.post")
+    def test_generate_embedding_via_api(self, mock_post):
+        """Test generating embeddings via HuggingFace API."""
+        # ARRANGE
+        mock_response = Mock()
+        mock_response.status_code = 200
+        # API returns a list of lists for feature extraction
+        mock_response.json.return_value = [[0.9] * 384]
+        mock_post.return_value = mock_response
+
+        with patch.dict(
+            "os.environ", {"USE_EMBEDDING_API": "True", "HF_API_TOKEN": "test-token"}
+        ):
+            text = "Test API embedding"
+
+            # ACT
+            embedding = EmbeddingService.generate_embedding(text)
+
+            # ASSERT
+            assert len(embedding) == 384
+            assert embedding[0] == 0.9
+            mock_post.assert_called_once()
+
     @patch("sentence_transformers.SentenceTransformer")
     def test_generate_embeddings_batch_processes_multiple_texts(self, mock_class):
         """Test batch embedding generation."""
         # ARRANGE
         mock_model = Mock()
-        # Side effect to handle batch encoding
+        # Mock returns a list of items that respond to .tolist()
         mock_model.encode.return_value = [
             Mock(tolist=lambda: [0.1] * 384),
             Mock(tolist=lambda: [0.2] * 384),
         ]
         mock_class.return_value = mock_model
-
-        EmbeddingService._model = None
+        EmbeddingService._local_model = None
 
         texts = ["Text 1", "Text 2"]
 
@@ -288,6 +310,7 @@ class TestEmbeddingService:
         # ASSERT
         assert len(embeddings) == 2
         assert all(len(emb) == 384 for emb in embeddings)
+        assert embeddings[1][0] == 0.2
 
     def test_generate_embeddings_batch_handles_empty_list(self):
         """Test batch generation with empty input."""
@@ -301,14 +324,42 @@ class TestEmbeddingService:
         assert embeddings == []
 
     @patch("sentence_transformers.SentenceTransformer")
+    def test_generate_embeddings_mapping(self, mock_class):
+        """Test mapping of valid/invalid strings in batch."""
+        # ARRANGE
+        mock_model = Mock()
+        mock_model.encode.return_value = [Mock(tolist=lambda: [0.5] * 384)]
+        mock_class.return_value = mock_model
+        EmbeddingService._local_model = None
+
+        texts = ["", "Valid content", "  "]
+
+        # ACT
+        embeddings = EmbeddingService.generate_embeddings_batch(texts)
+
+        # ASSERT
+        assert len(embeddings) == 3
+        assert all(isinstance(v, list) for v in embeddings)
+        assert all(len(v) == 384 for v in embeddings)
+        # First and last should be zero vectors
+        assert all(x == 0.0 for x in embeddings[0])
+        assert all(x == 0.0 for x in embeddings[2])
+        # Middle should be the mock vector
+        assert embeddings[1][0] == 0.5
+        # model.encode should only have been called with 1 string
+        mock_model.encode.assert_called_once()
+        args, _ = mock_model.encode.call_args
+        assert len(args[0]) == 1
+        assert args[0][0] == "Valid content"
+
+    @patch("sentence_transformers.SentenceTransformer")
     def test_create_embedding_record_returns_proper_structure(self, mock_class):
         """Test embedding record has correct structure."""
         # ARRANGE
         mock_model = Mock()
-        mock_model.encode.return_value = Mock(tolist=lambda: [0.1] * 384)
+        mock_model.encode.return_value = [Mock(tolist=lambda: [0.1] * 384)]
         mock_class.return_value = mock_model
-
-        EmbeddingService._model = None
+        EmbeddingService._local_model = None
 
         # ACT
         record = EmbeddingService.create_embedding_record(
@@ -319,7 +370,7 @@ class TestEmbeddingService:
         assert record["content_type"] == "chunk"
         assert record["content_id"] == "test-chunk-id"
         assert len(record["vector"]) == 384
-        assert record["model_name"] == "all-MiniLM-L6-v2"
+        assert record["model_name"] == EmbeddingService.MODEL_NAME
 
 
 # ============================================================================

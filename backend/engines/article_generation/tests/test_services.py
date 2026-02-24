@@ -59,8 +59,13 @@ def chunks(topic):
 class TestArticleGenerationService:
     """Test ArticleGenerationService."""
 
+    @patch(
+        "engines.content.services.embedding_service.EmbeddingService.generate_embedding"
+    )
     @patch("engines.article_generation.services.generation_service.Groq")
-    def test_generate_article_basic(self, mock_groq_class, topic, chunks):
+    def test_generate_article_basic(
+        self, mock_groq_class, mock_embedding, topic, chunks
+    ):
         """Test basic article generation."""
         # Mock GROQ client instance
         mock_client = MagicMock()
