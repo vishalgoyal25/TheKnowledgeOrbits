@@ -18,7 +18,7 @@ import pytest  # noqa: E402
 # ===== THE VIRTUAL ML BRIDGE (CI OPTIMIZATION) =====
 
 
-def _get_mock_vector(sentences: Any) -> np.ndarray:
+def _get_mock_vector(sentences: Any, *args: Any, **kwargs: Any) -> np.ndarray:
     """Helper to generate synthetic embedding vectors."""
     if isinstance(sentences, str):
         return np.random.rand(384).astype(np.float32)

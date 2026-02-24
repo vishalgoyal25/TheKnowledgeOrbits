@@ -83,8 +83,18 @@ class TestRSSScraperService:
 class TestCAProcessorService:
     """Test CAProcessorService."""
 
-    def test_process_article(self, ca_source):
+    @patch(
+        "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch"
+    )
+    def test_process_article(self, mock_embeddings, ca_source):
         """Test processing CA article into chunks."""
+
+        # Dynamic side effect to return correct number of embeddings
+        def mock_emb_side_effect(texts):
+            return [[0.1] * 384 for _ in texts]
+
+        mock_embeddings.side_effect = mock_emb_side_effect
+
         article = CAArticle.objects.create(
             source=ca_source,
             title="Test Article",
@@ -99,6 +109,7 @@ class TestCAProcessorService:
         article.refresh_from_db()
         assert article.processing_status == "completed"
         assert article.chunk_count > 0
+        assert article.processed_at is not None
 
     def test_chunk_content(self):
         """Test content chunking."""

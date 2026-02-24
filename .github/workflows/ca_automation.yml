@@ -1,0 +1,65 @@
+name: 🤖 Current Affairs Ghost Worker
+
+on:
+  schedule:
+    # Runs once every 24 hours at 00:00 UTC (Safest for Free Tier)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Manual trigger for ad-hoc syncing
+
+jobs:
+  scrape_and_process:
+    name: Execute CA Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    concurrency:
+      group: ca-scraping
+      cancel-in-progress: false
+
+    steps:
+      - name: 🛰️ Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements/scraper.txt'
+
+      - name: 🧠 Cache ML Models
+        uses: actions/cache@v4
+        id: cache-models
+        with:
+          path: ~/.cache/torch/sentence_transformers
+          key: ml-model-all-MiniLM-L6-v2-v1
+          restore-keys: |
+             ml-model-all-MiniLM-L6-v2-
+
+      - name: 📦 Install Scraper Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          for i in 1 2 3; do pip install -r backend/requirements/scraper.txt && break || sleep 10; done
+
+      - name: 🚀 Run Automated Scraper
+        working-directory: ./backend
+        env:
+          # Database (Supabase)
+          DB_NAME: ${{ secrets.PROD_DB_NAME }}
+          DB_USER: ${{ secrets.PROD_DB_USER }}
+          DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          DB_HOST: ${{ secrets.PROD_DB_HOST }}
+          DB_PORT: ${{ secrets.PROD_DB_PORT }}
+
+          # AI & Security
+          GROQ_API_KEY: ${{ secrets.PROD_GROQ_API_KEY }}
+          SECRET_KEY: ${{ secrets.PROD_SECRET_KEY }}
+          DEBUG: "False"
+
+          # Environment optimization
+          SENTENCE_TRANSFORMERS_HOME: ~/.cache/torch/sentence_transformers
+          PYTHONPATH: .
+          PYTHONDONTWRITEBYTECODE: 1
+        run: |
+          python manage.py scrape_ca
