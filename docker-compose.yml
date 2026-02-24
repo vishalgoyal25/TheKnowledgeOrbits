@@ -37,8 +37,10 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
       args:
-        INSTALL_DEV: "true"
-        INSTALL_ML: "true"
+        INSTALL_DEV: "false" # Dev tools not needed at runtime (saves ~1GB + 20min build)
+        INSTALL_ML: "true" # ML model baked into layer for fast container startup
+    # Name the built image so 'worker' can reuse it — avoids building twice
+    image: theknowledgeorbits-backend:dev
     container_name: TheKnowledgeOrbits_backend
     volumes:
       - ./backend:/app
@@ -55,19 +57,15 @@ services:
       - app_network
 
   worker:
-    build:
-      context: .
-      dockerfile: docker/backend.Dockerfile
-      args:
-        INSTALL_DEV: "true"
-        INSTALL_ML: "true"
+    # Reuses the same image built by 'backend' — no separate build step
+    image: theknowledgeorbits-backend:dev
     container_name: TheKnowledgeOrbits_worker
     command: python manage.py process_tasks
     volumes:
       - ./backend:/app
     depends_on:
-      postgres:
-        condition: service_healthy
+      - backend
+      - postgres
     env_file:
       - backend/.env
     environment:
