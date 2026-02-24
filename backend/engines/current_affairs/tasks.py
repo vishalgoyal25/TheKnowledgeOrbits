@@ -1,8 +1,10 @@
-from background_task import background
 from django.utils import timezone
+
 import structlog
-from .services.rss_scraper import RSSScraperService
+from background_task import background
+
 from .services.ca_processor import CAProcessorService
+from .services.rss_scraper import RSSScraperService
 from .services.topic_linker import TopicLinkerService
 
 logger = structlog.get_logger(__name__)

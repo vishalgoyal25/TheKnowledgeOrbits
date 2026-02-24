@@ -1,7 +1,9 @@
 from django.core.management.base import BaseCommand
-from background_task.models import Task
-from engines.current_affairs.tasks import auto_scrape_and_process_ca
+
 import structlog
+from background_task.models import Task
+
+from engines.current_affairs.tasks import auto_scrape_and_process_ca
 
 logger = structlog.get_logger(__name__)
 
