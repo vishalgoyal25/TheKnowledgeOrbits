@@ -6,9 +6,10 @@ or HuggingFace Inference API (cloud).
 """
 
 import os
+from typing import Any, Dict, List
+
 import requests
 import structlog
-from typing import Any, Dict, List
 
 logger = structlog.get_logger(__name__)
 

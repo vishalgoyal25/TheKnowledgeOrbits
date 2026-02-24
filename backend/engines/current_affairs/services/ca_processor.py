@@ -1,11 +1,14 @@
-import sentry_sdk
 from typing import List
+
 from django.db import transaction
 from django.utils import timezone
+
+import sentry_sdk
 import structlog
 
 from engines.content.models import Embedding
 from engines.content.services.embedding_service import EmbeddingService
+
 from ..models import CAArticle, CAChunk
 
 logger = structlog.get_logger(__name__)
