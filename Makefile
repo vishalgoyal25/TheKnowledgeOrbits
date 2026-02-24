@@ -27,6 +27,16 @@ test-content:
 test-ci:
 	docker exec $(BACKEND_CONTAINER) pytest engines/ -x --tb=short
 
+# ---- Build targets ----
+
+build:
+	# Fast build: no dev tools (~5-8 min). Use for daily development.
+	docker-compose up -d --build
+
+build-test:
+	# Full build: includes pytest/black/mypy (~25 min first time, cached after).
+	docker-compose -f docker-compose.yml -f docker-compose.test.yml up -d --build
+
 # ---- Linting / Formatting ----
 
 fmt:

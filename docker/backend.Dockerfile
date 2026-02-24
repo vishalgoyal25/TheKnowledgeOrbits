@@ -3,6 +3,8 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# Suppress pip's root-user warning (safe inside Docker — container IS the environment)
+ENV PIP_ROOT_USER_ACTION=ignore
 
 # Set work directory
 WORKDIR /app
@@ -19,27 +21,28 @@ RUN apt-get update && apt-get install -y \
 ARG INSTALL_DEV=false
 ARG INSTALL_ML=false
 
-# 1. Install ML first (Heavy, rarely changes)
-#    Also pre-download the embedding model into the image layer cache
-#    so containers don't re-download it on every fresh start (~90 MB saved).
+# ── LAYER 1: ML packages (heavy, ~1GB, rarely changes) ────────────────────────
+# When INSTALL_ML=true, also pre-downloads the embedding model so it is baked
+# into the image layer. Subsequent builds reuse this layer unless ml.txt changes.
 COPY backend/requirements/ml.txt /app/requirements/ml.txt
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip --quiet
 RUN if [ "$INSTALL_ML" = "true" ] ; then \
     pip install --no-cache-dir -r requirements/ml.txt && \
     python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" ; \
     fi
 
-# 2. Install Dev (Testing tools)
+# ── LAYER 2: Dev/testing tools (medium, rarely changes) ───────────────────────
 COPY backend/requirements/dev.txt /app/requirements/dev.txt
 RUN if [ "$INSTALL_DEV" = "true" ] ; then pip install --no-cache-dir -r requirements/dev.txt ; fi
 
-# 3. Install Base + Scraper (Changes most frequently)
+# ── LAYER 3: Base application packages (changes most frequently) ──────────────
+# NOTE: scraper.txt is intentionally NOT installed here — all its packages are
+# already covered by ml.txt + base.txt. scraper.txt is a standalone file used
+# only by GitHub Actions (ca_automation.yml) where the other files aren't present.
 COPY backend/requirements/base.txt /app/requirements/base.txt
-COPY backend/requirements/scraper.txt /app/requirements/scraper.txt
 RUN pip install --no-cache-dir -r requirements/base.txt
-RUN pip install --no-cache-dir -r requirements/scraper.txt
 
-# Copy project
+# ── LAYER 4: Application code (changes most frequently, must be last) ─────────
 COPY backend/ .
 
 # Expose port
