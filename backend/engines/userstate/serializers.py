@@ -61,12 +61,47 @@ class TopicMasterySerializer(serializers.ModelSerializer):  # type: ignore
 
 
 class BookmarkSerializer(serializers.ModelSerializer):  # type: ignore
-    """Bookmark serializer."""
+    """Bookmark serializer with expanded content details."""
+
+    content = serializers.SerializerMethodField()
 
     class Meta:
         model = Bookmark
-        fields = ["id", "content_type", "content_id", "notes", "created_at"]
+        fields = ["id", "content_type", "content_id", "notes", "created_at", "content"]
         read_only_fields = ["id", "created_at"]
+
+    def get_content(self, obj: Any) -> Any:
+        """Fetch title and topic from the bookmarked Article or Quiz."""
+        try:
+            if obj.content_type == "article":
+                from engines.article_generation.models import Article
+
+                article = Article.objects.select_related("topic").get(id=obj.content_id)
+                return {
+                    "id": str(article.id),
+                    "title": article.title,
+                    "topic": {
+                        "id": str(article.topic.id),
+                        "name": article.topic.name,
+                    },
+                }
+            elif obj.content_type == "quiz":
+                from engines.assessment.models import Quiz
+
+                quiz = Quiz.objects.select_related("topic").get(id=obj.content_id)
+                return {
+                    "id": str(quiz.id),
+                    "title": quiz.title,
+                    "topic": {
+                        "id": str(quiz.topic.id),
+                        "name": quiz.topic.name,
+                    },
+                    "difficulty_level": quiz.difficulty_level,
+                    "question_count": quiz.question_count,
+                }
+        except Exception:
+            pass
+        return None
 
 
 class BookmarkCreateSerializer(serializers.Serializer):  # type: ignore

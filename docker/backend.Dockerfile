@@ -45,8 +45,16 @@ RUN pip install --no-cache-dir -r requirements/base.txt
 # ── LAYER 4: Application code (changes most frequently, must be last) ─────────
 COPY backend/ .
 
-# Expose port
+# Expose default port (overridden by Render via $PORT)
 EXPOSE 8000
 
-# Run migrations and start server
-CMD sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+# Start Gunicorn with optimized settings for Render
+# - Use the dynamic $PORT provided by Render
+# - Multiple workers for concurrency
+# - Increased timeout to 120s to allow for cold starts
+CMD gunicorn core.wsgi:application \
+    --bind 0.0.0.0:${PORT:-8000} \
+    --workers 3 \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile -

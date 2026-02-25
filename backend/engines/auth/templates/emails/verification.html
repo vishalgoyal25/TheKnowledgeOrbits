@@ -1,33 +1,119 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
-        .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-        .footer { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your Email - TheKnowledgeOrbits</title>
 </head>
-<body>
-    <div class="header">
-        <h1>Welcome to {{ site_name }}!</h1>
-    </div>
-    <div class="content">
-        <h2>Hello {{ user.full_name|default:user.email }},</h2>
-        <p>Thank you for registering. Please verify your email address.</p>
+<body style="margin:0; padding:0; background-color:#f0f2f5; font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="min-height:100vh;">
+        <tr>
+            <td align="center" style="padding:40px 20px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
-        <p style="text-align: center;">
-            <a href="{{ verification_url }}" class="button">Verify Email</a>
-        </p>
+                    <!-- Header -->
+                    <tr>
+                        <td style="background:linear-gradient(135deg,#2563eb 0%,#7c3aed 50%,#db2777 100%); padding:48px 40px 40px; text-align:center;">
+                            <div style="font-size:32px; margin-bottom:12px;">🎓</div>
+                            <h1 style="margin:0; color:#ffffff; font-size:24px; font-weight:700; letter-spacing:-0.5px;">
+                                TheKnowledgeOrbits
+                            </h1>
+                            <p style="margin:8px 0 0; color:rgba(255,255,255,0.85); font-size:13px; text-transform:uppercase; letter-spacing:1.5px;">
+                                AI-Powered UPSC Preparation
+                            </p>
+                        </td>
+                    </tr>
 
-        <p>Or copy this link: <br><span style="word-break: break-all; color: #667eea;">{{ verification_url }}</span></p>
+                    <!-- Body -->
+                    <tr>
+                        <td style="padding:40px 40px 16px;">
+                            <h2 style="margin:0 0 8px; color:#1a1a2e; font-size:22px; font-weight:700;">
+                                Welcome aboard, {{ user.full_name|default:"Scholar" }}! 🚀
+                            </h2>
+                            <p style="margin:0 0 24px; color:#4a5568; font-size:15px; line-height:1.7;">
+                                Thank you for joining <strong>TheKnowledgeOrbits</strong> — your personal AI-powered UPSC companion. You're one click away from accessing AI-generated articles, interactive quizzes, and syllabus-mapped study tools.
+                            </p>
 
-        <p><strong>Link expires in 24 hours.</strong></p>
-    </div>
-    <div class="footer">
-        <p>&copy; 2026 TheKnowledgeOrbits</p>
-    </div>
+                            <!-- CTA Button -->
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td align="center" style="padding:8px 0 32px;">
+                                        <a href="{{ verification_url }}"
+                                           style="display:inline-block; background:linear-gradient(135deg,#2563eb,#7c3aed); color:#ffffff; padding:16px 48px; font-size:16px; font-weight:600; text-decoration:none; border-radius:12px; letter-spacing:0.3px; box-shadow:0 4px 14px rgba(37,99,235,0.35);">
+                                            ✅ Verify My Email
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Fallback link -->
+                            <div style="background:#f7f8fa; border-radius:10px; padding:16px 20px; margin-bottom:24px;">
+                                <p style="margin:0 0 6px; color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
+                                    Button not working? Copy this link:
+                                </p>
+                                <p style="margin:0; word-break:break-all; font-size:13px; color:#2563eb; line-height:1.5;">
+                                    {{ verification_url }}
+                                </p>
+                            </div>
+
+                            <!-- Expiry notice -->
+                            <div style="border-left:4px solid #f59e0b; background:#fffbeb; padding:12px 16px; border-radius:0 8px 8px 0; margin-bottom:24px;">
+                                <p style="margin:0; color:#92400e; font-size:13px;">
+                                    ⏰ <strong>This link expires in 24 hours.</strong> If it expires, you can request a new one from the login page.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- What's next -->
+                    <tr>
+                        <td style="padding:0 40px 32px;">
+                            <h3 style="margin:0 0 16px; color:#1a1a2e; font-size:16px; font-weight:600;">
+                                What awaits you:
+                            </h3>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="padding:8px 0; color:#4a5568; font-size:14px;">
+                                        📚 <strong>AI-Generated Articles</strong> — Syllabus-mapped content from verified NCERT sources
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:8px 0; color:#4a5568; font-size:14px;">
+                                        🧠 <strong>Interactive Quizzes</strong> — UPSC-pattern MCQs with detailed explanations
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:8px 0; color:#4a5568; font-size:14px;">
+                                        📰 <strong>Current Affairs</strong> — Daily updates automatically linked to your syllabus
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:8px 0; color:#4a5568; font-size:14px;">
+                                        📊 <strong>Progress Tracking</strong> — Track mastery across all UPSC topics
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background:#f9fafb; padding:24px 40px; border-top:1px solid #e5e7eb;">
+                            <p style="margin:0 0 4px; color:#9ca3af; font-size:12px; text-align:center;">
+                                You received this email because you signed up on TheKnowledgeOrbits.
+                            </p>
+                            <p style="margin:0; color:#9ca3af; font-size:12px; text-align:center;">
+                                If you didn't create an account, you can safely ignore this email.
+                            </p>
+                            <p style="margin:12px 0 0; color:#d1d5db; font-size:11px; text-align:center;">
+                                &copy; 2026 TheKnowledgeOrbits &bull; AI-Powered UPSC OS
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

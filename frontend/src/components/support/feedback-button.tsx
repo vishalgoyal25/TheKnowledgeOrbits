@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   MessageSquare,
   Send,
@@ -43,6 +44,7 @@ import { ApiError } from "@/lib/types";
  * a multi-field form for user suggestions.
  */
 export default function FeedbackButton() {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();

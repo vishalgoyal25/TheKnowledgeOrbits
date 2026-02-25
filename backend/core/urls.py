@@ -5,25 +5,56 @@ URL configuration for TheKnowledgeOrbits.
 from typing import Any
 
 from django.contrib import admin
+from django.db import connection
+from django.http import JsonResponse
 from django.urls import include, path
 
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
+
+def health_check(request: Any) -> JsonResponse:
+    """Ultra-lightweight health check for Render/LB."""
+    health = {
+        "status": "healthy",
+        "message": "TheKnowledgeOrbits API is running",
+        "db": "connected",
+    }
+    try:
+        # Check if DB is reachable
+        connection.ensure_connection()
+    except Exception:
+        health["status"] = "unhealthy"
+        health["db"] = "disconnected"
+        return JsonResponse(health, status=503)
+
+    return JsonResponse(health, status=200)
 
 
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def health_check(request) -> Any:  # type: ignore
-    """Health check endpoint."""
-    return Response(
-        {"status": "healthy", "message": "TheKnowledgeOrbits API is running"},
-        status=status.HTTP_200_OK,
+def api_index(request: Any) -> JsonResponse:
+    """API Index with available modules (Plain Django for speed)."""
+    return JsonResponse(
+        {
+            "name": "TheKnowledgeOrbits API",
+            "version": "v1",
+            "status": "online",
+            "endpoints": {
+                "health": "/api/v1/health/",
+                "auth": "/api/v1/auth/",
+                "content": "/api/v1/content/",
+                "knowledge": "/api/v1/knowledge/",
+                "articles": "/api/v1/articles/",
+                "current_affairs": "/api/v1/ca/",
+                "assessment": "/api/v1/assessment/",
+                "user_state": "/api/v1/userstate/",
+                "analytics": "/api/v1/analytics/",
+                "authorization": "/api/v1/authorization/",
+                "support": "/api/v1/support/",
+            },
+        },
+        status=200,
     )
 
 
 urlpatterns = [
+    path("", api_index, name="api-index"),
     path("admin/", admin.site.urls),
     path("api/v1/health/", health_check, name="health-check"),
     # Engine URLs will be added here as we build them
