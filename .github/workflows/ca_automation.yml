@@ -28,15 +28,6 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'backend/requirements/scraper.txt'
 
-      - name: 🧠 Cache ML Models
-        uses: actions/cache@v4
-        id: cache-models
-        with:
-          path: ~/.cache/torch/sentence_transformers
-          key: ml-model-all-MiniLM-L6-v2-v1
-          restore-keys: |
-             ml-model-all-MiniLM-L6-v2-
-
       - name: 📦 Install Scraper Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -57,8 +48,12 @@ jobs:
           SECRET_KEY: ${{ secrets.PROD_SECRET_KEY }}
           DEBUG: "False"
 
+          # Embeddings: use HuggingFace API instead of loading local model
+          # (avoids 400MB model download on every run, saves ~3min per job)
+          HF_API_TOKEN: ${{ secrets.PROD_HF_API_TOKEN }}
+          USE_EMBEDDING_API: "True"
+
           # Environment optimization
-          SENTENCE_TRANSFORMERS_HOME: ~/.cache/torch/sentence_transformers
           PYTHONPATH: .
           PYTHONDONTWRITEBYTECODE: 1
         run: |

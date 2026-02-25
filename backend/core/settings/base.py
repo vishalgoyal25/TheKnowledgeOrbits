@@ -95,7 +95,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("DB_NAME", default="TheKnowledgeOrbits"),
         "USER": env("DB_USER", default="postgres"),
-        "PASSWORD": env("DB_PASSWORD", default="admin123"),
+        "PASSWORD": env("DB_PASSWORD"),  # No default — must be set explicitly
         "HOST": env("DB_HOST", default="localhost"),
         "PORT": env("DB_PORT", default="5432"),
         "OPTIONS": {

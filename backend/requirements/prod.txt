@@ -1,0 +1,12 @@
+# ============================================================================
+# prod.txt — Extra packages needed ONLY in production (Render deployment)
+# ============================================================================
+# Install in addition to base.txt:
+#   pip install -r requirements/base.txt -r requirements/prod.txt
+# ============================================================================
+
+# Production WSGI server (replaces `manage.py runserver`)
+gunicorn>=23.0.0
+
+# Serve static files directly from Django — no S3/CDN needed on free tier
+whitenoise>=6.9.0
