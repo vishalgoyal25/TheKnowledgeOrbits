@@ -58,3 +58,14 @@ jobs:
           PYTHONDONTWRITEBYTECODE: 1
         run: |
           python manage.py scrape_ca
+
+      - name: 🔍 Check Environment on Failure
+        if: failure()
+        working-directory: ./backend
+        run: |
+          echo "Listing installed packages..."
+          pip list
+          echo "Checking PYTHONPATH..."
+          echo $PYTHONPATH
+          echo "Verifying simplejwt module location..."
+          python -c "import rest_framework_simplejwt; print(rest_framework_simplejwt.__file__)" || echo "Module NOT found"
