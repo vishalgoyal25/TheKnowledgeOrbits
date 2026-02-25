@@ -38,7 +38,7 @@ SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 X_FRAME_OPTIONS = "DENY"
-SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/"]
+SECURE_REDIRECT_EXEMPT = [r"^/api/v1/health/", r"^/$"]
 
 # ── Static Files (WhiteNoise) ─────────────────────────────────────────────────
 # WhiteNoise serves static files directly from Django — no S3/CDN needed on

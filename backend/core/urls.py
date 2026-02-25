@@ -11,21 +11,18 @@ from django.urls import include, path
 
 
 def health_check(request: Any) -> JsonResponse:
-    """Ultra-lightweight health check for Render/LB."""
-    health = {
-        "status": "healthy",
-        "message": "TheKnowledgeOrbits API is running",
-        "db": "connected",
-    }
-    try:
-        # Check if DB is reachable
-        connection.ensure_connection()
-    except Exception:
-        health["status"] = "unhealthy"
-        health["db"] = "disconnected"
-        return JsonResponse(health, status=503)
-
-    return JsonResponse(health, status=200)
+    """
+    Ultra-lightweight health check for Render/LB.
+    Does NOT check DB to avoid connection pool exhaustion
+    and 5s timeout failures during heavy DB load.
+    """
+    return JsonResponse(
+        {
+            "status": "healthy",
+            "message": "TheKnowledgeOrbits API is operational",
+        },
+        status=200,
+    )
 
 
 def api_index(request: Any) -> JsonResponse:
@@ -36,7 +33,6 @@ def api_index(request: Any) -> JsonResponse:
             "version": "v1",
             "status": "online",
             "endpoints": {
-                "health": "/api/v1/health/",
                 "auth": "/api/v1/auth/",
                 "content": "/api/v1/content/",
                 "knowledge": "/api/v1/knowledge/",
