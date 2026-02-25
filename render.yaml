@@ -1,0 +1,108 @@
+# ==============================================================================
+# render.yaml — Render Infrastructure-as-Code (IaC) manifest
+# ==============================================================================
+# Docs: https://render.com/docs/blueprint-spec
+# Usage: Connect this repo on Render → "New Blueprint" → auto-detects this file
+# ==============================================================================
+
+services:
+  # ── Django Backend (Web Service) ───────────────────────────────────────────
+  - type: web
+    name: theknowledgeorbits-backend
+    runtime: python
+    region: oregon   # closest to free-tier Supabase region
+
+    # Build configuration
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r backend/requirements/base.txt
+      pip install -r backend/requirements/prod.txt
+      cd backend && python manage.py collectstatic --noinput
+
+    # Start command: gunicorn with 2 workers (optimal for free tier: 512MB RAM)
+    startCommand: "cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -"
+
+    # Pre-deploy: run migrations before new version goes live (zero-downtime)
+    # Render runs this in a one-off container before routing traffic
+    preDeployCommand: "cd backend && python manage.py migrate --noinput"
+
+    healthCheckPath: /api/v1/health/
+
+    # Environment variables — set actual secret values in the Render dashboard
+    # (Never commit real secrets to this file!)
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: core.settings.prod
+      - key: PYTHONPATH
+        value: .
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # ── Secrets (set in Render Dashboard → Environment) ────────────────────
+      # These are placeholders — override in the Render dashboard UI
+      - key: SECRET_KEY
+        generateValue: true   # Render auto-generates a secure key on first deploy
+
+      - key: DEBUG
+        value: "False"
+
+      # Render service URL (set after first deploy / use custom domain)
+      # Format: theknowledgeorbits-backend.onrender.com
+      - key: ALLOWED_HOSTS
+        sync: false   # Must be set manually in dashboard
+
+      # CSRF origins: include both Render backend URL and Vercel frontend URL
+      # e.g. https://theknowledgeorbits-backend.onrender.com,https://theknowledgeorbits.vercel.app
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+
+      # CORS: Vercel frontend URL(s)
+      # e.g. https://theknowledgeorbits.vercel.app
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+      # ── Supabase Database ──────────────────────────────────────────────────
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+
+      # ── AI & Embeddings ───────────────────────────────────────────────────
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_API_TOKEN
+        sync: false
+      - key: USE_EMBEDDING_API
+        value: "True"
+
+      # ── Email (Brevo SMTP) ─────────────────────────────────────────────────
+      - key: EMAIL_HOST
+        value: smtp-relay.brevo.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+
+      # ── Frontend URL ──────────────────────────────────────────────────────
+      - key: FRONTEND_URL
+        sync: false   # e.g. https://theknowledgeorbits.vercel.app
+
+      # ── Monitoring (optional) ─────────────────────────────────────────────
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: production
