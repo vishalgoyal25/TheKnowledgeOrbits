@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GROQ_API_KEY: mock-key-for-linting
+      DB_PASSWORD: mock-password-for-linting   # Required: base.py has no default (security fix)
     steps:
       - uses: actions/checkout@v4
 
