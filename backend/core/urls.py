@@ -32,6 +32,7 @@ def api_index(request: Any) -> JsonResponse:
             "version": "v1",
             "status": "online",
             "endpoints": {
+                "health": "/api/v1/health/",
                 "auth": "/api/v1/auth/",
                 "content": "/api/v1/content/",
                 "knowledge": "/api/v1/knowledge/",

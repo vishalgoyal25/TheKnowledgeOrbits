@@ -6,8 +6,11 @@ import sentry_sdk
 Article Generation Engine Views
 """
 
+from django.db.models import Q
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -41,19 +44,27 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
 
     permission_classes = [AllowAny]
     lookup_field = "id"
+    pagination_class = PageNumberPagination
 
     ordering_fields = ["created_at", "title", "review_status"]
     ordering = ["-created_at"]
 
     def get_queryset(self) -> Any:
-        """Get articles (filtered by visibility)."""
-        queryset = Article.objects.filter(is_published=True).select_related(
-            "topic", "topic__subject"
-        )
+        """
+        Get articles.
+        - Anonymous: Only is_published=True AND is_public=True
+        - Logged-in: (is_published=True AND is_public=True) OR (created_by=user)
+        """
+        if self.request.user.is_authenticated:
+            # User can see all public published articles OR any article they created
+            queryset = Article.objects.filter(
+                Q(is_published=True, is_public=True) | Q(created_by=self.request.user)
+            )
+        else:
+            # Anonymous see only public published
+            queryset = Article.objects.filter(is_published=True, is_public=True)
 
-        # Apply visibility filtering (PKB Ownership Logic)
-        visibility_service = get_visibility_service()
-        queryset = visibility_service.filter_articles(queryset, self.request.user)  # type: ignore
+        queryset = queryset.select_related("topic", "topic__subject")
 
         # Filter by topic
         topic_id = self.request.query_params.get("topic_id")
@@ -65,7 +76,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
         if review_status:
             queryset = queryset.filter(review_status=review_status)
 
-        return queryset
+        return queryset.order_by("-created_at")
 
     def retrieve(self, request, *args, **kwargs) -> Any:  # type: ignore
         """Retrieve article and log read event."""
