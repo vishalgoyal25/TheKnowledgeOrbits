@@ -50,11 +50,14 @@ EXPOSE 8000
 
 # Start Gunicorn with optimized settings for Render
 # - Use the dynamic $PORT provided by Render
-# - Multiple workers for concurrency
+# - ONE worker to stay within 512MB RAM limit (Critical for Render Free)
+# - gthread class for lightweight concurrency via threads instead of fork-processes
 # - Increased timeout to 120s to allow for cold starts
 CMD gunicorn core.wsgi:application \
     --bind 0.0.0.0:${PORT:-8000} \
-    --workers 3 \
+    --workers 1 \
+    --threads 4 \
+    --worker-class gthread \
     --timeout 120 \
     --access-logfile - \
     --error-logfile -
