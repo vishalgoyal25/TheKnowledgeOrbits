@@ -5,7 +5,6 @@ URL configuration for TheKnowledgeOrbits.
 from typing import Any
 
 from django.contrib import admin
-from django.db import connection
 from django.http import JsonResponse
 from django.urls import include, path
 
