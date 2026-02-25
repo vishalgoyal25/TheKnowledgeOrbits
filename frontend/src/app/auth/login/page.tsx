@@ -2,47 +2,49 @@
  * Login Page
  */
 
+"use client";
+
 import { Suspense } from "react";
 import LoginForm from "@/components/auth/LoginForm";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            Welcome Back
-          </CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your TheKnowledgeOrbits account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Suspense fallback={<div>Loading...</div>}>
+    <div className="container relative min-h-[calc(100vh-8rem)] flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-1 lg:px-0">
+      <div className="lg:p-8">
+        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[450px]">
+          <div className="flex flex-col space-y-2 text-center">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Welcome Back
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Sign in to your TheKnowledgeOrbits account
+            </p>
+          </div>
+          <Suspense
+            fallback={
+              <div className="flex justify-center p-8">
+                <Loader2 className="animate-spin" />
+              </div>
+            }
+          >
             <LoginForm />
           </Suspense>
 
-          <div className="mt-6 text-center text-sm">
-            <p className="text-gray-600">
-              Don't have an account?{" "}
-              <Link
-                href="/auth/register"
-                className="text-blue-600 hover:underline font-medium"
-              >
-                Sign up
-              </Link>
-            </p>
+          <div className="text-center text-sm">
+            <span className="text-muted-foreground">
+              Don&apos;t have an account?{" "}
+            </span>
+            <Link
+              href="/auth/register"
+              className="text-blue-600 hover:underline font-semibold"
+            >
+              Create one for free
+            </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

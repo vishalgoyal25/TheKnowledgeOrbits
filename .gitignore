@@ -83,3 +83,4 @@ docs/
 new_docs/
 .ipynb_checkpoints/
 *.db
+*.sql
