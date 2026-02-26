@@ -13,7 +13,7 @@ interface Props {
 export default function BookmarkButton({
   contentType,
   contentId,
-  title,
+  title: _title,
 }: Props) {
   const { isBookmarked, toggle, isLoading } = useBookmarkToggle(
     contentType,

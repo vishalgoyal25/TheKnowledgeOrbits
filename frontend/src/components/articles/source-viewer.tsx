@@ -1,9 +1,9 @@
 "use client";
 
 import { ArticleSourceMap } from "@/lib/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Star, Book, Newspaper } from "lucide-react";
+import { Book, Newspaper } from "lucide-react";
 
 interface SourceViewerProps {
   sources: ArticleSourceMap[];

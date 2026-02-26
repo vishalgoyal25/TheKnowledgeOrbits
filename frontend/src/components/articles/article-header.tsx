@@ -1,11 +1,9 @@
 "use client";
 
 import { Article } from "@/lib/types";
-import { Article as NotebookArticle } from "@/types/notebook";
 import BookmarkButton from "./bookmark-button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, FileText, Star, Tag } from "lucide-react";
+import { Calendar, Clock, Star, Tag } from "lucide-react";
 import { formatDate, getQualityColor } from "@/lib/utils";
 
 interface Props {

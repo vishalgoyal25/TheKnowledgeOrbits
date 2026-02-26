@@ -20,16 +20,16 @@ django.setup()
 
 from engines.content.services.embedding_service import EmbeddingService  # noqa: E402
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# ---- helpers ----
 
-PASS = "\033[92m✅ PASS\033[0m"
-FAIL = "\033[91m❌ FAIL\033[0m"
-INFO = "\033[94mℹ️  INFO\033[0m"
+UI_PASS = "[PASS]"  # nosec B105
+UI_FAIL = "[FAIL]"  # nosec B105
+UI_INFO = "[INFO]"
 results = []
 
 
 def check(label: str, condition: bool, detail: str = ""):
-    status = PASS if condition else FAIL
+    status = UI_PASS if condition else UI_FAIL
     msg = f"  {status}  {label}"
     if detail:
         msg += f"\n         {detail}"
@@ -97,7 +97,7 @@ try:
     check("create_embedding_record vector dim", len(record["vector"]) == 384)
 
     local_sample_val = vec[0]
-    print(f"\n  {INFO}  First 5 dims of local embedding: {vec[:5]}")
+    print(f"\n  {UI_INFO}  First 5 dims of local embedding: {vec[:5]}")
 
 except Exception as e:
     check("LOCAL MODE — no unhandled exceptions", False, str(e))
@@ -112,7 +112,7 @@ print("=" * 60)
 hf_token = os.getenv("HF_API_TOKEN", "")
 if not hf_token:
     print(
-        f"  {INFO}  HF_API_TOKEN not set — skipping live cloud test (fallback will be tested instead)."
+        f"  {UI_INFO}  HF_API_TOKEN not set — skipping live cloud test (fallback will be tested instead)."
     )
     CLOUD_LIVE = False
 else:
@@ -143,12 +143,12 @@ try:
             "Cloud batch all vectors are 384-dim", all(len(v) == 384 for v in vecs_api)
         )
 
-        print(f"\n  {INFO}  First 5 dims of cloud embedding: {vec_api[:5]}")
+        print(f"\n  {UI_INFO}  First 5 dims of cloud embedding: {vec_api[:5]}")
 
     else:
         # Token missing → should automatically fall back to local model
         print(
-            f"  {INFO}  Testing API-mode FALLBACK (no token → falls back to local)..."
+            f"  {UI_INFO}  Testing API-mode FALLBACK (no token → falls back to local)..."
         )
         EmbeddingService._local_model = None
         os.environ.pop("HF_API_TOKEN", None)  # Ensure missing
@@ -168,7 +168,7 @@ except Exception as e:
 # =============================================================================
 os.environ["USE_EMBEDDING_API"] = "False"
 EmbeddingService._local_model = None
-print(f"\n  {INFO}  Reset USE_EMBEDDING_API=False (local mode default restored).")
+print(f"\n  {UI_INFO}  Reset USE_EMBEDDING_API=False (local mode default restored).")
 
 # =============================================================================
 # SUMMARY
@@ -180,9 +180,9 @@ failed = total - passed
 print(f"  RESULT: {passed}/{total} checks passed  |  {failed} failed")
 
 if failed == 0:
-    print(f"  {PASS}  Hybrid AI Brain is verified and production-ready!")
+    print(f"  {UI_PASS}  Hybrid AI Brain is verified and production-ready!")
 else:
-    print(f"  {FAIL}  {failed} check(s) need attention.")
+    print(f"  {UI_FAIL}  {failed} check(s) need attention.")
 print("=" * 60 + "\n")
 
 sys.exit(0 if failed == 0 else 1)

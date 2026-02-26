@@ -44,7 +44,7 @@ import { ApiError } from "@/lib/types";
  * a multi-field form for user suggestions.
  */
 export default function FeedbackButton() {
-  const pathname = usePathname();
+  const _pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();

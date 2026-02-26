@@ -99,7 +99,7 @@ class BookmarkSerializer(serializers.ModelSerializer):  # type: ignore
                     "difficulty_level": quiz.difficulty_level,
                     "question_count": quiz.question_count,
                 }
-        except Exception:
+        except Exception:  # nosec B110
             pass
         return None
 

@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useSearch } from "@/lib/hooks/use-search";
 import Link from "next/link";
 import SearchResults from "@/components/search/search-results";

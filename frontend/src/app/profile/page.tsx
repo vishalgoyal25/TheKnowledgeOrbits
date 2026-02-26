@@ -6,7 +6,7 @@
 
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth/useAuth";
-import { User, Mail, Calendar, ShieldCheck, BadgeCheck } from "lucide-react";
+import { Mail, Calendar, ShieldCheck, BadgeCheck } from "lucide-react";
 
 export default function ProfilePage() {
   const { user } = useAuth();

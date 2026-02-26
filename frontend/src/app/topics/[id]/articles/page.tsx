@@ -26,7 +26,7 @@ export default function TopicArticlesPage() {
   const { data: topic, isLoading: topicLoading } = useTopic(topicId);
   const { data: articlesData, isLoading: articlesLoading } =
     useArticlesByTopic(topicId);
-  const { data: caChunks, isLoading: caChunksLoading } = useCAChunksForTopic(
+  const { data: caChunks, isLoading: _caChunksLoading } = useCAChunksForTopic(
     topicId,
     30,
   );

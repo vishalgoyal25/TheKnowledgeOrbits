@@ -9,7 +9,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuizzes, useGenerateQuiz } from "@/lib/hooks/use-quiz";
+import { useQuizzes } from "@/lib/hooks/use-quiz";
 import QuizCard from "@/components/quiz/quiz-card";
 import QuizFilters from "@/components/quiz/quiz-filters";
 import { Button } from "@/components/ui/button";

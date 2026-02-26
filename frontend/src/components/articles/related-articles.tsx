@@ -5,14 +5,15 @@
 
 "use client";
 
-import { Article } from "@/lib/types";
-
 interface Props {
   currentArticleId: string;
   topicId: string;
 }
 
-export default function RelatedArticles({ currentArticleId, topicId }: Props) {
+export default function RelatedArticles({
+  currentArticleId: _currentArticleId,
+  topicId: _topicId,
+}: Props) {
   // TODO: Fetch related articles from API based on topic
   return (
     <div className="mt-12 pt-8 border-t">

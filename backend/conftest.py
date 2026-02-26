@@ -76,7 +76,7 @@ def mock_ml_models(monkeypatch: Any) -> None:
                     "sentence_transformers.SentenceTransformer",
                     MagicMock(return_value=mock_instance),
                 )
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     # 2. Patch OpenAI & Groq using sys.modules to avoid F811

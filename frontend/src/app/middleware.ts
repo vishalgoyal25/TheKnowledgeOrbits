@@ -9,7 +9,7 @@ import type { NextRequest } from "next/server";
  *
  * To enable protection, set auth cookies on login and uncomment the guard below.
  */
-export function middleware(request: NextRequest) {
+export function middleware(_request: NextRequest) {
   // Future: check for auth cookie and redirect to /auth/login if missing
   // const token = request.cookies.get('access_token');
   // const protectedPaths = ['/dashboard', '/notebook', '/assessment'];
