@@ -118,7 +118,7 @@ export function createLogger(namespace: string): Logger {
         // In modern Next.js this usually works fine.
         // eslint-disable-next-line @typescript-eslint/no-var-requires
         const chalk = require("chalk");
-        const levelColours: Record<LogLevel, any> = {
+        const levelColours: Record<LogLevel, (text: string) => string> = {
           debug: chalk.gray,
           info: chalk.blue.bold,
           warn: chalk.yellow.bold,

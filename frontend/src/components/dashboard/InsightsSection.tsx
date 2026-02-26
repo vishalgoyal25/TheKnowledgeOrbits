@@ -22,11 +22,11 @@ export default function InsightsSection({ insights }: Props) {
         ) : (
           <div className="space-y-3">
             {insights.map((insight, idx) => {
-              const data = insight.data as Record<string, any>;
+              const data = insight.data as Record<string, unknown>;
               return (
                 <Alert key={idx} className="bg-blue-50 border-blue-200">
                   <AlertDescription className="text-sm">
-                    {data.message || "New insight available"}
+                    {(data.message as string) || "New insight available"}
                   </AlertDescription>
                 </Alert>
               );

@@ -72,8 +72,9 @@ export default function NotebookPage() {
 
   const filteredBookmarks = bookmarks?.filter((b) => {
     // Safely extract title from dynamic content structure
-    const content = b.content as Record<string, any>;
-    const title = content?.title || b.notes || "Untitled Bookmark";
+    const content = b.content as Record<string, unknown>;
+    const title =
+      (content?.title as string) || (b.notes as string) || "Untitled Bookmark";
     return title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 

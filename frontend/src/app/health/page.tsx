@@ -7,14 +7,11 @@
 import { useEffect, useState } from "react";
 import {
   Activity,
-  CheckCircle2,
-  Server,
   Globe,
   Database,
   Cpu,
   Code2,
   ExternalLink,
-  Layers,
   Layout,
   Terminal,
 } from "lucide-react";

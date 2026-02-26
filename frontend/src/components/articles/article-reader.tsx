@@ -15,7 +15,6 @@ import { useReadingProgress } from "@/lib/hooks/use-reading-progress";
 import ArticleHeader from "./article-header";
 import ArticleContent from "./article-content";
 import ReadingProgress from "./reading-progress";
-import BookmarkButton from "./bookmark-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Newspaper } from "lucide-react";

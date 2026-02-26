@@ -3,7 +3,6 @@
  */
 
 import React from "react";
-import Sidebar from "@/components/layout/sidebar";
 
 export default function DashboardLayout({
   children,

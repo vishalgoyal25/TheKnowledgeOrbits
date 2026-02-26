@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bookmark } from "@/types/notebook";
 import { bookmarksAPI } from "@/lib/api/bookmarks";
-import { FileText, Brain, Trash2, Edit, ExternalLink } from "lucide-react";
+import { FileText, Brain, Trash2, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import RemoveBookmarkDialog from "./RemoveBookmarkDialog";
 import { createLogger } from "@/lib/logger";

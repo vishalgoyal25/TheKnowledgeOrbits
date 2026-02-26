@@ -4,9 +4,10 @@ Bookmark Service
 Handles bookmark CRUD operations.
 """
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from django.db import transaction
+from django.db.models import QuerySet
 
 import structlog
 
@@ -113,7 +114,7 @@ class BookmarkService:
     @staticmethod
     def get_bookmarks(
         user: "User", content_type: Optional[str] = None
-    ) -> List[Bookmark]:
+    ) -> QuerySet[Bookmark]:
         """
         Get user's bookmarks.
 
@@ -122,7 +123,7 @@ class BookmarkService:
             content_type: Optional filter
 
         Returns:
-            List of Bookmark instances
+            QuerySet of Bookmark instances
         """
         queryset = Bookmark.objects.filter(user=user)
 
@@ -131,7 +132,7 @@ class BookmarkService:
                 raise ValueError("Invalid content_type")
             queryset = queryset.filter(content_type=content_type)
 
-        return list(queryset.order_by("-created_at"))
+        return queryset.order_by("-created_at")
 
     @staticmethod
     def is_bookmarked(user: "User", content_type: str, content_id: str) -> bool:

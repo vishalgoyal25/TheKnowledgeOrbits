@@ -1,6 +1,6 @@
 """User State Engine Views."""
 
-from typing import cast
+from typing import Any, cast
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -69,7 +69,7 @@ def get_mastery(request: Request) -> Response:
     masteries = masteries.order_by("-mastery_score")
 
     paginator = StandardPageNumberPagination()
-    paginated_masteries = paginator.paginate_queryset(masteries, request)
+    paginated_masteries: Any = paginator.paginate_queryset(masteries, request)
     serializer = TopicMasterySerializer(paginated_masteries, many=True)
     return paginator.get_paginated_response(serializer.data)
 
@@ -121,7 +121,7 @@ def list_bookmarks(request: Request) -> Response:
         # We need to turn list into queryset or deal with list inside paginator.
         # Since get_bookmarks returns a queryset (Bookmark config), we can paginate directly.
         paginator = StandardPageNumberPagination()
-        paginated_bookmarks = paginator.paginate_queryset(bookmarks, request)
+        paginated_bookmarks: Any = paginator.paginate_queryset(bookmarks, request)
         serializer = BookmarkSerializer(paginated_bookmarks, many=True)
         return paginator.get_paginated_response(serializer.data)
 
@@ -281,6 +281,6 @@ def list_reading_progress(request: Request) -> Response:
     progress = ReadingProgress.objects.filter(user=user).order_by("-updated_at")
 
     paginator = StandardPageNumberPagination()
-    paginated_progress = paginator.paginate_queryset(progress, request)
+    paginated_progress: Any = paginator.paginate_queryset(progress, request)
     serializer = ReadingProgressSerializer(paginated_progress, many=True)
     return paginator.get_paginated_response(serializer.data)

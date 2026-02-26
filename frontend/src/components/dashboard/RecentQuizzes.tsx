@@ -24,9 +24,9 @@ export default function RecentQuizzes({ isGuest = false }: RecentQuizzesProps) {
       quiz: {
         id: "mock-q1",
         title: "Indian Polity: Preamble",
-        topic: { name: "Polity" } as unknown as any, // Using unknown as bridge
+        topic: { name: "Polity" },
         question_count: 10,
-      } as unknown as any,
+      } as unknown as QuizAttempt["quiz"],
       status: "submitted",
       score: 80,
       accuracy: 80,
@@ -36,15 +36,15 @@ export default function RecentQuizzes({ isGuest = false }: RecentQuizzesProps) {
       started_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
       submitted_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
       time_spent: 600,
-    } as unknown as QuizAttempt,
+    } as QuizAttempt,
     {
       id: "mock-2",
       quiz: {
         id: "mock-q2",
         title: "Modern History: Gandhian Era",
-        topic: { name: "History" } as unknown as any,
+        topic: { name: "History" },
         question_count: 15,
-      } as unknown as any,
+      } as unknown as QuizAttempt["quiz"],
       status: "active",
       score: null,
       accuracy: 0,
@@ -54,7 +54,7 @@ export default function RecentQuizzes({ isGuest = false }: RecentQuizzesProps) {
       started_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
       submitted_at: null,
       time_spent: 120,
-    } as unknown as QuizAttempt,
+    } as QuizAttempt,
   ];
   // Only fetch if not guest
   const { data: attempts, isLoading } = useMyAttempts(undefined, {

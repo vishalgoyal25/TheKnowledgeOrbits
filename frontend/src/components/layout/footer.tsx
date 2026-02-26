@@ -14,7 +14,6 @@ import {
   Facebook,
   Mail,
   MapPin,
-  Phone,
 } from "lucide-react";
 
 const footerLinks = {

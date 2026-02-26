@@ -4,13 +4,12 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  FileText,
   Folder,
   Sparkles,
   Newspaper,
@@ -21,7 +20,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
-  GraduationCap,
   LifeBuoy,
   FileQuestion,
   LucideIcon,
@@ -132,7 +130,7 @@ const navItems: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated: _isAuthenticated } = useAuth();
 
   const NavLink = ({ item }: { item: NavItem }) => {
     const Icon = item.icon;
