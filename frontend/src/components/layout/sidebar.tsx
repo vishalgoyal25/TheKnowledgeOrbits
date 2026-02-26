@@ -173,104 +173,114 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "absolute left-0 top-0 flex flex-col bg-white border-r transition-all duration-300 ease-in-out z-40 h-[calc(100vh-112px)]",
-        isCollapsed ? "w-20" : "w-64",
+        "absolute left-0 top-0 flex flex-col bg-white transition-all duration-300 ease-in-out z-40 h-[calc(100vh-112px)]",
+        isCollapsed ? "w-0 border-r-0" : "w-64 border-r",
       )}
     >
       {/* Collapse Toggle */}
       <Button
-        variant="ghost"
+        variant="default"
         size="icon"
-        className="absolute -right-3 top-6 h-6 w-6 rounded-full border bg-white shadow-sm hover:bg-gray-50 z-50"
+        className={cn(
+          "fixed top-[120px] h-10 w-10 rounded-r-xl rounded-l-none border-l-0 shadow-lg bg-blue-600 hover:bg-blue-700 text-white z-50 transition-all duration-300 ease-in-out",
+          isCollapsed ? "left-0" : "left-64",
+        )}
         onClick={toggleSidebar}
         suppressHydrationWarning
       >
         {isCollapsed ? (
-          <ChevronRight className="h-3 w-3" />
+          <ChevronRight className="h-5 w-5" />
         ) : (
-          <ChevronLeft className="h-3 w-3" />
+          <ChevronLeft className="h-5 w-5" />
         )}
       </Button>
 
-      <ScrollArea className="flex-1 px-3 py-6">
-        <div className="space-y-8">
-          {/* Section: Learning */}
-          <div className="space-y-2">
-            {!isCollapsed && (
-              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                Main Menu
-              </p>
-            )}
-            <div className="space-y-1">
-              {navItems
-                .filter((i) => i.category === "primary")
-                .map((item) => (
-                  <NavLink key={item.href} item={item} />
-                ))}
-            </div>
-          </div>
-
-          {/* Section: Tools */}
-          <div className="space-y-2">
-            {!isCollapsed && (
-              <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                Knowledge Tools
-              </p>
-            )}
-            <div className="space-y-1">
-              {navItems
-                .filter((i) => i.category === "tools")
-                .map((item) => (
-                  <NavLink key={item.href} item={item} />
-                ))}
-            </div>
-          </div>
-
-          {/* Upgrade Card / Tip */}
-          {!isCollapsed && (
-            <div className="mx-2 p-4 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl text-white space-y-3 shadow-inner">
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-yellow-400 fill-yellow-400" />
-                <span className="text-xs font-bold">Pro Tip</span>
+      <div
+        className={cn(
+          "flex flex-col h-full transition-opacity duration-200",
+          isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100",
+        )}
+      >
+        <ScrollArea className="flex-1 px-3 py-6">
+          <div className="space-y-8">
+            {/* Section: Learning */}
+            <div className="space-y-2">
+              {!isCollapsed && (
+                <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Main Menu
+                </p>
+              )}
+              <div className="space-y-1">
+                {navItems
+                  .filter((i) => i.category === "primary")
+                  .map((item) => (
+                    <NavLink key={item.href} item={item} />
+                  ))}
               </div>
-              <p className="text-[10px] leading-relaxed opacity-90">
-                Regular quiz attempts increase syllabus retention by up to 45%.
-                Try our daily orbits!
-              </p>
-              <Link href="/assessment/generate">
-                <Button
-                  size="sm"
-                  className="w-full bg-white/20 hover:bg-white/30 text-white border-none text-[10px] h-7"
-                >
-                  Take Quiz
-                </Button>
-              </Link>
             </div>
-          )}
-        </div>
-      </ScrollArea>
 
-      {/* User Footer Section */}
-      <div className="p-4 border-t bg-gray-50/50">
-        <div
-          className={cn(
-            "flex items-center gap-3",
-            isCollapsed ? "justify-center" : "",
-          )}
-        >
-          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border border-blue-200">
-            {user?.full_name?.charAt(0) || "U"}
-          </div>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-gray-900 truncate">
-                {user?.full_name || "Guest Student"}
-              </p>
-              <p className="text-[10px] text-gray-500 truncate">
-                {user?.email || "Aspirant"}
-              </p>
+            {/* Section: Tools */}
+            <div className="space-y-2">
+              {!isCollapsed && (
+                <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Knowledge Tools
+                </p>
+              )}
+              <div className="space-y-1">
+                {navItems
+                  .filter((i) => i.category === "tools")
+                  .map((item) => (
+                    <NavLink key={item.href} item={item} />
+                  ))}
+              </div>
             </div>
-          )}
+
+            {/* Upgrade Card / Tip */}
+            {!isCollapsed && (
+              <div className="mx-2 p-4 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl text-white space-y-3 shadow-inner">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                  <span className="text-xs font-bold">Pro Tip</span>
+                </div>
+                <p className="text-[10px] leading-relaxed opacity-90">
+                  Regular quiz attempts increase syllabus retention by up to
+                  45%. Try our daily orbits!
+                </p>
+                <Link href="/assessment/generate">
+                  <Button
+                    size="sm"
+                    className="w-full bg-white/20 hover:bg-white/30 text-white border-none text-[10px] h-7"
+                  >
+                    Take Quiz
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* User Footer Section */}
+        <div className="p-4 border-t bg-gray-50/50">
+          <div
+            className={cn(
+              "flex items-center gap-3",
+              isCollapsed ? "justify-center" : "",
+            )}
+          >
+            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border border-blue-200">
+              {user?.full_name?.charAt(0) || "U"}
+            </div>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-gray-900 truncate">
+                  {user?.full_name || "Guest Student"}
+                </p>
+                <p className="text-[10px] text-gray-500 truncate">
+                  {user?.email || "Aspirant"}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </aside>

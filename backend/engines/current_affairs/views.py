@@ -17,6 +17,8 @@ from rest_framework.response import Response
 
 import structlog
 
+from core.pagination import StandardPageNumberPagination
+
 from .models import CAArticle, CAChunk, CASource, CATopicLink
 from .serializers import (
     CAArticleSerializer,
@@ -35,6 +37,7 @@ class CASourceViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = CASource.objects.all()
     serializer_class = CASourceSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["name", "last_scraped_at", "article_count"]
     ordering = ["name"]
@@ -93,6 +96,7 @@ class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     queryset = CAArticle.objects.all()
     serializer_class = CAArticleSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardPageNumberPagination
     filter_backends = [filters.OrderingFilter, filters.SearchFilter]
     search_fields = ["title", "content", "author"]
     ordering_fields = ["published_at", "word_count", "chunk_count"]
@@ -129,6 +133,7 @@ class CAChunkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     queryset = CAChunk.objects.all()
     serializer_class = CAChunkSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["published_at", "confidence_score"]
     ordering = ["-published_at"]
@@ -180,6 +185,7 @@ class CATopicLinkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     queryset = CATopicLink.objects.all()
     serializer_class = CATopicLinkSerializer
     permission_classes = [AllowAny]
+    pagination_class = StandardPageNumberPagination
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["relevance_score", "created_at"]
     ordering = ["-relevance_score"]

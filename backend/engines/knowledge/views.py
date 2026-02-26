@@ -16,8 +16,8 @@ from rest_framework.response import Response
 
 import structlog
 
+from core.pagination import StandardPageNumberPagination
 from engines.auth.models import User
-from engines.content.pagination import ContentCursorPagination
 from engines.knowledge.models import (
     ChunkTopicMap,
     Module,
@@ -46,7 +46,7 @@ class ProgramViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = Program.objects.all()
     serializer_class = ProgramSerializer
     permission_classes = [AllowAny]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
 
     def get_queryset(self) -> QuerySet:  # type: ignore
         """
@@ -70,7 +70,7 @@ class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = Subject.objects.select_related("program").all()
     serializer_class = SubjectSerializer
     permission_classes = [AllowAny]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
 
     def get_queryset(self) -> QuerySet:  # type: ignore
         """
@@ -98,7 +98,7 @@ class ModuleViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = Module.objects.select_related("subject__program").all()
     serializer_class = ModuleSerializer
     permission_classes = [AllowAny]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
 
     def get_queryset(self) -> Any:
         """Filter modules."""
@@ -121,7 +121,7 @@ class TopicViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = Topic.objects.select_related("module__subject", "subject").all()
     serializer_class = TopicSerializer
     permission_classes = [AllowAny]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
 
     def get_queryset(self) -> QuerySet:  # type: ignore
         """
@@ -293,7 +293,7 @@ class ChunkTopicMapViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = ChunkTopicMap.objects.select_related("chunk", "topic").all()
     serializer_class = ChunkTopicMapSerializer
     permission_classes = [AllowAny]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
 
     def get_queryset(self) -> Any:
         """Filter mappings."""
@@ -320,7 +320,7 @@ class ThemeViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = Theme.objects.all()
     serializer_class = ThemeSerializer
     permission_classes = [AllowAny]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
 
     def get_queryset(self) -> Any:
         """Filter themes."""

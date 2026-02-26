@@ -20,6 +20,7 @@ from rest_framework.response import Response
 
 import structlog
 
+from core.pagination import StandardPageNumberPagination
 from engines.assessment.models import QuestionResponse, Quiz, QuizAttempt
 from engines.assessment.serializers import (
     QuestionDetailSerializer,
@@ -162,8 +163,10 @@ def list_quizzes(request: Request) -> Response:
     # Prefetch related data
     quizzes = queryset.select_related("topic").order_by("-created_at")
 
-    serializer = QuizListSerializer(quizzes, many=True)
-    return Response(serializer.data)
+    paginator = StandardPageNumberPagination()
+    paginated_quizzes = paginator.paginate_queryset(quizzes, request)
+    serializer = QuizListSerializer(paginated_quizzes, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
 # Add new view for "My Quizzes"
@@ -182,8 +185,10 @@ def my_quizzes(request: Request) -> Response:
         .order_by("-created_at")
     )
 
-    serializer = QuizListSerializer(quizzes, many=True)
-    return Response(serializer.data)
+    paginator = StandardPageNumberPagination()
+    paginated_quizzes = paginator.paginate_queryset(quizzes, request)
+    serializer = QuizListSerializer(paginated_quizzes, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(["GET"])
@@ -492,6 +497,9 @@ def list_user_attempts(request: Request) -> Response:
         queryset = queryset.filter(status=status_filter)
 
     attempts = queryset.select_related("quiz__topic").order_by("-started_at")
-    serializer = QuizAttemptSerializer(attempts, many=True)
 
-    return Response(serializer.data)
+    paginator = StandardPageNumberPagination()
+    paginated_attempts = paginator.paginate_queryset(attempts, request)
+    serializer = QuizAttemptSerializer(paginated_attempts, many=True)
+
+    return paginator.get_paginated_response(serializer.data)
