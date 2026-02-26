@@ -64,7 +64,7 @@ class TestQuizListView:
         response = api_client.get("/api/v1/assessment/quizzes/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 2
+        assert len(response.data["results"]) == 2
 
     def test_inactive_quizzes_hidden(self, api_client, topic):
         """Test inactive quizzes not shown."""
@@ -75,7 +75,7 @@ class TestQuizListView:
         response = api_client.get("/api/v1/assessment/quizzes/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 0
+        assert len(response.data["results"]) == 0
 
 
 @pytest.mark.django_db

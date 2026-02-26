@@ -17,10 +17,10 @@ from rest_framework.response import Response
 
 import structlog
 
+from core.pagination import StandardPageNumberPagination
 from engines.auth.models import User
 from engines.authorization.permissions import CanManageContent
 from engines.content.models import Asset, Chunk, Document, Embedding, IngestionJob
-from engines.content.pagination import ChunkCursorPagination, ContentCursorPagination
 from engines.content.serializers import (
     AssetSerializer,
     ChunkListSerializer,
@@ -43,7 +43,7 @@ class DocumentViewSet(viewsets.ModelViewSet):  # type: ignore
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
     ordering = ["-created_at"]
 
     def get_queryset(self) -> QuerySet:  # type: ignore
@@ -143,7 +143,7 @@ class ChunkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
 
     queryset = Chunk.objects.all()
     permission_classes = [IsAuthenticated]
-    pagination_class = ChunkCursorPagination
+    pagination_class = StandardPageNumberPagination
     ordering = ["document", "chunk_index"]
 
     def get_serializer_class(self) -> Any:
@@ -203,7 +203,7 @@ class EmbeddingViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     queryset = Embedding.objects.all()
     serializer_class = EmbeddingSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
     ordering = ["-created_at"]
 
     def get_queryset(self) -> Any:
@@ -231,7 +231,7 @@ class AssetViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
     ordering = ["-created_at"]
 
     def get_queryset(self) -> Any:
@@ -259,7 +259,7 @@ class IngestionJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     queryset = IngestionJob.objects.all()
     serializer_class = IngestionJobSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = ContentCursorPagination
+    pagination_class = StandardPageNumberPagination
     ordering = ["-created_at"]
 
     def get_queryset(self) -> Any:

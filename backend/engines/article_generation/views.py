@@ -10,12 +10,12 @@ from django.db.models import Q
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 import structlog
 
+from core.pagination import StandardPageNumberPagination
 from engines.shared.services.visibility_service import get_visibility_service
 from engines.userstate.services.activity_service import get_activity_service
 
@@ -44,7 +44,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
 
     permission_classes = [AllowAny]
     lookup_field = "id"
-    pagination_class = PageNumberPagination
+    pagination_class = StandardPageNumberPagination
 
     ordering_fields = ["created_at", "title", "review_status"]
     ordering = ["-created_at"]
@@ -286,10 +286,12 @@ def list_articles(request) -> Any:  # type: ignore
     if topic_id:
         queryset = queryset.filter(topic_id=topic_id)
 
-    articles = queryset.select_related("topic").order_by("-created_at")[:20]
+    articles = queryset.select_related("topic").order_by("-created_at")
 
-    serializer = ArticleListSerializer(articles, many=True)
-    return Response(serializer.data)
+    paginator = StandardPageNumberPagination()
+    paginated_articles = paginator.paginate_queryset(articles, request)
+    serializer = ArticleListSerializer(paginated_articles, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(["GET"])
@@ -306,5 +308,7 @@ def my_notebook(request) -> Any:  # type: ignore
         .order_by("-created_at")
     )
 
-    serializer = ArticleListSerializer(articles, many=True)
-    return Response(serializer.data)
+    paginator = StandardPageNumberPagination()
+    paginated_articles = paginator.paginate_queryset(articles, request)
+    serializer = ArticleListSerializer(paginated_articles, many=True)
+    return paginator.get_paginated_response(serializer.data)

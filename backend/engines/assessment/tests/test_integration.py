@@ -131,11 +131,13 @@ class TestPrivateQuizWorkflow:
         # Check in My Quizzes
         response = client.get("/api/v1/assessment/my-quizzes/")
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) >= 1
+        assert len(response.data["results"]) >= 1
 
         # Check not visible to anonymous
         client.logout()
         response = client.get("/api/v1/assessment/quizzes/")
         assert response.status_code == status.HTTP_200_OK
-        private_quizzes = [q for q in response.data if q["id"] == str(quiz.id)]
+        private_quizzes = [
+            q for q in response.data["results"] if q["id"] == str(quiz.id)
+        ]
         assert len(private_quizzes) == 0

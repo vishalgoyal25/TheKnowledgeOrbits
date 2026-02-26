@@ -15,10 +15,16 @@ const logger = createLogger("API");
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || "v1";
 
-// Handle API URL that might already include /api/v1
-const baseURL = API_URL.includes("/api/")
-  ? API_URL
-  : `${API_URL}/api/${API_VERSION}`;
+// Handle API URL that might already include /api/v1 or missing HTTP prefix
+let cleanApiUrl = API_URL.replace(/\/+$/, "");
+
+if (!cleanApiUrl.startsWith("http://") && !cleanApiUrl.startsWith("https://")) {
+  cleanApiUrl = `https://${cleanApiUrl}`;
+}
+
+const baseURL = cleanApiUrl.includes("/api/")
+  ? cleanApiUrl
+  : `${cleanApiUrl}/api/${API_VERSION}`;
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({

@@ -50,7 +50,7 @@ class TestBookmarkFlow:
         # Step 2: View bookmarks
         response = client.get("/api/v1/userstate/bookmarks/")
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
+        assert len(response.data["results"]) == 1
 
         # Step 3: Remove bookmark
         response = client.delete(f"/api/v1/userstate/bookmarks/{bookmark_id}/")
@@ -58,7 +58,7 @@ class TestBookmarkFlow:
 
         # Step 4: Verify removed
         response = client.get("/api/v1/userstate/bookmarks/")
-        assert len(response.data) == 0
+        assert len(response.data["results"]) == 0
 
 
 @pytest.mark.django_db
@@ -109,5 +109,5 @@ class TestMasteryTracking:
         response = client.get("/api/v1/userstate/mastery/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
-        assert response.data[0]["mastery_score"] == pytest.approx(66.67, 0.1)
+        assert len(response.data["results"]) == 1
+        assert response.data["results"][0]["mastery_score"] == pytest.approx(66.67, 0.1)

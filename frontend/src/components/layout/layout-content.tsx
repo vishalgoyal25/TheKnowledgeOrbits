@@ -22,7 +22,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
         <div
           className={cn(
             "flex-1 min-w-0 transition-all duration-300 ease-in-out",
-            !isHomePage && (isCollapsed ? "lg:pl-20" : "lg:pl-64"),
+            !isHomePage && (isCollapsed ? "lg:pl-0" : "lg:pl-64"),
           )}
         >
           {children}

@@ -42,6 +42,7 @@ services:
     # Name the built image so 'worker' can reuse it — avoids building twice
     image: theknowledgeorbits-backend:dev
     container_name: TheKnowledgeOrbits_backend
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./backend:/app
     ports:

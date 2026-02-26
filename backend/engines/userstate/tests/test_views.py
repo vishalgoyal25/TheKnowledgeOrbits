@@ -77,7 +77,7 @@ class TestGetMasteryView:
         response = client.get("/api/v1/userstate/mastery/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert isinstance(response.data, list)
+        assert isinstance(response.data["results"], list)
 
     def test_get_mastery_weak_filter(self, authenticated_client):
         """Test filtering weak topics."""
@@ -166,7 +166,7 @@ class TestBookmarkViews:
         response = client.get("/api/v1/userstate/bookmarks/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 2
+        assert len(response.data["results"]) == 2
 
     def test_remove_bookmark(self, authenticated_client):
         """Test removing bookmark."""

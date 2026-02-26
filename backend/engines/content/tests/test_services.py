@@ -214,17 +214,20 @@ class TestChunkingService:
 class TestEmbeddingService:
     """Test suite for EmbeddingService."""
 
+    @pytest.fixture(autouse=True)
+    def force_local_embeddings(self):
+        """Mock environment so embeddings are forced to run locally."""
+        with patch.dict("os.environ", {"USE_EMBEDDING_API": "False"}):
+            yield
+
     # Patch the library directly everywhere it is used
-    @patch("sentence_transformers.SentenceTransformer")
-    def test_generate_embedding_returns_384_dim_vector(self, mock_class):
+    @patch.object(EmbeddingService, "_get_local_model")
+    def test_generate_embedding_returns_384_dim_vector(self, mock_get_local_model):
         """Test embedding generation returns 384-dimensional vector."""
         # ARRANGE
         mock_model = Mock()
         mock_model.encode.return_value = [Mock(tolist=lambda: [0.1] * 384)]
-        mock_class.return_value = mock_model
-
-        # Force reload or manually set model to ensure mock is used
-        EmbeddingService._local_model = None
+        mock_get_local_model.return_value = mock_model
 
         text = "Test sentence for embedding."
 
@@ -235,16 +238,13 @@ class TestEmbeddingService:
         assert len(embedding) == 384
         assert all(isinstance(x, float) for x in embedding)
 
-    @patch("sentence_transformers.SentenceTransformer")
-    def test_generate_embedding_calls_model_encode(self, mock_class):
+    @patch.object(EmbeddingService, "_get_local_model")
+    def test_generate_embedding_calls_model_encode(self, mock_get_local_model):
         """Test embedding service calls model.encode()."""
         # ARRANGE
         mock_model = Mock()
         mock_model.encode.return_value = [Mock(tolist=lambda: [0.1] * 384)]
-        mock_class.return_value = mock_model
-
-        # Reset singleton
-        EmbeddingService._local_model = None
+        mock_get_local_model.return_value = mock_model
 
         text = "Test text"
 
@@ -289,8 +289,10 @@ class TestEmbeddingService:
             assert embedding[0] == 0.9
             mock_post.assert_called_once()
 
-    @patch("sentence_transformers.SentenceTransformer")
-    def test_generate_embeddings_batch_processes_multiple_texts(self, mock_class):
+    @patch.object(EmbeddingService, "_get_local_model")
+    def test_generate_embeddings_batch_processes_multiple_texts(
+        self, mock_get_local_model
+    ):
         """Test batch embedding generation."""
         # ARRANGE
         mock_model = Mock()
@@ -299,8 +301,7 @@ class TestEmbeddingService:
             Mock(tolist=lambda: [0.1] * 384),
             Mock(tolist=lambda: [0.2] * 384),
         ]
-        mock_class.return_value = mock_model
-        EmbeddingService._local_model = None
+        mock_get_local_model.return_value = mock_model
 
         texts = ["Text 1", "Text 2"]
 
@@ -323,14 +324,13 @@ class TestEmbeddingService:
         # ASSERT
         assert embeddings == []
 
-    @patch("sentence_transformers.SentenceTransformer")
-    def test_generate_embeddings_mapping(self, mock_class):
+    @patch.object(EmbeddingService, "_get_local_model")
+    def test_generate_embeddings_mapping(self, mock_get_local_model):
         """Test mapping of valid/invalid strings in batch."""
         # ARRANGE
         mock_model = Mock()
         mock_model.encode.return_value = [Mock(tolist=lambda: [0.5] * 384)]
-        mock_class.return_value = mock_model
-        EmbeddingService._local_model = None
+        mock_get_local_model.return_value = mock_model
 
         texts = ["", "Valid content", "  "]
 
@@ -352,14 +352,15 @@ class TestEmbeddingService:
         assert len(args[0]) == 1
         assert args[0][0] == "Valid content"
 
-    @patch("sentence_transformers.SentenceTransformer")
-    def test_create_embedding_record_returns_proper_structure(self, mock_class):
+    @patch.object(EmbeddingService, "_get_local_model")
+    def test_create_embedding_record_returns_proper_structure(
+        self, mock_get_local_model
+    ):
         """Test embedding record has correct structure."""
         # ARRANGE
         mock_model = Mock()
         mock_model.encode.return_value = [Mock(tolist=lambda: [0.1] * 384)]
-        mock_class.return_value = mock_model
-        EmbeddingService._local_model = None
+        mock_get_local_model.return_value = mock_model
 
         # ACT
         record = EmbeddingService.create_embedding_record(

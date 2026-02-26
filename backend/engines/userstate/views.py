@@ -11,6 +11,7 @@ from rest_framework.response import Response
 import sentry_sdk
 import structlog
 
+from core.pagination import StandardPageNumberPagination
 from engines.auth.models import User
 from engines.userstate.models import ReadingProgress, UserEvent, UserProgress
 from engines.userstate.serializers import (
@@ -67,8 +68,10 @@ def get_mastery(request: Request) -> Response:
 
     masteries = masteries.order_by("-mastery_score")
 
-    serializer = TopicMasterySerializer(masteries, many=True)
-    return Response(serializer.data)
+    paginator = StandardPageNumberPagination()
+    paginated_masteries = paginator.paginate_queryset(masteries, request)
+    serializer = TopicMasterySerializer(paginated_masteries, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(["GET"])
@@ -115,8 +118,12 @@ def list_bookmarks(request: Request) -> Response:
     try:
         bookmarks = bookmark_service.get_bookmarks(user=user, content_type=content_type)
 
-        serializer = BookmarkSerializer(bookmarks, many=True)
-        return Response(serializer.data)
+        # We need to turn list into queryset or deal with list inside paginator.
+        # Since get_bookmarks returns a queryset (Bookmark config), we can paginate directly.
+        paginator = StandardPageNumberPagination()
+        paginated_bookmarks = paginator.paginate_queryset(bookmarks, request)
+        serializer = BookmarkSerializer(paginated_bookmarks, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -272,5 +279,8 @@ def list_reading_progress(request: Request) -> Response:
     """
     user = cast(User, request.user)
     progress = ReadingProgress.objects.filter(user=user).order_by("-updated_at")
-    serializer = ReadingProgressSerializer(progress, many=True)
-    return Response(serializer.data)
+
+    paginator = StandardPageNumberPagination()
+    paginated_progress = paginator.paginate_queryset(progress, request)
+    serializer = ReadingProgressSerializer(paginated_progress, many=True)
+    return paginator.get_paginated_response(serializer.data)
