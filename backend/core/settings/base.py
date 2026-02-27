@@ -120,10 +120,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Password Hashing - Argon2 ONLY
+# Password Hashing - Use PBKDF2 as primary for free tier memory limits
 PASSWORD_HASHERS = [
-    "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
 ]
 
 # Internationalization

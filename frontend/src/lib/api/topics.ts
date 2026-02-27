@@ -3,7 +3,7 @@
  */
 
 import apiClient from "./client";
-import { Topic, TopicListResponse, PaginationParams } from "../types";
+import { Topic, PaginationParams } from "../types";
 
 export const topicsAPI = {
   // List all topics

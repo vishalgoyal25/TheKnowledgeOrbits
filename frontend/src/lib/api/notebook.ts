@@ -5,12 +5,10 @@ export const notebookAPI = {
   // Get user's private articles (My Notebook)
   getMyArticles: async (): Promise<Article[]> => {
     const response = await apiClient.get("/articles/my-notebook/");
-    console.log("[DEBUG] getMyArticles response.data:", response.data);
     // Handle paginated response
     const results = Array.isArray(response.data)
       ? response.data
       : response.data.results || [];
-    console.log("[DEBUG] getMyArticles returning:", results);
     return results;
   },
 
@@ -29,7 +27,7 @@ export const notebookAPI = {
   },
 
   // Get all articles (with optional pagination/filters)
-  getArticles: async (params?: Record<string, any>): Promise<Article[]> => {
+  getArticles: async (params?: Record<string, unknown>): Promise<Article[]> => {
     const response = await apiClient.get("/articles/", { params });
     // Handle paginated response
     return Array.isArray(response.data)

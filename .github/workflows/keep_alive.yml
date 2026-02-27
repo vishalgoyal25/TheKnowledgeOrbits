@@ -2,8 +2,8 @@ name: Keep Alive Ghost Worker
 
 on:
   schedule:
-    # Run every 15 minutes to prevent Render free-tier cold starts
-    - cron: '*/15 * * * *'
+    # Run every 10 minutes to reliably prevent Render free-tier cold starts
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Allow manual triggering
 
 jobs:

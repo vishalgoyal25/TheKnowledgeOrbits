@@ -9,6 +9,7 @@ export function useBookmarks(contentType?: "article" | "quiz") {
     queryFn: () => bookmarksAPI.getBookmarks(contentType),
     staleTime: 2 * 60 * 1000, // 2 minutes
     select: (data) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Array.isArray(data) ? data : (data as any).results || [],
   });
 }
