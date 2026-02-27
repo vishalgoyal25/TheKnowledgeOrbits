@@ -128,14 +128,22 @@ class RSSScraperService:
         # Priority 2: Fallback to RSS feed content if full page fetch fails or is blocked
         if not content:
             # Try 'content' list (common in Atom/RSS 2.0)
-            if hasattr(entry, "content") and isinstance(entry.content, list) and entry.content:
+            if (
+                hasattr(entry, "content")
+                and isinstance(entry.content, list)
+                and entry.content
+            ):
                 for c in entry.content:
                     if c.get("value"):
                         content = c.get("value")
                         break
 
             # Try 'summary_detail'
-            if not content and hasattr(entry, "summary_detail") and entry.summary_detail:
+            if (
+                not content
+                and hasattr(entry, "summary_detail")
+                and entry.summary_detail
+            ):
                 content = entry.summary_detail.get("value", "")
 
             # Try 'summary' (fallback)
@@ -237,12 +245,18 @@ class RSSScraperService:
                     element = soup.select_one(selector)
                     if element:
                         # Extract paragraphs securely without scripts/styles
-                        for s in element(["script", "style", "nav", "header", "footer"]):
+                        for s in element(
+                            ["script", "style", "nav", "header", "footer"]
+                        ):
                             s.decompose()
-                        
+
                         paragraphs = element.find_all("p")
                         if paragraphs:
-                            valid_ps = [p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 30]
+                            valid_ps = [
+                                p.get_text().strip()
+                                for p in paragraphs
+                                if len(p.get_text().strip()) > 30
+                            ]
                             if valid_ps:
                                 return " ".join(valid_ps)
 

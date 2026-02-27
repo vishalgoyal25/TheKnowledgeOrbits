@@ -8,7 +8,7 @@ index ba2f15c..ce25cf9 100644
      runs-on: ubuntu-latest
 -    timeout-minutes: 15
 +    timeout-minutes: 45
- 
+
      concurrency:
        group: ca-scraping
 diff --git a/backend/engines/article_generation/views.py b/backend/engines/article_generation/views.py
@@ -18,15 +18,15 @@ index 5ba8064..c864816 100644
 @@ -227,8 +227,10 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
              .order_by("-created_at")
          )
- 
+
 -        serializer = ArticleListSerializer(articles, many=True)
 -        return Response(serializer.data)
 +        paginator = StandardPageNumberPagination()
 +        paginated_articles = paginator.paginate_queryset(articles, request)
 +        serializer = ArticleListSerializer(paginated_articles, many=True)
 +        return paginator.get_paginated_response(serializer.data)
- 
- 
+
+
  class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
 diff --git a/backend/engines/current_affairs/services/rss_scraper.py b/backend/engines/current_affairs/services/rss_scraper.py
 index d0f3993..cbb0d42 100644
@@ -34,7 +34,7 @@ index d0f3993..cbb0d42 100644
 +++ b/backend/engines/current_affairs/services/rss_scraper.py
 @@ -115,43 +115,36 @@ class RSSScraperService:
              return False
- 
+
          # Extract content
 -        # Priority: content > summary > description
 +        # Priority 1: Actively fetch the full article page (for TH and IE full text)
@@ -46,7 +46,7 @@ index d0f3993..cbb0d42 100644
 +        except Exception as e:
 +            sentry_sdk.capture_exception(e)
 +            logger.debug(f"Failed to fetch full content for {url}: {str(e)}")
- 
+
 -        # 1. Try 'content' list (common in Atom/RSS 2.0)
 -        if (
 -            hasattr(entry, "content")
@@ -77,7 +77,7 @@ index d0f3993..cbb0d42 100644
 +                    if c.get("value"):
 +                        content = c.get("value")
 +                        break
- 
+
 -        # 5. Fallback: Fetch full page content if RSS content is empty or too short
 -        if not content or len(content.strip()) < 50:
 -            try:
@@ -99,7 +99,7 @@ index d0f3993..cbb0d42 100644
 +            # Try 'description'
 +            if not content:
 +                content = entry.get("description", "")
- 
+
          # Clean content (basic checks)
          if not content or len(content.strip()) < 10:
 @@ -213,44 +206,54 @@ class RSSScraperService:
@@ -117,10 +117,10 @@ index d0f3993..cbb0d42 100644
              # Timeout is critical to avoid hanging
 -            response = requests.get(url, headers=headers, timeout=10)
 +            response = requests.get(url, headers=headers, timeout=12)
- 
+
              if response.status_code == 200:
                  soup = BeautifulSoup(response.content, "html.parser")
- 
+
 -                # Heuristic to find article content
 -                # 1. Try common article body selectors
 +                # Heuristic to find article content specifically targeting TH and IE
@@ -138,7 +138,7 @@ index d0f3993..cbb0d42 100644
                      "div.content",
 -                    "div.story_details",
                  ]
- 
+
                  for selector in selectors:
                      element = soup.select_one(selector)
                      if element:
@@ -146,14 +146,14 @@ index d0f3993..cbb0d42 100644
 +                        # Extract paragraphs securely without scripts/styles
 +                        for s in element(["script", "style", "nav", "header", "footer"]):
 +                            s.decompose()
-+                        
++
                          paragraphs = element.find_all("p")
                          if paragraphs:
 -                            return " ".join([p.get_text().strip() for p in paragraphs])
 +                            valid_ps = [p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 30]
 +                            if valid_ps:
 +                                return " ".join(valid_ps)
- 
+
 -                # 2. Fallback: Just grab large paragraphs
 +                # 2. Fallback: Just grab large paragraphs from the whole page
                  paragraphs = soup.find_all("p")
@@ -176,29 +176,29 @@ index 70fd256..d508b35 100644
 @@ -58,7 +58,7 @@ export default function ArticlesPage() {
      );
    }
- 
+
 -  const articles = data?.results || [];
 +  const articles = data || [];
- 
+
    return (
      <div className="container mx-auto px-4 py-8">
 @@ -92,9 +92,8 @@ export default function ArticlesPage() {
          />
        </div>
- 
+
 -      {/* Stats */}
        <div className="mb-6 text-sm text-gray-600">
 -        Showing {articles.length} of {data?.count || 0} articles
 +        Showing {articles.length} articles
        </div>
- 
+
        {/* Article Grid */}
 diff --git a/frontend/src/app/notebook/page.tsx b/frontend/src/app/notebook/page.tsx
 index 28af06a..4db9e76 100644
 --- a/frontend/src/app/notebook/page.tsx
 +++ b/frontend/src/app/notebook/page.tsx
 @@ -66,8 +66,8 @@ export default function NotebookPage() {
- 
+
    const filteredAttempts = attempts?.filter(
      (a) =>
 -      a.quiz.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -206,7 +206,7 @@ index 28af06a..4db9e76 100644
 +      a.quiz?.title?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
 +      a.quiz?.topic?.name?.toLowerCase()?.includes(searchQuery.toLowerCase()),
    );
- 
+
    const filteredBookmarks = bookmarks?.filter((b) => {
 diff --git a/frontend/src/app/topics/page.tsx b/frontend/src/app/topics/page.tsx
 index 59ccc30..4bbfe50 100644
@@ -215,12 +215,12 @@ index 59ccc30..4bbfe50 100644
 @@ -56,8 +56,8 @@ export default function TopicsPage() {
      );
    }
- 
+
 -  const topics = topicsData?.results || [];
 -  const subjects = subjectsData?.results || [];
 +  const topics = topicsData || [];
 +  const subjects = subjectsData || [];
- 
+
    // Client-side filter
    const filteredTopics = topics.filter(
 diff --git a/frontend/src/components/dashboard/InsightsSection.tsx b/frontend/src/components/dashboard/InsightsSection.tsx
@@ -241,12 +241,12 @@ index 65c4751..b550a6a 100644
 --- a/frontend/src/components/dashboard/RecentActivity.tsx
 +++ b/frontend/src/components/dashboard/RecentActivity.tsx
 @@ -26,7 +26,7 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
- 
+
    const getMessage = (activity: ActivityType) => {
      // Cast data safely for rendering
 -    const data = activity.event_data as Record<string, unknown>;
 +    const data = (activity.event_data as Record<string, unknown>) || {};
- 
+
      switch (activity.event_type) {
        case "article_read":
 diff --git a/frontend/src/components/quiz/attempt-card.tsx b/frontend/src/components/quiz/attempt-card.tsx
@@ -269,7 +269,7 @@ index 9687094..417ce3d 100644
 +          {attempt.quiz?.topic?.name || "General Knowledge"}
          </div>
        </CardHeader>
- 
+
 @@ -83,14 +83,14 @@ export default function AttemptCard({ attempt }: AttemptCardProps) {
        <CardFooter>
          {isSubmitted ? (
@@ -292,7 +292,7 @@ index bcaeab1..63849c8 100644
 --- a/frontend/src/components/quiz/quiz-card.tsx
 +++ b/frontend/src/components/quiz/quiz-card.tsx
 @@ -51,7 +51,7 @@ export default function QuizCard({ quiz }: QuizCardProps) {
- 
+
          <div className="flex items-center gap-2">
            <span className="text-sm font-medium text-blue-600">
 -            {quiz.topic.name}
@@ -305,7 +305,7 @@ index 22b7506..43e49c1 100644
 --- a/frontend/src/lib/api/articles.ts
 +++ b/frontend/src/lib/api/articles.ts
 @@ -14,9 +14,10 @@ import {
- 
+
  export const articlesAPI = {
    // List articles
 -  list: async (params?: ArticleFilterParams): Promise<ArticleListResponse> => {
@@ -315,7 +315,7 @@ index 22b7506..43e49c1 100644
 +    // Handle paginated response
 +    return Array.isArray(response.data) ? response.data : response.data.results || [];
    },
- 
+
    // Get article by ID
 @@ -51,10 +52,11 @@ export const articlesAPI = {
    listByTopic: async (
@@ -346,7 +346,7 @@ index f11619b..63efad7 100644
 +    console.log("[DEBUG] getBookmarks returning:", results);
 +    return results;
    },
- 
+
    // Add bookmark
 diff --git a/frontend/src/lib/api/notebook.ts b/frontend/src/lib/api/notebook.ts
 index 5748960..25af92a 100644
@@ -363,7 +363,7 @@ index 5748960..25af92a 100644
 +    console.log("[DEBUG] getMyArticles returning:", results);
 +    return results;
    },
- 
+
    // Delete article
 @@ -21,4 +25,11 @@ export const notebookAPI = {
      const response = await apiClient.post("/articles/generate/", data);
@@ -389,7 +389,7 @@ index 8e2cf1d..81e42f3 100644
 +    // Handle paginated response
 +    return Array.isArray(response.data) ? response.data : response.data.results || [];
    },
- 
+
    /**
 @@ -79,7 +80,11 @@ export const quizAPI = {
      const response = await apiClient.get("/assessment/my-attempts/", {
@@ -402,7 +402,7 @@ index 8e2cf1d..81e42f3 100644
 +    console.log("[DEBUG] listMyAttempts returning:", results);
 +    return results;
    },
- 
+
    /**
 @@ -89,6 +94,7 @@ export const quizAPI = {
      topic_id?: string;
@@ -425,14 +425,14 @@ index 7b50af0..d34b2f4 100644
 +    // Handle paginated response
 +    return Array.isArray(response.data) ? response.data : response.data.results || [];
    },
- 
+
    // Get subject by ID
 diff --git a/frontend/src/lib/api/topics.ts b/frontend/src/lib/api/topics.ts
 index 74db412..72ba203 100644
 --- a/frontend/src/lib/api/topics.ts
 +++ b/frontend/src/lib/api/topics.ts
 @@ -7,9 +7,10 @@ import { Topic, TopicListResponse, PaginationParams } from "../types";
- 
+
  export const topicsAPI = {
    // List all topics
 -  list: async (params?: PaginationParams): Promise<TopicListResponse> => {
@@ -442,7 +442,7 @@ index 74db412..72ba203 100644
 +    // Handle paginated response
 +    return Array.isArray(response.data) ? response.data : response.data.results || [];
    },
- 
+
    // Get topic by ID
 @@ -22,21 +23,23 @@ export const topicsAPI = {
    listByModule: async (
@@ -457,7 +457,7 @@ index 74db412..72ba203 100644
 +    // Handle paginated response
 +    return Array.isArray(response.data) ? response.data : response.data.results || [];
    },
- 
+
    // List topics by subject
    listBySubject: async (
      subjectId: string,
