@@ -16,6 +16,7 @@ import { AxiosError } from "axios";
 import { ApiError } from "@/lib/types";
 
 import { Suspense } from "react";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 /**
  * GeneratePageContent - Handles the interactive state for RAG-based article generation.
@@ -184,14 +185,16 @@ function GeneratePageContent() {
 
 export default function GeneratePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="container mx-auto px-4 py-8 text-center text-gray-500">
-          Loading generation tools...
-        </div>
-      }
-    >
-      <GeneratePageContent />
-    </Suspense>
+    <ProtectedRoute>
+      <Suspense
+        fallback={
+          <div className="container mx-auto px-4 py-8 text-center text-gray-500">
+            Loading generation tools...
+          </div>
+        }
+      >
+        <GeneratePageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }

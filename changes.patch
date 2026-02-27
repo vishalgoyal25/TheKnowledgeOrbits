@@ -1,0 +1,485 @@
+diff --git a/.github/workflows/ca_automation.yml b/.github/workflows/ca_automation.yml
+index ba2f15c..ce25cf9 100644
+--- a/.github/workflows/ca_automation.yml
++++ b/.github/workflows/ca_automation.yml
+@@ -11,7 +11,7 @@ jobs:
+   scrape_and_process:
+     name: Execute CA Sync
+     runs-on: ubuntu-latest
+-    timeout-minutes: 15
++    timeout-minutes: 45
+ 
+     concurrency:
+       group: ca-scraping
+diff --git a/backend/engines/article_generation/views.py b/backend/engines/article_generation/views.py
+index 5ba8064..c864816 100644
+--- a/backend/engines/article_generation/views.py
++++ b/backend/engines/article_generation/views.py
+@@ -227,8 +227,10 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
+             .order_by("-created_at")
+         )
+ 
+-        serializer = ArticleListSerializer(articles, many=True)
+-        return Response(serializer.data)
++        paginator = StandardPageNumberPagination()
++        paginated_articles = paginator.paginate_queryset(articles, request)
++        serializer = ArticleListSerializer(paginated_articles, many=True)
++        return paginator.get_paginated_response(serializer.data)
+ 
+ 
+ class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
+diff --git a/backend/engines/current_affairs/services/rss_scraper.py b/backend/engines/current_affairs/services/rss_scraper.py
+index d0f3993..cbb0d42 100644
+--- a/backend/engines/current_affairs/services/rss_scraper.py
++++ b/backend/engines/current_affairs/services/rss_scraper.py
+@@ -115,43 +115,36 @@ class RSSScraperService:
+             return False
+ 
+         # Extract content
+-        # Priority: content > summary > description
++        # Priority 1: Actively fetch the full article page (for TH and IE full text)
+         content = ""
++        try:
++            fetched = RSSScraperService._fetch_full_content(url)
++            if fetched and len(fetched.strip()) > 300:
++                content = fetched
++        except Exception as e:
++            sentry_sdk.capture_exception(e)
++            logger.debug(f"Failed to fetch full content for {url}: {str(e)}")
+ 
+-        # 1. Try 'content' list (common in Atom/RSS 2.0)
+-        if (
+-            hasattr(entry, "content")
+-            and isinstance(entry.content, list)
+-            and entry.content
+-        ):
+-            # Try to find html/text content
+-            for c in entry.content:
+-                if c.get("value"):
+-                    content = c.get("value")
+-                    break
+-
+-        # 2. Try 'summary_detail'
+-        if not content and hasattr(entry, "summary_detail") and entry.summary_detail:
+-            content = entry.summary_detail.get("value", "")
+-
+-        # 3. Try 'summary' (fallback)
+-        if not content and hasattr(entry, "summary"):
+-            content = entry.summary
+-
+-        # 4. Try 'description'
++        # Priority 2: Fallback to RSS feed content if full page fetch fails or is blocked
+         if not content:
+-            content = entry.get("description", "")
++            # Try 'content' list (common in Atom/RSS 2.0)
++            if hasattr(entry, "content") and isinstance(entry.content, list) and entry.content:
++                for c in entry.content:
++                    if c.get("value"):
++                        content = c.get("value")
++                        break
+ 
+-        # 5. Fallback: Fetch full page content if RSS content is empty or too short
+-        if not content or len(content.strip()) < 50:
+-            try:
+-                fetched = RSSScraperService._fetch_full_content(url)
+-                if fetched:
+-                    content = fetched
+-                    # logger.info(f"Fetched full content for '{title}' (Length: {len(content)})")
+-            except Exception as e:
+-                sentry_sdk.capture_exception(e)
+-                logger.debug(f"Failed to fetch full content for {url}: {str(e)}")
++            # Try 'summary_detail'
++            if not content and hasattr(entry, "summary_detail") and entry.summary_detail:
++                content = entry.summary_detail.get("value", "")
++
++            # Try 'summary' (fallback)
++            if not content and hasattr(entry, "summary"):
++                content = entry.summary
++
++            # Try 'description'
++            if not content:
++                content = entry.get("description", "")
+ 
+         # Clean content (basic checks)
+         if not content or len(content.strip()) < 10:
+@@ -213,44 +206,54 @@ class RSSScraperService:
+         Fetch full page content for articles where RSS feed is truncated/empty.
+         """
+         try:
+-            # Basic headers to mimic browser
++            # Modern headers to mimic a real browser to bypass basic bot blocks (Cloudflare, etc.)
+             headers = {
+-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
++                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
++                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
++                "Accept-Language": "en-US,en;q=0.5",
+             }
+             # Timeout is critical to avoid hanging
+-            response = requests.get(url, headers=headers, timeout=10)
++            response = requests.get(url, headers=headers, timeout=12)
+ 
+             if response.status_code == 200:
+                 soup = BeautifulSoup(response.content, "html.parser")
+ 
+-                # Heuristic to find article content
+-                # 1. Try common article body selectors
++                # Heuristic to find article content specifically targeting TH and IE
++                # The Hindu: div.articlebodycontent, class^=content-body
++                # Indian Express: div#pcl-full-content, div.story_details
+                 selectors = [
++                    "div.articlebodycontent",
++                    "div[id^='content-body']",
++                    "div#pcl-full-content",
++                    "div.story_details",
+                     "div.story-details",
+                     "div.full-details",
+                     "article",
+                     "div.article-body",
+                     "div.content",
+-                    "div.story_details",
+                 ]
+ 
+                 for selector in selectors:
+                     element = soup.select_one(selector)
+                     if element:
+-                        # Extract paragraphs
++                        # Extract paragraphs securely without scripts/styles
++                        for s in element(["script", "style", "nav", "header", "footer"]):
++                            s.decompose()
++                        
+                         paragraphs = element.find_all("p")
+                         if paragraphs:
+-                            return " ".join([p.get_text().strip() for p in paragraphs])
++                            valid_ps = [p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 30]
++                            if valid_ps:
++                                return " ".join(valid_ps)
+ 
+-                # 2. Fallback: Just grab large paragraphs
++                # 2. Fallback: Just grab large paragraphs from the whole page
+                 paragraphs = soup.find_all("p")
+                 if paragraphs:
+-                    # Filter out very short UI texts.
+-                    # Only keep p tags with substantial content (> 50 chars) to avoid navigational noise.
++                    # Filter out very short UI texts. (Ads, nav links, etc.)
+                     valid_ps = [
+                         p.get_text().strip()
+                         for p in paragraphs
+-                        if len(p.get_text().strip()) > 50
++                        if len(p.get_text().strip()) > 80
+                     ]
+                     if valid_ps:
+                         return " ".join(valid_ps)
+diff --git a/frontend/src/app/articles/page.tsx b/frontend/src/app/articles/page.tsx
+index 70fd256..d508b35 100644
+--- a/frontend/src/app/articles/page.tsx
++++ b/frontend/src/app/articles/page.tsx
+@@ -58,7 +58,7 @@ export default function ArticlesPage() {
+     );
+   }
+ 
+-  const articles = data?.results || [];
++  const articles = data || [];
+ 
+   return (
+     <div className="container mx-auto px-4 py-8">
+@@ -92,9 +92,8 @@ export default function ArticlesPage() {
+         />
+       </div>
+ 
+-      {/* Stats */}
+       <div className="mb-6 text-sm text-gray-600">
+-        Showing {articles.length} of {data?.count || 0} articles
++        Showing {articles.length} articles
+       </div>
+ 
+       {/* Article Grid */}
+diff --git a/frontend/src/app/notebook/page.tsx b/frontend/src/app/notebook/page.tsx
+index 28af06a..4db9e76 100644
+--- a/frontend/src/app/notebook/page.tsx
++++ b/frontend/src/app/notebook/page.tsx
+@@ -66,8 +66,8 @@ export default function NotebookPage() {
+ 
+   const filteredAttempts = attempts?.filter(
+     (a) =>
+-      a.quiz.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+-      a.quiz.topic.name.toLowerCase().includes(searchQuery.toLowerCase()),
++      a.quiz?.title?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
++      a.quiz?.topic?.name?.toLowerCase()?.includes(searchQuery.toLowerCase()),
+   );
+ 
+   const filteredBookmarks = bookmarks?.filter((b) => {
+diff --git a/frontend/src/app/topics/page.tsx b/frontend/src/app/topics/page.tsx
+index 59ccc30..4bbfe50 100644
+--- a/frontend/src/app/topics/page.tsx
++++ b/frontend/src/app/topics/page.tsx
+@@ -56,8 +56,8 @@ export default function TopicsPage() {
+     );
+   }
+ 
+-  const topics = topicsData?.results || [];
+-  const subjects = subjectsData?.results || [];
++  const topics = topicsData || [];
++  const subjects = subjectsData || [];
+ 
+   // Client-side filter
+   const filteredTopics = topics.filter(
+diff --git a/frontend/src/components/dashboard/InsightsSection.tsx b/frontend/src/components/dashboard/InsightsSection.tsx
+index 1f6e03b..e6a08c6 100644
+--- a/frontend/src/components/dashboard/InsightsSection.tsx
++++ b/frontend/src/components/dashboard/InsightsSection.tsx
+@@ -22,7 +22,7 @@ export default function InsightsSection({ insights }: Props) {
+         ) : (
+           <div className="space-y-3">
+             {insights.map((insight, idx) => {
+-              const data = insight.data as Record<string, unknown>;
++              const data = (insight.data as Record<string, unknown>) || {};
+               return (
+                 <Alert key={idx} className="bg-blue-50 border-blue-200">
+                   <AlertDescription className="text-sm">
+diff --git a/frontend/src/components/dashboard/RecentActivity.tsx b/frontend/src/components/dashboard/RecentActivity.tsx
+index 65c4751..b550a6a 100644
+--- a/frontend/src/components/dashboard/RecentActivity.tsx
++++ b/frontend/src/components/dashboard/RecentActivity.tsx
+@@ -26,7 +26,7 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
+ 
+   const getMessage = (activity: ActivityType) => {
+     // Cast data safely for rendering
+-    const data = activity.event_data as Record<string, unknown>;
++    const data = (activity.event_data as Record<string, unknown>) || {};
+ 
+     switch (activity.event_type) {
+       case "article_read":
+diff --git a/frontend/src/components/quiz/attempt-card.tsx b/frontend/src/components/quiz/attempt-card.tsx
+index 9687094..417ce3d 100644
+--- a/frontend/src/components/quiz/attempt-card.tsx
++++ b/frontend/src/components/quiz/attempt-card.tsx
+@@ -48,14 +48,14 @@ export default function AttemptCard({ attempt }: AttemptCardProps) {
+       <CardHeader className="pb-3">
+         <div className="flex justify-between items-start gap-2">
+           <CardTitle className="text-base font-medium line-clamp-2">
+-            {attempt.quiz.title}
++            {attempt.quiz?.title || "Deleted/Draft Quiz"}
+           </CardTitle>
+           <Badge className={getStatusColor(attempt.status)} variant="outline">
+             {attempt.status.charAt(0).toUpperCase() + attempt.status.slice(1)}
+           </Badge>
+         </div>
+         <div className="text-sm text-muted-foreground">
+-          {attempt.quiz.topic.name}
++          {attempt.quiz?.topic?.name || "General Knowledge"}
+         </div>
+       </CardHeader>
+ 
+@@ -83,14 +83,14 @@ export default function AttemptCard({ attempt }: AttemptCardProps) {
+       <CardFooter>
+         {isSubmitted ? (
+           <Button asChild variant="outline" className="w-full gap-2">
+-            <Link href={`/assessment/${attempt.quiz.id}`}>
++            <Link href={`/assessment/${attempt.quiz?.id || ""}`}>
+               <RotateCcw className="h-4 w-4" />
+               Retake Quiz
+             </Link>
+           </Button>
+         ) : (
+           <Button asChild className="w-full gap-2">
+-            <Link href={`/assessment/${attempt.quiz.id}`}>Resume Quiz</Link>
++            <Link href={`/assessment/${attempt.quiz?.id || ""}`}>Resume Quiz</Link>
+           </Button>
+         )}
+       </CardFooter>
+diff --git a/frontend/src/components/quiz/quiz-card.tsx b/frontend/src/components/quiz/quiz-card.tsx
+index bcaeab1..63849c8 100644
+--- a/frontend/src/components/quiz/quiz-card.tsx
++++ b/frontend/src/components/quiz/quiz-card.tsx
+@@ -51,7 +51,7 @@ export default function QuizCard({ quiz }: QuizCardProps) {
+ 
+         <div className="flex items-center gap-2">
+           <span className="text-sm font-medium text-blue-600">
+-            {quiz.topic.name}
++            {quiz.topic?.name || "Uncategorized"}
+           </span>
+           {quiz.include_ca && (
+             <Badge variant="outline" className="text-xs gap-1">
+diff --git a/frontend/src/lib/api/articles.ts b/frontend/src/lib/api/articles.ts
+index 22b7506..43e49c1 100644
+--- a/frontend/src/lib/api/articles.ts
++++ b/frontend/src/lib/api/articles.ts
+@@ -14,9 +14,10 @@ import {
+ 
+ export const articlesAPI = {
+   // List articles
+-  list: async (params?: ArticleFilterParams): Promise<ArticleListResponse> => {
++  list: async (params?: ArticleFilterParams): Promise<Article[]> => {
+     const response = await apiClient.get("/articles/", { params });
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ 
+   // Get article by ID
+@@ -51,10 +52,11 @@ export const articlesAPI = {
+   listByTopic: async (
+     topicId: string,
+     params?: ArticleFilterParams,
+-  ): Promise<ArticleListResponse> => {
++  ): Promise<Article[]> => {
+     const response = await apiClient.get("/articles/", {
+       params: { ...params, topic_id: topicId },
+     });
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ };
+diff --git a/frontend/src/lib/api/bookmarks.ts b/frontend/src/lib/api/bookmarks.ts
+index f11619b..63efad7 100644
+--- a/frontend/src/lib/api/bookmarks.ts
++++ b/frontend/src/lib/api/bookmarks.ts
+@@ -8,7 +8,11 @@ export const bookmarksAPI = {
+   ): Promise<Bookmark[]> => {
+     const params = contentType ? { content_type: contentType } : {};
+     const response = await apiClient.get("/userstate/bookmarks/", { params });
+-    return response.data;
++    console.log("[DEBUG] getBookmarks response.data:", response.data);
++    // Handle paginated response
++    const results = Array.isArray(response.data) ? response.data : response.data.results || [];
++    console.log("[DEBUG] getBookmarks returning:", results);
++    return results;
+   },
+ 
+   // Add bookmark
+diff --git a/frontend/src/lib/api/notebook.ts b/frontend/src/lib/api/notebook.ts
+index 5748960..25af92a 100644
+--- a/frontend/src/lib/api/notebook.ts
++++ b/frontend/src/lib/api/notebook.ts
+@@ -5,7 +5,11 @@ export const notebookAPI = {
+   // Get user's private articles (My Notebook)
+   getMyArticles: async (): Promise<Article[]> => {
+     const response = await apiClient.get("/articles/my-notebook/");
+-    return response.data;
++    console.log("[DEBUG] getMyArticles response.data:", response.data);
++    // Handle paginated response
++    const results = Array.isArray(response.data) ? response.data : response.data.results || [];
++    console.log("[DEBUG] getMyArticles returning:", results);
++    return results;
+   },
+ 
+   // Delete article
+@@ -21,4 +25,11 @@ export const notebookAPI = {
+     const response = await apiClient.post("/articles/generate/", data);
+     return response.data;
+   },
++
++  // Get all articles (with optional pagination/filters)
++  getArticles: async (params?: Record<string, any>): Promise<Article[]> => {
++    const response = await apiClient.get("/articles/", { params });
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
++  },
+ };
+diff --git a/frontend/src/lib/api/quiz.ts b/frontend/src/lib/api/quiz.ts
+index 8e2cf1d..81e42f3 100644
+--- a/frontend/src/lib/api/quiz.ts
++++ b/frontend/src/lib/api/quiz.ts
+@@ -32,7 +32,8 @@ export const quizAPI = {
+     include_ca?: boolean;
+   }): Promise<Quiz[]> => {
+     const response = await apiClient.get("/assessment/quizzes/", { params });
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ 
+   /**
+@@ -79,7 +80,11 @@ export const quizAPI = {
+     const response = await apiClient.get("/assessment/my-attempts/", {
+       params,
+     });
+-    return response.data;
++    console.log("[DEBUG] listMyAttempts response.data:", response.data);
++    // Handle paginated response
++    const results = Array.isArray(response.data) ? response.data : response.data.results || [];
++    console.log("[DEBUG] listMyAttempts returning:", results);
++    return results;
+   },
+ 
+   /**
+@@ -89,6 +94,7 @@ export const quizAPI = {
+     topic_id?: string;
+   }): Promise<TopicMastery[]> => {
+     const response = await apiClient.get("/userstate/mastery/", { params });
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ };
+diff --git a/frontend/src/lib/api/subjects.ts b/frontend/src/lib/api/subjects.ts
+index 7b50af0..d34b2f4 100644
+--- a/frontend/src/lib/api/subjects.ts
++++ b/frontend/src/lib/api/subjects.ts
+@@ -26,7 +26,8 @@ export const subjectsAPI = {
+   // List subjects
+   list: async () => {
+     const response = await apiClient.get("/knowledge/subjects/");
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ 
+   // Get subject by ID
+diff --git a/frontend/src/lib/api/topics.ts b/frontend/src/lib/api/topics.ts
+index 74db412..72ba203 100644
+--- a/frontend/src/lib/api/topics.ts
++++ b/frontend/src/lib/api/topics.ts
+@@ -7,9 +7,10 @@ import { Topic, TopicListResponse, PaginationParams } from "../types";
+ 
+ export const topicsAPI = {
+   // List all topics
+-  list: async (params?: PaginationParams): Promise<TopicListResponse> => {
++  list: async (params?: PaginationParams): Promise<Topic[]> => {
+     const response = await apiClient.get("/knowledge/topics/", { params });
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ 
+   // Get topic by ID
+@@ -22,21 +23,23 @@ export const topicsAPI = {
+   listByModule: async (
+     moduleId: string,
+     params?: PaginationParams,
+-  ): Promise<TopicListResponse> => {
++  ): Promise<Topic[]> => {
+     const response = await apiClient.get("/knowledge/topics/", {
+       params: { ...params, module_id: moduleId },
+     });
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ 
+   // List topics by subject
+   listBySubject: async (
+     subjectId: string,
+     params?: PaginationParams,
+-  ): Promise<TopicListResponse> => {
++  ): Promise<Topic[]> => {
+     const response = await apiClient.get("/knowledge/topics/", {
+       params: { ...params, subject_id: subjectId },
+     });
+-    return response.data;
++    // Handle paginated response
++    return Array.isArray(response.data) ? response.data : response.data.results || [];
+   },
+ };
+diff --git a/frontend/src/lib/hooks/use-bookmarks.ts b/frontend/src/lib/hooks/use-bookmarks.ts
+index 8489516..967a538 100644
+--- a/frontend/src/lib/hooks/use-bookmarks.ts
++++ b/frontend/src/lib/hooks/use-bookmarks.ts
+@@ -8,5 +8,6 @@ export function useBookmarks(contentType?: "article" | "quiz") {
+     queryKey: ["bookmarks", contentType],
+     queryFn: () => bookmarksAPI.getBookmarks(contentType),
+     staleTime: 2 * 60 * 1000, // 2 minutes
++    select: (data) => Array.isArray(data) ? data : (data as any).results || [],
+   });
+ }

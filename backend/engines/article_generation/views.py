@@ -227,8 +227,10 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
             .order_by("-created_at")
         )
 
-        serializer = ArticleListSerializer(articles, many=True)
-        return Response(serializer.data)
+        paginator = StandardPageNumberPagination()
+        paginated_articles = paginator.paginate_queryset(articles, request)
+        serializer = ArticleListSerializer(paginated_articles, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore

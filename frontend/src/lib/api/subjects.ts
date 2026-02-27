@@ -26,7 +26,10 @@ export const subjectsAPI = {
   // List subjects
   list: async () => {
     const response = await apiClient.get("/knowledge/subjects/");
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 
   // Get subject by ID

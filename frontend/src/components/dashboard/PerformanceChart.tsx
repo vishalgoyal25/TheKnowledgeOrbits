@@ -9,6 +9,20 @@ interface Props {
 }
 
 export default function PerformanceChart({ data }: Props) {
+  if (!data || !data.daily_data || data.daily_data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Weekly Performance</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[300px] text-muted-foreground border-t border-gray-100 bg-gray-50/50">
+          Not enough data yet. Complete some quizzes this week to see your
+          progress!
+        </CardContent>
+      </Card>
+    );
+  }
+
   const chartData = data.daily_data.map((d) => ({
     date: new Date(d.date).toLocaleDateString("en-US", {
       month: "short",

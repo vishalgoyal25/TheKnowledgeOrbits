@@ -8,5 +8,7 @@ export function useBookmarks(contentType?: "article" | "quiz") {
     queryKey: ["bookmarks", contentType],
     queryFn: () => bookmarksAPI.getBookmarks(contentType),
     staleTime: 2 * 60 * 1000, // 2 minutes
+    select: (data) =>
+      Array.isArray(data) ? data : (data as any).results || [],
   });
 }

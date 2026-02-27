@@ -11,7 +11,7 @@ jobs:
   scrape_and_process:
     name: Execute CA Sync
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
 
     concurrency:
       group: ca-scraping
