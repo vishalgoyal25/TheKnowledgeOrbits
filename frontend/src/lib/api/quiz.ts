@@ -82,12 +82,10 @@ export const quizAPI = {
     const response = await apiClient.get("/assessment/my-attempts/", {
       params,
     });
-    console.log("[DEBUG] listMyAttempts response.data:", response.data);
     // Handle paginated response
     const results = Array.isArray(response.data)
       ? response.data
       : response.data.results || [];
-    console.log("[DEBUG] listMyAttempts returning:", results);
     return results;
   },
 
