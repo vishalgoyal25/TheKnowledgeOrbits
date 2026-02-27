@@ -115,43 +115,36 @@ class RSSScraperService:
             return False
 
         # Extract content
-        # Priority: content > summary > description
+        # Priority 1: Actively fetch the full article page (for TH and IE full text)
         content = ""
+        try:
+            fetched = RSSScraperService._fetch_full_content(url)
+            if fetched and len(fetched.strip()) > 300:
+                content = fetched
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            logger.debug(f"Failed to fetch full content for {url}: {str(e)}")
 
-        # 1. Try 'content' list (common in Atom/RSS 2.0)
-        if (
-            hasattr(entry, "content")
-            and isinstance(entry.content, list)
-            and entry.content
-        ):
-            # Try to find html/text content
-            for c in entry.content:
-                if c.get("value"):
-                    content = c.get("value")
-                    break
-
-        # 2. Try 'summary_detail'
-        if not content and hasattr(entry, "summary_detail") and entry.summary_detail:
-            content = entry.summary_detail.get("value", "")
-
-        # 3. Try 'summary' (fallback)
-        if not content and hasattr(entry, "summary"):
-            content = entry.summary
-
-        # 4. Try 'description'
+        # Priority 2: Fallback to RSS feed content if full page fetch fails or is blocked
         if not content:
-            content = entry.get("description", "")
+            # Try 'content' list (common in Atom/RSS 2.0)
+            if hasattr(entry, "content") and isinstance(entry.content, list) and entry.content:
+                for c in entry.content:
+                    if c.get("value"):
+                        content = c.get("value")
+                        break
 
-        # 5. Fallback: Fetch full page content if RSS content is empty or too short
-        if not content or len(content.strip()) < 50:
-            try:
-                fetched = RSSScraperService._fetch_full_content(url)
-                if fetched:
-                    content = fetched
-                    # logger.info(f"Fetched full content for '{title}' (Length: {len(content)})")
-            except Exception as e:
-                sentry_sdk.capture_exception(e)
-                logger.debug(f"Failed to fetch full content for {url}: {str(e)}")
+            # Try 'summary_detail'
+            if not content and hasattr(entry, "summary_detail") and entry.summary_detail:
+                content = entry.summary_detail.get("value", "")
+
+            # Try 'summary' (fallback)
+            if not content and hasattr(entry, "summary"):
+                content = entry.summary
+
+            # Try 'description'
+            if not content:
+                content = entry.get("description", "")
 
         # Clean content (basic checks)
         if not content or len(content.strip()) < 10:
@@ -213,44 +206,54 @@ class RSSScraperService:
         Fetch full page content for articles where RSS feed is truncated/empty.
         """
         try:
-            # Basic headers to mimic browser
+            # Modern headers to mimic a real browser to bypass basic bot blocks (Cloudflare, etc.)
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
             }
             # Timeout is critical to avoid hanging
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=12)
 
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, "html.parser")
 
-                # Heuristic to find article content
-                # 1. Try common article body selectors
+                # Heuristic to find article content specifically targeting TH and IE
+                # The Hindu: div.articlebodycontent, class^=content-body
+                # Indian Express: div#pcl-full-content, div.story_details
                 selectors = [
+                    "div.articlebodycontent",
+                    "div[id^='content-body']",
+                    "div#pcl-full-content",
+                    "div.story_details",
                     "div.story-details",
                     "div.full-details",
                     "article",
                     "div.article-body",
                     "div.content",
-                    "div.story_details",
                 ]
 
                 for selector in selectors:
                     element = soup.select_one(selector)
                     if element:
-                        # Extract paragraphs
+                        # Extract paragraphs securely without scripts/styles
+                        for s in element(["script", "style", "nav", "header", "footer"]):
+                            s.decompose()
+                        
                         paragraphs = element.find_all("p")
                         if paragraphs:
-                            return " ".join([p.get_text().strip() for p in paragraphs])
+                            valid_ps = [p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 30]
+                            if valid_ps:
+                                return " ".join(valid_ps)
 
-                # 2. Fallback: Just grab large paragraphs
+                # 2. Fallback: Just grab large paragraphs from the whole page
                 paragraphs = soup.find_all("p")
                 if paragraphs:
-                    # Filter out very short UI texts.
-                    # Only keep p tags with substantial content (> 50 chars) to avoid navigational noise.
+                    # Filter out very short UI texts. (Ads, nav links, etc.)
                     valid_ps = [
                         p.get_text().strip()
                         for p in paragraphs
-                        if len(p.get_text().strip()) > 50
+                        if len(p.get_text().strip()) > 80
                     ]
                     if valid_ps:
                         return " ".join(valid_ps)

@@ -32,7 +32,10 @@ export const quizAPI = {
     include_ca?: boolean;
   }): Promise<Quiz[]> => {
     const response = await apiClient.get("/assessment/quizzes/", { params });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 
   /**
@@ -79,7 +82,13 @@ export const quizAPI = {
     const response = await apiClient.get("/assessment/my-attempts/", {
       params,
     });
-    return response.data;
+    console.log("[DEBUG] listMyAttempts response.data:", response.data);
+    // Handle paginated response
+    const results = Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
+    console.log("[DEBUG] listMyAttempts returning:", results);
+    return results;
   },
 
   /**
@@ -89,6 +98,9 @@ export const quizAPI = {
     topic_id?: string;
   }): Promise<TopicMastery[]> => {
     const response = await apiClient.get("/userstate/mastery/", { params });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 };

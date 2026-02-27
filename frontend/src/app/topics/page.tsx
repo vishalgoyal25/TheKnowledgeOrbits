@@ -56,12 +56,16 @@ export default function TopicsPage() {
     );
   }
 
-  const topics = topicsData?.results || [];
-  const subjects = subjectsData?.results || [];
+  const topics = Array.isArray(topicsData)
+    ? topicsData
+    : (topicsData as any)?.results || [];
+  const subjects = Array.isArray(subjectsData)
+    ? subjectsData
+    : (subjectsData as any)?.results || [];
 
   // Client-side filter
   const filteredTopics = topics.filter(
-    (topic) =>
+    (topic: any) =>
       topic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       topic.description?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -124,7 +128,7 @@ export default function TopicsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTopics.map((topic) => (
+              {filteredTopics.map((topic: any) => (
                 <TopicCard key={topic.id} topic={topic} />
               ))}
             </div>

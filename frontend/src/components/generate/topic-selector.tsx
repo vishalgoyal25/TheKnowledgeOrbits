@@ -26,14 +26,16 @@ export default function TopicSelector({
   const [searchTerm, setSearchTerm] = useState("");
   const { data: topicsData, isLoading } = useTopics();
 
-  const topics = topicsData?.results || [];
+  const topics = Array.isArray(topicsData)
+    ? topicsData
+    : (topicsData as any)?.results || [];
 
   // Filter topics
   const filteredTopics = topics.filter(
-    (topic) =>
+    (topic: any) =>
       topic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       topic.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      topic.keywords?.some((k) =>
+      topic.keywords?.some((k: string) =>
         k.toLowerCase().includes(searchTerm.toLowerCase()),
       ),
   );
@@ -68,7 +70,7 @@ export default function TopicSelector({
 
       {/* Topic List */}
       <div className="space-y-2 max-h-96 overflow-y-auto">
-        {filteredTopics.map((topic) => (
+        {filteredTopics.map((topic: any) => (
           <Card
             key={topic.id}
             className={`cursor-pointer transition-all hover:shadow-md ${

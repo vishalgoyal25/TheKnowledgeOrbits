@@ -26,7 +26,7 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
 
   const getMessage = (activity: ActivityType) => {
     // Cast data safely for rendering
-    const data = activity.event_data as Record<string, unknown>;
+    const data = (activity.event_data as Record<string, unknown>) || {};
 
     switch (activity.event_type) {
       case "article_read":

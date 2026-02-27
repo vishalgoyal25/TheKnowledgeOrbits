@@ -8,7 +8,13 @@ export const bookmarksAPI = {
   ): Promise<Bookmark[]> => {
     const params = contentType ? { content_type: contentType } : {};
     const response = await apiClient.get("/userstate/bookmarks/", { params });
-    return response.data;
+    console.log("[DEBUG] getBookmarks response.data:", response.data);
+    // Handle paginated response
+    const results = Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
+    console.log("[DEBUG] getBookmarks returning:", results);
+    return results;
   },
 
   // Add bookmark

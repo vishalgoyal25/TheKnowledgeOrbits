@@ -7,9 +7,12 @@ import { Topic, TopicListResponse, PaginationParams } from "../types";
 
 export const topicsAPI = {
   // List all topics
-  list: async (params?: PaginationParams): Promise<TopicListResponse> => {
+  list: async (params?: PaginationParams): Promise<Topic[]> => {
     const response = await apiClient.get("/knowledge/topics/", { params });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 
   // Get topic by ID
@@ -22,21 +25,27 @@ export const topicsAPI = {
   listByModule: async (
     moduleId: string,
     params?: PaginationParams,
-  ): Promise<TopicListResponse> => {
+  ): Promise<Topic[]> => {
     const response = await apiClient.get("/knowledge/topics/", {
       params: { ...params, module_id: moduleId },
     });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 
   // List topics by subject
   listBySubject: async (
     subjectId: string,
     params?: PaginationParams,
-  ): Promise<TopicListResponse> => {
+  ): Promise<Topic[]> => {
     const response = await apiClient.get("/knowledge/topics/", {
       params: { ...params, subject_id: subjectId },
     });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 };

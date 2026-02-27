@@ -14,9 +14,12 @@ import {
 
 export const articlesAPI = {
   // List articles
-  list: async (params?: ArticleFilterParams): Promise<ArticleListResponse> => {
+  list: async (params?: ArticleFilterParams): Promise<Article[]> => {
     const response = await apiClient.get("/articles/", { params });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 
   // Get article by ID
@@ -51,10 +54,13 @@ export const articlesAPI = {
   listByTopic: async (
     topicId: string,
     params?: ArticleFilterParams,
-  ): Promise<ArticleListResponse> => {
+  ): Promise<Article[]> => {
     const response = await apiClient.get("/articles/", {
       params: { ...params, topic_id: topicId },
     });
-    return response.data;
+    // Handle paginated response
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
   },
 };

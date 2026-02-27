@@ -58,7 +58,7 @@ export default function ArticlesPage() {
     );
   }
 
-  const articles = data?.results || [];
+  const articles = Array.isArray(data) ? data : (data as any)?.results || [];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -92,9 +92,8 @@ export default function ArticlesPage() {
         />
       </div>
 
-      {/* Stats */}
       <div className="mb-6 text-sm text-gray-600">
-        Showing {articles.length} of {data?.count || 0} articles
+        Showing {articles.length} articles
       </div>
 
       {/* Article Grid */}
@@ -120,7 +119,7 @@ export default function ArticlesPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {articles.map((article) => (
+          {articles.map((article: any) => (
             <ArticleCard key={article.id} article={article} />
           ))}
         </div>
