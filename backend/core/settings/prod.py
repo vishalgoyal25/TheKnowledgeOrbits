@@ -99,6 +99,4 @@ LOGGING["root"] = {  # noqa: F405
 os.environ.setdefault("SENTRY_ENVIRONMENT", "production")
 
 # ── Ensure FRONTEND_URL never defaults to localhost in production ─────────────
-FRONTEND_URL = env(
-    "FRONTEND_URL", default="https://theknowledgeorbits.vercel.app"
-)
+FRONTEND_URL = env("FRONTEND_URL", default="https://theknowledgeorbits.vercel.app")
