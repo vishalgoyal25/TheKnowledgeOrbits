@@ -227,16 +227,13 @@ LOGGING: Dict[str, Any] = {
     "disable_existing_loggers": False,
     "formatters": {
         "json_formatter": {
-            "()": "structlog.stdlib.ProcessorFormatter",
-            "processor": "structlog.processors.JSONRenderer",
+            "format": '{"level": "%(levelname)s", "time": "%(asctime)s", "module": "%(module)s", "message": "%(message)s"}',
         },
         "plain_console": {
-            "()": "structlog.stdlib.ProcessorFormatter",
-            "processor": "structlog.dev.ConsoleRenderer",
+            "format": "%(levelname)s %(asctime)s %(module)s %(message)s",
         },
         "key_value": {
-            "()": "structlog.stdlib.ProcessorFormatter",
-            "processor": "structlog.processors.KeyValueRenderer",
+            "format": "level=%(levelname)s time=%(asctime)s module=%(module)s msg='%(message)s'",
         },
     },
     "handlers": {
