@@ -36,6 +36,8 @@ class EmailService:
         """
 
         def _send():
+            from django.db import connection
+
             try:
                 verification_url = f"{settings.FRONTEND_URL}/auth/verify/{token}"
 
@@ -64,8 +66,14 @@ class EmailService:
                 logger.error(
                     "verification_email_failed", error=str(e), user_email=user.email
                 )
+            finally:
+                connection.close()
 
-        threading.Thread(target=_send, daemon=True).start()
+        from django.db import transaction
+
+        transaction.on_commit(
+            lambda: threading.Thread(target=_send, daemon=True).start()
+        )
         return True
 
     @staticmethod
@@ -76,6 +84,8 @@ class EmailService:
         """
 
         def _send():
+            from django.db import connection
+
             try:
                 reset_url = f"{settings.FRONTEND_URL}/auth/reset-password/{token}"
 
@@ -104,8 +114,14 @@ class EmailService:
                 logger.error(
                     "password_reset_email_failed", error=str(e), user_email=user.email
                 )
+            finally:
+                connection.close()
 
-        threading.Thread(target=_send, daemon=True).start()
+        from django.db import transaction
+
+        transaction.on_commit(
+            lambda: threading.Thread(target=_send, daemon=True).start()
+        )
         return True
 
 
