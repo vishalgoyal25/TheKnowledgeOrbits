@@ -42,9 +42,7 @@ import { cn } from "@/lib/utils";
 
 export default function HomePage() {
   const { data: articlesData, isLoading } = useArticles({ page_size: 9 });
-  const articlesArray = Array.isArray(articlesData)
-    ? articlesData
-    : (articlesData as any)?.results || [];
+  const articlesArray = articlesData || [];
   const articles = articlesArray.slice(0, 9);
   const { isCollapsed } = useSidebar();
 
@@ -166,7 +164,7 @@ export default function HomePage() {
             </div>
           ) : articles.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {articles.map((article: any) => (
+              {articles.map((article) => (
                 <ArticleCard key={article.id} article={article} />
               ))}
             </div>

@@ -58,31 +58,26 @@ export default function NotebookPage() {
     refetch: refetchBookmarks,
   } = useBookmarks(undefined); // undefined for 'all'
 
-  // Safe Array Extractors
-  const safeArticles = Array.isArray(articles)
-    ? articles
-    : (articles as any)?.results || [];
-  const safeAttempts = Array.isArray(attempts)
-    ? attempts
-    : (attempts as any)?.results || [];
-  const safeBookmarks = Array.isArray(bookmarks)
-    ? bookmarks
-    : (bookmarks as any)?.results || [];
+  const safeArticles = articles || [];
+  const safeAttempts = attempts || [];
+  const safeBookmarks = bookmarks || [];
 
   // Filtering Logic
   const filteredArticles = safeArticles.filter(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (a: any) =>
       a.title?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
       a.topic?.name?.toLowerCase()?.includes(searchQuery.toLowerCase()),
   );
 
   const filteredAttempts = safeAttempts.filter(
-    (a: any) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (a) =>
       a.quiz?.title?.toLowerCase()?.includes(searchQuery.toLowerCase()) ||
       a.quiz?.topic?.name?.toLowerCase()?.includes(searchQuery.toLowerCase()),
   );
 
-  const filteredBookmarks = safeBookmarks.filter((b: any) => {
+  const filteredBookmarks = safeBookmarks.filter((b) => {
     // Safely extract title from dynamic content structure
     const content = b.content as Record<string, unknown>;
     const title =
@@ -168,7 +163,7 @@ export default function NotebookPage() {
             <TabsContent value="articles" className="space-y-4">
               {filteredArticles && filteredArticles.length > 0 ? (
                 <div className="space-y-4">
-                  {filteredArticles.map((article: any) => (
+                  {filteredArticles.map((article) => (
                     <ArticleCard
                       key={article.id}
                       article={article}
@@ -194,7 +189,7 @@ export default function NotebookPage() {
             <TabsContent value="quizzes" className="space-y-4">
               {filteredAttempts && filteredAttempts.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-                  {filteredAttempts.map((attempt: any) => (
+                  {filteredAttempts.map((attempt) => (
                     <AttemptCard key={attempt.id} attempt={attempt} />
                   ))}
                 </div>
@@ -216,7 +211,7 @@ export default function NotebookPage() {
             <TabsContent value="bookmarks" className="space-y-4">
               {filteredBookmarks && filteredBookmarks.length > 0 ? (
                 <div className="space-y-4">
-                  {filteredBookmarks.map((bookmark: any) => (
+                  {filteredBookmarks.map((bookmark) => (
                     <BookmarkCard
                       key={bookmark.id}
                       bookmark={bookmark}

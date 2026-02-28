@@ -32,7 +32,7 @@ from .services.generation_service import ArticleGenerationService
 logger = structlog.get_logger(__name__)
 
 
-class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
+class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
     """
     ViewSet for Articles.
 
@@ -40,6 +40,7 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     - Detail: GET /api/v1/articles/:id/
     - Generate: POST /api/v1/articles/generate/
     - Sources: GET /api/v1/articles/:id/sources/
+    - Delete: DELETE /api/v1/articles/:id/
     """
 
     permission_classes = [AllowAny]
@@ -97,6 +98,35 @@ class ArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
         if self.action == "retrieve":
             return ArticleDetailSerializer
         return ArticleListSerializer
+
+    def destroy(self, request, *args, **kwargs) -> Any:
+        """Delete an article created by the user."""
+        if not request.user.is_authenticated:
+            return Response(
+                {"error": "Authentication required to delete an article."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        article = self.get_object()
+
+        # Ensure user can only delete their own private articles
+        if article.created_by != request.user:
+            return Response(
+                {"error": "You do not have permission to delete this article."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Clean up decoupled dependencies from the userstate engine
+        from engines.userstate.models import Bookmark, ReadingProgress
+
+        Bookmark.objects.filter(content_type="article", content_id=article.id).delete()
+        ReadingProgress.objects.filter(article_id=article.id).delete()
+
+        article.delete()
+        logger.info(
+            "article_deleted", user_id=request.user.id, article_id=str(article.id)
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=False,

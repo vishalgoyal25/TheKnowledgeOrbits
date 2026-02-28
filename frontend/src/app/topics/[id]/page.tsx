@@ -55,7 +55,7 @@ export default function TopicDetailPage() {
     );
   }
 
-  const articles = articlesData?.results || [];
+  const articles = articlesData || [];
 
   return (
     <div className="container mx-auto px-4 py-8">

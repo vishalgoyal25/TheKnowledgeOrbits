@@ -9,13 +9,14 @@
 #         make lint
 #         make fmt
 #         make check
+#         make check-all (pre-commit equivalent)
 # ==============================================================================
 
 BACKEND_CONTAINER = TheKnowledgeOrbits_backend
 
 # ---- Testing ----
 
-test:
+test-backend:
 	docker exec $(BACKEND_CONTAINER) pytest engines/ -v --tb=short
 
 test-quick:
@@ -26,6 +27,11 @@ test-content:
 
 test-ci:
 	docker exec $(BACKEND_CONTAINER) pytest engines/ -x --tb=short
+
+test-frontend:
+	cd frontend && npm test
+
+test: test-backend test-frontend
 
 # ---- Build targets ----
 
@@ -39,19 +45,37 @@ build-test:
 
 # ---- Linting / Formatting ----
 
-fmt:
-	docker exec $(BACKEND_CONTAINER) black engines/ conftest.py
+fmt-backend:
+	docker exec $(BACKEND_CONTAINER) isort engines/ conftest.py && docker exec $(BACKEND_CONTAINER) black engines/ conftest.py
 
-lint:
+fmt-frontend:
+	cd frontend && npm run format
+
+fmt: fmt-backend fmt-frontend
+
+lint-backend:
 	docker exec $(BACKEND_CONTAINER) flake8 engines/ conftest.py
 
-type-check:
+lint-frontend:
+	cd frontend && npm run lint
+
+lint: lint-backend lint-frontend
+
+type-check-backend:
 	docker exec $(BACKEND_CONTAINER) mypy engines/
+
+type-check-frontend:
+	cd frontend && npm run type-check
+
+type-check: type-check-backend type-check-frontend
 
 # ---- Combined quality gate ----
 
 check: fmt lint
 	docker exec $(BACKEND_CONTAINER) pytest engines/ -q
+
+check-all:
+	pre-commit run --all-files
 
 # ---- Django ----
 
@@ -61,4 +85,4 @@ migrate:
 shell:
 	docker exec -it $(BACKEND_CONTAINER) python manage.py shell
 
-.PHONY: test test-quick test-content test-ci fmt lint type-check check migrate shell
+.PHONY: test-backend test-frontend test test-quick test-content test-ci fmt-backend fmt-frontend fmt lint-backend lint-frontend lint type-check-backend type-check-frontend type-check check check-all migrate shell

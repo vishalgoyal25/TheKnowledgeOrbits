@@ -44,9 +44,7 @@ export default function AssessmentPage() {
     );
   }
 
-  const quizzesData = Array.isArray(quizzes)
-    ? quizzes
-    : (quizzes as any)?.results || [];
+  const quizzesData = quizzes || [];
 
   return (
     <ProtectedRoute>
@@ -100,7 +98,7 @@ export default function AssessmentPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {quizzesData.map((quiz: any) => (
+            {quizzesData.map((quiz) => (
               <QuizCard key={quiz.id} quiz={quiz} />
             ))}
           </div>

@@ -55,12 +55,23 @@ class EmbeddingService:
         headers = {"Authorization": f"Bearer {api_token}"}
 
         try:
-            response = requests.post(
-                cls.HF_API_URL,
-                headers=headers,
-                json={"inputs": texts, "options": {"wait_for_model": True}},
-                timeout=20,
-            )
+            import time
+
+            # Add basic retry mechanism for HF API queueing
+            for attempt in range(3):
+                try:
+                    response = requests.post(
+                        cls.HF_API_URL,
+                        headers=headers,
+                        json={"inputs": texts, "options": {"wait_for_model": True}},
+                        timeout=120,  # Increased from 20 to prevent fallback timeout
+                    )
+                    break
+                except requests.exceptions.Timeout:
+                    if attempt == 2:
+                        raise
+                    logger.warning("hf_api_timeout_retrying", attempt=attempt + 1)
+                    time.sleep(5)
 
             if response.status_code == 200:
                 result = response.json()

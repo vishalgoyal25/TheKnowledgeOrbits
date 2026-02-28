@@ -663,12 +663,18 @@ Generate the {question_count} questions now:"""
 
             if source_indices:
                 # Link specific chunks
-                for chunk_idx in source_indices:
-                    if chunk_idx < len(static_chunks):
-                        question.source_static_chunks.add(static_chunks[chunk_idx])
-                    elif chunk_idx - len(static_chunks) < len(ca_chunks):
-                        ca_idx = chunk_idx - len(static_chunks)
-                        question.source_ca_chunks.add(ca_chunks[ca_idx])
+                for chunk_idx_raw in source_indices:
+                    try:
+                        chunk_idx = int(chunk_idx_raw)
+                        if chunk_idx < len(static_chunks):
+                            question.source_static_chunks.add(static_chunks[chunk_idx])
+                        elif chunk_idx - len(static_chunks) < len(ca_chunks):
+                            ca_idx = chunk_idx - len(static_chunks)
+                            question.source_ca_chunks.add(ca_chunks[ca_idx])
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            "invalid_source_chunk_index", index=chunk_idx_raw
+                        )
             else:
                 # Link all chunks (fallback)
                 question.source_static_chunks.set(static_chunks)

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bookmark } from "@/types/notebook";
 import { bookmarksAPI } from "@/lib/api/bookmarks";
-import { FileText, Brain, Trash2, ExternalLink } from "lucide-react";
+import { FileText, Brain, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import RemoveBookmarkDialog from "./RemoveBookmarkDialog";
 import { createLogger } from "@/lib/logger";
@@ -52,7 +52,10 @@ export default function BookmarkCard({ bookmark, onRemove }: Props) {
 
   return (
     <>
-      <Card className="p-5 hover:shadow-lg transition-shadow">
+      <Card
+        className="p-5 hover:shadow-lg transition-shadow cursor-pointer"
+        onClick={handleView}
+      >
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
@@ -81,16 +84,10 @@ export default function BookmarkCard({ bookmark, onRemove }: Props) {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleView}
-              className="flex items-center gap-1"
-            >
-              <ExternalLink className="h-4 w-4" />
-              View
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowRemoveDialog(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowRemoveDialog(true);
+              }}
               className="text-red-600 hover:bg-red-50"
             >
               <Trash2 className="h-4 w-4" />
