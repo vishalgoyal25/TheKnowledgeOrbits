@@ -9,6 +9,7 @@ Database: Supabase PostgreSQL with pgvector
 import os
 
 from .base import *  # noqa: F401, F403
+from .base import env
 
 # ── Security ──────────────────────────────────────────────────────────────────
 DEBUG = False
@@ -96,3 +97,8 @@ LOGGING["root"] = {  # noqa: F405
 
 # ── Sentry environment label ──────────────────────────────────────────────────
 os.environ.setdefault("SENTRY_ENVIRONMENT", "production")
+
+# ── Ensure FRONTEND_URL never defaults to localhost in production ─────────────
+FRONTEND_URL = env(
+    "FRONTEND_URL", default="https://theknowledgeorbits.vercel.app"
+)

@@ -26,13 +26,15 @@ const baseURL = cleanApiUrl.includes("/api/")
   ? cleanApiUrl
   : `${cleanApiUrl}/api/${API_VERSION}`;
 
+logger.info(`[API Base URL Configured]: ${baseURL}`);
+
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL,
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 120000, // 120 seconds for batched generation
+  timeout: 120000, // 120 seconds for batched generation / Render Cold starts
 });
 
 // Request interceptor (add auth token)
@@ -145,7 +147,16 @@ export const getErrorMessage = (error: unknown): string => {
           .join(" | ");
       }
 
+      // If we got a 500 error from Render (e.g. SMTP crash) and it's returning HTML
+      if (typeof data === "string" && (data as string).includes("<html")) {
+        return "Critical Server Error: The backend crashed (500). Please check Render logs.";
+      }
       return "An error occurred on the server";
+    }
+
+    // Network timeouts or connection refused
+    if (axiosError.message.includes("Network Error")) {
+      return `Network Error: Could not connect to the backend API at ${axiosError.config?.baseURL}. Please verify CORS and API URL.`;
     }
 
     return axiosError.message || "Network error. Please check your connection.";

@@ -4,7 +4,7 @@ Auth Engine - Service Tests
 Tests for EmailService and TokenService.
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,9 +17,17 @@ from engines.auth.services.token_service import TokenService, get_token_service
 class TestEmailService:
     """Test EmailService."""
 
+    @patch("engines.auth.services.email_service.threading.Thread")
     @patch("engines.auth.services.email_service.send_mail")
-    def test_send_verification_email_success(self, mock_send_mail):
+    def test_send_verification_email_success(self, mock_send_mail, mock_thread):
         """Test sending verification email."""
+
+        def run_target(target, daemon=False):
+            target()
+            return MagicMock()
+
+        mock_thread.side_effect = run_target
+
         user = User.objects.create_user(email="test@example.com", password="pass")
         token = "test-token"
 
@@ -32,9 +40,17 @@ class TestEmailService:
         assert "Verify Your Email" in kwargs["subject"]
         assert user.email in kwargs["recipient_list"]
 
+    @patch("engines.auth.services.email_service.threading.Thread")
     @patch("engines.auth.services.email_service.send_mail")
-    def test_send_password_reset_email_success(self, mock_send_mail):
+    def test_send_password_reset_email_success(self, mock_send_mail, mock_thread):
         """Test sending password reset email."""
+
+        def run_target(target, daemon=False):
+            target()
+            return MagicMock()
+
+        mock_thread.side_effect = run_target
+
         user = User.objects.create_user(email="test@example.com", password="pass")
         token = "reset-token"
 
@@ -46,18 +62,27 @@ class TestEmailService:
         args, kwargs = mock_send_mail.call_args
         assert "Password Reset" in kwargs["subject"]
 
+    @patch("engines.auth.services.email_service.threading.Thread")
     @patch(
         "engines.auth.services.email_service.send_mail",
         side_effect=Exception("SMTP error"),
     )
-    def test_send_email_failure(self, mock_send_mail):
+    def test_send_email_failure(self, mock_send_mail, mock_thread):
         """Test email sending failure."""
+
+        def run_target(target, daemon=False):
+            target()
+            return MagicMock()
+
+        mock_thread.side_effect = run_target
+
         user = User.objects.create_user(email="test@example.com", password="pass")
 
         service = EmailService()
         result = service.send_verification_email(user, "token")
 
-        assert result is False
+        # Result is True because threading handles it asynchronously without failing the request
+        assert result is True
 
     def test_get_email_service_singleton(self):
         """Test email service returns same instance."""

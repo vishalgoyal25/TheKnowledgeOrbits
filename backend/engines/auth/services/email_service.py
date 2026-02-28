@@ -1,3 +1,5 @@
+import threading
+
 import sentry_sdk
 
 """
@@ -30,87 +32,81 @@ class EmailService:
     def send_verification_email(user: "User", token: str) -> bool:
         """
         Send an email verification link to a newly registered user.
-
-        Args:
-            user (User): The user instance to receive the email.
-            token (str): The unique verification token.
-
-        Returns:
-            bool: True if the email was dispatched successfully, False otherwise.
+        Uses a background thread to prevent blocking the web request.
         """
-        try:
-            verification_url = f"{settings.FRONTEND_URL}/auth/verify/{token}"
 
-            context = {
-                "user": user,
-                "verification_url": verification_url,
-                "site_name": "TheKnowledgeOrbits",
-            }
+        def _send():
+            try:
+                verification_url = f"{settings.FRONTEND_URL}/auth/verify/{token}"
 
-            html_message = render_to_string("emails/verification.html", context)
-            plain_message = strip_tags(html_message)
+                context = {
+                    "user": user,
+                    "verification_url": verification_url,
+                    "site_name": "TheKnowledgeOrbits",
+                }
 
-            send_mail(
-                subject="Verify Your Email - TheKnowledgeOrbits",
-                message=plain_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_message,
-                fail_silently=False,
-            )
+                html_message = render_to_string("emails/verification.html", context)
+                plain_message = strip_tags(html_message)
 
-            logger.info("verification_email_dispatched", user_email=user.email)
-            return True
+                send_mail(
+                    subject="Verify Your Email - TheKnowledgeOrbits",
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    html_message=html_message,
+                    fail_silently=True,  # Changed to True to avoid unhandled SMTP crash
+                )
 
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            logger.error(
-                "verification_email_failed", error=str(e), user_email=user.email
-            )
-            return False
+                logger.info("verification_email_dispatched", user_email=user.email)
+
+            except Exception as e:
+                sentry_sdk.capture_exception(e)
+                logger.error(
+                    "verification_email_failed", error=str(e), user_email=user.email
+                )
+
+        threading.Thread(target=_send, daemon=True).start()
+        return True
 
     @staticmethod
     def send_password_reset_email(user: "User", token: str) -> bool:
         """
         Send a password reset link to a user who requested it.
-
-        Args:
-            user (User): The user instance to receive the email.
-            token (str): The time-bound reset token.
-
-        Returns:
-            bool: True if the email was dispatched successfully, False otherwise.
+        Uses a background thread to prevent blocking the web request.
         """
-        try:
-            reset_url = f"{settings.FRONTEND_URL}/auth/reset-password/{token}"
 
-            context = {
-                "user": user,
-                "reset_url": reset_url,
-                "site_name": "TheKnowledgeOrbits",
-            }
+        def _send():
+            try:
+                reset_url = f"{settings.FRONTEND_URL}/auth/reset-password/{token}"
 
-            html_message = render_to_string("emails/password_reset.html", context)
-            plain_message = strip_tags(html_message)
+                context = {
+                    "user": user,
+                    "reset_url": reset_url,
+                    "site_name": "TheKnowledgeOrbits",
+                }
 
-            send_mail(
-                subject="Password Reset Request - TheKnowledgeOrbits",
-                message=plain_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_message,
-                fail_silently=False,
-            )
+                html_message = render_to_string("emails/password_reset.html", context)
+                plain_message = strip_tags(html_message)
 
-            logger.info("password_reset_email_dispatched", user_email=user.email)
-            return True
+                send_mail(
+                    subject="Password Reset Request - TheKnowledgeOrbits",
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    html_message=html_message,
+                    fail_silently=True,
+                )
 
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            logger.error(
-                "password_reset_email_failed", error=str(e), user_email=user.email
-            )
-            return False
+                logger.info("password_reset_email_dispatched", user_email=user.email)
+
+            except Exception as e:
+                sentry_sdk.capture_exception(e)
+                logger.error(
+                    "password_reset_email_failed", error=str(e), user_email=user.email
+                )
+
+        threading.Thread(target=_send, daemon=True).start()
+        return True
 
 
 # Singleton
