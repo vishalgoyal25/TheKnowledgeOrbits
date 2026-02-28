@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.db import connection, transaction
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
@@ -36,8 +37,6 @@ class EmailService:
         """
 
         def _send():
-            from django.db import connection
-
             try:
                 verification_url = f"{settings.FRONTEND_URL}/auth/verify/{token}"
 
@@ -69,8 +68,6 @@ class EmailService:
             finally:
                 connection.close()
 
-        from django.db import transaction
-
         transaction.on_commit(
             lambda: threading.Thread(target=_send, daemon=True).start()
         )
@@ -84,8 +81,6 @@ class EmailService:
         """
 
         def _send():
-            from django.db import connection
-
             try:
                 reset_url = f"{settings.FRONTEND_URL}/auth/reset-password/{token}"
 
@@ -116,8 +111,6 @@ class EmailService:
                 )
             finally:
                 connection.close()
-
-        from django.db import transaction
 
         transaction.on_commit(
             lambda: threading.Thread(target=_send, daemon=True).start()
