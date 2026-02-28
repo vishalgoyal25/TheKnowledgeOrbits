@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Article } from "@/types/notebook";
 import { notebookAPI } from "@/lib/api/notebook";
-import { FileText, Calendar, Clock, Trash2, Eye } from "lucide-react";
+import { FileText, Calendar, Clock, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import DeleteArticleDialog from "./DeleteArticleDialog";
 import { createLogger } from "@/lib/logger";
@@ -37,7 +37,10 @@ export default function ArticleCard({ article, onDelete }: Props) {
 
   return (
     <>
-      <Card className="p-6 hover:shadow-lg transition-shadow">
+      <Card
+        className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
+        onClick={() => router.push(`/articles/${article.id}`)}
+      >
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
@@ -70,16 +73,10 @@ export default function ArticleCard({ article, onDelete }: Props) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push(`/articles/${article.id}`)}
-              className="flex items-center gap-1"
-            >
-              <Eye className="h-4 w-4" />
-              Read
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowDeleteDialog(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteDialog(true);
+              }}
               className="text-red-600 hover:bg-red-50"
             >
               <Trash2 className="h-4 w-4" />

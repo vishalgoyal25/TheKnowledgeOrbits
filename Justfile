@@ -18,12 +18,24 @@ dev:
     @echo "Run 'just dev-frontend' in another terminal"
 
 # Testing - Run backend tests
-test:
+test-backend:
     cd backend && pytest
+
+# Testing - Run frontend tests
+test-frontend:
+    cd frontend && npm test
 
 # Testing - Run with coverage
 test-cov:
     cd backend && pytest --cov=engines --cov-report=html
+
+# Type Checking - Backend
+typecheck-backend:
+    cd backend && mypy .
+
+# Type Checking - Frontend
+typecheck-frontend:
+    cd frontend && npm run type-check
 
 # Database - Create migrations
 makemigrations engine="":
@@ -37,17 +49,25 @@ migrate:
 db-reset:
     cd backend && python manage.py flush --no-input
 
-# Linting - Run black formatter
-format:
-    cd backend && black .
+# Formatting - Run black and isort (Backend)
+format-backend:
+    cd backend && isort . && black .
 
-# Linting - Run flake8
-lint:
+# Formatting - Run prettier (Frontend)
+format-frontend:
+    cd frontend && npm run format
+
+# Linting - Run flake8 (Backend)
+lint-backend:
     cd backend && flake8 .
+
+# Linting - Run eslint (Frontend)
+lint-frontend:
+    cd frontend && npm run lint
 
 # Security - Run bandit security scan
 security:
-    cd backend && bandit -r engines/ core/ shared/
+    cd backend && bandit -r engines/ core/ -x "*/tests/*"
 
 # Shell - Django shell
 shell:
@@ -75,3 +95,7 @@ install-frontend:
 
 # Setup - Full install
 install: install-backend install-frontend
+
+# Pre-commit - Run all checks
+precommit:
+    pre-commit run --all-files

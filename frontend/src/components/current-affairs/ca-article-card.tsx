@@ -4,7 +4,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CAArticle } from "@/lib/types";
 import {
   Card,
@@ -37,8 +37,13 @@ export default function CAArticleCard({ article }: CAArticleCardProps) {
     }
   };
 
+  const router = useRouter();
+
   return (
-    <Card className="h-full transition-all hover:shadow-lg">
+    <Card
+      className="h-full transition-all hover:shadow-lg cursor-pointer"
+      onClick={() => router.push(`/current-affairs/${article.id}`)}
+    >
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-lg line-clamp-2 flex-1">
@@ -92,16 +97,12 @@ export default function CAArticleCard({ article }: CAArticleCardProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href={`/current-affairs/${article.id}`}>
-            <Badge
-              variant="outline"
-              className="cursor-pointer hover:bg-gray-100"
-            >
-              View
-            </Badge>
-          </Link>
-
-          <a href={article.url} target="_blank" rel="noopener noreferrer">
+          <a
+            href={article.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Badge
               variant="outline"
               className="cursor-pointer hover:bg-gray-100 gap-1"

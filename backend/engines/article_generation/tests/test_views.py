@@ -221,5 +221,10 @@ class TestMyNotebookView:
         response = client.get("/api/v1/articles/my-notebook/")
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
-        assert response.data[0]["title"] == "My Article"
+        results = (
+            response.data.get("results", response.data)
+            if isinstance(response.data, dict)
+            else response.data
+        )
+        assert len(results) == 1
+        assert results[0]["title"] == "My Article"

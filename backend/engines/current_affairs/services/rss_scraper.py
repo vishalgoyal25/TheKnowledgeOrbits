@@ -166,9 +166,14 @@ class RSSScraperService:
         published_at = timezone.now()  # Default
         if hasattr(entry, "published_parsed") and entry.published_parsed:
             try:
-                published_at = datetime(*entry.published_parsed[:6])
-                if timezone.is_naive(published_at):
-                    published_at = timezone.make_aware(published_at)
+                import datetime as dt
+
+                parsed_dt = datetime(*entry.published_parsed[:6])
+                if timezone.is_naive(parsed_dt):
+                    # RSS feeds always parse as UTC. Force UTC aware, NOT local timezone.
+                    published_at = parsed_dt.replace(tzinfo=dt.timezone.utc)
+                else:
+                    published_at = parsed_dt
             except Exception as e:
                 sentry_sdk.capture_exception(e)
                 logger.debug(f"Failed to parse published date: {str(e)}")  # nosec: B110
