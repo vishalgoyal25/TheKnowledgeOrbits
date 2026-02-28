@@ -26,18 +26,15 @@ def _get_mock_vector(sentences: Any, *args: Any, **kwargs: Any) -> np.ndarray:
     return np.random.rand(count, 384).astype(np.float32)
 
 
-# Mock SentenceTransformers
-try:
-    import sentence_transformers  # noqa: F401
-except ImportError:
-    mock_st_module = MagicMock()
-    mock_model_instance = MagicMock()
-    # Configure the instance to return real numpy data that .tolist() can be called on
-    mock_model_instance.encode.side_effect = _get_mock_vector
+# Mock SentenceTransformers (Force mock to save memory and prevent torch crashes)
+mock_st_module = MagicMock()
+mock_model_instance = MagicMock()
+# Configure the instance to return real numpy data that .tolist() can be called on
+mock_model_instance.encode.side_effect = _get_mock_vector
 
-    mock_model_class = MagicMock(return_value=mock_model_instance)
-    mock_st_module.SentenceTransformer = mock_model_class
-    sys.modules["sentence_transformers"] = mock_st_module
+mock_model_class = MagicMock(return_value=mock_model_instance)
+mock_st_module.SentenceTransformer = mock_model_class
+sys.modules["sentence_transformers"] = mock_st_module
 
 # Mock OpenAI & Groq
 try:
