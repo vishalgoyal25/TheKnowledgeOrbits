@@ -19,7 +19,13 @@ DEBUG = False
 # Format: comma-separated list, e.g. "myapp.onrender.com,www.myapp.com"
 ALLOWED_HOSTS = env.list(  # noqa: F405
     "ALLOWED_HOSTS",
-    default=["localhost"],
+    default=[
+        "localhost",
+        "127.0.0.1",
+        "theknowledgeorbits-backend.onrender.com",
+        "theknowledgeorbits.com",
+        "www.theknowledgeorbits.com",
+    ],
 )
 
 # CSRF: must trust both the Render service URL and the Vercel frontend URL
