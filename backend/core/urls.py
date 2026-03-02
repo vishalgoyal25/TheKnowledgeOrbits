@@ -5,23 +5,16 @@ URL configuration for TheKnowledgeOrbits.
 from typing import Any
 
 from django.contrib import admin
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import include, path
 
 
-def health_check(request: Any) -> JsonResponse:
+def health_check(request: Any) -> HttpResponse:
     """
     Ultra-lightweight health check for Render/LB.
-    Does NOT check DB to avoid connection pool exhaustion
-    and 5s timeout failures during heavy DB load.
+    Returns plain text for maximum speed and zero overhead.
     """
-    return JsonResponse(
-        {
-            "status": "healthy",
-            "message": "TheKnowledgeOrbits API is operational",
-        },
-        status=200,
-    )
+    return HttpResponse("OK", status=200)
 
 
 def api_index(request: Any) -> JsonResponse:
@@ -50,9 +43,10 @@ def api_index(request: Any) -> JsonResponse:
 
 
 urlpatterns = [
-    path("", api_index, name="api-index"),
+    path("", health_check, name="health-check"),
+    path("api/v1/", api_index, name="api-index"),
     path("admin/", admin.site.urls),
-    path("api/v1/health/", health_check, name="health-check"),
+    path("api/v1/health/", health_check, name="health-check-v1"),
     # Engine URLs will be added here as we build them
     # Content Engine
     path("api/v1/content/", include("engines.content.urls")),

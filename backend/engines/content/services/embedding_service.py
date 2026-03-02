@@ -108,16 +108,32 @@ class EmbeddingService:
             return results
 
         valid_texts = [texts[i] for i in valid_indices]
-        use_api = os.getenv("USE_EMBEDDING_API", "False").lower() == "true"
 
-        if use_api:
+        # PROACTIVE MEMORY MANAGEMENT:
+        # Default to API if token is present or we're on Render, to save RAM (512MB limit)
+        is_render = os.getenv("RENDER", "False").lower() == "true"
+        has_token = bool(os.getenv("HF_API_TOKEN"))
+
+        default_use_api = "True" if (is_render or has_token) else "False"
+        use_api = os.getenv("USE_EMBEDDING_API", default_use_api).lower() == "true"
+
+        if use_api and has_token:
             logger.debug("generating_embeddings_via_api", count=len(valid_indices))
             try:
                 valid_embeddings = cls._generate_api_embedding(valid_texts)
             except Exception as e:
-                logger.warning("hf_api_failed_falling_back_locally", error=str(e))
-                valid_embeddings = cls._generate_local_embeddings(valid_texts)
+                if not is_render:
+                    logger.warning("hf_api_failed_falling_back_locally", error=str(e))
+                    valid_embeddings = cls._generate_local_embeddings(valid_texts)
+                else:
+                    logger.error("hf_api_failed_on_render_critical", error=str(e))
+                    raise e
         else:
+            if is_render:
+                logger.warning(
+                    "local_embedding_on_render_dangerous",
+                    msg="Memory limit 512MB likely to be exceeded",
+                )
             logger.debug("generating_embeddings_locally", count=len(valid_indices))
             valid_embeddings = cls._generate_local_embeddings(valid_texts)
 

@@ -89,20 +89,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "core.wsgi.application"
 
-# Database
+# Database Configuration
+# Professional standard: Key names stay the same (DB_NAME, etc.)
+# and values are provided by the environment (Local .env vs Render Dashboard).
+DB_MODE = env("DB_MODE", default="standard")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("DB_NAME", default="TheKnowledgeOrbits"),
         "USER": env("DB_USER", default="postgres"),
-        "PASSWORD": env("DB_PASSWORD"),  # No default — must be set explicitly
-        "HOST": env("DB_HOST", default="localhost"),
-        "PORT": env("DB_PORT", default="5432"),
+        "PASSWORD": env("DB_PASSWORD", default="admin123"),
+        "HOST": env("HOST", default="localhost"),
+        "PORT": env("PORT", default="5432"),
         "OPTIONS": {
             "options": "-c timezone=Asia/Kolkata",
         },
     }
 }
+
+# Standard URL Configuration
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"]
+)
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS", default=["http://localhost:3000"]
+)
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -179,9 +192,7 @@ SIMPLE_JWT = {
 }
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = env.list(
-    "CORS_ALLOWED_ORIGINS", default=["http://localhost:3000", "http://127.0.0.1:3000"]
-)
+# CORS Settings (Managed by Switchboard above)
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_METHODS = [
@@ -205,11 +216,10 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
-# CSRF Trusted Origins (required for POST requests from external domains)
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+# CSRF Trusted Origins (Managed by Switchboard above)
+# CSRF_TRUSTED_ORIGINS is already defined.
+# If you need to add more:
+# CSRF_TRUSTED_ORIGINS += ["..."]
 
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
