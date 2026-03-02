@@ -477,23 +477,22 @@ Generate the article now:"""
             article.generation_metadata["ca_sources"] = ca_sources_meta
             article.save()
 
-        # Generate Embedding for Semantic Search
+        # Generate Embedding for Semantic Search in background
         try:
+            from engines.content.tasks import generate_content_embedding
+
             # Combine title, summary, and first part of content for rich context
             embedding_text = (
                 f"{article.title}\n{article.summary}\n{article.content[:1000]}"
             )
-            vector = EmbeddingService.generate_embedding(embedding_text)
 
-            Embedding.objects.create(
-                content_type="article",
-                content_id=article.id,
-                vector=vector,
-                model_name=EmbeddingService.MODEL_NAME,
+            # Queue background task
+            generate_content_embedding(
+                content_type="article", content_id=str(article.id), text=embedding_text
             )
-            logger.info("article_embedding_created", article_id=str(article.id))
+            logger.info("article_embedding_queued", article_id=str(article.id))
         except Exception as e:
             sentry_sdk.capture_exception(e)
-            logger.error("article_embedding_generation_failed", error=str(e))
+            logger.error("article_embedding_queue_failed", error=str(e))
 
         return article

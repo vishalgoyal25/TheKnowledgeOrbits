@@ -2,17 +2,17 @@
  * Axios client for API requests
  */
 
-import axios, {
-  AxiosInstance,
-  AxiosError,
-  InternalAxiosRequestConfig,
-} from "axios";
 import { tokenManager } from "@/lib/auth/token-manager";
 import { createLogger } from "@/lib/logger";
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  InternalAxiosRequestConfig,
+} from "axios";
 
 const logger = createLogger("API");
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || "v1";
 
 // Handle API URL that might already include /api/v1 or missing HTTP prefix
@@ -49,7 +49,7 @@ apiClient.interceptors.request.use(
 
     return config;
   },
-  (error) => {
+  (error: AxiosError) => {
     logger.error("Request configuration error:", error);
     return Promise.reject(error);
   },
@@ -57,7 +57,7 @@ apiClient.interceptors.request.use(
 
 // Response interceptor - Handle token refresh
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response: any) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;

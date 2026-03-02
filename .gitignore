@@ -81,6 +81,9 @@ htmlcov/
 # Add large datasets or temporary files here
 docs/
 new_docs/
+agentic_dev/
 .ipynb_checkpoints/
 *.db
 *.sql
+*.patch
+*_errors.txt

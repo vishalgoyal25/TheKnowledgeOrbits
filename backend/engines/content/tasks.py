@@ -55,15 +55,38 @@ def process_document_async(self, document_id: str) -> dict:  # type: ignore
 def generate_embeddings_batch(chunk_ids: list) -> dict:  # type: ignore
     """
     Generate embeddings for multiple chunks in batch.
-
-    Args:
-        chunk_ids: List of chunk UUIDs
-
-    Returns:
-        Result dictionary with success count
     """
     # Placeholder for batch embedding generation
     logger.info("batch_embedding_task_started", chunk_count=len(chunk_ids))
 
     # Will be implemented when needed
     return {"processed": len(chunk_ids), "success": len(chunk_ids), "failed": 0}
+
+
+from background_task import background
+
+from .models import Embedding
+from .services.embedding_service import EmbeddingService
+
+
+@background(schedule=0)
+def generate_content_embedding(content_type: str, content_id: str, text: str):
+    """
+    Background task to generate embedding for any content (Article, Chunk, etc.)
+    """
+    logger.info(
+        "background_embedding_started", content_type=content_type, content_id=content_id
+    )
+    try:
+        vector = EmbeddingService.generate_embedding(text)
+
+        # Safe update/create
+        Embedding.objects.update_or_create(
+            content_type=content_type,
+            content_id=content_id,
+            defaults={"vector": vector, "model_name": EmbeddingService.MODEL_NAME},
+        )
+        logger.info("background_embedding_success", content_id=content_id)
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        logger.error("background_embedding_failed", content_id=content_id, error=str(e))
