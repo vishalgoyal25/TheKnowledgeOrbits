@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.utils import timezone
 
 import sentry_sdk
@@ -12,7 +14,7 @@ logger = structlog.get_logger(__name__)
 
 @background(schedule=0)
 def generate_article_task(
-    job_id: str, topic_id: str, include_ca: bool, user_id: int = None
+    job_id: str, topic_id: str, include_ca: bool, user_id: Optional[int] = None
 ):
     """
     Background task to generate an article using RAG.

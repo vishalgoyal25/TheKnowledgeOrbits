@@ -9,7 +9,11 @@ Async tasks for content processing.
 """
 
 import structlog
+from background_task import background
 from celery import shared_task
+
+from .models import Embedding
+from .services.embedding_service import EmbeddingService
 
 logger = structlog.get_logger(__name__)
 
@@ -61,12 +65,6 @@ def generate_embeddings_batch(chunk_ids: list) -> dict:  # type: ignore
 
     # Will be implemented when needed
     return {"processed": len(chunk_ids), "success": len(chunk_ids), "failed": 0}
-
-
-from background_task import background
-
-from .models import Embedding
-from .services.embedding_service import EmbeddingService
 
 
 @background(schedule=0)
