@@ -15,8 +15,7 @@ from django.utils import timezone
 import structlog
 from groq import Groq
 
-from engines.content.models import Chunk, Embedding
-from engines.content.services.embedding_service import EmbeddingService
+from engines.content.models import Chunk
 from engines.current_affairs.models import CAChunk, CATopicLink
 from engines.knowledge.models import ChunkTopicMap, Topic
 

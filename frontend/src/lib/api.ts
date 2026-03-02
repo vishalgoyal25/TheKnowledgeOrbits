@@ -1,7 +1,6 @@
 /**
  * Unified API client bridge
- * Re-exports the core axios instance to maintain compatibility
- * with older components while using the new Switchboard logic.
+ * Re-exports the core axios instance to maintain compatibility.
  */
 
 import apiClient from "./api/client";
