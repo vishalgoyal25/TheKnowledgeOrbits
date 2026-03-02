@@ -11,7 +11,7 @@ import os
 from .base import *  # noqa: F401, F403
 from .base import env
 
-# ── Security ──────────────────────────────────────────────────────────────────
+# ── Security ─────────────────────────────────────────────────────────────────
 DEBUG = False
 
 # Render provides the HOST as an env var; Vercel frontend URL also needs to be
@@ -28,14 +28,24 @@ CSRF_TRUSTED_ORIGINS = env.list(  # noqa: F405
     default=[
         "https://theknowledgeorbits.vercel.app",
         "https://theknowledgeorbits-backend.onrender.com",
+        "https://theknowledgeorbits.com",
+        "https://www.theknowledgeorbits.com",
     ],
 )
-if "https://theknowledgeorbits.vercel.app" not in CSRF_TRUSTED_ORIGINS:
-    CSRF_TRUSTED_ORIGINS.append("https://theknowledgeorbits.vercel.app")
+for trusted_origin in [
+    "https://theknowledgeorbits.vercel.app",
+    "https://theknowledgeorbits.com",
+    "https://www.theknowledgeorbits.com",
+]:
+    if trusted_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(trusted_origin)
 
 # HTTPS security headers
 SECURE_SSL_REDIRECT = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # required for Render
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)  # required for Render
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "None"
@@ -48,7 +58,7 @@ SECURE_HSTS_PRELOAD = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REDIRECT_EXEMPT = [r"^/api/v1/health/", r"^/$"]
 
-# ── Static Files (WhiteNoise) ─────────────────────────────────────────────────
+# ── Static Files (WhiteNoise) ────────────────────────────────────────────────
 # WhiteNoise serves static files directly from Django — no S3/CDN needed on
 # free-tier Render. It compresses and caches files automatically.
 #
@@ -62,25 +72,33 @@ MIDDLEWARE.insert(  # noqa: F405
 )
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# ── Database SSL (Supabase requires SSL) ──────────────────────────────────────
+# ── Database SSL (Supabase requires SSL) ─────────────────────────────────────
 DATABASES["default"]["OPTIONS"] = {  # noqa: F405
     "sslmode": "require",
     "options": "-c timezone=Asia/Kolkata",
 }
 
-# ── CORS for Vercel Frontend ──────────────────────────────────────────────────
+# ── CORS for Vercel Frontend ─────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list(  # noqa: F405
     "CORS_ALLOWED_ORIGINS",
     default=[
         "https://theknowledgeorbits.vercel.app",
         "https://theknowledgeorbits-backend.onrender.com",
+        "https://theknowledgeorbits.com",
+        "https://www.theknowledgeorbits.com",
     ],
 )
-if "https://theknowledgeorbits.vercel.app" not in CORS_ALLOWED_ORIGINS:
-    CORS_ALLOWED_ORIGINS.append("https://theknowledgeorbits.vercel.app")
+for allowed_origin in [
+    "https://theknowledgeorbits.vercel.app",
+    "https://theknowledgeorbits.com",
+    "https://www.theknowledgeorbits.com",
+]:
+    if allowed_origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(allowed_origin)
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
+    r"^https://.*\.theknowledgeorbits\.com$",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -95,8 +113,8 @@ LOGGING["root"] = {  # noqa: F405
     "level": "WARNING",
 }
 
-# ── Sentry environment label ──────────────────────────────────────────────────
+# ── Sentry environment label ─────────────────────────────────────────────────
 os.environ.setdefault("SENTRY_ENVIRONMENT", "production")
 
-# ── Ensure FRONTEND_URL never defaults to localhost in production ─────────────
-FRONTEND_URL = env("FRONTEND_URL", default="https://theknowledgeorbits.vercel.app")
+# ── Ensure FRONTEND_URL never defaults to localhost in production ────────────
+FRONTEND_URL = env("FRONTEND_URL", default="https://theknowledgeorbits.com")
