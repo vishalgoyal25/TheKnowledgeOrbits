@@ -2,8 +2,8 @@ name: 🤖 Current Affairs Ghost Worker
 
 on:
   schedule:
-    # Runs once every 24 hours at 00:00 UTC (Safest for Free Tier)
-    - cron: '0 0 * * *'
+    # Runs once every 12 hours at 00:00 and 12:00 UTC (Distributed load)
+    - cron: '0 */12 * * *'
   workflow_dispatch:
     # Manual trigger for ad-hoc syncing
 
@@ -11,7 +11,7 @@ jobs:
   scrape_and_process:
     name: Execute CA Sync
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     concurrency:
       group: ca-scraping

@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List
 
 from django.db import transaction
 from django.utils import timezone
@@ -137,13 +137,147 @@ class CAProcessorService:
         return chunks
 
     @staticmethod
-    def process_pending_articles(batch_size: int = 10) -> int:
-        """Process pending CA articles in batches"""
-        pending_articles = CAArticle.objects.filter(
+    def process_pending_articles(batch_size: int = 50) -> int:
+        """
+        Process pending CA articles in TRUE BATCH mode.
+        Significantly reduces DB round-trips and API overhead.
+        """
+        pending_articles_qs = CAArticle.objects.filter(
             processing_status="pending"
         ).order_by("published_at")[:batch_size]
-        processed_count = 0
+
+        # Convert to list to avoid sliced QuerySet issue for bulk_update and iterations
+        pending_articles = list(pending_articles_qs)
+
+        if not pending_articles:
+            return 0
+
+        article_ids = [a.id for a in pending_articles]
+        logger.info("batch_processing_ca_articles_start", count=len(article_ids))
+
+        # 1. Mark articles as processing immediately
+        CAArticle.objects.filter(id__in=article_ids).update(
+            processing_status="processing"
+        )
+
+        all_chunks_to_create: List[Dict[str, Any]] = []
+        article_chunk_counts: Dict[Any, int] = (
+            {}
+        )  # track chunks per article for final status update
+
+        # 2. Chunking Logic (CPU bound, fast local operation)
         for article in pending_articles:
-            if CAProcessorService.process_article(article):
-                processed_count += 1
-        return processed_count
+            try:
+                chunks_text = CAProcessorService._chunk_content(article.content)
+                if not chunks_text and article.content and len(article.content) > 10:
+                    chunks_text = [article.content.strip()]
+
+                if not chunks_text:
+                    article.processing_status = "failed"
+                    article.processing_error = "No valid chunks generated"
+                    article.save()
+                    continue
+
+                # Keep metadata about chunks to link them back to the article
+                article_chunk_counts[article.id] = len(chunks_text)
+                for idx, text in enumerate(chunks_text):
+                    all_chunks_to_create.append(
+                        {
+                            "article": article,
+                            "text": text,
+                            "index": idx,
+                            "published_at": article.published_at,
+                        }
+                    )
+            except Exception as e:
+                logger.error(
+                    "chunking_failed", article_id=str(article.id), error=str(e)
+                )
+                article.processing_status = "failed"
+                article.processing_error = f"Chunking failed: {str(e)}"
+                article.save()
+
+        if not all_chunks_to_create:
+            return 0
+
+        # 3. Batch Embedding (THE BIGGEST WIN - ONE API CALL)
+        try:
+            texts_to_embed = [c["text"] for c in all_chunks_to_create]
+            logger.info("generating_embeddings_batch", total_chunks=len(texts_to_embed))
+            vectors = EmbeddingService.generate_embeddings_batch(texts_to_embed)
+        except Exception as e:
+            logger.error("batch_embedding_failed", error=str(e))
+            CAArticle.objects.filter(id__in=article_ids).update(
+                processing_status="failed",
+                processing_error=f"Embedding API failed: {str(e)}",
+            )
+            return 0
+
+        # 4. Bulk DB Creation (Optimized for Mumbai Latency)
+        try:
+            from datetime import timedelta
+
+            with transaction.atomic():
+                # 4a. Create Chunks
+                chunks_objects = [
+                    CAChunk(
+                        ca_article=c["article"],
+                        chunk_text=c["text"],
+                        chunk_index=c["index"],
+                        source_type="dynamic",
+                        published_at=c["published_at"],
+                        expiry_date=c["published_at"] + timedelta(days=180),
+                        quality_flag="medium",
+                        confidence_score=0.7,
+                    )
+                    for c in all_chunks_to_create
+                ]
+                # bulk_create returns the objects with IDs set (on PostgreSQL)
+                created_chunks = CAChunk.objects.bulk_create(chunks_objects)
+
+                # 4b. Create Embeddings
+                embedding_objects = [
+                    Embedding(
+                        content_type="ca_chunk",
+                        content_id=chunk.id,
+                        vector=vec,
+                        model_name=EmbeddingService.MODEL_NAME,
+                    )
+                    for chunk, vec in zip(created_chunks, vectors)
+                ]
+                created_embeddings = Embedding.objects.bulk_create(embedding_objects)
+
+                # 4c. Update Chunks with Embedding IDs (Linking)
+                # Note: We need another bulk update or can stay as is if we don't strictly need the FK in CAChunk
+                # (PostgreSQL allows us to do this because IDs are ready)
+                for chunk, embedding in zip(created_chunks, created_embeddings):
+                    chunk.embedding_id = embedding.id
+
+                CAChunk.objects.bulk_update(created_chunks, fields=["embedding_id"])
+
+                # 5. Final Status Update
+                for article in pending_articles:
+                    if article.id in article_chunk_counts:
+                        article.processing_status = "completed"
+                        article.chunk_count = article_chunk_counts[article.id]
+                        article.processed_at = timezone.now()
+
+                CAArticle.objects.bulk_update(
+                    pending_articles,
+                    fields=["processing_status", "chunk_count", "processed_at"],
+                )
+
+            logger.info(
+                "batch_processing_ca_completed",
+                articles=len(pending_articles),
+                chunks=len(created_chunks),
+            )
+            return len(pending_articles)
+
+        except Exception as e:
+            logger.error("bulk_db_save_failed", error=str(e))
+            CAArticle.objects.filter(id__in=article_ids).update(
+                processing_status="failed",
+                processing_error=f"Bulk DB save failed: {str(e)}",
+            )
+            return 0

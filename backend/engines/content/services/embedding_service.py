@@ -45,47 +45,58 @@ class EmbeddingService:
 
     @classmethod
     def _generate_api_embedding(cls, texts: List[str]) -> List[List[float]]:
-        """Generate embeddings via HuggingFace Inference API."""
+        """Generate embeddings via HuggingFace Inference API in sub-batches."""
         api_token = os.getenv("HF_API_TOKEN")
         if not api_token:
             logger.error("hf_api_token_missing")
-            # Fallback to local if token is missing
             return cls._generate_local_embeddings(texts)
 
         headers = {"Authorization": f"Bearer {api_token}"}
+        all_embeddings = []
 
-        try:
-            import time
+        # Sub-batching to stay within API payload limits and prevent timeouts
+        sub_batch_size = 20
+        import time
 
-            # Add basic retry mechanism for HF API queueing
+        for i in range(0, len(texts), sub_batch_size):
+            batch = texts[i : i + sub_batch_size]
+            success = False
+
             for attempt in range(3):
                 try:
                     response = requests.post(
                         cls.HF_API_URL,
                         headers=headers,
-                        json={"inputs": texts, "options": {"wait_for_model": True}},
-                        timeout=120,  # Increased from 20 to prevent fallback timeout
+                        json={"inputs": batch, "options": {"wait_for_model": True}},
+                        timeout=120,
                     )
-                    break
+
+                    if response.status_code == 200:
+                        batch_result = response.json()
+                        # Result might be a single list if batch size was 1
+                        if isinstance(batch_result[0], float):
+                            all_embeddings.append(batch_result)
+                        else:
+                            all_embeddings.extend(batch_result)
+                        success = True
+                        break
+                    else:
+                        logger.error(
+                            "hf_api_error",
+                            status=response.status_code,
+                            body=response.text,
+                        )
+                        time.sleep(5)
                 except requests.exceptions.Timeout:
-                    if attempt == 2:
-                        raise
                     logger.warning("hf_api_timeout_retrying", attempt=attempt + 1)
                     time.sleep(5)
 
-            if response.status_code == 200:
-                result = response.json()
-                # API returns a list of lists for multiple inputs
-                return result
-            else:
-                logger.error(
-                    "hf_api_error", status=response.status_code, body=response.text
+            if not success:
+                raise Exception(
+                    f"Failed to generate embeddings via API after retries for batch starting at index {i}"
                 )
-                raise Exception(f"HuggingFace API error: {response.text}")
 
-        except Exception as e:
-            logger.error("hf_api_exception", error=str(e))
-            raise e
+        return all_embeddings
 
     @classmethod
     def generate_embedding(cls, text: str) -> List[float]:
