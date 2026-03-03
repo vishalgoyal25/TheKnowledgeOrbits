@@ -133,7 +133,15 @@ class CAProcessorService:
             chunk_text = content[start:end].strip()
             if len(chunk_text) >= CAProcessorService.MIN_CHUNK_SIZE:
                 chunks.append(chunk_text)
-            start = end - CAProcessorService.CHUNK_OVERLAP
+
+            # Fix: Ensure start always moves forward.
+            # If the break point was too close to start (shorter than overlap),
+            # we don't overlap to avoid an infinite backward loop.
+            if (end - start) <= CAProcessorService.CHUNK_OVERLAP:
+                start = end
+            else:
+                start = end - CAProcessorService.CHUNK_OVERLAP
+
         return chunks
 
     @staticmethod
@@ -185,7 +193,6 @@ class CAProcessorService:
                 if not chunks_text:
                     article.processing_status = "failed"
                     article.processing_error = "No valid chunks generated"
-                    article.save()
                     continue
 
                 # Keep metadata about chunks to link them back to the article
@@ -205,9 +212,14 @@ class CAProcessorService:
                 )
                 article.processing_status = "failed"
                 article.processing_error = f"Chunking failed: {str(e)}"
-                article.save()
 
         if not all_chunks_to_create:
+            # Mark remaining "processing" articles as failed if no chunks produced
+            CAArticle.objects.filter(
+                id__in=article_ids, processing_status="processing"
+            ).update(
+                processing_status="failed", processing_error="No chunks to process"
+            )
             return 0
 
         # 3. Batch Embedding (THE BIGGEST WIN - ONE API CALL)
@@ -271,10 +283,22 @@ class CAProcessorService:
                         article.processing_status = "completed"
                         article.chunk_count = article_chunk_counts[article.id]
                         article.processed_at = timezone.now()
+                    # If an article failed chunking, its status and error are already set on the object
+                    # We need to ensure these are also updated in the bulk_update
+                    elif article.processing_status == "processing":
+                        # This case should ideally not happen if the logic above is correct,
+                        # but as a safeguard, mark as failed if still 'processing' without chunks
+                        article.processing_status = "failed"
+                        article.processing_error = "No chunks generated for article"
 
                 CAArticle.objects.bulk_update(
                     pending_articles,
-                    fields=["processing_status", "chunk_count", "processed_at"],
+                    fields=[
+                        "processing_status",
+                        "chunk_count",
+                        "processed_at",
+                        "processing_error",
+                    ],
                 )
 
             logger.info(

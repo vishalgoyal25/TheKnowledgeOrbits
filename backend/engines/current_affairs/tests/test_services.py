@@ -120,6 +120,15 @@ class TestCAProcessorService:
         assert len(chunks) >= 1
         assert all(len(c) >= CAProcessorService.MIN_CHUNK_SIZE for c in chunks)
 
+    def test_chunk_content_infinite_loop_regression(self):
+        """Regression test for infinite loop when break point is small."""
+        # This setup previously caused an infinite loop:
+        # start=0, end=150, overlap=200 -> new start = -50
+        content = "Sentence. " * 30 + "X" * 2000
+        chunks = CAProcessorService._chunk_content(content)
+        assert len(chunks) > 0
+        assert "Sentence." in chunks[0]
+
 
 @pytest.mark.django_db
 class TestTopicLinkerService:
