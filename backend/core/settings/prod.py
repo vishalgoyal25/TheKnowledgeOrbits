@@ -14,10 +14,18 @@ from .base import env
 # ── Security ─────────────────────────────────────────────────────────────────
 DEBUG = False
 
-# Render provides the HOST as an env var; Vercel frontend URL also needs to be
-# added once the frontend is deployed.
-# Format: comma-separated list, e.g. "myapp.onrender.com,www.myapp.com"
-ALLOWED_HOSTS = env.list(  # noqa: F405
+
+# Robust helper for lists that may be space or comma separated in Render UI
+def get_env_list(var_name, default=None):
+    raw_val = env(var_name, default="")
+    if not raw_val:
+        return default or []
+    # Convert spaces/tabs to commas, then split by comma
+    cleaned = raw_val.replace("\t", ",").replace(" ", ",")
+    return [s.strip() for s in cleaned.split(",") if s.strip()]
+
+
+ALLOWED_HOSTS = get_env_list(
     "ALLOWED_HOSTS",
     default=[
         "localhost",
@@ -28,8 +36,7 @@ ALLOWED_HOSTS = env.list(  # noqa: F405
     ],
 )
 
-# CSRF: must trust both the Render service URL and the Vercel frontend URL
-CSRF_TRUSTED_ORIGINS = env.list(  # noqa: F405
+CSRF_TRUSTED_ORIGINS = get_env_list(
     "CSRF_TRUSTED_ORIGINS",
     default=[
         "https://theknowledgeorbits.vercel.app",
@@ -38,13 +45,6 @@ CSRF_TRUSTED_ORIGINS = env.list(  # noqa: F405
         "https://www.theknowledgeorbits.com",
     ],
 )
-for trusted_origin in [
-    "https://theknowledgeorbits.vercel.app",
-    "https://theknowledgeorbits.com",
-    "https://www.theknowledgeorbits.com",
-]:
-    if trusted_origin not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append(trusted_origin)
 
 # HTTPS security headers
 SECURE_SSL_REDIRECT = True
@@ -78,14 +78,19 @@ MIDDLEWARE.insert(  # noqa: F405
 )
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# ── Database SSL (Supabase requires SSL) ─────────────────────────────────────
+# ── Database SSL/Keepalive (Crucial for Oregon-Mumbai Latency) ──────────────────
 DATABASES["default"]["OPTIONS"] = {  # noqa: F405
     "sslmode": "require",
     "options": "-c timezone=Asia/Kolkata",
+    "connect_timeout": 10,  # Increase timeout for cross-ocean handshake
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 5,
 }
 
 # ── CORS for Vercel Frontend ─────────────────────────────────────────────────
-CORS_ALLOWED_ORIGINS = env.list(  # noqa: F405
+CORS_ALLOWED_ORIGINS = get_env_list(
     "CORS_ALLOWED_ORIGINS",
     default=[
         "https://theknowledgeorbits.vercel.app",
@@ -94,13 +99,6 @@ CORS_ALLOWED_ORIGINS = env.list(  # noqa: F405
         "https://www.theknowledgeorbits.com",
     ],
 )
-for allowed_origin in [
-    "https://theknowledgeorbits.vercel.app",
-    "https://theknowledgeorbits.com",
-    "https://www.theknowledgeorbits.com",
-]:
-    if allowed_origin not in CORS_ALLOWED_ORIGINS:
-        CORS_ALLOWED_ORIGINS.append(allowed_origin)
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
