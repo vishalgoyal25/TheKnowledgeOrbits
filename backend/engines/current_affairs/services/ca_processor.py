@@ -142,6 +142,16 @@ class CAProcessorService:
         Process pending CA articles in TRUE BATCH mode.
         Significantly reduces DB round-trips and API overhead.
         """
+        # Self-healing: Reset any articles stuck in 'processing' for more than 1 hour
+        from datetime import timedelta
+
+        stuck_cutoff = timezone.now() - timedelta(hours=1)
+        stuck_count = CAArticle.objects.filter(
+            processing_status="processing", updated_at__lt=stuck_cutoff
+        ).update(processing_status="pending")
+        if stuck_count > 0:
+            logger.info("stuck_articles_reset", count=stuck_count)
+
         pending_articles_qs = CAArticle.objects.filter(
             processing_status="pending"
         ).order_by("published_at")[:batch_size]
