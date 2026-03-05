@@ -90,23 +90,30 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 # Database Configuration
-# Professional standard: Key names stay the same (DB_NAME, etc.)
-# and values are provided by the environment (Local .env vs Render Dashboard).
-DB_MODE = env("DB_MODE", default="standard")
+# Professional standard: Use a DUMMY database during Render build to avoid timeouts.
+RENDER_BUILD_MODE = os.getenv("RENDER") == "true" and not os.getenv("DB_HOST")
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("DB_NAME", default=env("NAME", default="TheKnowledgeOrbits")),
-        "USER": env("DB_USER", default=env("USER", default="postgres")),
-        "PASSWORD": env("DB_PASSWORD", default=env("PASSWORD", default="")),
-        "HOST": env("DB_HOST", default=env("HOST", default="localhost")),
-        "PORT": env("DB_PORT", default="5432"),
-        "OPTIONS": {
-            "options": "-c timezone=Asia/Kolkata",
-        },
+if RENDER_BUILD_MODE:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("DB_NAME", default=env("NAME", default="TheKnowledgeOrbits")),
+            "USER": env("DB_USER", default=env("USER", default="postgres")),
+            "PASSWORD": env("DB_PASSWORD", default=env("PASSWORD", default="")),
+            "HOST": env("DB_HOST", default=env("HOST", default="localhost")),
+            "PORT": env("DB_PORT", default="5432"),
+            "OPTIONS": {
+                "options": "-c timezone=Asia/Kolkata",
+            },
+        }
+    }
 
 # Standard URL Configuration
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
