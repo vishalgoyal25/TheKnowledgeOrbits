@@ -179,9 +179,9 @@ class CAProcessorService:
         )
 
         all_chunks_to_create: List[Dict[str, Any]] = []
-        article_chunk_counts: Dict[Any, int] = (
-            {}
-        )  # track chunks per article for final status update
+        article_chunk_counts: Dict[
+            Any, int
+        ] = {}  # track chunks per article for final status update
 
         # 2. Chunking Logic (CPU bound, fast local operation)
         for article in pending_articles:

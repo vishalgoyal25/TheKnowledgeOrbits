@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("assessment", "0004_remove_quiz_quiz_created_by_idx_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

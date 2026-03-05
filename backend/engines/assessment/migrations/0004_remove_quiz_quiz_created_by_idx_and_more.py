@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("assessment", "0003_merge_0002_add_ownership_0002_delete_topicmastery"),
     ]
