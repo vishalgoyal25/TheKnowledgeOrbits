@@ -142,6 +142,10 @@ class TopicAdmin(admin.ModelAdmin):  # type: ignore
         from engines.knowledge.services.mapping_service import MappingService
 
         topic = self.get_object(request, object_id)
+        if topic is None:
+            from django.http import Http404
+
+            raise Http404("Topic not found")
 
         if request.method == "POST":
             # Get suggested chunk IDs from form
@@ -149,7 +153,7 @@ class TopicAdmin(admin.ModelAdmin):  # type: ignore
 
             if chunk_ids:
                 result = MappingService.approve_mappings(
-                    topic_id=str(topic.id),  # type: ignore
+                    topic_id=str(topic.id),
                     chunk_ids=chunk_ids,
                     user_id=request.user.id,
                     priority=1,
@@ -157,13 +161,13 @@ class TopicAdmin(admin.ModelAdmin):  # type: ignore
 
                 self.message_user(
                     request,
-                    f"Successfully mapped {result['created']} chunks to {topic.name}",  # type: ignore
+                    f"Successfully mapped {result['created']} chunks to {topic.name}",
                 )
 
         # Get suggestions
         suggestions = MappingService.auto_suggest_chunks(
             topic_id=str(topic.id),
-            limit=20,  # type: ignore
+            limit=20,
         )
 
         context = {
