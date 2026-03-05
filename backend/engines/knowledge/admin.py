@@ -162,7 +162,8 @@ class TopicAdmin(admin.ModelAdmin):  # type: ignore
 
         # Get suggestions
         suggestions = MappingService.auto_suggest_chunks(
-            topic_id=str(topic.id), limit=20  # type: ignore
+            topic_id=str(topic.id),
+            limit=20,  # type: ignore
         )
 
         context = {

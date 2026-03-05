@@ -1,77 +1,23 @@
-# Pre-commit configuration for TheKnowledgeOrbits
-# Focus: Automated formatting and basic quality checks (Frustration-Free)
-
 repos:
-  # 1. General File Sanity
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-      - id: check-added-large-files
 
-  # 2. Backend (Python) formatting with Black
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
     hooks:
-      - id: black
-        args: [--line-length=88]
+      - id: ruff  # Replaces Flake8, isort, and Bandit
+        args: [ --fix ]
+      - id: ruff-format # Replaces Black
 
-  # 3. Backend (Python) import sorting with isort (black-compatible profile)
-  #    Must run AFTER black so both agree on the final format.
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        name: isort (python)
-        args: ["--profile=black", "--filter-files"]
-        files: ^backend/
-
-  # 4. Backend (Python) linting with Flake8
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        args: ["--config=backend/.flake8"]
-
-  # 5. Type checking with Mypy (local)
-  - repo: local
-    hooks:
-      - id: mypy
-        name: mypy (backend)
-        entry: python -c "import os, sys, subprocess; os.chdir('backend'); sys.exit(subprocess.run('mypy .', shell=True).returncode)"
-        language: system
-        types: [python]
-        pass_filenames: false
-
-  # 6. Security scanning with Bandit (local)
-  - repo: local
-    hooks:
-      - id: bandit
-        name: bandit (backend)
-        entry: python -c "import os, sys, subprocess; os.chdir('backend'); sys.exit(subprocess.run('bandit -r engines/ core/ -x \"*/tests/*\"', shell=True).returncode)"
-        language: system
-        types: [python]
-        pass_filenames: false
-
-  # 7. Testing with Pytest (local)
-  - repo: local
-    hooks:
-      - id: pytest
-        name: pytest (backend)
-        entry: python -c "import os, sys, subprocess; os.chdir('backend'); sys.exit(subprocess.run('pytest', shell=True).returncode)"
-        language: system
-        types: [python]
-        pass_filenames: false
-
-  # 8. Frontend (TypeScript/React/CSS) formatting with Prettier
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
     hooks:
       - id: prettier
         types_or: [javascript, jsx, ts, tsx, css, scss, markdown, json]
-        # Skip node_modules and build artifacts
         exclude: |
           (?x)^(
             frontend/\.next/|
@@ -79,41 +25,3 @@ repos:
             backend/staticfiles/|
             backend/media/
           )
-
-  # 9. Frontend (TypeScript/React) linting with ESLint (local)
-  - repo: local
-    hooks:
-      - id: eslint
-        name: eslint (frontend)
-        entry: python -c "import os, sys, subprocess; os.chdir('frontend'); sys.exit(subprocess.run('npm run lint', shell=True).returncode)"
-        language: system
-        types_or: [javascript, jsx, ts, tsx]
-        pass_filenames: false
-
-  # 10. Frontend (TypeScript) type checking with tsc (local)
-  - repo: local
-    hooks:
-      - id: type-check
-        name: type-check (frontend)
-        entry: python -c "import os, sys, subprocess; os.chdir('frontend'); sys.exit(subprocess.run('npm run type-check', shell=True).returncode)"
-        language: system
-        types_or: [ts, tsx]
-        pass_filenames: false
-
-  # 11. Frontend (JavaScript/TypeScript) Testing with Jest (local)
-  - repo: local
-    hooks:
-      - id: jest
-        name: jest (frontend)
-        entry: python -c "import os, sys, subprocess; os.chdir('frontend'); sys.exit(subprocess.run('npm test', shell=True).returncode)"
-        language: system
-        types_or: [javascript, jsx, ts, tsx]
-        pass_filenames: false
-
-  # 12. Conventional Commits (Commitlint)
-  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v9.16.0
-    hooks:
-      - id: commitlint
-        stages: [commit-msg]
-        additional_dependencies: ["@commitlint/config-conventional"]

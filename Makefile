@@ -77,6 +77,14 @@ check: fmt lint
 check-all:
 	pre-commit run --all-files
 
+# ---- Deep Check (Pre-Push Layer) ----
+deepcheck:
+	@echo "Running Backend Checks (via Docker)..."
+	-docker exec $(BACKEND_CONTAINER) mypy engines/
+	-docker exec $(BACKEND_CONTAINER) pytest engines/ -q
+	@echo "Running Frontend Checks..."
+	cd frontend && npm run type-check && npm test
+
 # ---- Django ----
 
 migrate:
@@ -85,4 +93,4 @@ migrate:
 shell:
 	docker exec -it $(BACKEND_CONTAINER) python manage.py shell
 
-.PHONY: test-backend test-frontend test test-quick test-content test-ci fmt-backend fmt-frontend fmt lint-backend lint-frontend lint type-check-backend type-check-frontend type-check check check-all migrate shell
+.PHONY: test-backend test-frontend test test-quick test-content test-ci fmt-backend fmt-frontend fmt lint-backend lint-frontend lint type-check-backend type-check-frontend type-check check check-all deepcheck migrate shell

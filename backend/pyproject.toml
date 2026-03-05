@@ -22,3 +22,10 @@ exclude = ["migrations", "tests"]
 
 [tool.django-stubs]
 django_settings_module = "core.settings.mypy"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+ignore = ["E402"]

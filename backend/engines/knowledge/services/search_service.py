@@ -21,7 +21,9 @@ logger = structlog.get_logger(__name__)
 
 class SearchService:
     @classmethod
-    def semantic_search(cls, query: str, limit: int = 10, user: Any = None) -> List[Dict]:  # type: ignore
+    def semantic_search(
+        cls, query: str, limit: int = 10, user: Any = None
+    ) -> List[Dict]:  # type: ignore
         """
         Perform semantic search across all content types.
         """

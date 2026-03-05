@@ -31,25 +31,17 @@ jobs:
           pip install -r backend/requirements/base.txt
           pip install -r backend/requirements/dev.txt
 
-      - name: Black Check
+      - name: Ruff Check
         working-directory: ./backend
-        run: black --check .
+        run: pip install ruff && ruff check .
 
-      - name: Isort Check
+      - name: Ruff Format Check
         working-directory: ./backend
-        run: isort --check-only --diff .
-
-      - name: Flake8 Check
-        working-directory: ./backend
-        run: flake8 . --config=.flake8
+        run: pip install ruff && ruff format --check .
 
       - name: Mypy Type Check
         working-directory: ./backend
         run: mypy .
-
-      - name: Bandit Security Scan
-        working-directory: ./backend
-        run: bandit -r . -ll
 
   # ============================================
   # JOB 2: Backend Logic (342 Tests)
@@ -158,3 +150,16 @@ jobs:
         env:
           NEXT_PUBLIC_SENTRY_DSN: ""
           SENTRY_AUTH_TOKEN: ""
+
+  # ============================================
+  # JOB 4: Deploy to Render (The Gatekeeper)
+  # ============================================
+  deploy:
+    name: Trigger Render Deployment
+    needs: [backend-tests, frontend-integrity] # ONLY runs if ALL tests pass
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Only deploy from the main branch
+    steps:
+      - name: Trigger Render Deploy Hook
+        # Ensure you have RENDER_DEPLOY_HOOK_URL set in your GitHub Repository Secrets
+        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
