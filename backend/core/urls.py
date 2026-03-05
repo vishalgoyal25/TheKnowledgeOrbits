@@ -14,7 +14,7 @@ def health_check(request: Any) -> HttpResponse:
     Ultra-lightweight health check for Render/LB.
     Returns plain text for maximum speed and zero overhead.
     """
-    return HttpResponse("OK", status=200)
+    return HttpResponse("OK, System is Successfully Running!", status=200)
 
 
 def api_index(request: Any) -> JsonResponse:

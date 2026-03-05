@@ -3,11 +3,11 @@ services:
     image: pgvector/pgvector:pg16
     container_name: TheKnowledgeOrbits_postgres
     environment:
-      POSTGRES_DB: TheKnowledgeOrbits
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,8 +22,8 @@ services:
     image: dpage/pgadmin4
     container_name: TheKnowledgeOrbits_pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@theknowledgeorbits.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     ports:
       - "1993:80"
     depends_on:
