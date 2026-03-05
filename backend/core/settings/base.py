@@ -94,7 +94,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 RENDER_BUILD_MODE = os.getenv("RENDER") == "true" and not os.getenv("DB_HOST")
 
 if RENDER_BUILD_MODE:
-    DATABASES = {
+    DATABASES: Dict[str, Any] = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": ":memory:",
