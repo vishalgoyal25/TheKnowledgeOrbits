@@ -53,10 +53,10 @@ class TestCompleteQuizFlow:
         for i in range(3):
             q = Question.objects.create(
                 quiz=quiz,
-                question_text=f"Question {i+1}",
+                question_text=f"Question {i + 1}",
                 options={"A": "Correct", "B": "Wrong", "C": "Wrong", "D": "Wrong"},
                 correct_answer="A",
-                explanation=f"Explanation {i+1}",
+                explanation=f"Explanation {i + 1}",
                 order_index=i,
             )
             questions.append(q)

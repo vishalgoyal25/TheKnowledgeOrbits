@@ -39,7 +39,7 @@ def require_role(*required_roles) -> Any:  # type: ignore
                 return Response(
                     {
                         "error": "PERMISSION_DENIED",
-                        "message": f'Required role: {", ".join(required_roles)}',
+                        "message": f"Required role: {', '.join(required_roles)}",
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )

@@ -150,7 +150,7 @@ class TestQuizStartView:
         for i in range(5):
             Question.objects.create(
                 quiz=quiz,
-                question_text=f"Question {i+1}",
+                question_text=f"Question {i + 1}",
                 options={"A": "1", "B": "2", "C": "3", "D": "4"},
                 correct_answer="A",
                 explanation="Test explanation",
@@ -181,7 +181,7 @@ class TestQuizSubmitView:
         for i in range(3):
             q = Question.objects.create(
                 quiz=quiz,
-                question_text=f"Q{i+1}",
+                question_text=f"Q{i + 1}",
                 options={"A": "Correct", "B": "Wrong"},
                 correct_answer="A",
                 explanation="Test",

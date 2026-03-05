@@ -291,8 +291,7 @@ class IngestionService:
             else:
                 logger.error("unsupported_file_type", file_name=file.name)
                 raise ValueError(
-                    f"Unsupported file type: {file_name}. "
-                    f"Supported formats: .txt, .pdf"
+                    f"Unsupported file type: {file_name}. Supported formats: .txt, .pdf"
                 )
 
         except ValueError:
