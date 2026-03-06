@@ -7,6 +7,7 @@ import { createLogger } from "@/lib/logger";
 import axios, {
   AxiosError,
   AxiosInstance,
+  AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
 
@@ -58,7 +59,7 @@ apiClient.interceptors.request.use(
 
 // Response interceptor - Handle token refresh
 apiClient.interceptors.response.use(
-  (response: any) => response,
+  (response: AxiosResponse) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
