@@ -6,17 +6,17 @@
 
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { quizAPI } from "../api/quiz";
 import {
-  QuizGenerateRequest,
-  QuizSubmitRequest,
   ApiError,
   Quiz,
   QuizAttempt,
+  QuizGenerateRequest,
+  QuizSubmitRequest,
 } from "../types";
-import { toast } from "@/hooks/use-toast";
 
 // ===== Query Keys =====
 
@@ -55,6 +55,7 @@ export function useQuizzes(params?: {
     queryKey: quizKeys.list(params || {}),
     queryFn: () => quizAPI.listQuizzes(params),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -71,6 +72,7 @@ export function useQuiz(quizId: string | null) {
     queryFn: () => quizAPI.getQuiz(quizId!),
     enabled: !!quizId,
     staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000,
   });
 }
 
@@ -157,6 +159,9 @@ export function useSubmitQuiz() {
       // Invalidate all related lists to ensure UI consistency
       queryClient.invalidateQueries({ queryKey: quizKeys.attempts() });
       queryClient.invalidateQueries({ queryKey: quizKeys.mastery() });
+
+      // Invalidate dashboard cache (stats changed after quiz)
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
 
       toast({
         title: "Quiz submitted!",

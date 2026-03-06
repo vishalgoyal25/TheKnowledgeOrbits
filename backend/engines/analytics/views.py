@@ -11,15 +11,13 @@ Dashboard API Endpoints:
 
 from typing import cast
 
+import structlog
 from django.core.cache import cache
-
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-
-import structlog
 
 from engines.analytics.serializers import InsightSerializer
 from engines.analytics.services.analytics_service import get_analytics_service
@@ -75,8 +73,19 @@ def get_weekly_stats(request: Request) -> Response:
     GET /api/v1/analytics/weekly-stats/
     """
     user = cast(User, request.user)
+
+    # Check cache first
+    cache_key = f"weekly_stats_{user.id}"
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        logger.debug("weekly_stats_cache_hit", user_email=user.email)
+        return Response(cached_data)
+
     analytics_service = get_analytics_service()
     stats = analytics_service.get_weekly_stats(user)
+
+    # Cache for 10 minutes
+    cache.set(cache_key, stats, 600)
 
     return Response(stats)
 
@@ -90,8 +99,19 @@ def get_monthly_stats(request: Request) -> Response:
     GET /api/v1/analytics/monthly-stats/
     """
     user = cast(User, request.user)
+
+    # Check cache first
+    cache_key = f"monthly_stats_{user.id}"
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        logger.debug("monthly_stats_cache_hit", user_email=user.email)
+        return Response(cached_data)
+
     analytics_service = get_analytics_service()
     stats = analytics_service.get_monthly_stats(user)
+
+    # Cache for 30 minutes
+    cache.set(cache_key, stats, 1800)
 
     return Response(stats)
 
@@ -124,9 +144,10 @@ def generate_insights(request: Request) -> Response:
     insights_service = get_insights_service()
     insights = insights_service.generate_insights(user)
 
-    # Invalidate dashboard cache
-    cache_key = f"dashboard_{user.id}"
-    cache.delete(cache_key)
+    # Invalidate all user analytics caches
+    cache.delete(f"dashboard_{user.id}")
+    cache.delete(f"weekly_stats_{user.id}")
+    cache.delete(f"monthly_stats_{user.id}")
 
     serializer = InsightSerializer(insights, many=True)
     return Response(serializer.data, status=status.HTTP_201_CREATED)

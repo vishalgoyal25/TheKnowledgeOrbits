@@ -6,16 +6,15 @@ import sentry_sdk
 Article Generation Engine Views
 """
 
+import structlog
+from django.core.cache import cache
 from django.db.models import Q
-
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-import structlog
-
-from core.pagination import StandardPageNumberPagination
+from core.pagination import StandardLimitOffsetPagination
 from engines.shared.services.visibility_service import get_visibility_service
 from engines.userstate.services.activity_service import get_activity_service
 
@@ -45,7 +44,7 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
 
     permission_classes = [AllowAny]
     lookup_field = "id"
-    pagination_class = StandardPageNumberPagination
+    pagination_class = StandardLimitOffsetPagination
 
     ordering_fields = ["created_at", "title", "review_status"]
     ordering = ["-created_at"]
@@ -180,6 +179,11 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
                     user_id=request.user.id,
                     article_id=str(article.id),
                 )
+
+                # Invalidate user's analytics caches (stats changed)
+                cache.delete(f"dashboard_{request.user.id}")
+                cache.delete(f"weekly_stats_{request.user.id}")
+                cache.delete(f"monthly_stats_{request.user.id}")
             else:
                 # Public article for anonymous users
                 article.is_public = True
@@ -257,7 +261,7 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
             .order_by("-created_at")
         )
 
-        paginator = StandardPageNumberPagination()
+        paginator = StandardLimitOffsetPagination()
         paginated_articles = paginator.paginate_queryset(articles, request)
         serializer = ArticleListSerializer(paginated_articles, many=True)
         return paginator.get_paginated_response(serializer.data)
@@ -320,7 +324,7 @@ def list_articles(request) -> Any:  # type: ignore
 
     articles = queryset.select_related("topic").order_by("-created_at")
 
-    paginator = StandardPageNumberPagination()
+    paginator = StandardLimitOffsetPagination()
     paginated_articles = paginator.paginate_queryset(articles, request)
     serializer = ArticleListSerializer(paginated_articles, many=True)
     return paginator.get_paginated_response(serializer.data)
@@ -340,7 +344,7 @@ def my_notebook(request) -> Any:  # type: ignore
         .order_by("-created_at")
     )
 
-    paginator = StandardPageNumberPagination()
+    paginator = StandardLimitOffsetPagination()
     paginated_articles = paginator.paginate_queryset(articles, request)
     serializer = ArticleListSerializer(paginated_articles, many=True)
     return paginator.get_paginated_response(serializer.data)

@@ -14,6 +14,7 @@ export function useTopics(params?: PaginationParams) {
     queryKey: ["topics", params],
     queryFn: () => topicsAPI.list(params),
     staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour — topics rarely change
   });
 }
 
@@ -24,6 +25,7 @@ export function useTopic(id: string | null) {
     queryFn: () => topicsAPI.getById(id!),
     enabled: !!id,
     staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000,
   });
 }
 
@@ -37,5 +39,6 @@ export function useTopicsByModule(
     queryFn: () => topicsAPI.listByModule(moduleId!, params),
     enabled: !!moduleId,
     staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000,
   });
 }

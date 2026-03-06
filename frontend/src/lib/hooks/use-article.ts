@@ -4,8 +4,13 @@
 
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "@/lib/api/client";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { articlesAPI } from "../api/articles";
 import {
   Article,
@@ -19,6 +24,25 @@ export function useArticles(params?: ArticleFilterParams) {
     queryKey: ["articles", params],
     queryFn: () => articlesAPI.list(params),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 min — survive page navigation
+  });
+}
+
+// Infinite List articles (for Timeline Load More)
+export function useInfiniteArticles(params?: ArticleFilterParams) {
+  return useInfiniteQuery({
+    queryKey: ["articles-infinite", params],
+    queryFn: ({ pageParam = 0 }) =>
+      articlesAPI.list({ ...params, limit: 20, offset: pageParam as number }),
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.next) {
+        return allPages.length * 20;
+      }
+      return undefined;
+    },
+    initialPageParam: 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000, // Keep timeline data in memory
   });
 }
 
@@ -32,6 +56,7 @@ export function useArticle(articleId: string, options?: { enabled?: boolean }) {
     },
     enabled: !!articleId && (options?.enabled ?? true),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour — article detail is heavy, keep it longer
   });
 }
 
@@ -75,6 +100,9 @@ export function useGenerateArticle() {
 
       // Set article in cache
       queryClient.setQueryData(["article", data.article.id], data.article);
+
+      // Invalidate dashboard cache (stats changed)
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }

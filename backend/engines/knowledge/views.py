@@ -6,15 +6,14 @@ Knowledge Engine Views
 
 from typing import Any, Optional, cast
 
+import structlog
+from django.core.cache import cache
 from django.db.models import QuerySet
-
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-
-import structlog
 
 from core.pagination import StandardPageNumberPagination
 from engines.auth.models import User
@@ -63,6 +62,16 @@ class ProgramViewSet(viewsets.ModelViewSet):  # type: ignore
 
         return queryset.order_by("name")
 
+    def list(self, request, *args, **kwargs):
+        """Cache the programs list for all users (public data)."""
+        cache_key = "programs_list"
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, 900)  # 15 minutes
+        return response
+
 
 class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
     """ViewSet for Subject CRUD."""
@@ -90,6 +99,17 @@ class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
             queryset = queryset.filter(is_active=is_active.lower() == "true")
 
         return queryset.order_by("program", "order_index")
+
+    def list(self, request, *args, **kwargs):
+        """Cache the subjects list for all users (public data)."""
+        params = request.query_params.urlencode()
+        cache_key = f"subjects_list_{params}"
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, 900)  # 15 minutes
+        return response
 
 
 class ModuleViewSet(viewsets.ModelViewSet):  # type: ignore
@@ -157,6 +177,17 @@ class TopicViewSet(viewsets.ModelViewSet):  # type: ignore
             queryset = queryset.filter(is_active=is_active.lower() == "true")
 
         return queryset.order_by("module", "order_index")
+
+    def list(self, request, *args, **kwargs):
+        """Cache the topics list for all users (public data)."""
+        params = request.query_params.urlencode()
+        cache_key = f"topics_list_{params}"
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, 600)  # 10 minutes
+        return response
 
     @action(detail=True, methods=["get"])
     def chunks(self, request: Response, pk: Optional[str] = None) -> Response:

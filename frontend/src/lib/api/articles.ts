@@ -2,23 +2,21 @@
  * Article API endpoints
  */
 
-import apiClient from "./client";
 import {
   Article,
-  ArticleSourcesResponse,
+  ArticleFilterParams,
   ArticleGenerationRequest,
   ArticleGenerationResponse,
-  ArticleFilterParams,
+  ArticleListResponse,
+  ArticleSourcesResponse,
 } from "../types";
+import apiClient from "./client";
 
 export const articlesAPI = {
   // List articles
-  list: async (params?: ArticleFilterParams): Promise<Article[]> => {
+  list: async (params?: ArticleFilterParams): Promise<ArticleListResponse> => {
     const response = await apiClient.get("/articles/", { params });
-    // Handle paginated response
-    return Array.isArray(response.data)
-      ? response.data
-      : response.data.results || [];
+    return response.data;
   },
 
   // Get article by ID
@@ -49,17 +47,13 @@ export const articlesAPI = {
     return response.data;
   },
 
-  // List articles by topic
   listByTopic: async (
     topicId: string,
     params?: ArticleFilterParams,
-  ): Promise<Article[]> => {
+  ): Promise<ArticleListResponse> => {
     const response = await apiClient.get("/articles/", {
       params: { ...params, topic_id: topicId },
     });
-    // Handle paginated response
-    return Array.isArray(response.data)
-      ? response.data
-      : response.data.results || [];
+    return response.data;
   },
 };

@@ -7,21 +7,20 @@ Current Affairs Engine - Views
 from datetime import timedelta
 from typing import Any, Optional
 
+import structlog
 from django.utils import timezone
-
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-import structlog
-
-from core.pagination import StandardPageNumberPagination
+from core.pagination import StandardLimitOffsetPagination, StandardPageNumberPagination
 
 from .models import CAArticle, CAChunk, CASource, CATopicLink
 from .serializers import (
     CAArticleSerializer,
+    CAArticleSummarySerializer,
     CAChunkSerializer,
     CASourceSerializer,
     CATopicLinkSerializer,
@@ -96,11 +95,16 @@ class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     queryset = CAArticle.objects.all()
     serializer_class = CAArticleSerializer
     permission_classes = [AllowAny]
-    pagination_class = StandardPageNumberPagination
+    pagination_class = StandardLimitOffsetPagination
     filter_backends = [filters.OrderingFilter, filters.SearchFilter]
     search_fields = ["title", "content", "author"]
     ordering_fields = ["published_at", "word_count", "chunk_count"]
     ordering = ["-published_at"]
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return CAArticleSummarySerializer
+        return CAArticleSerializer
 
     def get_queryset(self) -> Any:
         queryset = super().get_queryset()

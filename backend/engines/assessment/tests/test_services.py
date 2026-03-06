@@ -55,7 +55,7 @@ def chunks(topic):
 class TestQuizGeneratorService:
     """Test QuizGeneratorService."""
 
-    @patch("engines.assessment.services.quiz_generator.Groq")
+    @patch("groq.Groq")
     def test_generate_quiz_basic(self, mock_groq_class, topic, chunks):
         """Test basic quiz generation."""
         # Mock GROQ client instance

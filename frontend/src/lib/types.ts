@@ -161,6 +161,8 @@ export interface ArticleGenerationResponse {
 export interface PaginationParams {
   page?: number;
   page_size?: number;
+  limit?: number;
+  offset?: number;
 }
 
 // Filter Params

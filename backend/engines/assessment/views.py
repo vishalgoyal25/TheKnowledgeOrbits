@@ -8,17 +8,16 @@ API endpoints for quiz operations.
 
 from typing import cast
 
+import structlog
+from django.core.cache import cache
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-
-import structlog
 
 from core.pagination import StandardPageNumberPagination
 from engines.assessment.models import QuestionResponse, Quiz, QuizAttempt
@@ -411,6 +410,11 @@ def submit_quiz(request: Request) -> Response:
             attempt_id=str(attempt.id),
             score=score,
         )
+
+        # Invalidate user's analytics caches (stats changed)
+        cache.delete(f"dashboard_{request.user.id}")
+        cache.delete(f"weekly_stats_{request.user.id}")
+        cache.delete(f"monthly_stats_{request.user.id}")
 
     logger.info(
         "quiz_submitted",

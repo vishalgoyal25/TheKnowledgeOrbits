@@ -4,8 +4,7 @@
 
 "use client";
 
-import { useRouter } from "next/navigation";
-import { CAArticle } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -13,9 +12,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Calendar, FileText, Sparkles } from "lucide-react";
+import { currentAffairsAPI } from "@/lib/api/current-affairs";
+import { CAArticle } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { Calendar, ExternalLink, FileText, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface CAArticleCardProps {
   article: CAArticle;
@@ -38,11 +40,22 @@ export default function CAArticleCard({ article }: CAArticleCardProps) {
   };
 
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const handlePrefetch = () => {
+    // Prefetch CA article detail on hover so click feels instant
+    queryClient.prefetchQuery({
+      queryKey: ["ca-article", article.id],
+      queryFn: () => currentAffairsAPI.getArticle(article.id),
+      staleTime: 10 * 60 * 1000,
+    });
+  };
 
   return (
     <Card
       className="h-full transition-all hover:shadow-lg cursor-pointer"
       onClick={() => router.push(`/current-affairs/${article.id}`)}
+      onMouseEnter={handlePrefetch}
     >
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
@@ -66,7 +79,8 @@ export default function CAArticleCard({ article }: CAArticleCardProps) {
 
       <CardContent>
         <p className="text-sm text-gray-600 line-clamp-3">
-          {article.summary || article.content.substring(0, 150) + "..."}
+          {article.summary ||
+            (article.content ? article.content.substring(0, 150) + "..." : "")}
         </p>
 
         {/* Categories */}

@@ -10,7 +10,6 @@ from typing import Any, Dict, List, cast
 
 import numpy as np
 import structlog
-from sentence_transformers import SentenceTransformer
 
 from engines.content.models import Embedding
 from engines.knowledge.models import Topic
@@ -19,8 +18,18 @@ from ..models import CAChunk, CATopicLink
 
 logger = structlog.get_logger(__name__)
 
-# Initialize model for fallback topic embedding generation
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+_embedding_model = None
+
+
+def get_embedding_model():
+    """Lazy load SentenceTransformer so it doesn't boot during Django startup."""
+    global _embedding_model
+    if _embedding_model is None:
+        logger.info("lazy_loading_sentence_transformer")
+        from sentence_transformers import SentenceTransformer
+
+        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _embedding_model
 
 
 class TopicLinkerService:
@@ -191,7 +200,8 @@ class TopicLinkerService:
                 # Generate embedding on the fly
                 # Note: This is slower but runs only once per topic per batch usually
                 # We should cache this in future, but fine for now.
-                avg_vector = embedding_model.encode(topic_text)
+                model = get_embedding_model()
+                avg_vector = model.encode(topic_text)
 
             topic_embeddings[str(topic.id)] = np.array(avg_vector)
 

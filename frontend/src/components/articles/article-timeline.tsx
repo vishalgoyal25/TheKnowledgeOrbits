@@ -1,32 +1,28 @@
-/**
- * CA Timeline Component - Chronological view
- */
-
 "use client";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { CAArticle } from "@/lib/types";
+import { Article } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
-import { Calendar, ExternalLink } from "lucide-react";
+import { BookOpen, Calendar } from "lucide-react";
 import Link from "next/link";
 
-interface CATimelineProps {
-  articles: CAArticle[];
+interface ArticleTimelineProps {
+  articles: Article[];
 }
 
-export default function CATimeline({ articles }: CATimelineProps) {
+export default function ArticleTimeline({ articles }: ArticleTimelineProps) {
   // Group by date
   const groupedByDate = articles.reduce(
     (acc, article) => {
-      const date = new Date(article.published_at).toDateString();
+      const date = new Date(article.created_at).toDateString();
       if (!acc[date]) {
         acc[date] = [];
       }
       acc[date].push(article);
       return acc;
     },
-    {} as Record<string, CAArticle[]>,
+    {} as Record<string, Article[]>,
   );
 
   return (
@@ -38,7 +34,7 @@ export default function CATimeline({ articles }: CATimelineProps) {
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-blue-600" />
               <h3 className="font-semibold text-gray-900">
-                {formatDate(dayArticles[0].published_at)}
+                {formatDate(dayArticles[0].created_at)}
               </h3>
               <Badge variant="secondary">{dayArticles.length} articles</Badge>
             </div>
@@ -56,49 +52,44 @@ export default function CATimeline({ articles }: CATimelineProps) {
 
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between gap-2 mb-2 group">
-                    <Link
-                      href={`/current-affairs/${article.id}`}
-                      className="flex-1"
-                    >
-                      <h4 className="font-semibold group-hover:text-blue-600 transition-colors line-clamp-2 after:absolute after:inset-0">
+                    <Link href={`/articles/${article.id}`} className="flex-1">
+                      <h4 className="font-semibold group-hover:text-blue-600 transition-colors line-clamp-2 text-lg after:absolute after:inset-0">
                         {article.title}
                       </h4>
                     </Link>
 
-                    {article.chunk_count > 0 && (
+                    {article.review_status && (
                       <Badge
-                        variant="outline"
+                        variant={
+                          article.review_status === "approved"
+                            ? "default"
+                            : "secondary"
+                        }
                         className="flex-shrink-0 relative z-10 bg-white"
                       >
-                        {article.chunk_count} chunks
+                        {article.review_status}
                       </Badge>
                     )}
                   </div>
 
                   <p className="text-sm text-gray-600 line-clamp-2 mb-3">
                     {article.summary ||
-                      article.content.substring(0, 120) + "..."}
+                      (article.content
+                        ? article.content.substring(0, 150) + "..."
+                        : "No summary available.")}
                   </p>
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>{article.source_name}</span>
-                      {article.author && (
-                        <>
-                          <span>•</span>
-                          <span>{article.author}</span>
-                        </>
-                      )}
+                      <BookOpen className="h-3 w-3" />
+                      <span>{article.topic?.name || "Uncategorized"}</span>
+                      <span>•</span>
+                      <span>{article.read_time} min read</span>
                     </div>
 
-                    <a
-                      href={article.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1 relative z-10 p-1 -m-1"
-                    >
-                      Source <ExternalLink className="h-3 w-3" />
-                    </a>
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                      {article.word_count} words
+                    </div>
                   </div>
                 </CardContent>
               </Card>

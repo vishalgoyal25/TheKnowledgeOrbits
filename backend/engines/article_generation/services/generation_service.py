@@ -8,12 +8,10 @@ RAG-based article generation using GROQ with integrated Contextual Analysis.
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+import structlog
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-
-import structlog
-from groq import Groq
 
 from engines.content.models import Chunk
 from engines.current_affairs.models import CAChunk, CATopicLink
@@ -248,7 +246,9 @@ class ArticleGenerationService:
             context_length=len(context),
         )
 
-        # Call GROQ
+        # Call GROQ (Lazy Load)
+        from groq import Groq
+
         client = Groq(api_key=settings.GROQ_API_KEY)
 
         response = client.chat.completions.create(
