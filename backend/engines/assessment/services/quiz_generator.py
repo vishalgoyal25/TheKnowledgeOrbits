@@ -17,12 +17,10 @@ import json
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
+import structlog
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-
-import structlog
-from groq import Groq
 
 from engines.assessment.models import Question, Quiz
 from engines.content.models import Chunk
@@ -43,9 +41,17 @@ class QuizGeneratorService:
     CA_RELEVANCE_DAYS = 60
 
     def __init__(self) -> Any:  # type: ignore
-        """Initialize quiz generator with Groq client."""
-        self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
+        """Initialize quiz generator with Groq configs."""
+        self._groq_client = None
         self.model = "llama-3.1-8b-instant"
+
+    @property
+    def groq_client(self):
+        if self._groq_client is None:
+            from groq import Groq
+
+            self._groq_client = Groq(api_key=settings.GROQ_API_KEY)
+        return self._groq_client
 
     def generate_quiz(
         self,

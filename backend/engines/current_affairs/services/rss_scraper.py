@@ -9,13 +9,12 @@ Scrapes RSS feeds from news sources
 from datetime import datetime
 from typing import Any, Dict
 
-from django.db import transaction
-from django.utils import timezone
-
 import feedparser
 import requests
 import structlog
 from bs4 import BeautifulSoup
+from django.db import transaction
+from django.utils import timezone
 
 from ..models import CAArticle, CASource
 
@@ -190,6 +189,9 @@ class RSSScraperService:
         # Calculate word count
         word_count = len(content.split())
 
+        # Create summary from content for safe list rendering
+        summary = (content[:150] + "...") if len(content) > 150 else content
+
         # Create article
         try:
             with transaction.atomic():
@@ -198,6 +200,7 @@ class RSSScraperService:
                     title=title,
                     url=url,
                     content=content,
+                    summary=summary,
                     published_at=published_at,
                     author=author[:200],  # Truncate if too long
                     categories=categories,

@@ -62,7 +62,7 @@ class TestArticleGenerationService:
     @patch(
         "engines.content.services.embedding_service.EmbeddingService.generate_embedding"
     )
-    @patch("engines.article_generation.services.generation_service.Groq")
+    @patch("groq.Groq")
     def test_generate_article_basic(
         self, mock_groq_class, mock_embedding, topic, chunks
     ):

@@ -68,6 +68,32 @@ class CAArticleSerializer(serializers.ModelSerializer):  # type: ignore
         ]
 
 
+class CAArticleSummarySerializer(serializers.ModelSerializer):  # type: ignore
+    source_name = serializers.CharField(source="source.name", read_only=True)
+    summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CAArticle
+        fields = [
+            "id",
+            "source_name",
+            "title",
+            "published_at",
+            "processing_status",
+            "word_count",
+            "chunk_count",
+            "summary",
+        ]
+        read_only_fields = fields
+
+    def get_summary(self, obj: Any) -> str:
+        if obj.summary:
+            return str(obj.summary)
+        if obj.content:
+            return str(obj.content[:150]) + "..."
+        return ""
+
+
 class CAChunkSerializer(serializers.ModelSerializer):  # type: ignore
     article_title = serializers.CharField(source="ca_article.title", read_only=True)
     topic_count = serializers.SerializerMethodField()

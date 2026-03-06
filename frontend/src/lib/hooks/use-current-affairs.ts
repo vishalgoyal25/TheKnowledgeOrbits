@@ -4,11 +4,11 @@
 
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
-  currentAffairsAPI,
   CAArticleFilterParams,
   CAChunkFilterParams,
+  currentAffairsAPI,
 } from "../api/current-affairs";
 
 // List CA sources
@@ -36,6 +36,29 @@ export function useCAArticles(params?: CAArticleFilterParams) {
     queryKey: ["ca-articles", params],
     queryFn: () => currentAffairsAPI.listArticles(params),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 min — survive page navigation
+  });
+}
+
+// Infinite List CA articles (for Timeline Load More)
+export function useInfiniteCAArticles(params?: CAArticleFilterParams) {
+  return useInfiniteQuery({
+    queryKey: ["ca-articles-infinite", params],
+    queryFn: ({ pageParam = 0 }) =>
+      currentAffairsAPI.listArticles({
+        ...params,
+        limit: 20,
+        offset: pageParam as number,
+      }),
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.next) {
+        return allPages.length * 20;
+      }
+      return undefined;
+    },
+    initialPageParam: 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000, // Keep timeline data in memory
   });
 }
 
@@ -46,6 +69,7 @@ export function useCAArticle(id: string | null) {
     queryFn: () => currentAffairsAPI.getArticle(id!),
     enabled: !!id,
     staleTime: 10 * 60 * 1000,
+    gcTime: 60 * 60 * 1000, // 1 hour — article detail is heavy, keep it longer
   });
 }
 

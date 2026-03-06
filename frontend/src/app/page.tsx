@@ -7,42 +7,42 @@
 
 "use client";
 
-import Link from "next/link";
-import { useArticles } from "@/lib/hooks/use-article";
-import { Button } from "@/components/ui/button";
 import ArticleCard from "@/components/articles/article-card";
-import {
-  Sparkles,
-  Zap,
-  FileQuestion,
-  ArrowRight,
-  Newspaper,
-  BookMarked,
-  Bookmark,
-  CheckCircle2,
-  PenTool,
-  Users,
-  ShieldCheck,
-  Trophy,
-  Lightbulb,
-  Search,
-  LayoutDashboard,
-  Folder,
-} from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { useSidebar } from "@/components/providers/sidebar-provider";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { useSidebar } from "@/components/providers/sidebar-provider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useArticles } from "@/lib/hooks/use-article";
 import { cn } from "@/lib/utils";
+import {
+  ArrowRight,
+  BookMarked,
+  Bookmark,
+  CheckCircle2,
+  FileQuestion,
+  Folder,
+  LayoutDashboard,
+  Lightbulb,
+  Newspaper,
+  PenTool,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Trophy,
+  Users,
+  Zap,
+} from "lucide-react";
+import Link from "next/link";
 
 export default function HomePage() {
   const { data: articlesData, isLoading } = useArticles({ page_size: 9 });
-  const articlesArray = articlesData || [];
+  const articlesArray = articlesData?.results || [];
   const articles = articlesArray.slice(0, 9);
   const { isCollapsed } = useSidebar();
 
@@ -360,25 +360,25 @@ export default function HomePage() {
                 </p>
 
                 <ul className="space-y-4">
-                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium font-medium">
+                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
                     <div className="bg-blue-100 p-1 rounded-full">
                       <CheckCircle2 className="h-4 w-4 text-blue-600" />
                     </div>{" "}
                     Verified UPSC Syllabus Mapping
                   </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium font-medium">
+                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
                     <div className="bg-blue-100 p-1 rounded-full">
                       <CheckCircle2 className="h-4 w-4 text-blue-600" />
                     </div>{" "}
                     Personal Notebook Sync
                   </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium font-medium">
+                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
                     <div className="bg-blue-100 p-1 rounded-full">
                       <CheckCircle2 className="h-4 w-4 text-blue-600" />
                     </div>{" "}
                     AI-powered Doubt Clearance
                   </li>
-                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium font-medium">
+                  <li className="flex items-center gap-3 text-sm text-slate-700 font-medium">
                     <div className="bg-blue-100 p-1 rounded-full">
                       <CheckCircle2 className="h-4 w-4 text-blue-600" />
                     </div>{" "}

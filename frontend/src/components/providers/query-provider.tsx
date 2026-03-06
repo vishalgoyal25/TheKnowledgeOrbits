@@ -14,7 +14,9 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000, // 1 minute
+            gcTime: 30 * 60 * 1000, // 30 minutes — keep unused data in memory
             refetchOnWindowFocus: false,
+            retry: 1, // Retry failed queries once
           },
         },
       }),

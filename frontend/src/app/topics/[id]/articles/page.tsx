@@ -4,20 +4,20 @@
 
 "use client";
 
-import { useParams } from "next/navigation";
-import { useTopic } from "@/lib/hooks/use-topics";
-import { useArticlesByTopic } from "@/lib/hooks/use-article";
 import ArticleCard from "@/components/articles/article-card";
 import BreadcrumbNav from "@/components/topics/breadcrumb-nav";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, FileText, Newspaper } from "lucide-react";
-import Link from "next/link";
+import { useArticlesByTopic } from "@/lib/hooks/use-article";
+import { useTopic } from "@/lib/hooks/use-topics";
 import { getDifficultyColor } from "@/lib/utils"; // Keep this import
+import { FileText, Newspaper, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 
-import { useCAChunksForTopic } from "@/lib/hooks/use-current-affairs";
 import CATopicBadge from "@/components/current-affairs/ca-topic-badge";
+import { useCAChunksForTopic } from "@/lib/hooks/use-current-affairs";
 
 export default function TopicArticlesPage() {
   const params = useParams();
@@ -48,7 +48,7 @@ export default function TopicArticlesPage() {
     );
   }
 
-  const articles = articlesData || [];
+  const articles = articlesData?.results || [];
 
   return (
     <div className="container mx-auto px-4 py-8">
