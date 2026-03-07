@@ -93,7 +93,17 @@ def generate_quiz(request: Request) -> Response:
 
                 # ===== OWNERSHIP LOGIC (PKB Extension) =====
                 if u_id:
-                    user = User.objects.get(id=u_id)
+                    import time
+
+                    for _ in range(5):
+                        try:
+                            user = User.objects.get(id=u_id)
+                            break
+                        except User.DoesNotExist:
+                            time.sleep(0.5)
+                    else:
+                        raise User.DoesNotExist(f"User {u_id} not found after retries")
+
                     quiz.created_by = user
                     quiz.is_public = False
                     quiz.save()
@@ -128,15 +138,17 @@ def generate_quiz(request: Request) -> Response:
                     timeout=3600,
                 )
 
-        # Submit task
-        quiz_executor.submit(
-            generate_quiz_background_task,
-            job_id,
-            topic_id_str,
-            difficulty,
-            include_ca,
-            question_count,
-            user_id,
+        # Submit task only AFTER current transaction commits (safeguard for race conditions)
+        transaction.on_commit(
+            lambda: quiz_executor.submit(
+                generate_quiz_background_task,
+                job_id,
+                topic_id_str,
+                difficulty,
+                include_ca,
+                question_count,
+                user_id,
+            )
         )
 
         return Response(
