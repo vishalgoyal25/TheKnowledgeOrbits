@@ -9,7 +9,7 @@ Database: Supabase PostgreSQL with pgvector
 import os
 
 from .base import *  # noqa: F401, F403
-from .base import env
+from .base import MIDDLEWARE, env
 
 # ── Security ─────────────────────────────────────────────────────────────────
 DEBUG = False
@@ -78,11 +78,30 @@ MIDDLEWARE.insert(  # noqa: F405
 )
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# ── Response Compression (Phase 6.3) ─────────────────────────────────────────
+# Gzip compresses the huge ~30KB JSON arrays from the database down to ~5KB.
+# Must be at index 0 (the FIRST middleware) so it applies to the final response.
+MIDDLEWARE.insert(0, "django.middleware.gzip.GZipMiddleware")  # noqa: F405
+
+# ── Unused Middleware Purge (Phase 6.2) ──────────────────────────────────────
+# The API uses JWT, so dragging SessionMiddleware around wastes a DB query per
+# request. It also returns JSON, making MessageMiddleware (flash msgs) useless.
+# By removing these only in prod.py, the local /admin still functions properly.
+MIDDLEWARE = [
+    m
+    for m in MIDDLEWARE  # noqa: F405
+    if m
+    not in (
+        "django.contrib.sessions.middleware.SessionMiddleware",
+        "django.contrib.messages.middleware.MessageMiddleware",
+    )
+]
+
 # ── Database SSL/Keepalive (Crucial for Oregon-Mumbai Latency) ──────────────────
 DATABASES["default"]["OPTIONS"] = {  # noqa: F405
     "sslmode": "require",
     "options": "-c timezone=Asia/Kolkata",
-    "connect_timeout": 10,  # Increase timeout for cross-ocean handshake
+    "connect_timeout": 30,  # PgBouncer over cross-ocean link needs more time
     "keepalives": 1,
     "keepalives_idle": 30,
     "keepalives_interval": 10,
@@ -122,6 +141,13 @@ LOGGING["handlers"]["console"]["formatter"] = "json_formatter"  # noqa: F405
 LOGGING["root"] = {  # noqa: F405
     "handlers": ["console"],
     "level": "WARNING",
+}
+
+# Silence verbose SQL logging in production for performance & security
+LOGGING["loggers"]["django.db.backends"] = {  # noqa: F405
+    "level": "WARNING",
+    "handlers": ["console"],
+    "propagate": False,
 }
 
 # ── Sentry environment label ─────────────────────────────────────────────────

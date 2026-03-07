@@ -6,6 +6,8 @@ Assessment Engine Views
 API endpoints for quiz operations.
 """
 
+import concurrent.futures
+import uuid
 from typing import cast
 
 import structlog
@@ -37,6 +39,9 @@ from engines.userstate.services.mastery_service import get_mastery_service
 
 logger = structlog.get_logger(__name__)
 
+# Global thread pool for background quiz generation
+quiz_executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+
 
 @api_view(["POST"])
 @permission_classes([AllowAny])  # Allow generation without auth for testing
@@ -63,46 +68,85 @@ def generate_quiz(request: Request) -> Response:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # Get generator service
-        generator = get_quiz_generator()
-
-        # Generate quiz
-        quiz = generator.generate_quiz(
-            topic_id=str(serializer.validated_data["topic_id"]),
-            difficulty=serializer.validated_data["difficulty"],
-            include_ca=serializer.validated_data["include_ca"],
-            question_count=serializer.validated_data["question_count"],
-            user_id=request.user.id if request.user.is_authenticated else None,
+        job_id = str(uuid.uuid4())
+        cache.set(
+            f"quiz_job_{job_id}", {"status": "pending", "type": "quiz"}, timeout=3600
         )
 
-        # ===== OWNERSHIP LOGIC (PKB Extension) =====
-        if request.user.is_authenticated:
-            # User-owned private quiz
-            user = cast(User, request.user)  # type: ignore
-            quiz.created_by = user
-            quiz.is_public = False
-            quiz.save()
-            logger.info(
-                "private_quiz_generated", user_email=user.email, quiz_id=str(quiz.id)
-            )
-        else:
-            # Public quiz
-            quiz.is_public = True
-            quiz.created_by = None
-            quiz.save()
-            logger.info("public_quiz_generated", quiz_id=str(quiz.id))
-        # ===== END OWNERSHIP LOGIC =====
+        # Extract needed data
+        topic_id_str = str(serializer.validated_data["topic_id"])
+        difficulty = serializer.validated_data["difficulty"]
+        include_ca = serializer.validated_data["include_ca"]
+        question_count = serializer.validated_data["question_count"]
+        user_id = request.user.id if request.user.is_authenticated else None
 
-        # Serialize and return
-        result = QuizDetailSerializer(quiz).data
+        def generate_quiz_background_task(j_id, t_id, diff, inc_ca, q_count, u_id):
+            try:
+                generator = get_quiz_generator()
+                quiz = generator.generate_quiz(
+                    topic_id=t_id,
+                    difficulty=diff,
+                    include_ca=inc_ca,
+                    question_count=q_count,
+                    user_id=u_id,
+                )
 
-        logger.info(
-            "quiz_generation_success",
-            quiz_id=str(quiz.id),
-            user_id=request.user.id if request.user.is_authenticated else None,
+                # ===== OWNERSHIP LOGIC (PKB Extension) =====
+                if u_id:
+                    user = User.objects.get(id=u_id)
+                    quiz.created_by = user
+                    quiz.is_public = False
+                    quiz.save()
+                    logger.info(
+                        "private_quiz_generated", user_id=u_id, quiz_id=str(quiz.id)
+                    )
+                else:
+                    quiz.is_public = True
+                    quiz.created_by = None
+                    quiz.save()
+                    logger.info("public_quiz_generated", quiz_id=str(quiz.id))
+                # ===== END OWNERSHIP LOGIC =====
+
+                result = QuizDetailSerializer(quiz).data
+                logger.info(
+                    "quiz_generation_success", quiz_id=str(quiz.id), user_id=u_id
+                )
+                cache.set(
+                    f"quiz_job_{j_id}",
+                    {"status": "completed", "quiz": result},
+                    timeout=3600,
+                )
+
+            except Exception as e:
+                sentry_sdk.capture_exception(e)
+                logger.error(
+                    "quiz_generation_background_failed", error=str(e), exc_info=True
+                )
+                cache.set(
+                    f"quiz_job_{j_id}",
+                    {"status": "failed", "error": "Failed to generate quiz"},
+                    timeout=3600,
+                )
+
+        # Submit task
+        quiz_executor.submit(
+            generate_quiz_background_task,
+            job_id,
+            topic_id_str,
+            difficulty,
+            include_ca,
+            question_count,
+            user_id,
         )
 
-        return Response(result, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                "job_id": job_id,
+                "status": "pending",
+                "message": "Quiz generation started",
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     except ValueError as e:
         logger.warning("quiz_generation_validation_error", error=str(e))
@@ -118,6 +162,22 @@ def generate_quiz(request: Request) -> Response:
             {"error": "GENERATION_FAILED", "message": "Failed to generate quiz"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_quiz_job_status(request: Request, job_id: str) -> Response:
+    """
+    Poll status of a background quiz generation job.
+
+    GET /api/v1/assessment/jobs/<job_id>/status/
+    """
+    job_data = cache.get(f"quiz_job_{job_id}")
+    if not job_data:
+        return Response(
+            {"error": "Job not found or expired"}, status=status.HTTP_404_NOT_FOUND
+        )
+    return Response(job_data)
 
 
 @api_view(["GET"])
@@ -297,7 +357,10 @@ def submit_quiz(request: Request) -> Response:
     answers = serializer.validated_data["answers"]
 
     # Get attempt
-    attempt = get_object_or_404(QuizAttempt, id=attempt_id)
+    attempt = get_object_or_404(
+        QuizAttempt.objects.select_related("quiz").prefetch_related("quiz__questions"),
+        id=attempt_id,
+    )
 
     # Check if attempt belongs to user (for authenticated users)
     if request.user.is_authenticated and attempt.user != request.user:

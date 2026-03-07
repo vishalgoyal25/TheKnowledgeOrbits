@@ -107,7 +107,7 @@ class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
         return CAArticleSerializer
 
     def get_queryset(self) -> Any:
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related("source")
 
         # Filter by source
         source_id = self.request.query_params.get("source_id")
@@ -143,7 +143,9 @@ class CAChunkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     ordering = ["-published_at"]
 
     def get_queryset(self) -> Any:
-        queryset = super().get_queryset()
+        queryset = (
+            super().get_queryset().select_related("ca_article", "ca_article__source")
+        )
 
         # Filter by topic
         topic_id = self.request.query_params.get("topic_id")
@@ -195,7 +197,7 @@ class CATopicLinkViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
     ordering = ["-relevance_score"]
 
     def get_queryset(self) -> Any:
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related("ca_chunk", "topic")
 
         # Filter by topic
         topic_id = self.request.query_params.get("topic_id")
