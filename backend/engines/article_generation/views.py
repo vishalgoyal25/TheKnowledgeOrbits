@@ -6,9 +6,12 @@ import sentry_sdk
 Article Generation Engine Views
 """
 
+import concurrent.futures
+
 import structlog
 from django.core.cache import cache
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -29,6 +32,9 @@ from .serializers import (
 from .services.generation_service import ArticleGenerationService
 
 logger = structlog.get_logger(__name__)
+
+# Global thread pool for background article generation
+article_executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
 
 class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
@@ -153,64 +159,113 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
         include_ca = serializer.validated_data["include_ca"]
 
         try:
-            # Generate article
-            result = ArticleGenerationService.generate_article(
-                topic_id=topic_id, include_ca=include_ca, user_id=request.user.id
+            from engines.auth.models import User
+            from engines.knowledge.models import Topic
+
+            topic = Topic.objects.get(id=topic_id)
+            user_id = request.user.id if request.user.is_authenticated else None
+
+            # Create pending job
+            job = ArticleGenerationJob.objects.create(
+                topic=topic,
+                requested_by=request.user if request.user.is_authenticated else None,
+                status="pending",
+                generation_params={"include_ca": include_ca},
             )
 
-            # Fetch generated article
-            article = Article.objects.get(id=result["article_id"])
+            # Define background task
+            def generate_article_background_task(j_id, t_id, inc_ca, u_id):
+                try:
+                    job_obj = ArticleGenerationJob.objects.get(id=j_id)
+                    job_obj.status = "processing"
+                    job_obj.started_at = timezone.now()
+                    job_obj.save()
 
-            # ===== OWNERSHIP LOGIC (PKB Extension) =====
-            if request.user.is_authenticated:
-                # User-owned private article
-                article.created_by = request.user
-                article.is_public = False
-                article.save()
+                    # Generate article
+                    result = ArticleGenerationService.generate_article(
+                        topic_id=t_id, include_ca=inc_ca, user_id=u_id
+                    )
 
-                # Log activity
-                activity_service = get_activity_service()
-                activity_service.log_article_generated(
-                    user=request.user, article_id=str(article.id), topic_id=topic_id
-                )
+                    # Fetch generated article
+                    article = Article.objects.get(id=result["article_id"])
 
-                logger.info(
-                    "private_article_generated",
-                    user_id=request.user.id,
-                    article_id=str(article.id),
-                )
+                    # ===== OWNERSHIP LOGIC (PKB Extension) =====
+                    if u_id:
+                        user = User.objects.get(id=u_id)
+                        article.created_by = user
+                        article.is_public = False
+                        article.save()
 
-                # Invalidate user's analytics caches (stats changed)
-                cache.delete(f"dashboard_{request.user.id}")
-                cache.delete(f"weekly_stats_{request.user.id}")
-                cache.delete(f"monthly_stats_{request.user.id}")
-            else:
-                # Public article for anonymous users
-                article.is_public = True
-                article.created_by = None
-                article.save()
-                logger.info(
-                    "public_article_generated_anonymous", article_id=str(article.id)
-                )
-            # ===== END OWNERSHIP LOGIC =====
+                        # Log activity
+                        activity_service = get_activity_service()
+                        activity_service.log_article_generated(
+                            user=user, article_id=str(article.id), topic_id=t_id
+                        )
+
+                        logger.info(
+                            "private_article_generated",
+                            user_id=u_id,
+                            article_id=str(article.id),
+                        )
+
+                        cache.delete(f"dashboard_{u_id}")
+                        cache.delete(f"weekly_stats_{u_id}")
+                        cache.delete(f"monthly_stats_{u_id}")
+                    else:
+                        article.is_public = True
+                        article.created_by = None
+                        article.save()
+                        logger.info(
+                            "public_article_generated_anonymous",
+                            article_id=str(article.id),
+                        )
+                    # ===== END OWNERSHIP LOGIC =====
+
+                    # Update job
+                    job_obj.article = article
+                    job_obj.status = "completed"
+                    job_obj.completed_at = timezone.now()
+                    job_obj.save()
+
+                    logger.info("article_generation_success", job_id=str(j_id))
+
+                except Exception as e:
+                    sentry_sdk.capture_exception(e)
+                    logger.error(
+                        "article_generation_background_failed",
+                        error=str(e),
+                        exc_info=True,
+                    )
+                    job_obj = ArticleGenerationJob.objects.get(id=j_id)
+                    job_obj.status = "failed"
+                    job_obj.error_log = str(e)
+                    job_obj.save()
+
+            # Submit task
+            article_executor.submit(
+                generate_article_background_task,
+                str(job.id),
+                topic_id,
+                include_ca,
+                user_id,
+            )
 
             return Response(
                 {
-                    "message": "Article generated successfully",
-                    "article": ArticleDetailSerializer(article).data,
-                    "metadata": {
-                        "word_count": result["word_count"],
-                        "quality_score": result["quality_score"],
-                        "source_chunks": result["source_chunks"],
-                    },
+                    "message": "Article generation started",
+                    "job_id": str(job.id),
+                    "status": "pending",
                 },
-                status=status.HTTP_201_CREATED,
+                status=status.HTTP_202_ACCEPTED,
             )
 
+        except Topic.DoesNotExist:
+            return Response(
+                {"error": "Topic not found"}, status=status.HTTP_404_NOT_FOUND
+            )
         except ValueError as e:
             logger.warning("article_generation_validation_error", error=str(e))
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
         except Exception as e:
             sentry_sdk.capture_exception(e)
             logger.error("article_generation_error", error=str(e))

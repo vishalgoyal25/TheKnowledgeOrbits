@@ -11,6 +11,9 @@ app_name = "assessment"
 urlpatterns = [
     # Quiz generation
     path("generate/", views.generate_quiz, name="generate-quiz"),
+    path(
+        "jobs/<str:job_id>/status/", views.get_quiz_job_status, name="quiz-job-status"
+    ),
     # Quiz listing and details
     path("quizzes/", views.list_quizzes, name="list-quizzes"),
     path("quizzes/<uuid:quiz_id>/", views.get_quiz, name="get-quiz"),
