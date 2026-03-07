@@ -7,10 +7,9 @@ Tests for quiz generation and attempt endpoints.
 import uuid
 from unittest.mock import MagicMock, patch
 
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
-
-import pytest
 
 from engines.assessment.models import Question, Quiz, QuizAttempt
 from engines.auth.models import User
@@ -107,9 +106,8 @@ class TestQuizGenerateView:
 
         response = client.post("/api/v1/assessment/generate/", data)
 
-        assert response.status_code == status.HTTP_201_CREATED
-        # generate_quiz view returns QuizDetailSerializer data directly
-        assert response.data["title"] == "Generated Quiz"
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert "job_id" in response.data
 
     @patch("engines.assessment.views.get_quiz_generator")
     def test_generate_quiz_invalid_topic(
@@ -131,7 +129,8 @@ class TestQuizGenerateView:
 
         response = client.post("/api/v1/assessment/generate/", data)
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert "job_id" in response.data
 
 
 @pytest.mark.django_db
