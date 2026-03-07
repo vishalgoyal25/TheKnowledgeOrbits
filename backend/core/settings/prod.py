@@ -9,7 +9,7 @@ Database: Supabase PostgreSQL with pgvector
 import os
 
 from .base import *  # noqa: F401, F403
-from .base import DATABASES, LOGGING, MIDDLEWARE, env
+from .base import DATABASES, INSTALLED_APPS, LOGGING, MIDDLEWARE, TEMPLATES, env
 
 # ── Security ─────────────────────────────────────────────────────────────────
 DEBUG = False
@@ -83,10 +83,9 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # Must be at index 0 (the FIRST middleware) so it applies to the final response.
 MIDDLEWARE.insert(0, "django.middleware.gzip.GZipMiddleware")  # noqa: F405
 
-# ── Unused Middleware Purge (Phase 6.2) ──────────────────────────────────────
-# The API uses JWT, so dragging SessionMiddleware around wastes a DB query per
-# request. It also returns JSON, making MessageMiddleware (flash msgs) useless.
-# By removing these only in prod.py, the local /admin still functions properly.
+# ── Stateless Optimization (Phase 6.2) ──────────────────────────────────────
+# For a high-performance production API, we strip out stateful components.
+# This removes database hits from sessions and CPU from message processing.
 MIDDLEWARE = [
     m
     for m in MIDDLEWARE  # noqa: F405
@@ -96,6 +95,30 @@ MIDDLEWARE = [
         "django.contrib.messages.middleware.MessageMiddleware",
     )
 ]
+
+# We must also remove the apps to satisfy Django's internal system checks (E409, E410)
+INSTALLED_APPS = [
+    app
+    for app in INSTALLED_APPS  # noqa: F405
+    if app
+    not in (
+        "django.contrib.admin",
+        "django.contrib.messages",
+        "django.contrib.sessions",
+    )
+]
+
+# Filter out context processors that depend on sessions/messages/admin
+for template_config in TEMPLATES:  # noqa: F405
+    template_config["OPTIONS"]["context_processors"] = [
+        cp
+        for cp in template_config["OPTIONS"]["context_processors"]
+        if cp
+        not in (
+            "django.contrib.auth.context_processors.auth",
+            "django.contrib.messages.context_processors.messages",
+        )
+    ]
 
 # ── Database Performance & Security (Phase 5 & 6) ───────────────────────────
 # We guard these with an engine check to prevent crashes during Render build mode

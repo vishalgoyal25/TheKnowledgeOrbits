@@ -1,9 +1,6 @@
-"""
-URL configuration for TheKnowledgeOrbits.
-"""
-
 from typing import Any
 
+from django.conf import settings
 from django.contrib import admin
 from django.http import HttpResponse, JsonResponse
 from django.urls import include, path
@@ -45,27 +42,20 @@ def api_index(request: Any) -> JsonResponse:
 urlpatterns = [
     path("", health_check, name="health-check"),
     path("api/v1/", api_index, name="api-index"),
-    path("admin/", admin.site.urls),
     path("api/v1/health/", health_check, name="health-check-v1"),
-    # Engine URLs will be added here as we build them
-    # Content Engine
+    # Engine URLs
     path("api/v1/content/", include("engines.content.urls")),
-    # Knowledge Engine
     path("api/v1/knowledge/", include("engines.knowledge.urls")),
-    # Article Generation Engine
     path("api/v1/articles/", include("engines.article_generation.urls")),
-    # Current Affairs Engine
     path("api/v1/ca/", include("engines.current_affairs.urls")),
-    # Assessment Engine
     path("api/v1/assessment/", include("engines.assessment.urls")),
-    # User State Engine
     path("api/v1/userstate/", include("engines.userstate.urls")),
-    # Analytics Engine
     path("api/v1/analytics/", include("engines.analytics.urls")),
-    # Auth Engine
     path("api/v1/auth/", include("engines.auth.urls")),
-    # Authorization Engine
     path("api/v1/authorization/", include("engines.authorization.urls")),
-    # Support Engine
     path("api/v1/support/", include("engines.support.urls")),
 ]
+
+# Conditionally add the admin path (not disabled in production)
+if "django.contrib.admin" in settings.INSTALLED_APPS:
+    urlpatterns.append(path("admin/", admin.site.urls))
