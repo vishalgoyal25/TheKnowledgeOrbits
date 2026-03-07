@@ -89,6 +89,13 @@ DATABASES["default"]["OPTIONS"] = {  # noqa: F405
     "keepalives_count": 5,
 }
 
+# ── Persistent DB Connections ─────────────────────────────────────────────────
+# Reuse connections for 10 min; health-check before reuse (Django 4.1+)
+DATABASES["default"]["CONN_MAX_AGE"] = 600  # noqa: F405
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = True  # noqa: F405
+# Required for Supabase PgBouncer transaction mode (port 6543)
+DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True  # noqa: F405
+
 # ── CORS for Vercel Frontend ─────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = get_env_list(
     "CORS_ALLOWED_ORIGINS",
