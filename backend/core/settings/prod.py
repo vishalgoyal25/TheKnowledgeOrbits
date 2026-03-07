@@ -109,16 +109,19 @@ INSTALLED_APPS = [
 ]
 
 # Filter out context processors that depend on sessions/messages/admin
-for template_config in TEMPLATES:  # noqa: F405
-    template_config["OPTIONS"]["context_processors"] = [
-        cp
-        for cp in template_config["OPTIONS"]["context_processors"]
-        if cp
-        not in (
-            "django.contrib.auth.context_processors.auth",
-            "django.contrib.messages.context_processors.messages",
-        )
-    ]
+template_configs: Any = TEMPLATES  # noqa: F405
+for template_config in template_configs:
+    options = template_config.get("OPTIONS", {})
+    if "context_processors" in options:
+        options["context_processors"] = [
+            cp
+            for cp in options["context_processors"]
+            if cp
+            not in (
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            )
+        ]
 
 # ── Database Performance & Security (Phase 5 & 6) ───────────────────────────
 # We guard these with an engine check to prevent crashes during Render build mode
