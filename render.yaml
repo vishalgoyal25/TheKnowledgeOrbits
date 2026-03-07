@@ -10,7 +10,7 @@ services:
   - type: web
     name: theknowledgeorbits-backend
     runtime: python
-    region: oregon   # closest to free-tier Supabase region
+    region: oregon # closest to free-tier Supabase region
 
     # Build configuration
     buildCommand: |
@@ -43,7 +43,7 @@ services:
       # ── Secrets (set in Render Dashboard → Environment) ────────────────────
       # These are placeholders — override in the Render dashboard UI
       - key: SECRET_KEY
-        generateValue: true   # Render auto-generates a secure key on first deploy
+        generateValue: true # Render auto-generates a secure key on first deploy
 
       - key: DEBUG
         value: "False"
@@ -51,7 +51,7 @@ services:
       # Render service URL (set after first deploy / use custom domain)
       # Format: theknowledgeorbits-backend.onrender.com
       - key: ALLOWED_HOSTS
-        sync: false   # Must be set manually in dashboard
+        sync: false # Must be set manually in dashboard
 
       # CSRF origins: include both Render backend URL and Vercel frontend URL
       # e.g. https://theknowledgeorbits-backend.onrender.com,https://theknowledgeorbits.vercel.app
@@ -73,7 +73,7 @@ services:
       - key: DB_HOST
         sync: false
       - key: DB_PORT
-        value: "5432"
+        value: "6543"
 
       # ── AI & Embeddings ───────────────────────────────────────────────────
       - key: GROQ_API_KEY
@@ -99,7 +99,7 @@ services:
 
       # ── Frontend URL ──────────────────────────────────────────────────────
       - key: FRONTEND_URL
-        sync: false   # e.g. https://theknowledgeorbits.vercel.app
+        sync: false # e.g. https://theknowledgeorbits.vercel.app
 
       # ── Monitoring (optional) ─────────────────────────────────────────────
       - key: SENTRY_DSN

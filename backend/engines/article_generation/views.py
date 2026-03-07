@@ -10,6 +10,7 @@ import concurrent.futures
 
 import structlog
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -176,7 +177,19 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
             # Define background task
             def generate_article_background_task(j_id, t_id, inc_ca, u_id):
                 try:
-                    job_obj = ArticleGenerationJob.objects.get(id=j_id)
+                    import time
+
+                    for _ in range(5):
+                        try:
+                            job_obj = ArticleGenerationJob.objects.get(id=j_id)
+                            break
+                        except ArticleGenerationJob.DoesNotExist:
+                            time.sleep(0.5)
+                    else:
+                        raise ArticleGenerationJob.DoesNotExist(
+                            f"Job {j_id} not found after retries"
+                        )
+
                     job_obj.status = "processing"
                     job_obj.started_at = timezone.now()
                     job_obj.save()
@@ -241,13 +254,15 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
                     job_obj.error_log = str(e)
                     job_obj.save()
 
-            # Submit task
-            article_executor.submit(
-                generate_article_background_task,
-                str(job.id),
-                topic_id,
-                include_ca,
-                user_id,
+            # Submit task only AFTER current transaction commits (safeguard for race conditions)
+            transaction.on_commit(
+                lambda: article_executor.submit(
+                    generate_article_background_task,
+                    str(job.id),
+                    topic_id,
+                    include_ca,
+                    user_id,
+                )
             )
 
             return Response(

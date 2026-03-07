@@ -9,7 +9,7 @@ Database: Supabase PostgreSQL with pgvector
 import os
 
 from .base import *  # noqa: F401, F403
-from .base import MIDDLEWARE, env
+from .base import DATABASES, LOGGING, MIDDLEWARE, env
 
 # ── Security ─────────────────────────────────────────────────────────────────
 DEBUG = False
@@ -97,23 +97,30 @@ MIDDLEWARE = [
     )
 ]
 
-# ── Database SSL/Keepalive (Crucial for Oregon-Mumbai Latency) ──────────────────
-DATABASES["default"]["OPTIONS"] = {  # noqa: F405
-    "sslmode": "require",
-    "options": "-c timezone=Asia/Kolkata",
-    "connect_timeout": 30,  # PgBouncer over cross-ocean link needs more time
-    "keepalives": 1,
-    "keepalives_idle": 30,
-    "keepalives_interval": 10,
-    "keepalives_count": 5,
-}
+# ── Database Performance & Security (Phase 5 & 6) ───────────────────────────
+# We guard these with an engine check to prevent crashes during Render build mode
+# (which uses a temporary SQLite :memory: database).
+if "postgresql" in DATABASES["default"]["ENGINE"]:  # noqa: F405
+    # SSL & Connection Tuning
+    DATABASES["default"]["OPTIONS"].update(
+        {  # noqa: F405
+            "sslmode": "require",
+            "connect_timeout": 30,  # PgBouncer over cross-ocean link needs more time
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        }
+    )
 
-# ── Persistent DB Connections ─────────────────────────────────────────────────
-# Reuse connections for 10 min; health-check before reuse (Django 4.1+)
-DATABASES["default"]["CONN_MAX_AGE"] = 600  # noqa: F405
-DATABASES["default"]["CONN_HEALTH_CHECKS"] = True  # noqa: F405
-# Required for Supabase PgBouncer transaction mode (port 6543)
-DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True  # noqa: F405
+    # Persistent Connections (Phase 5.1)
+    # Reuse connections for 10 min (600s). Saves ~200-300ms TLS handshake per request.
+    DATABASES["default"]["CONN_MAX_AGE"] = 600  # noqa: F405
+    DATABASES["default"]["CONN_HEALTH_CHECKS"] = True  # noqa: F405
+
+    # Supabase / PgBouncer Tuning
+    # Required for transaction mode pooling on port 6543
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True  # noqa: F405
 
 # ── CORS for Vercel Frontend ─────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = get_env_list(

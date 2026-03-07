@@ -2,18 +2,45 @@
 Global pytest fixtures for TheKnowledgeOrbits.
 """
 
+import concurrent.futures
 import os
 import sys
+from concurrent.futures import Future
 from typing import Any
 from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
 
 # CRITICAL: Set Django settings BEFORE any Django imports
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings.dev")
 
 import django  # noqa: E402
 
-import numpy as np  # noqa: E402
-import pytest  # noqa: E402
+# ===== THE TEST EXECUTOR (FIXING ASYNC RACES) =====
+
+
+class SyncExecutor:
+    """Mock executor that runs tasks synchronously for consistent testing."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
+    def submit(self, fn: Any, *args: Any, **kwargs: Any) -> Future:
+        future: Future = Future()
+        try:
+            result = fn(*args, **kwargs)
+            future.set_result(result)
+        except Exception as e:
+            future.set_exception(e)
+        return future
+
+    def shutdown(self, wait: bool = True, **kwargs: Any) -> None:
+        pass
+
+
+# Global patch for all executors
+concurrent.futures.ThreadPoolExecutor = SyncExecutor  # type: ignore
 
 # ===== THE VIRTUAL ML BRIDGE (CI OPTIMIZATION) =====
 
