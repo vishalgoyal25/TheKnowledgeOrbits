@@ -7,9 +7,10 @@ Database: Supabase PostgreSQL with pgvector
 """
 
 import os
+from typing import Any
 
 from .base import *  # noqa: F401, F403
-from .base import DATABASES, INSTALLED_APPS, LOGGING, MIDDLEWARE, TEMPLATES, env
+from .base import DATABASES, INSTALLED_APPS, LOGGING, TEMPLATES, env  # noqa: F401
 
 # ── Security ─────────────────────────────────────────────────────────────────
 DEBUG = False
@@ -64,39 +65,34 @@ SECURE_HSTS_PRELOAD = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REDIRECT_EXEMPT = [r"^/api/v1/health/", r"^/$"]
 
+# ── Production Infrastructure (Phase 6.2 Hardening) ───────────────────────────
+# We restore the session/auth infrastructure but keep it high-performance.
+# This prevents 500 errors from middlewares that depend on sessions (like Auth).
+MIDDLEWARE = [  # noqa: F811
+    "django.middleware.gzip.GZipMiddleware",  # [0] First for maximum compression
+    "corsheaders.middleware.CorsMiddleware",  # [1] Early to handle frontend preflights
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Immediately after Security for static assets
+    "django.contrib.sessions.middleware.SessionMiddleware",  # Required by Auth (cache-backed)
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.http.ConditionalGetMiddleware",  # [NEW] Enables ETags for Phase 7 FE caching
+    "django.middleware.csrf.CsrfViewMiddleware",  # Critical security
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "engines.authorization.middleware.RBACMiddleware",  # After Auth/Identity is established
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+# We must use cache-based sessions to avoid database hits in production.
+# This makes sessions truly stateless from a database perspective.
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
+
 # ── Static Files (WhiteNoise) ────────────────────────────────────────────────
 # WhiteNoise serves static files directly from Django — no S3/CDN needed on
 # free-tier Render. It compresses and caches files automatically.
-#
-# Base MIDDLEWARE order:
-#   [0] CorsMiddleware
-#   [1] SecurityMiddleware   ← WhiteNoise must go immediately AFTER this
-#   [2] SessionMiddleware ...
-MIDDLEWARE.insert(  # noqa: F405
-    2,  # Index 2 = right after SecurityMiddleware (index 1)
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-)
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# ── Response Compression (Phase 6.3) ─────────────────────────────────────────
-# Gzip compresses the huge ~30KB JSON arrays from the database down to ~5KB.
-# Must be at index 0 (the FIRST middleware) so it applies to the final response.
-MIDDLEWARE.insert(0, "django.middleware.gzip.GZipMiddleware")  # noqa: F405
-
-# ── Stateless Optimization (Phase 6.2) ──────────────────────────────────────
-# For a high-performance production API, we strip out stateful components.
-# This removes database hits from sessions and CPU from message processing.
-MIDDLEWARE = [
-    m
-    for m in MIDDLEWARE  # noqa: F405
-    if m
-    not in (
-        "django.contrib.sessions.middleware.SessionMiddleware",
-        "django.contrib.messages.middleware.MessageMiddleware",
-    )
-]
-
-# We must also remove the apps to satisfy Django's internal system checks (E409, E410)
+# Apps: We restore sessions and auth, but KEEP admin/messages gone for speed.
 INSTALLED_APPS = [
     app
     for app in INSTALLED_APPS  # noqa: F405
@@ -104,11 +100,10 @@ INSTALLED_APPS = [
     not in (
         "django.contrib.admin",
         "django.contrib.messages",
-        "django.contrib.sessions",
     )
 ]
 
-# Filter out context processors that depend on sessions/messages/admin
+# Clean up context processors for the removed messages/admin apps
 template_configs: Any = TEMPLATES  # noqa: F405
 for template_config in template_configs:
     options = template_config.get("OPTIONS", {})
@@ -116,11 +111,7 @@ for template_config in template_configs:
         options["context_processors"] = [
             cp
             for cp in options["context_processors"]
-            if cp
-            not in (
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            )
+            if cp != "django.contrib.messages.context_processors.messages"
         ]
 
 # ── Database Performance & Security (Phase 5 & 6) ───────────────────────────

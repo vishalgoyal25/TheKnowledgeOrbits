@@ -6,9 +6,10 @@ End-to-end quiz workflows.
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
+
+import pytest
 
 from engines.assessment.models import Question, QuestionResponse, Quiz, QuizAttempt
 from engines.auth.models import User
@@ -125,8 +126,8 @@ class TestPrivateQuizWorkflow:
             },
         )
 
-        assert response.status_code == status.HTTP_202_ACCEPTED
-        assert "job_id" in response.data
+        assert response.status_code == status.HTTP_201_CREATED
+        assert "id" in response.data
 
         # In integration tests, we just assume the pre-created object is what we're listing
         # Since the service is mocked and backgrounded, we might need to manually set ownership

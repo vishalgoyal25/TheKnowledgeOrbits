@@ -26,6 +26,9 @@ export function formatRelativeTime(dateString: string): string {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
 
+  // Handle clock skew: If timestamp is in the future relative to client, treat as "Just now"
+  if (diff < 60000) return "Just now";
+
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
