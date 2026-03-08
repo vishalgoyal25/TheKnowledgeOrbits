@@ -7,19 +7,20 @@ API endpoints for quiz operations.
 """
 
 import concurrent.futures
-import uuid
 from typing import cast
 
-import structlog
 from django.core.cache import cache
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+
+import structlog
 
 from core.pagination import StandardPageNumberPagination
 from engines.assessment.models import QuestionResponse, Quiz, QuizAttempt
@@ -68,11 +69,6 @@ def generate_quiz(request: Request) -> Response:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        job_id = str(uuid.uuid4())
-        cache.set(
-            f"quiz_job_{job_id}", {"status": "pending", "type": "quiz"}, timeout=3600
-        )
-
         # Extract needed data
         topic_id_str = str(serializer.validated_data["topic_id"])
         difficulty = serializer.validated_data["difficulty"]
@@ -80,85 +76,34 @@ def generate_quiz(request: Request) -> Response:
         question_count = serializer.validated_data["question_count"]
         user_id = request.user.id if request.user.is_authenticated else None
 
-        def generate_quiz_background_task(j_id, t_id, diff, inc_ca, q_count, u_id):
-            try:
-                generator = get_quiz_generator()
-                quiz = generator.generate_quiz(
-                    topic_id=t_id,
-                    difficulty=diff,
-                    include_ca=inc_ca,
-                    question_count=q_count,
-                    user_id=u_id,
-                )
-
-                # ===== OWNERSHIP LOGIC (PKB Extension) =====
-                if u_id:
-                    import time
-
-                    for _ in range(5):
-                        try:
-                            user = User.objects.get(id=u_id)
-                            break
-                        except User.DoesNotExist:
-                            time.sleep(0.5)
-                    else:
-                        raise User.DoesNotExist(f"User {u_id} not found after retries")
-
-                    quiz.created_by = user
-                    quiz.is_public = False
-                    quiz.save()
-                    logger.info(
-                        "private_quiz_generated", user_id=u_id, quiz_id=str(quiz.id)
-                    )
-                else:
-                    quiz.is_public = True
-                    quiz.created_by = None
-                    quiz.save()
-                    logger.info("public_quiz_generated", quiz_id=str(quiz.id))
-                # ===== END OWNERSHIP LOGIC =====
-
-                result = QuizDetailSerializer(quiz).data
-                logger.info(
-                    "quiz_generation_success", quiz_id=str(quiz.id), user_id=u_id
-                )
-                cache.set(
-                    f"quiz_job_{j_id}",
-                    {"status": "completed", "quiz": result},
-                    timeout=3600,
-                )
-
-            except Exception as e:
-                sentry_sdk.capture_exception(e)
-                logger.error(
-                    "quiz_generation_background_failed", error=str(e), exc_info=True
-                )
-                cache.set(
-                    f"quiz_job_{j_id}",
-                    {"status": "failed", "error": "Failed to generate quiz"},
-                    timeout=3600,
-                )
-
-        # Submit task only AFTER current transaction commits (safeguard for race conditions)
-        transaction.on_commit(
-            lambda: quiz_executor.submit(
-                generate_quiz_background_task,
-                job_id,
-                topic_id_str,
-                difficulty,
-                include_ca,
-                question_count,
-                user_id,
-            )
+        # Generate quiz synchronously (restored for frontend compatibility)
+        # TODO: Move to async polling pattern in Phase 7
+        generator = get_quiz_generator()
+        quiz = generator.generate_quiz(
+            topic_id=topic_id_str,
+            difficulty=difficulty,
+            include_ca=include_ca,
+            question_count=question_count,
+            user_id=user_id,
         )
 
-        return Response(
-            {
-                "job_id": job_id,
-                "status": "pending",
-                "message": "Quiz generation started",
-            },
-            status=status.HTTP_202_ACCEPTED,
-        )
+        # ===== OWNERSHIP LOGIC (PKB Extension) =====
+        if user_id:
+            user = User.objects.get(id=user_id)
+            quiz.created_by = user
+            quiz.is_public = False
+            quiz.save()
+            logger.info("private_quiz_generated", user_id=user_id, quiz_id=str(quiz.id))
+        else:
+            quiz.is_public = True
+            quiz.created_by = None
+            quiz.save()
+            logger.info("public_quiz_generated", quiz_id=str(quiz.id))
+        # ===== END OWNERSHIP LOGIC =====
+
+        serializer = QuizDetailSerializer(quiz)
+        logger.info("quiz_generation_success", quiz_id=str(quiz.id), user_id=user_id)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     except ValueError as e:
         logger.warning("quiz_generation_validation_error", error=str(e))

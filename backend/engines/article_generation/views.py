@@ -8,15 +8,15 @@ Article Generation Engine Views
 
 import concurrent.futures
 
-import structlog
 from django.core.cache import cache
-from django.db import transaction
 from django.db.models import Q
-from django.utils import timezone
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+
+import structlog
 
 from core.pagination import StandardLimitOffsetPagination
 from engines.shared.services.visibility_service import get_visibility_service
@@ -150,7 +150,8 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
             "include_ca": false
         }
         """
-        logger.info("article_generation_requested", user_id=request.user.id)
+        user_id = request.user.id if request.user.is_authenticated else None
+        logger.info("article_generation_requested", user_id=user_id)
 
         # Validate request
         serializer = ArticleGenerationRequestSerializer(data=request.data)
@@ -160,118 +161,62 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
         include_ca = serializer.validated_data["include_ca"]
 
         try:
-            from engines.auth.models import User
             from engines.knowledge.models import Topic
 
-            topic = Topic.objects.get(id=topic_id)
-            user_id = request.user.id if request.user.is_authenticated else None
-
-            # Create pending job
-            job = ArticleGenerationJob.objects.create(
-                topic=topic,
-                requested_by=request.user if request.user.is_authenticated else None,
-                status="pending",
-                generation_params={"include_ca": include_ca},
+            Topic.objects.get(id=topic_id)  # Verify topic exists
+            # Generate article synchronously (restored for frontend compatibility)
+            # TODO: Move to async polling pattern in Phase 7
+            result = ArticleGenerationService.generate_article(
+                topic_id=topic_id, include_ca=include_ca, user_id=user_id
             )
 
-            # Define background task
-            def generate_article_background_task(j_id, t_id, inc_ca, u_id):
-                try:
-                    import time
+            # Fetch generated article
+            article = Article.objects.get(id=result["article_id"])
 
-                    for _ in range(5):
-                        try:
-                            job_obj = ArticleGenerationJob.objects.get(id=j_id)
-                            break
-                        except ArticleGenerationJob.DoesNotExist:
-                            time.sleep(0.5)
-                    else:
-                        raise ArticleGenerationJob.DoesNotExist(
-                            f"Job {j_id} not found after retries"
-                        )
+            # ===== OWNERSHIP LOGIC (PKB Extension) =====
+            if user_id:
+                from engines.auth.models import User
 
-                    job_obj.status = "processing"
-                    job_obj.started_at = timezone.now()
-                    job_obj.save()
+                user = User.objects.get(id=user_id)
+                article.created_by = user
+                article.is_public = False
+                article.save()
 
-                    # Generate article
-                    result = ArticleGenerationService.generate_article(
-                        topic_id=t_id, include_ca=inc_ca, user_id=u_id
-                    )
-
-                    # Fetch generated article
-                    article = Article.objects.get(id=result["article_id"])
-
-                    # ===== OWNERSHIP LOGIC (PKB Extension) =====
-                    if u_id:
-                        user = User.objects.get(id=u_id)
-                        article.created_by = user
-                        article.is_public = False
-                        article.save()
-
-                        # Log activity
-                        activity_service = get_activity_service()
-                        activity_service.log_article_generated(
-                            user=user, article_id=str(article.id), topic_id=t_id
-                        )
-
-                        logger.info(
-                            "private_article_generated",
-                            user_id=u_id,
-                            article_id=str(article.id),
-                        )
-
-                        cache.delete(f"dashboard_{u_id}")
-                        cache.delete(f"weekly_stats_{u_id}")
-                        cache.delete(f"monthly_stats_{u_id}")
-                    else:
-                        article.is_public = True
-                        article.created_by = None
-                        article.save()
-                        logger.info(
-                            "public_article_generated_anonymous",
-                            article_id=str(article.id),
-                        )
-                    # ===== END OWNERSHIP LOGIC =====
-
-                    # Update job
-                    job_obj.article = article
-                    job_obj.status = "completed"
-                    job_obj.completed_at = timezone.now()
-                    job_obj.save()
-
-                    logger.info("article_generation_success", job_id=str(j_id))
-
-                except Exception as e:
-                    sentry_sdk.capture_exception(e)
-                    logger.error(
-                        "article_generation_background_failed",
-                        error=str(e),
-                        exc_info=True,
-                    )
-                    job_obj = ArticleGenerationJob.objects.get(id=j_id)
-                    job_obj.status = "failed"
-                    job_obj.error_log = str(e)
-                    job_obj.save()
-
-            # Submit task only AFTER current transaction commits (safeguard for race conditions)
-            transaction.on_commit(
-                lambda: article_executor.submit(
-                    generate_article_background_task,
-                    str(job.id),
-                    topic_id,
-                    include_ca,
-                    user_id,
+                # Log activity
+                activity_service = get_activity_service()
+                activity_service.log_article_generated(
+                    user=user, article_id=str(article.id), topic_id=topic_id
                 )
-            )
 
+                logger.info(
+                    "private_article_generated",
+                    user_id=user_id,
+                    article_id=str(article.id),
+                )
+
+                cache.delete(f"dashboard_{user_id}")
+            else:
+                article.is_public = True
+                article.created_by = None
+                article.save()
+                logger.info(
+                    "public_article_generated_anonymous",
+                    article_id=str(article.id),
+                )
+            # ===== END OWNERSHIP LOGIC =====
+
+            serializer = ArticleDetailSerializer(article)
             return Response(
                 {
-                    "message": "Article generation started",
-                    "job_id": str(job.id),
-                    "status": "pending",
+                    "message": "Article generated!",
+                    "article": serializer.data,
+                    "metadata": {
+                        "word_count": article.word_count,
+                        "quality_score": article.quality_score,
+                        "source_chunks": article.source_chunk_count,
+                    },
                 },
-                status=status.HTTP_202_ACCEPTED,
+                status=status.HTTP_201_CREATED,
             )
 
         except Topic.DoesNotExist:

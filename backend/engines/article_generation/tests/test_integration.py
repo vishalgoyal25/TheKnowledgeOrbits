@@ -6,9 +6,10 @@ End-to-end article generation workflows.
 
 from unittest.mock import patch
 
-import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
+
+import pytest
 
 from engines.article_generation.models import Article
 from engines.auth.models import User
@@ -69,11 +70,9 @@ class TestArticleGenerationFlow:
             {"topic_id": str(topic.id), "include_ca": False},
         )
 
-        assert response.status_code == status.HTTP_202_ACCEPTED
-        assert "job_id" in response.data
-        article_id = str(
-            article.id
-        )  # Use pre-created article ID for subsequent read test
+        assert response.status_code == status.HTTP_201_CREATED
+        assert "article" in response.data
+        article_id = response.data["article"]["id"]
 
         # Step 2: Read article
         response = client.get(f"/api/v1/articles/{article_id}/")
@@ -108,8 +107,8 @@ class TestPrivateArticleWorkflow:
             "/api/v1/articles/generate/",
             {"topic_id": str(topic.id), "include_ca": False},
         )
-        assert response.status_code == status.HTTP_202_ACCEPTED
-        assert "job_id" in response.data
+        assert response.status_code == status.HTTP_201_CREATED
+        assert "article" in response.data
 
         # In integration tests, we just assume the pre-created object is what we're listing
         # Since the service is mocked and backgrounded, we manually set ownership
