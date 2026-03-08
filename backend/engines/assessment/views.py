@@ -101,9 +101,9 @@ def generate_quiz(request: Request) -> Response:
             logger.info("public_quiz_generated", quiz_id=str(quiz.id))
         # ===== END OWNERSHIP LOGIC =====
 
-        serializer = QuizDetailSerializer(quiz)
+        detail_serializer = QuizDetailSerializer(quiz)
         logger.info("quiz_generation_success", quiz_id=str(quiz.id), user_id=user_id)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
 
     except ValueError as e:
         logger.warning("quiz_generation_validation_error", error=str(e))

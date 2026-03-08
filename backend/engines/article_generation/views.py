@@ -205,11 +205,11 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
                 )
             # ===== END OWNERSHIP LOGIC =====
 
-            serializer = ArticleDetailSerializer(article)
+            detail_serializer = ArticleDetailSerializer(article)
             return Response(
                 {
                     "message": "Article generated!",
-                    "article": serializer.data,
+                    "article": detail_serializer.data,
                     "metadata": {
                         "word_count": article.word_count,
                         "quality_score": article.quality_score,
