@@ -93,13 +93,25 @@ export function useGenerateArticle() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: ArticleGenerationRequest) => articlesAPI.generate(data),
-    onSuccess: (data) => {
+    mutationFn: async (data: ArticleGenerationRequest) => {
+      const response = await articlesAPI.generate(data);
+      const jobId = response.job_id;
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const statusResponse = await articlesAPI.getJobStatus(jobId);
+
+        if (statusResponse.status === "completed") {
+          return statusResponse;
+        } else if (statusResponse.status === "failed") {
+          throw new Error("Article generation failed during processing.");
+        }
+      }
+    },
+    onSuccess: () => {
       // Invalidate articles list
       queryClient.invalidateQueries({ queryKey: ["articles"] });
-
-      // Set article in cache
-      queryClient.setQueryData(["article", data.article.id], data.article);
 
       // Invalidate dashboard cache (stats changed)
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });

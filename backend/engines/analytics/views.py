@@ -11,13 +11,15 @@ Dashboard API Endpoints:
 
 from typing import cast
 
-import structlog
 from django.core.cache import cache
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+
+import structlog
 
 from engines.analytics.serializers import InsightSerializer
 from engines.analytics.services.analytics_service import get_analytics_service
@@ -56,8 +58,8 @@ def get_dashboard(request: Request) -> Response:
     dashboard_service = get_dashboard_service()
     data = dashboard_service.get_dashboard_overview(user)
 
-    # Cache for 5 minutes
-    cache.set(cache_key, data, 300)
+    # Cache for 1 hour
+    cache.set(cache_key, data, 3600)
 
     logger.info("dashboard_generated", user_email=user.email)
 
@@ -84,8 +86,8 @@ def get_weekly_stats(request: Request) -> Response:
     analytics_service = get_analytics_service()
     stats = analytics_service.get_weekly_stats(user)
 
-    # Cache for 10 minutes
-    cache.set(cache_key, stats, 600)
+    # Cache for 1 hour
+    cache.set(cache_key, stats, 3600)
 
     return Response(stats)
 
@@ -110,8 +112,8 @@ def get_monthly_stats(request: Request) -> Response:
     analytics_service = get_analytics_service()
     stats = analytics_service.get_monthly_stats(user)
 
-    # Cache for 30 minutes
-    cache.set(cache_key, stats, 1800)
+    # Cache for 1 hour
+    cache.set(cache_key, stats, 3600)
 
     return Response(stats)
 

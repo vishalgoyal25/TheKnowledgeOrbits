@@ -1,22 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useGenerateQuiz } from "@/lib/hooks/use-quiz";
-import { Topic, QuizGenerateRequest, ApiError } from "@/lib/types";
-import { AxiosError } from "axios";
 import TopicSelector from "@/components/generate/topic-selector";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -24,16 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { useGenerateQuiz } from "@/lib/hooks/use-quiz";
+import { createLogger } from "@/lib/logger";
+import { ApiError, QuizGenerateRequest, Topic } from "@/lib/types";
+import { AxiosError } from "axios";
 import {
+  AlertCircle,
+  ArrowLeft,
   Brain,
   Newspaper,
   Sparkles,
-  AlertCircle,
-  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { createLogger } from "@/lib/logger";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 const logger = createLogger("QuizGenerator");
 
@@ -60,8 +60,10 @@ export default function QuizGeneratorPage() {
     };
 
     generateQuizMutation.mutate(request, {
-      onSuccess: (quiz) => {
-        router.push(`/assessment/${quiz.id}`);
+      onSuccess: (status) => {
+        if (status.quiz_id) {
+          router.push(`/assessment/${status.quiz_id}`);
+        }
       },
       onError: (error) => {
         logger.error("Quiz generation failed:", error);

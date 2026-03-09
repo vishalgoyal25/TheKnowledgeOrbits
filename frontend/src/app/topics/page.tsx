@@ -4,16 +4,16 @@
 
 "use client";
 
-import { useState } from "react";
-import { useTopics } from "@/lib/hooks/use-topics";
-import { useSubjects } from "@/lib/hooks/use-subjects";
 import TopicCard from "@/components/topics/topic-card";
 import TopicTree from "@/components/topics/topic-tree";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, LayoutGrid, List } from "lucide-react";
+import { useSubjects } from "@/lib/hooks/use-subjects";
+import { useTopics } from "@/lib/hooks/use-topics";
+import { BookOpen, Filter, LayoutGrid, List, Search } from "lucide-react";
+import { useState } from "react";
 
 export default function TopicsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,10 +32,7 @@ export default function TopicsPage() {
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Skeleton className="h-10 w-48 mb-2" />
-          <Skeleton className="h-5 w-96" />
-        </div>
+        <Skeleton className="h-12 w-64 mb-8" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-48" />
@@ -71,10 +68,40 @@ export default function TopicsPage() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Topics</h1>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <BookOpen className="h-8 w-8 text-blue-600" />
+            <h1 className="text-4xl font-bold">Topics</h1>
+          </div>
+        </div>
+
         <p className="text-gray-600">
           Browse UPSC topics organized by subject and module
         </p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-blue-50 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Total Topics</div>
+          <div className="text-3xl font-bold text-blue-600">
+            {topics.length}
+          </div>
+        </div>
+
+        <div className="bg-green-50 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Active Subjects</div>
+          <div className="text-3xl font-bold text-green-600">
+            {subjects.length}
+          </div>
+        </div>
+
+        <div className="bg-purple-50 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Showing</div>
+          <div className="text-3xl font-bold text-purple-600">
+            {filteredTopics.length}
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
@@ -97,23 +124,16 @@ export default function TopicsPage() {
 
       {/* View Toggle & Content */}
       <Tabs defaultValue="grid" className="w-full">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-          <p className="text-sm text-gray-600">
-            Showing {filteredTopics.length} of {topics.length} topics across{" "}
-            {subjects.length} subjects
-          </p>
-
-          <TabsList>
-            <TabsTrigger value="grid" className="gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              Grid
-            </TabsTrigger>
-            <TabsTrigger value="tree" className="gap-2">
-              <List className="h-4 w-4" />
-              Tree
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="mb-6">
+          <TabsTrigger value="grid" className="gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            Grid
+          </TabsTrigger>
+          <TabsTrigger value="tree" className="gap-2">
+            <List className="h-4 w-4" />
+            Tree
+          </TabsTrigger>
+        </TabsList>
 
         {/* Grid View */}
         <TabsContent value="grid">

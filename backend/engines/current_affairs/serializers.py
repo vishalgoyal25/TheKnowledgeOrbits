@@ -89,8 +89,6 @@ class CAArticleSummarySerializer(serializers.ModelSerializer):  # type: ignore
     def get_summary(self, obj: Any) -> str:
         if obj.summary:
             return str(obj.summary)
-        if obj.content:
-            return str(obj.content[:150]) + "..."
         return ""
 
 

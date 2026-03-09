@@ -107,8 +107,8 @@ class TestQuizGenerateView:
 
         response = client.post("/api/v1/assessment/generate/", data)
 
-        assert response.status_code == status.HTTP_201_CREATED
-        assert "id" in response.data
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert "job_id" in response.data
 
     @patch("engines.assessment.views.get_quiz_generator")
     def test_generate_quiz_invalid_topic(

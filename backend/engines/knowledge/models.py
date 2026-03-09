@@ -206,6 +206,8 @@ class Topic(models.Model):
             models.Index(fields=["difficulty_level"]),
             models.Index(fields=["topic_type"]),
             models.Index(fields=["is_active"]),
+            models.Index(fields=["module", "is_active"]),
+            models.Index(fields=["subject", "is_active"]),
         ]
 
     def __str__(self) -> str:

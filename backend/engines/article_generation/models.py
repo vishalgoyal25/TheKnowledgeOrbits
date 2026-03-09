@@ -139,7 +139,8 @@ class Article(models.Model):
         db_table = "article_article"
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["topic"]),
+            models.Index(fields=["topic", "-created_at"]),
+            models.Index(fields=["created_by", "-created_at"]),
             models.Index(fields=["slug"]),
             models.Index(fields=["is_published", "-published_at"]),
             models.Index(fields=["review_status"]),

@@ -9,12 +9,13 @@ Scrapes RSS feeds from news sources
 from datetime import datetime
 from typing import Any, Dict
 
+from django.db import transaction
+from django.utils import timezone
+
 import feedparser
 import requests
 import structlog
 from bs4 import BeautifulSoup
-from django.db import transaction
-from django.utils import timezone
 
 from ..models import CAArticle, CASource
 
@@ -317,5 +318,19 @@ class RSSScraperService:
                 results["errors"].append(
                     {"source": source.name, "error": result["error"]}
                 )
+
+        if results["articles_new"] > 0:
+            from django.core.cache import cache
+
+            cache.delete("ca_articles_page_1")
+
+            # Invalidate all count query caches for ca_article
+            try:
+                if hasattr(cache, "delete_pattern"):
+                    cache.delete_pattern("q_count_ca_article_*")
+                else:
+                    cache.delete("ca_articles_total_count")
+            except Exception:
+                pass
 
         return results
