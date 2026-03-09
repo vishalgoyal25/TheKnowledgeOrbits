@@ -7,7 +7,8 @@ API endpoints for quiz operations.
 """
 
 import concurrent.futures
-from typing import cast
+import uuid
+from typing import Optional, cast
 
 from django.core.cache import cache
 from django.db import transaction
@@ -34,91 +35,129 @@ from engines.assessment.serializers import (
 )
 from engines.assessment.services.quiz_generator import get_quiz_generator
 from engines.auth.models import User
+from engines.shared.services.cache_service import get_cache_service
 from engines.shared.services.visibility_service import get_visibility_service
 from engines.userstate.services.activity_service import get_activity_service
 from engines.userstate.services.mastery_service import get_mastery_service
 
 logger = structlog.get_logger(__name__)
+cache_service = get_cache_service()
 
 # Global thread pool for background quiz generation
 quiz_executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 
 
-@api_view(["POST"])
-@permission_classes([AllowAny])  # Allow generation without auth for testing
-def generate_quiz(request: Request) -> Response:
-    """
-    Generate new quiz from topic.
-
-    POST /api/v1/assessment/generate/
-    Body: {
-        "topic_id": "uuid",
-        "difficulty": "medium",
-        "include_ca": false,
-        "question_count": 10
-    }
-
-    Returns:
-        201: Quiz detail with questions
-        400: Validation error
-        500: Generation failed
-    """
-    serializer = QuizGenerateSerializer(data=request.data)
-
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+def _background_quiz_generation(
+    job_id: str,
+    topic_id: str,
+    difficulty: str,
+    include_ca: bool,
+    question_count: int,
+    user_id: Optional[uuid.UUID],
+):
+    """Background task for quiz generation."""
     try:
-        # Extract needed data
-        topic_id_str = str(serializer.validated_data["topic_id"])
-        difficulty = serializer.validated_data["difficulty"]
-        include_ca = serializer.validated_data["include_ca"]
-        question_count = serializer.validated_data["question_count"]
-        user_id = request.user.id if request.user.is_authenticated else None
+        cache.set(
+            f"quiz_job_{job_id}", {"status": "processing", "job_id": job_id}, 3600
+        )
 
-        # Generate quiz synchronously (restored for frontend compatibility)
-        # TODO: Move to async polling pattern in Phase 7
         generator = get_quiz_generator()
         quiz = generator.generate_quiz(
-            topic_id=topic_id_str,
+            topic_id=topic_id,
             difficulty=difficulty,
             include_ca=include_ca,
             question_count=question_count,
             user_id=user_id,
         )
 
-        # ===== OWNERSHIP LOGIC (PKB Extension) =====
+        # ===== OWNERSHIP LOGIC =====
         if user_id:
             user = User.objects.get(id=user_id)
             quiz.created_by = user
             quiz.is_public = False
             quiz.save()
-            logger.info("private_quiz_generated", user_id=user_id, quiz_id=str(quiz.id))
         else:
             quiz.is_public = True
             quiz.created_by = None
             quiz.save()
-            logger.info("public_quiz_generated", quiz_id=str(quiz.id))
-        # ===== END OWNERSHIP LOGIC =====
 
-        detail_serializer = QuizDetailSerializer(quiz)
-        logger.info("quiz_generation_success", quiz_id=str(quiz.id), user_id=user_id)
-        return Response(detail_serializer.data, status=status.HTTP_201_CREATED)
-
-    except ValueError as e:
-        logger.warning("quiz_generation_validation_error", error=str(e))
-        return Response(
-            {"error": "VALIDATION_ERROR", "message": str(e)},
-            status=status.HTTP_400_BAD_REQUEST,
+        # Update job status in cache
+        cache.set(
+            f"quiz_job_{job_id}",
+            {"status": "completed", "job_id": job_id, "quiz_id": str(quiz.id)},
+            3600,
+        )
+        logger.info(
+            "background_quiz_generation_success", job_id=job_id, quiz_id=str(quiz.id)
         )
 
     except Exception as e:
         sentry_sdk.capture_exception(e)
-        logger.error("quiz_generation_failed", error=str(e), exc_info=True)
-        return Response(
-            {"error": "GENERATION_FAILED", "message": "Failed to generate quiz"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        logger.error(
+            "background_quiz_generation_failed",
+            job_id=job_id,
+            error=str(e),
+            exc_info=True,
         )
+        cache.set(
+            f"quiz_job_{job_id}",
+            {"status": "failed", "job_id": job_id, "error": str(e)},
+            3600,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def generate_quiz(request: Request) -> Response:
+    """
+    Generate new quiz from topic (Background Processing).
+
+    Returns 202 Accepted immediately.
+    """
+    serializer = QuizGenerateSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    topic_id = str(serializer.validated_data["topic_id"])
+    difficulty = serializer.validated_data["difficulty"]
+    include_ca = serializer.validated_data["include_ca"]
+    question_count = serializer.validated_data["question_count"]
+    from engines.auth.models import User
+
+    user_id = cast(User, request.user).id if request.user.is_authenticated else None
+
+    # Verify topic exists
+    from engines.knowledge.models import Topic
+
+    if not Topic.objects.filter(id=topic_id).exists():
+        return Response(
+            {"error": "Topic not found"}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Create Job ID
+    job_id = str(uuid.uuid4())
+    cache.set(f"quiz_job_{job_id}", {"status": "pending", "job_id": job_id}, 3600)
+
+    # Submit to executor
+    quiz_executor.submit(
+        _background_quiz_generation,
+        job_id,
+        topic_id,
+        difficulty,
+        include_ca,
+        question_count,
+        user_id,
+    )
+
+    return Response(
+        {
+            "message": "Quiz generation started",
+            "job_id": job_id,
+            "status_url": f"/api/v1/assessment/jobs/{job_id}/status/",
+        },
+        status=status.HTTP_202_ACCEPTED,
+    )
 
 
 @api_view(["GET"])
@@ -152,6 +191,18 @@ def list_quizzes(request: Request) -> Response:
     Returns:
         200: List of quizzes
     """
+    # Optimized: Try fetching first page from cache if no filters applied
+    is_first_page = not any(
+        request.query_params.get(p)
+        for p in ["topic_id", "difficulty", "include_ca", "limit", "offset", "page"]
+    )
+
+    if is_first_page:
+        cache_key = "quizzes_list_page_1"
+        cached_res = cache_service.get(cache_key)
+        if cached_res:
+            return Response(cached_res)
+
     queryset = Quiz.objects.filter(is_active=True)
 
     # ===== VISIBILITY FILTERING (PKB Ownership Logic) =====
@@ -176,13 +227,22 @@ def list_quizzes(request: Request) -> Response:
         include_ca_bool = include_ca.lower() == "true"
         queryset = queryset.filter(include_ca=include_ca_bool)
 
+    # Atomic Counter Caching for total quizzes count
+    if is_first_page:
+        cache_service.get_count("total_quizzes_count", queryset)
+
     # Prefetch related data
-    quizzes = queryset.select_related("topic").order_by("-created_at")
+    quizzes = queryset.select_related("topic", "created_by").order_by("-created_at")
 
     paginator = StandardPageNumberPagination()
     paginated_quizzes = paginator.paginate_queryset(quizzes, request)
     serializer = QuizListSerializer(paginated_quizzes, many=True)
-    return paginator.get_paginated_response(serializer.data)
+    response = paginator.get_paginated_response(serializer.data)
+
+    if is_first_page:
+        cache_service.set("quizzes_list_page_1", response.data, 900)  # 15 minutes
+
+    return response
 
 
 # Add new view for "My Quizzes"
@@ -258,7 +318,7 @@ def start_quiz(request: Request, quiz_id: str) -> Response:
                 "stale_attempt_abandoned",
                 attempt_id=str(active_attempt.id),
                 quiz_id=quiz_id,
-                user_email=request.user.email,
+                user_email=getattr(request.user, "email", "anonymous"),
             )
 
     # Create new attempt
@@ -272,7 +332,9 @@ def start_quiz(request: Request, quiz_id: str) -> Response:
         "quiz_attempt_started",
         attempt_id=str(attempt.id),
         quiz_id=str(quiz_id),
-        user_id=request.user.id if request.user.is_authenticated else None,
+        user_id=getattr(request.user, "id", None)
+        if request.user.is_authenticated
+        else None,
     )
 
     serializer = QuizAttemptSerializer(attempt)
@@ -415,9 +477,13 @@ def submit_quiz(request: Request) -> Response:
         # Update topic mastery for each question
         mastery_service = get_mastery_service()
 
+        from engines.auth.models import User
+
+        auth_user = cast(User, request.user)
+
         for response in responses:
             mastery_service.update_mastery(
-                user=request.user,
+                user=auth_user,
                 topic_id=str(response.question.quiz.topic_id),
                 is_correct=response.is_correct,
             )
@@ -425,16 +491,16 @@ def submit_quiz(request: Request) -> Response:
         # Log quiz completion event
         activity_service = get_activity_service()
         activity_service.log_quiz_completed(
-            user=request.user,
+            user=auth_user,
             quiz_id=str(attempt.quiz.id),
             attempt_id=str(attempt.id),
             score=score,
         )
 
         # Invalidate user's analytics caches (stats changed)
-        cache.delete(f"dashboard_{request.user.id}")
-        cache.delete(f"weekly_stats_{request.user.id}")
-        cache.delete(f"monthly_stats_{request.user.id}")
+        cache.delete(f"dashboard_{auth_user.id}")
+        cache.delete(f"weekly_stats_{auth_user.id}")
+        cache.delete(f"monthly_stats_{auth_user.id}")
 
     logger.info(
         "quiz_submitted",

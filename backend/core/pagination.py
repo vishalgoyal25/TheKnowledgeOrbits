@@ -13,6 +13,25 @@ class StandardPageNumberPagination(PageNumberPagination):
     page_size_query_param = "page_size"
     max_page_size = 100
 
+    def get_count(self, queryset):
+        """
+        Determine an object count, supporting caching to avoid expensive SELECT COUNT(*).
+        """
+        try:
+            model_name = queryset.model._meta.db_table
+            import hashlib
+
+            query_str = str(queryset.query)
+            query_hash = hashlib.md5(query_str.encode("utf-8")).hexdigest()
+            cache_key = f"q_count_{model_name}_{query_hash}"
+
+            from engines.shared.services.cache_service import get_cache_service
+
+            cache_service = get_cache_service()
+            return cache_service.get_count(cache_key, queryset)
+        except (AttributeError, TypeError, ValueError):
+            return super().get_count(queryset)
+
 
 class StandardLimitOffsetPagination(LimitOffsetPagination):
     """
@@ -24,3 +43,22 @@ class StandardLimitOffsetPagination(LimitOffsetPagination):
     limit_query_param = "limit"
     offset_query_param = "offset"
     max_limit = 100
+
+    def get_count(self, queryset):
+        """
+        Determine an object count, supporting caching to avoid expensive SELECT COUNT(*).
+        """
+        try:
+            model_name = queryset.model._meta.db_table
+            import hashlib
+
+            query_str = str(queryset.query)
+            query_hash = hashlib.md5(query_str.encode("utf-8")).hexdigest()
+            cache_key = f"q_count_{model_name}_{query_hash}"
+
+            from engines.shared.services.cache_service import get_cache_service
+
+            cache_service = get_cache_service()
+            return cache_service.get_count(cache_key, queryset)
+        except (AttributeError, TypeError, ValueError):
+            return super().get_count(queryset)

@@ -5,21 +5,32 @@
  * Uses existing apiClient from @/lib/api/client
  */
 
-import apiClient from "./client";
 import {
+  GenerationJobResponse,
   Quiz,
   QuizAttempt,
   QuizGenerateRequest,
   QuizSubmitRequest,
   TopicMastery,
 } from "../types";
+import apiClient from "./client";
 
 export const quizAPI = {
   /**
    * Generate a new quiz
    */
-  generateQuiz: async (data: QuizGenerateRequest): Promise<Quiz> => {
+  generateQuiz: async (
+    data: QuizGenerateRequest,
+  ): Promise<GenerationJobResponse> => {
     const response = await apiClient.post("/assessment/generate/", data);
+    return response.data;
+  },
+
+  /**
+   * Get job status
+   */
+  getJobStatus: async (jobId: string): Promise<GenerationJobResponse> => {
+    const response = await apiClient.get(`/assessment/jobs/${jobId}/status/`);
     return response.data;
   },
 

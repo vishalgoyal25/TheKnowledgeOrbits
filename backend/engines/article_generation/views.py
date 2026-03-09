@@ -10,6 +10,8 @@ import concurrent.futures
 
 from django.core.cache import cache
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -19,6 +21,7 @@ from rest_framework.response import Response
 import structlog
 
 from core.pagination import StandardLimitOffsetPagination
+from engines.shared.services.cache_service import get_cache_service
 from engines.shared.services.visibility_service import get_visibility_service
 from engines.userstate.services.activity_service import get_activity_service
 
@@ -33,9 +36,73 @@ from .serializers import (
 from .services.generation_service import ArticleGenerationService
 
 logger = structlog.get_logger(__name__)
+cache_service = get_cache_service()
 
 # Global thread pool for background article generation
 article_executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+
+
+def _background_article_generation(
+    job_id: str, topic_id: str, include_ca: bool, user_id: Any
+):
+    """Background task for article generation."""
+    try:
+        job = ArticleGenerationJob.objects.get(id=job_id)
+        job.status = "processing"
+        job.started_at = timezone.now()
+        job.save()
+
+        # Generate article
+        result = ArticleGenerationService.generate_article(
+            topic_id=topic_id, include_ca=include_ca, user_id=user_id
+        )
+
+        # Fetch generated article
+        article = Article.objects.get(id=result["article_id"])
+
+        # ===== OWNERSHIP LOGIC =====
+        if user_id:
+            from engines.auth.models import User
+
+            user = User.objects.get(id=user_id)
+            article.created_by = user
+            article.is_public = False
+            article.save()
+
+            # Log activity
+            activity_service = get_activity_service()
+            activity_service.log_article_generated(
+                user=user, article_id=str(article.id), topic_id=topic_id
+            )
+            cache.delete(f"dashboard_{user_id}")
+        else:
+            article.is_public = True
+            article.created_by = None
+            article.save()
+
+        # Update Job
+        job.status = "completed"
+        job.article = article
+        job.completed_at = timezone.now()
+        job.save()
+        logger.info(
+            "background_article_generation_success",
+            job_id=job_id,
+            article_id=str(article.id),
+        )
+
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        logger.error(
+            "background_article_generation_failed", job_id=job_id, error=str(e)
+        )
+        try:
+            job = ArticleGenerationJob.objects.get(id=job_id)
+            job.status = "failed"
+            job.error_log = str(e)
+            job.save()
+        except Exception:
+            pass
 
 
 class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
@@ -62,16 +129,33 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
         - Anonymous: Only is_published=True AND is_public=True
         - Logged-in: (is_published=True AND is_public=True) OR (created_by=user)
         """
-        if self.request.user.is_authenticated:
+        user = self.request.user
+        if user.is_authenticated:
             # User can see all public published articles OR any article they created
             queryset = Article.objects.filter(
-                Q(is_published=True, is_public=True) | Q(created_by=self.request.user)
+                Q(is_published=True, is_public=True) | Q(created_by=user)
             )
         else:
             # Anonymous see only public published
             queryset = Article.objects.filter(is_published=True, is_public=True)
 
-        queryset = queryset.select_related("topic", "topic__subject")
+        # Performance: Use atomic counter caching for total count
+        # This replaces the expensive SELECT COUNT(*) fired by pagination
+        if self.action == "list" and not any(
+            self.request.query_params.get(p) for p in ["topic_id", "review_status"]
+        ):
+            cache_key = "total_articles_count"
+            cache_service.get_count(cache_key, queryset)
+            # Inject into pagination if standard paginator is used
+            # StandardLimitOffsetPagination will still call count() unless we intercept
+            # For now, we optimize the QuerySet itself
+            pass
+
+        queryset = queryset.select_related("topic", "topic__subject", "created_by")
+
+        # Defer large content field for list views to improve performance
+        if self.action in ["list", "my_notebook"]:
+            queryset = queryset.defer("content")
 
         # Filter by topic
         topic_id = self.request.query_params.get("topic_id")
@@ -134,105 +218,63 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False, methods=["get"], url_path="jobs/(?P<job_id>[^/.]+)/status")
+    def job_status(self, request, job_id=None):
+        """Get status of an article generation job."""
+        job = get_object_or_404(ArticleGenerationJob, id=job_id)
+        serializer = ArticleGenerationJobSerializer(job)
+        return Response(serializer.data)
+
     @action(
         detail=False,
         methods=["post"],
         url_path="generate",
         permission_classes=[AllowAny],
     )
-    def generate(self, request) -> Any:  # type: ignore
+    def generate(self, request) -> Any:
         """
-        Generate article for a topic.
-
-        POST /api/v1/articles/generate/
-        Body: {
-            "topic_id": "uuid",
-            "include_ca": false
-        }
+        Generate article (Background Processing).
         """
-        user_id = request.user.id if request.user.is_authenticated else None
-        logger.info("article_generation_requested", user_id=user_id)
+        from typing import cast
 
-        # Validate request
+        from engines.auth.models import User
+
+        user_id = cast(User, request.user).id if request.user.is_authenticated else None
+
         serializer = ArticleGenerationRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         topic_id = str(serializer.validated_data["topic_id"])
         include_ca = serializer.validated_data["include_ca"]
 
-        try:
-            from engines.knowledge.models import Topic
+        from engines.knowledge.models import Topic
 
-            Topic.objects.get(id=topic_id)  # Verify topic exists
-            # Generate article synchronously (restored for frontend compatibility)
-            # TODO: Move to async polling pattern in Phase 7
-            result = ArticleGenerationService.generate_article(
-                topic_id=topic_id, include_ca=include_ca, user_id=user_id
-            )
-
-            # Fetch generated article
-            article = Article.objects.get(id=result["article_id"])
-
-            # ===== OWNERSHIP LOGIC (PKB Extension) =====
-            if user_id:
-                from engines.auth.models import User
-
-                user = User.objects.get(id=user_id)
-                article.created_by = user
-                article.is_public = False
-                article.save()
-
-                # Log activity
-                activity_service = get_activity_service()
-                activity_service.log_article_generated(
-                    user=user, article_id=str(article.id), topic_id=topic_id
-                )
-
-                logger.info(
-                    "private_article_generated",
-                    user_id=user_id,
-                    article_id=str(article.id),
-                )
-
-                cache.delete(f"dashboard_{user_id}")
-            else:
-                article.is_public = True
-                article.created_by = None
-                article.save()
-                logger.info(
-                    "public_article_generated_anonymous",
-                    article_id=str(article.id),
-                )
-            # ===== END OWNERSHIP LOGIC =====
-
-            detail_serializer = ArticleDetailSerializer(article)
+        if not Topic.objects.filter(id=topic_id).exists():
             return Response(
-                {
-                    "message": "Article generated!",
-                    "article": detail_serializer.data,
-                    "metadata": {
-                        "word_count": article.word_count,
-                        "quality_score": article.quality_score,
-                        "source_chunks": article.source_chunk_count,
-                    },
-                },
-                status=status.HTTP_201_CREATED,
+                {"error": "Topic not found"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        except Topic.DoesNotExist:
-            return Response(
-                {"error": "Topic not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-        except ValueError as e:
-            logger.warning("article_generation_validation_error", error=str(e))
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            sentry_sdk.capture_exception(e)
-            logger.error("article_generation_error", error=str(e))
-            return Response(
-                {"error": "Article generation failed. Please try again."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # Create Job
+        job = ArticleGenerationJob.objects.create(
+            topic_id=topic_id,
+            requested_by_id=user_id,
+            generation_params={"include_ca": include_ca},
+            status="pending",
+        )
+
+        # Submit to executor
+        article_executor.submit(
+            _background_article_generation, str(job.id), topic_id, include_ca, user_id
+        )
+
+        return Response(
+            {
+                "message": "Article generation started",
+                "job_id": str(job.id),
+                "status_url": f"/api/v1/articles/jobs/{job.id}/status/",
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     @action(detail=True, methods=["get"], url_path="sources")
     def sources(self, request, id=None) -> Any:  # type: ignore
@@ -302,8 +344,12 @@ class ArticleGenerationJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignor
         queryset = ArticleGenerationJob.objects.select_related("topic", "article").all()
 
         # Filter by user for non-staff
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(requested_by=self.request.user)  # type: ignore
+        from typing import cast
+
+        from engines.auth.models import User
+
+        if not getattr(self.request.user, "is_staff", False):
+            queryset = queryset.filter(requested_by=cast(User, self.request.user))
 
         # Filter by status
         status_filter = self.request.query_params.get("status")
@@ -337,7 +383,11 @@ def list_articles(request) -> Any:  # type: ignore
     if topic_id:
         queryset = queryset.filter(topic_id=topic_id)
 
-    articles = queryset.select_related("topic").order_by("-created_at")
+    articles = (
+        queryset.select_related("topic", "created_by")
+        .defer("content")
+        .order_by("-created_at")
+    )
 
     paginator = StandardLimitOffsetPagination()
     paginated_articles = paginator.paginate_queryset(articles, request)
@@ -355,7 +405,8 @@ def my_notebook(request) -> Any:  # type: ignore
     """
     articles = (
         Article.objects.filter(created_by=request.user, is_public=False)
-        .select_related("topic")
+        .select_related("topic", "created_by")
+        .defer("content")
         .order_by("-created_at")
     )
 

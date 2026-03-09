@@ -115,6 +115,7 @@ export default function ArticlesPage() {
   if (isGridLoading && isTimelineLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
+        <Skeleton className="h-12 w-64 mb-8" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-64" />
@@ -140,14 +141,53 @@ export default function ArticlesPage() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Articles</h1>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-8 w-8 text-blue-600" />
+            <h1 className="text-4xl font-bold">Articles</h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link href="/generate">
+              <Button className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                Generate Article
+              </Button>
+            </Link>
+          </div>
+        </div>
+
         <p className="text-gray-600">
           Browse AI-generated articles on UPSC topics
         </p>
       </div>
 
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-blue-50 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Total Articles</div>
+          <div className="text-3xl font-bold text-blue-600">
+            {totalArticles}
+          </div>
+        </div>
+
+        <div className="bg-green-50 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Approved</div>
+          <div className="text-3xl font-bold text-green-600">
+            {gridArticles.filter((a) => a.review_status === "approved").length}
+          </div>
+        </div>
+
+        <div className="bg-purple-50 rounded-lg p-4">
+          <div className="text-sm text-gray-600">Showing</div>
+          <div className="text-3xl font-bold text-purple-600">
+            {displayArticles.length}
+          </div>
+        </div>
+      </div>
+
       {/* Search & Filters */}
-      <div className="mb-6 space-y-3">
+      <div className="mb-8 space-y-4">
         <SearchBar
           placeholder="Search articles..."
           onSearch={setSearchTerm}
@@ -172,12 +212,8 @@ export default function ArticlesPage() {
         />
       </div>
 
-      <div className="mb-6 text-sm text-gray-600">
-        Showing {displayArticles.length} of {totalArticles} articles
-      </div>
-
       <Tabs defaultValue="grid" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="mb-6">
+        <TabsList>
           <TabsTrigger value="grid" className="gap-2">
             <LayoutGrid className="h-4 w-4" />
             Grid
@@ -188,7 +224,7 @@ export default function ArticlesPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="grid">
+        <TabsContent value="grid" className="mt-6">
           {displayArticles.length === 0 ? (
             <EmptyState
               title="No articles found"

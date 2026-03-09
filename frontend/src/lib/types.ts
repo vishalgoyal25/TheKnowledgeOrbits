@@ -146,15 +146,19 @@ export interface ArticleGenerationRequest {
   include_ca: boolean;
 }
 
+// Job Response for Async Generation
+export interface GenerationJobResponse {
+  job_id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  article_id?: string;
+  quiz_id?: string;
+}
+
 // Article Generation Response
 export interface ArticleGenerationResponse {
   message: string;
-  article: Article;
-  metadata: {
-    word_count: number;
-    quality_score: number;
-    source_chunks: number;
-  };
+  job_id: string;
+  status_url: string;
 }
 
 // Pagination Params

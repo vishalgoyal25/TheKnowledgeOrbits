@@ -12,7 +12,6 @@ import { AxiosError } from "axios";
 import { quizAPI } from "../api/quiz";
 import {
   ApiError,
-  Quiz,
   QuizAttempt,
   QuizGenerateRequest,
   QuizSubmitRequest,
@@ -86,14 +85,29 @@ export function useGenerateQuiz() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: QuizGenerateRequest) => quizAPI.generateQuiz(data),
-    onSuccess: (newQuiz: Quiz) => {
+    mutationFn: async (data: QuizGenerateRequest) => {
+      const response = await quizAPI.generateQuiz(data);
+      const jobId = response.job_id;
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const statusResponse = await quizAPI.getJobStatus(jobId);
+
+        if (statusResponse.status === "completed") {
+          return statusResponse;
+        } else if (statusResponse.status === "failed") {
+          throw new Error("Quiz generation failed during processing.");
+        }
+      }
+    },
+    onSuccess: () => {
       // Invalidate quiz lists to show the new quiz
       queryClient.invalidateQueries({ queryKey: quizKeys.lists() });
 
       toast({
         title: "Quiz generated successfully!",
-        description: `${newQuiz.question_count} questions created`,
+        description: "Your quiz is ready.",
       });
     },
     onError: (error: AxiosError<ApiError>) => {

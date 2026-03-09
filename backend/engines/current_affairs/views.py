@@ -7,15 +7,19 @@ Current Affairs Engine - Views
 from datetime import timedelta
 from typing import Any, Optional
 
-import structlog
+from django.core.cache import cache
 from django.utils import timezone
+
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+import structlog
+
 from core.pagination import StandardLimitOffsetPagination, StandardPageNumberPagination
+from engines.shared.services.cache_service import get_cache_service
 
 from .models import CAArticle, CAChunk, CASource, CATopicLink
 from .serializers import (
@@ -66,6 +70,13 @@ class CASourceViewSet(viewsets.ModelViewSet):  # type: ignore
                 source_id=str(source.id),
                 new_articles=result.get("articles_new", 0),
             )
+
+            # Invalidate the first page cache if new articles were added
+            if result.get("articles_new", 0) > 0:
+                cache.delete("ca_articles_page_1")
+                # Also optionally clear the total count if we added a new table-level counter later
+                cache.delete("q_count_current_affairs_caarticle")
+
             return Response(
                 {
                     "message": f"Scraped {result['articles_new']} new articles",
@@ -106,11 +117,42 @@ class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
             return CAArticleSummarySerializer
         return CAArticleSerializer
 
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        # Cache the first page for 15 minutes (900s) if no specific filters are applied
+        is_first_page = (
+            not request.query_params.get("offset")
+            and not request.query_params.get("source_id")
+            and not request.query_params.get("date_from")
+            and not request.query_params.get("date_to")
+            and not request.query_params.get("status")
+        )
+
+        if is_first_page:
+            cache_key = "ca_articles_page_1"
+            cached_res = cache.get(cache_key)
+            if cached_res:
+                return Response(cached_res)
+
+        response = super().list(request, *args, **kwargs)
+
+        if is_first_page:
+            cache.set("ca_articles_page_1", response.data, 900)
+
+        return response
+
     def get_queryset(self) -> Any:
         queryset = super().get_queryset().select_related("source")
 
-        # Filter by source
+        # Defer large content field for list views to improve performance
+        if self.action == "list":
+            queryset = queryset.defer("content")
+
+        # Atomic Counter Caching for total count
         source_id = self.request.query_params.get("source_id")
+        if self.action == "list" and not source_id:
+            cache_svc = get_cache_service()
+            cache_svc.get_count("ca_articles_total_count", fallback_queryset=queryset)
+
         if source_id:
             queryset = queryset.filter(source_id=source_id)
 

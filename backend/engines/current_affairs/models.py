@@ -126,10 +126,21 @@ class CAArticle(models.Model):
         db_table = "ca_article"
         ordering = ["-published_at"]
         indexes = [
-            models.Index(fields=["source", "published_at"]),
+            models.Index(fields=["source", "-published_at"]),
             models.Index(fields=["processing_status"]),
-            models.Index(fields=["published_at"]),
+            models.Index(fields=["-published_at"]),
+            models.Index(fields=["source", "processing_status"]),
         ]
+
+    def save(self, *args, **kwargs) -> Any:  # type: ignore
+        """Auto-generate summary if not provided"""
+        if (not self.summary or self.summary == "") and self.content:
+            self.summary = (
+                (self.content[:150] + "...")
+                if len(self.content) > 150
+                else self.content
+            )
+        super().save(*args, **kwargs)
 
     def __str__(self) -> Any:
         return self.title

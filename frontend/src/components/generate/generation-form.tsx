@@ -4,14 +4,14 @@
 
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useGenerateArticle } from "@/lib/hooks/use-article";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
+import { useGenerateArticle } from "@/lib/hooks/use-article";
+import { AlertCircle, CheckCircle, Loader2, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 interface GenerationFormProps {
   topicId: string;
@@ -38,10 +38,12 @@ export default function GenerationForm({
     generateArticle(
       { topic_id: topicId, include_ca: includeCA },
       {
-        onSuccess: (data) => {
+        onSuccess: (statusResponse) => {
           // Redirect to article after 2 seconds
           setTimeout(() => {
-            router.push(`/articles/${data.article.id}`);
+            if (statusResponse.article_id) {
+              router.push(`/articles/${statusResponse.article_id}`);
+            }
           }, 2000);
         },
       },
@@ -89,11 +91,6 @@ export default function GenerationForm({
           <CheckCircle className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800">
             Article generated successfully! Redirecting...
-            <div className="mt-2 text-sm">
-              <p>Word count: {data.metadata.word_count}</p>
-              <p>Quality score: {data.metadata.quality_score.toFixed(0)}%</p>
-              <p>Sources used: {data.metadata.source_chunks}</p>
-            </div>
           </AlertDescription>
         </Alert>
       )}

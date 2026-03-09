@@ -70,9 +70,9 @@ class TestArticleGenerationFlow:
             {"topic_id": str(topic.id), "include_ca": False},
         )
 
-        assert response.status_code == status.HTTP_201_CREATED
-        assert "article" in response.data
-        article_id = response.data["article"]["id"]
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert "job_id" in response.data
+        article_id = str(article.id)
 
         # Step 2: Read article
         response = client.get(f"/api/v1/articles/{article_id}/")
@@ -107,8 +107,8 @@ class TestPrivateArticleWorkflow:
             "/api/v1/articles/generate/",
             {"topic_id": str(topic.id), "include_ca": False},
         )
-        assert response.status_code == status.HTTP_201_CREATED
-        assert "article" in response.data
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert "job_id" in response.data
 
         # In integration tests, we just assume the pre-created object is what we're listing
         # Since the service is mocked and backgrounded, we manually set ownership

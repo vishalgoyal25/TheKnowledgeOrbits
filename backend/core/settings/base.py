@@ -325,25 +325,45 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 # Optional: Brevo API Key if using their official API client instead of SMTP
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 
-# Using Local Memory Cache for development (No Redis required)
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "unique-snowflake",
+# Cache Configuration
+REDIS_URL = env("REDIS_URL", default=None)
+
+if REDIS_URL:
+    try:
+        import django_redis  # noqa: F401
+
+        CACHES = {
+            "default": {
+                "BACKEND": "django_redis.cache.RedisCache",
+                "LOCATION": REDIS_URL,
+                "OPTIONS": {
+                    "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                    "CONNECTION_POOL_KWARGS": {
+                        "ssl_cert_reqs": None  # Required for Upstash rediss:// URIs
+                    },
+                },
+                "KEY_PREFIX": "theknowledgeorbits",
+                "TIMEOUT": 300,  # 5 minutes default
+            }
+        }
+    except ImportError:
+        # Fallback: django-redis not yet installed (e.g., during Docker build / CI)
+        CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "fallback-no-redis-package",
+            }
+        }
+else:
+    # No REDIS_URL set — use in-memory cache for local development
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+        }
     }
-}
 
-# Redis configuration (Commented out for later activation)
-# CACHES = {
-#     'default': {
-#         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-#         'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-#         'KEY_PREFIX': 'theknowledgeorbits',
-#         'TIMEOUT': 300,  # 5 minutes default
-#     }
-# }
-
-# Cache keys
+# Cache TTL presets
 CACHE_TTL = {
     "dashboard": 300,  # 5 minutes
     "weekly_stats": 600,  # 10 minutes

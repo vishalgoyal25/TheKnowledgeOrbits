@@ -6,14 +6,15 @@ Knowledge Engine Views
 
 from typing import Any, Optional, cast
 
-import structlog
-from django.core.cache import cache
 from django.db.models import QuerySet
+
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
+
+import structlog
 
 from core.pagination import StandardPageNumberPagination
 from engines.auth.models import User
@@ -27,16 +28,22 @@ from engines.knowledge.models import (
 )
 from engines.knowledge.serializers import (
     ChunkTopicMapSerializer,
+    ModuleListSerializer,
     ModuleSerializer,
+    ProgramListSerializer,
     ProgramSerializer,
+    SubjectListSerializer,
     SubjectSerializer,
     ThemeSerializer,
+    TopicListSerializer,
     TopicSerializer,
 )
 from engines.knowledge.services.mapping_service import MappingService
 from engines.knowledge.services.search_service import SearchService
+from engines.shared.services.cache_service import get_cache_service
 
 logger = structlog.get_logger(__name__)
+cache_service = get_cache_service()
 
 
 class ProgramViewSet(viewsets.ModelViewSet):  # type: ignore
@@ -46,6 +53,11 @@ class ProgramViewSet(viewsets.ModelViewSet):  # type: ignore
     serializer_class = ProgramSerializer
     permission_classes = [AllowAny]
     pagination_class = StandardPageNumberPagination
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return ProgramListSerializer
+        return ProgramSerializer
 
     def get_queryset(self) -> QuerySet:  # type: ignore
         """
@@ -65,11 +77,11 @@ class ProgramViewSet(viewsets.ModelViewSet):  # type: ignore
     def list(self, request, *args, **kwargs):
         """Cache the programs list for all users (public data)."""
         cache_key = "programs_list"
-        cached = cache.get(cache_key)
+        cached = cache_service.get(cache_key)
         if cached:
             return Response(cached)
         response = super().list(request, *args, **kwargs)
-        cache.set(cache_key, response.data, 900)  # 15 minutes
+        cache_service.set(cache_key, response.data, 3600)  # 1 hour
         return response
 
 
@@ -81,6 +93,11 @@ class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
     permission_classes = [AllowAny]
     pagination_class = StandardPageNumberPagination
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return SubjectListSerializer
+        return SubjectSerializer
+
     def get_queryset(self) -> QuerySet:  # type: ignore
         """
         Filter subjects by program and activation status.
@@ -89,6 +106,9 @@ class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
             QuerySet[Subject]: Filtered collection of subjects.
         """
         queryset = Subject.objects.select_related("program").all()
+
+        if self.action == "list":
+            queryset = queryset.defer("description")
 
         program_id = self.request.query_params.get("program_id")
         if program_id:
@@ -104,11 +124,11 @@ class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
         """Cache the subjects list for all users (public data)."""
         params = request.query_params.urlencode()
         cache_key = f"subjects_list_{params}"
-        cached = cache.get(cache_key)
+        cached = cache_service.get(cache_key)
         if cached:
             return Response(cached)
         response = super().list(request, *args, **kwargs)
-        cache.set(cache_key, response.data, 900)  # 15 minutes
+        cache_service.set(cache_key, response.data, 3600)  # 1 hour
         return response
 
 
@@ -120,9 +140,17 @@ class ModuleViewSet(viewsets.ModelViewSet):  # type: ignore
     permission_classes = [AllowAny]
     pagination_class = StandardPageNumberPagination
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return ModuleListSerializer
+        return ModuleSerializer
+
     def get_queryset(self) -> Any:
         """Filter modules."""
         queryset = Module.objects.select_related("subject__program").all()
+
+        if self.action == "list":
+            queryset = queryset.defer("description")
 
         subject_id = self.request.query_params.get("subject_id")
         if subject_id:
@@ -134,6 +162,17 @@ class ModuleViewSet(viewsets.ModelViewSet):  # type: ignore
 
         return queryset.order_by("subject", "order_index")
 
+    def list(self, request, *args, **kwargs):
+        """Cache the modules list for all users (public data)."""
+        params = request.query_params.urlencode()
+        cache_key = f"modules_list_{params}"
+        cached = cache_service.get(cache_key)
+        if cached:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache_service.set(cache_key, response.data, 3600)  # 1 hour
+        return response
+
 
 class TopicViewSet(viewsets.ModelViewSet):  # type: ignore
     """ViewSet for Topic CRUD."""
@@ -143,6 +182,11 @@ class TopicViewSet(viewsets.ModelViewSet):  # type: ignore
     permission_classes = [AllowAny]
     pagination_class = StandardPageNumberPagination
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return TopicListSerializer
+        return TopicSerializer
+
     def get_queryset(self) -> QuerySet:  # type: ignore
         """
         Comprehensive filtering for topics across modules, subjects, and difficulty.
@@ -150,7 +194,11 @@ class TopicViewSet(viewsets.ModelViewSet):  # type: ignore
         Returns:
             QuerySet[Topic]: Filtered topic collection.
         """
-        queryset = Topic.objects.select_related("module__subject", "subject").all()
+        queryset = Topic.objects.select_related("module", "subject").all()
+
+        if self.action == "list":
+            # Defer heavy description field in list views
+            queryset = queryset.defer("description")
 
         module_id = self.request.query_params.get("module_id")
         if module_id:
@@ -176,17 +224,25 @@ class TopicViewSet(viewsets.ModelViewSet):  # type: ignore
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == "true")
 
+        # Atomic Counter Caching for total topics count
+        if (
+            self.action == "list"
+            and not any([module_id, subject_id, difficulty, topic_type, search])
+            and (is_active is None or is_active.lower() == "true")
+        ):
+            cache_service.get_count("total_topics_count", queryset)
+
         return queryset.order_by("module", "order_index")
 
     def list(self, request, *args, **kwargs):
         """Cache the topics list for all users (public data)."""
         params = request.query_params.urlencode()
         cache_key = f"topics_list_{params}"
-        cached = cache.get(cache_key)
+        cached = cache_service.get(cache_key)
         if cached:
             return Response(cached)
         response = super().list(request, *args, **kwargs)
-        cache.set(cache_key, response.data, 600)  # 10 minutes
+        cache_service.set(cache_key, response.data, 900)  # 15 minutes
         return response
 
     @action(detail=True, methods=["get"])

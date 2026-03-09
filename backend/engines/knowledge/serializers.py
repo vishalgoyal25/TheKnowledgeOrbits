@@ -17,8 +17,22 @@ from engines.knowledge.models import (
 )
 
 
+class ProgramListSerializer(serializers.ModelSerializer):  # type: ignore
+    """Lightweight serializer for Program listing."""
+
+    class Meta:
+        model = Program
+        fields = [
+            "id",
+            "name",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
 class ProgramSerializer(serializers.ModelSerializer):  # type: ignore
-    """Serializer for Program."""
+    """Serializer for Program detail."""
 
     subjects_count = serializers.IntegerField(source="subjects.count", read_only=True)
 
@@ -37,8 +51,26 @@ class ProgramSerializer(serializers.ModelSerializer):  # type: ignore
         read_only_fields = ["id", "subjects_count", "created_at", "updated_at"]
 
 
+class SubjectListSerializer(serializers.ModelSerializer):  # type: ignore
+    """Lightweight serializer for Subject listing."""
+
+    program_name = serializers.CharField(source="program.name", read_only=True)
+
+    class Meta:
+        model = Subject
+        fields = [
+            "id",
+            "name",
+            "program",
+            "program_name",
+            "order_index",
+            "is_active",
+        ]
+        read_only_fields = fields
+
+
 class SubjectSerializer(serializers.ModelSerializer):  # type: ignore
-    """Serializer for Subject."""
+    """Serializer for Subject detail."""
 
     program_name = serializers.CharField(source="program.name", read_only=True)
     modules_count = serializers.IntegerField(source="modules.count", read_only=True)
@@ -66,8 +98,26 @@ class SubjectSerializer(serializers.ModelSerializer):  # type: ignore
         ]
 
 
+class ModuleListSerializer(serializers.ModelSerializer):  # type: ignore
+    """Lightweight serializer for Module listing."""
+
+    subject_name = serializers.CharField(source="subject.name", read_only=True)
+
+    class Meta:
+        model = Module
+        fields = [
+            "id",
+            "name",
+            "subject",
+            "subject_name",
+            "order_index",
+            "is_active",
+        ]
+        read_only_fields = fields
+
+
 class ModuleSerializer(serializers.ModelSerializer):  # type: ignore
-    """Serializer for Module."""
+    """Serializer for Module detail."""
 
     subject_name = serializers.CharField(source="subject.name", read_only=True)
     topics_count = serializers.IntegerField(source="topics.count", read_only=True)
@@ -95,8 +145,33 @@ class ModuleSerializer(serializers.ModelSerializer):  # type: ignore
         ]
 
 
+class TopicListSerializer(serializers.ModelSerializer):  # type: ignore
+    """Lightweight serializer for Topic listing (prevents N+1 counts)."""
+
+    module_name = serializers.CharField(source="module.name", read_only=True)
+    subject_name = serializers.CharField(source="subject.name", read_only=True)
+
+    class Meta:
+        model = Topic
+        fields = [
+            "id",
+            "name",
+            "module",
+            "module_name",
+            "subject",
+            "subject_name",
+            "parent_topic",
+            "topic_type",
+            "difficulty_level",
+            "order_index",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
 class TopicSerializer(serializers.ModelSerializer):  # type: ignore
-    """Serializer for Topic."""
+    """Serializer for Topic detail."""
 
     module_name = serializers.CharField(source="module.name", read_only=True)
     subject_name = serializers.CharField(source="subject.name", read_only=True)

@@ -1,12 +1,7 @@
-"""
-Current Affairs Engine - Model Tests
-
-Tests for CASource, CAArticle, CAChunk, CATopicLink models.
-"""
-
 import uuid
 from datetime import timedelta
 
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 import pytest
@@ -19,9 +14,9 @@ from engines.knowledge.models import Module, Program, Subject, Topic
 def ca_source():
     """Create CA source."""
     return CASource.objects.create(
-        name="The Hindu",
+        name=f"The Hindu {uuid.uuid4()}",
         source_type="rss",
-        url="https://www.thehindu.com/news/national/feeder/default.rss",
+        url=f"https://www.thehindu.com/news/national/feeder/default-{uuid.uuid4()}.rss",
         is_active=True,
         scrape_frequency="daily",
     )
@@ -30,10 +25,11 @@ def ca_source():
 @pytest.fixture
 def topic():
     """Create test topic."""
-    program = Program.objects.create(name="UPSC CSE")
-    subject = Subject.objects.create(name="Polity", program=program)
-    module = Module.objects.create(name="Constitution", subject=subject)
-    return Topic.objects.create(name="Article 370", module=module, subject=subject)
+    uid = str(uuid.uuid4())[:8]
+    program = Program.objects.create(name=f"Program-{uid}")
+    subject = Subject.objects.create(name=f"Subject-{uid}", program=program)
+    module = Module.objects.create(name=f"Module-{uid}", subject=subject)
+    return Topic.objects.create(name=f"Topic-{uid}", module=module, subject=subject)
 
 
 @pytest.mark.django_db
@@ -42,20 +38,24 @@ class TestCASourceModel:
 
     def test_create_source(self):
         """Test creating CA source."""
+        uid = str(uuid.uuid4())[:8]
         source = CASource.objects.create(
-            name="The Hindu",
+            name=f"Unique Source {uid}",
             source_type="rss",
-            url="https://example.com/rss",
+            url=f"https://example.com/rss-{uid}",
             is_active=True,
         )
 
-        assert source.name == "The Hindu"
+        assert "Unique Source" in source.name
         assert source.is_active
         assert source.article_count == 0
 
     def test_source_has_uuid(self):
         """Test source has UUID primary key."""
-        source = CASource.objects.create(name="Test Source", url="https://test.com/rss")
+        uid = str(uuid.uuid4())[:8]
+        source = CASource.objects.create(
+            name=f"Test {uid}", url=f"https://test.com/rss-{uid}"
+        )
 
         assert isinstance(source.id, uuid.UUID)
 
@@ -69,7 +69,7 @@ class TestCAArticleModel:
         article = CAArticle.objects.create(
             source=ca_source,
             title="Test Article",
-            url="https://example.com/article1",
+            url=f"https://example.com/article-{uuid.uuid4()}",
             content="Article content here",
             published_at=timezone.now(),
             word_count=100,
@@ -78,10 +78,12 @@ class TestCAArticleModel:
 
         assert article.title == "Test Article"
         assert article.processing_status == "pending"
+        # Check auto-summary from the model save() method
+        assert article.summary == "Article content here"
 
     def test_unique_url_constraint(self, ca_source):
         """Test article URL must be unique."""
-        url = "https://example.com/article1"
+        url = f"https://example.com/unique-{uuid.uuid4()}"
 
         CAArticle.objects.create(
             source=ca_source,
@@ -91,14 +93,16 @@ class TestCAArticleModel:
             published_at=timezone.now(),
         )
 
-        with pytest.raises(Exception):  # IntegrityError
-            CAArticle.objects.create(
-                source=ca_source,
-                title="Article 2",
-                url=url,
-                content="Different content",
-                published_at=timezone.now(),
-            )
+        # Use transaction.atomic to prevent dirtying the main test transaction
+        with transaction.atomic():
+            with pytest.raises(IntegrityError):
+                CAArticle.objects.create(
+                    source=ca_source,
+                    title="Article 2",
+                    url=url,
+                    content="Different content",
+                    published_at=timezone.now(),
+                )
 
 
 @pytest.mark.django_db
@@ -110,7 +114,7 @@ class TestCAChunkModel:
         article = CAArticle.objects.create(
             source=ca_source,
             title="Test Article",
-            url="https://example.com/article1",
+            url=f"https://example.com/chunk-test-{uuid.uuid4()}",
             content="Content",
             published_at=timezone.now(),
         )
@@ -128,15 +132,15 @@ class TestCAChunkModel:
 
     def test_expiry_date_auto_set(self, ca_source):
         """Test expiry date auto-sets to 180 days."""
+        published = timezone.now()
         article = CAArticle.objects.create(
             source=ca_source,
             title="Test",
-            url="https://example.com/test",
+            url=f"https://example.com/expiry-test-{uuid.uuid4()}",
             content="Content",
-            published_at=timezone.now(),
+            published_at=published,
         )
 
-        published = timezone.now()
         chunk = CAChunk.objects.create(
             ca_article=article,
             chunk_text="Content",
@@ -159,7 +163,7 @@ class TestCATopicLinkModel:
         article = CAArticle.objects.create(
             source=ca_source,
             title="Test",
-            url="https://example.com/test",
+            url=f"https://example.com/link-test-{uuid.uuid4()}",
             content="Content",
             published_at=timezone.now(),
         )
@@ -183,7 +187,7 @@ class TestCATopicLinkModel:
         article = CAArticle.objects.create(
             source=ca_source,
             title="Test",
-            url="https://example.com/test",
+            url=f"https://example.com/unique-link-test-{uuid.uuid4()}",
             content="Content",
             published_at=timezone.now(),
         )
@@ -197,5 +201,7 @@ class TestCATopicLinkModel:
 
         CATopicLink.objects.create(ca_chunk=chunk, topic=topic)
 
-        with pytest.raises(Exception):  # IntegrityError
-            CATopicLink.objects.create(ca_chunk=chunk, topic=topic)
+        # Use transaction.atomic to prevent dirtying the main test transaction
+        with transaction.atomic():
+            with pytest.raises(IntegrityError):
+                CATopicLink.objects.create(ca_chunk=chunk, topic=topic)

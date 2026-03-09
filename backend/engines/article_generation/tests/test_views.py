@@ -170,8 +170,8 @@ class TestArticleGenerateView:
 
         response = client.post("/api/v1/articles/generate/", data)
 
-        assert response.status_code == status.HTTP_201_CREATED
-        assert "article" in response.data
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert "job_id" in response.data
 
     @patch("engines.article_generation.views.ArticleGenerationService.generate_article")
     def test_generate_article_invalid_topic(self, mock_generate, authenticated_client):

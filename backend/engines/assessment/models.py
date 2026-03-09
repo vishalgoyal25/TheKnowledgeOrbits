@@ -115,7 +115,8 @@ class Quiz(models.Model):
         ordering = ["-created_at"]
         verbose_name_plural = "Quizzes"
         indexes = [
-            models.Index(fields=["topic"]),
+            models.Index(fields=["topic", "-created_at"]),
+            models.Index(fields=["created_by", "-created_at"]),
             models.Index(fields=["difficulty_level"]),
             models.Index(fields=["include_ca"]),
             models.Index(fields=["is_active"]),
@@ -338,6 +339,8 @@ class QuizAttempt(models.Model):
             models.Index(fields=["status"]),
             models.Index(fields=["-started_at"]),
             models.Index(fields=["quiz", "user"]),
+            models.Index(fields=["user", "-started_at"]),
+            models.Index(fields=["quiz", "-started_at"]),
         ]
 
     def __str__(self) -> str:

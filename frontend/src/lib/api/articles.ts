@@ -9,6 +9,7 @@ import {
   ArticleGenerationResponse,
   ArticleListResponse,
   ArticleSourcesResponse,
+  GenerationJobResponse,
 } from "../types";
 import apiClient from "./client";
 
@@ -44,6 +45,12 @@ export const articlesAPI = {
     data: ArticleGenerationRequest,
   ): Promise<ArticleGenerationResponse> => {
     const response = await apiClient.post("/articles/generate/", data);
+    return response.data;
+  },
+
+  // Get job status
+  getJobStatus: async (jobId: string): Promise<GenerationJobResponse> => {
+    const response = await apiClient.get(`/articles/jobs/${jobId}/status/`);
     return response.data;
   },
 
