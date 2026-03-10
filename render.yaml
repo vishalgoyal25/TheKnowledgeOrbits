@@ -13,18 +13,14 @@ services:
     region: oregon # closest to free-tier Supabase region
 
     # Build configuration
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r backend/requirements/base.txt
-      pip install -r backend/requirements/prod.txt
-      cd backend && python manage.py collectstatic --noinput
+    buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt && chmod +x render-build.sh && ./render-build.sh"
 
-    # Start command: gunicorn with 2 workers (optimal for free tier: 512MB RAM)
-    startCommand: "cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -"
+    # Start command: Optimized for high-concurrency (Threads + Workers)
+    startCommand: "cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 8 --worker-class gthread --timeout 120 --keep-alive 10 --max-requests 500 --max-requests-jitter 50"
 
-    # Pre-deploy: run migrations before new version goes live (zero-downtime)
-    # Render runs this in a one-off container before routing traffic
-    preDeployCommand: "cd backend && python manage.py migrate --noinput"
+    # Pre-deploy: run migrations on DIRECT port (5432) before new version goes live
+    # Using 5432 instead of 6543 for migrations is critical for stability.
+    preDeployCommand: "cd backend && DB_PORT=5432 python manage.py migrate --noinput"
 
     healthCheckPath: /api/v1/health/
 
