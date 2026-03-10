@@ -91,7 +91,10 @@ WSGI_APPLICATION = "core.wsgi.application"
 
 # Database Configuration
 # Professional standard: Use a DUMMY database during Render build to avoid timeouts.
-RENDER_BUILD_MODE = os.getenv("RENDER") == "true" and not os.getenv("DB_HOST")
+# We use an explicit environment variable to ensure the shield stays active during build.
+RENDER_BUILD_MODE = (
+    os.getenv("RENDER") == "true" and os.getenv("IS_BUILD_PHASE") == "true"
+)
 
 if RENDER_BUILD_MODE:
     DATABASES: Dict[str, Any] = {
