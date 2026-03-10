@@ -1,8 +1,6 @@
 /**
- * Article content renderer — parses markdown-like content into styled HTML
+ * Article content renderer (Server-side compatible)
  */
-
-"use client";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";

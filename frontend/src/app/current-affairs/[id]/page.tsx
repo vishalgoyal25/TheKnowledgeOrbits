@@ -1,12 +1,8 @@
 /**
- * CA Article Detail Page
+ * CA Article Detail Page (ISR/SSG)
  */
 
-"use client";
-
-import { useParams } from "next/navigation";
-import { useCAArticle } from "@/lib/hooks/use-current-affairs";
-import { Skeleton } from "@/components/ui/skeleton";
+import { currentAffairsAPI } from "@/lib/api/current-affairs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,137 +15,146 @@ import {
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
-export default function CAArticleDetailPage() {
-  const params = useParams();
-  const articleId = params.id as string;
+// Revalidate once a day (CA articles don't change once published)
+export const revalidate = 86400;
 
-  const { data: article, isLoading } = useCAArticle(articleId);
+// This is the secret for the 1 Lakh archive: 
+// Allow on-demand generation for items not pre-built
+export const dynamicParams = true;
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Skeleton className="h-8 w-32 mb-8" />
-        <Skeleton className="h-12 w-full mb-4" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+// Pre-render only the Latest 500 news items for fast build
+export async function generateStaticParams() {
+  try {
+    const list = await currentAffairsAPI.listArticles({ 
+      limit: 500, 
+      ordering: "-published_at" 
+    });
+    return list.results.map((article) => ({ id: article.id }));
+  } catch (error) {
+    console.error("ISR generateStaticParams for Current Affairs failed:", error);
+    return [];
   }
+}
 
-  if (!article) {
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function CAArticleDetailPage({ params }: PageProps) {
+  const { id: articleId } = await params;
+
+  try {
+    const article = await currentAffairsAPI.getArticle(articleId);
+
+    if (!article) {
+      return notFound();
+    }
+
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-gray-600">Article not found</p>
-          <Link href="/current-affairs">
-            <Button variant="outline" className="mt-4">
-              Back to Current Affairs
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Back button */}
+        <Link href="/current-affairs">
+          <Button variant="ghost" className="mb-6 gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Current Affairs
+          </Button>
+        </Link>
 
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Back button */}
-      <Link href="/current-affairs">
-        <Button variant="ghost" className="mb-6 gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Current Affairs
-        </Button>
-      </Link>
+        {/* Article Header */}
+        <div className="mb-10">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+            <h1 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight tracking-tight">
+              {article.title}
+            </h1>
 
-      {/* Article Header */}
-      <div className="mb-8">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <h1 className="text-4xl font-bold">{article.title}</h1>
-
-          <Badge
-            className={
-              article.processing_status === "completed"
-                ? "bg-green-100 text-green-800"
-                : article.processing_status === "processing"
-                  ? "bg-blue-100 text-blue-800"
-                  : article.processing_status === "pending"
-                    ? "bg-yellow-100 text-yellow-800"
-                    : "bg-red-100 text-red-800"
-            }
-          >
-            {article.processing_status}
-          </Badge>
-        </div>
-
-        {/* Metadata */}
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
-          <div className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            <span>{formatDate(article.published_at)}</span>
-          </div>
-
-          {article.author && (
-            <div className="flex items-center gap-1">
-              <User className="h-4 w-4" />
-              <span>{article.author}</span>
+            <div className="shrink-0">
+              <Badge
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider shadow-sm border-none ${
+                  article.processing_status === "completed"
+                    ? "bg-emerald-600 text-white"
+                    : article.processing_status === "processing"
+                      ? "bg-blue-600 text-white"
+                      : article.processing_status === "pending"
+                        ? "bg-amber-500 text-white"
+                        : "bg-red-600 text-white"
+                }`}
+              >
+                {article.processing_status}
+              </Badge>
             </div>
-          )}
-
-          <div className="flex items-center gap-1">
-            <FileText className="h-4 w-4" />
-            <span>{article.word_count} words</span>
           </div>
 
-          {article.chunk_count > 0 && (
-            <Badge variant="outline">
-              {article.chunk_count} chunks processed
-            </Badge>
-          )}
+          {/* Metadata Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-gray-50 rounded-xl border border-gray-100 mb-8 items-center">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+                <Calendar className="h-3.5 w-3.5" /> Published
+              </div>
+              <span className="text-sm font-bold text-gray-800">{formatDate(article.published_at)}</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+                <User className="h-3.5 w-3.5" /> Source
+              </div>
+              <span className="text-sm font-bold text-gray-800">{article.source_name}</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+                <FileText className="h-3.5 w-3.5" /> Length
+              </div>
+              <span className="text-sm font-bold text-gray-800">{article.word_count} Words</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+                <ExternalLink className="h-3.5 w-3.5" /> Original
+              </div>
+              <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold text-sm hover:underline">
+                View Source
+              </a>
+            </div>
+          </div>
         </div>
 
-        {/* Source */}
-        <div className="flex items-center justify-between">
-          <Badge variant="secondary">{article.source_name}</Badge>
+        {/* Categories */}
+        {article.categories && article.categories.length > 0 && (
+          <div className="mb-8 flex flex-wrap gap-2.5">
+            {article.categories.map((category, idx) => (
+              <Badge key={idx} variant="outline" className="px-3 py-1 bg-white hover:border-blue-300 font-medium text-gray-600">
+                {category}
+              </Badge>
+            ))}
+          </div>
+        )}
 
-          <a href={article.url} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="sm" className="gap-2">
-              Original Source <ExternalLink className="h-4 w-4" />
-            </Button>
-          </a>
-        </div>
-      </div>
+        {/* Summary */}
+        {article.summary && (
+          <div className="mb-10 bg-indigo-50 border-l-4 border-indigo-600 p-8 rounded-r-2xl shadow-sm">
+            <h2 className="text-indigo-900 font-black uppercase text-xs tracking-widest mb-3">Key Synthesis</h2>
+            <p className="text-indigo-900 text-lg leading-relaxed font-medium">{article.summary}</p>
+          </div>
+        )}
 
-      {/* Categories */}
-      {article.categories && article.categories.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          {article.categories.map((category, idx) => (
-            <Badge key={idx} variant="outline">
-              {category}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Summary */}
-      {article.summary && (
-        <Card className="mb-6 bg-blue-50">
-          <CardContent className="pt-6">
-            <h2 className="font-semibold mb-2">Summary</h2>
-            <p className="text-gray-700">{article.summary}</p>
+        {/* Content */}
+        <Card className="border-none shadow-none bg-white">
+          <CardContent className="px-0 pt-0">
+            <div className="prose prose-lg max-w-none prose-slate">
+              <div className="whitespace-pre-wrap text-gray-800 leading-[1.8] text-xl font-serif">
+                {article.content}
+              </div>
+            </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* Content */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="prose max-w-none">
-            <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-              {article.content}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        {/* Floating Back to Top Button or similar could go here */}
+      </div>
+    );
+  } catch (error) {
+    console.error("Error loading CA article in Server Component:", error);
+    return notFound();
+  }
 }

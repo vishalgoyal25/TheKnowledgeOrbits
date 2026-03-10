@@ -1,324 +1,77 @@
 /**
- * Current Affairs Home Page
+ * Current Affairs Home Page (ISR)
  */
 
-"use client";
-
-import CAArticleCard from "@/components/current-affairs/ca-article-card";
-import CAFilterBar from "@/components/current-affairs/ca-filter-bar";
-import CATimeline from "@/components/current-affairs/ca-timeline";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  useCAArticles,
-  useCASources,
-  useInfiniteCAArticles,
-} from "@/lib/hooks/use-current-affairs";
-import { CAArticleListResponse } from "@/lib/types";
-import {
-  ChevronLeft,
-  ChevronRight,
-  History,
-  LayoutGrid,
-  Loader2,
-  Newspaper,
-  Settings,
-} from "lucide-react";
+import { currentAffairsAPI } from "@/lib/api/current-affairs";
+import { Newspaper, LayoutGrid, Settings } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import CurrentAffairsClient from "./ca-client";
 
-export default function CurrentAffairsPage() {
-  const [filters, setFilters] = useState({});
-  const [gridPage, setGridPage] = useState(1);
-  const [activeTab, setActiveTab] = useState("grid");
-  const PAGE_SIZE = 20;
+// Revalidate every 10 minutes to catch new Ghost worker updates
+export const revalidate = 600;
 
-  // Grid Query (Numbered Pagination)
-  const { data: gridData, isLoading: isGridLoading } = useCAArticles({
-    ...filters,
-    ordering: "-published_at",
-    limit: PAGE_SIZE,
-    offset: (gridPage - 1) * PAGE_SIZE,
-  });
+export default async function CurrentAffairsPage() {
+  try {
+    // Fetch initial data on the server
+    const [articlesData, sourcesData] = await Promise.all([
+      currentAffairsAPI.listArticles({ limit: 20, ordering: "-published_at" }),
+      currentAffairsAPI.listSources(),
+    ]);
 
-  // Timeline Query (Infinite Scroll / Load More)
-  const {
-    data: timelineData,
-    isLoading: isTimelineLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-  } = useInfiniteCAArticles({
-    ...filters,
-    ordering: "-published_at",
-  });
+    const initialArticles = articlesData?.results || [];
+    const initialTotal = articlesData?.count || 0;
+    const sources = sourcesData?.results || [];
 
-  const { data: sourcesData } = useCASources();
-
-  // Extract arrays
-  const gridArticles = gridData?.results || [];
-  const gridTotal = gridData?.count || 0;
-
-  const timelineArticles =
-    timelineData?.pages.flatMap(
-      (page: CAArticleListResponse) => page.results,
-    ) || [];
-  const timelineTotal = timelineData?.pages[0]?.count || 0;
-
-  const totalArticles = activeTab === "grid" ? gridTotal : timelineTotal;
-  const displayArticles =
-    activeTab === "grid" ? gridArticles : timelineArticles;
-  const sources = sourcesData?.results || [];
-
-  const totalPages = Math.ceil(gridTotal / PAGE_SIZE);
-
-  const getPageNumbers = () => {
-    const pages = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (gridPage <= 4) {
-        pages.push(1, 2, 3, 4, 5, "...", totalPages);
-      } else if (gridPage > totalPages - 4) {
-        pages.push(
-          1,
-          "...",
-          totalPages - 4,
-          totalPages - 3,
-          totalPages - 2,
-          totalPages - 1,
-          totalPages,
-        );
-      } else {
-        pages.push(
-          1,
-          "...",
-          gridPage - 1,
-          gridPage,
-          gridPage + 1,
-          "...",
-          totalPages,
-        );
-      }
-    }
-    return pages;
-  };
-
-  if (isGridLoading && isTimelineLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Skeleton className="h-12 w-64 mb-8" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-64" />
-          ))}
+        {/* Header (Server Rendered) */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <Newspaper className="h-8 w-8 text-blue-600" />
+              <h1 className="text-4xl font-bold font-heading tracking-tight">Current Affairs</h1>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Link href="/current-affairs/chunks">
+                <Button variant="outline" className="gap-2">
+                  <LayoutGrid className="h-4 w-4" />
+                  View Chunks
+                </Button>
+              </Link>
+
+              <Link href="/current-affairs/sources">
+                <Button variant="outline" className="gap-2">
+                  <Settings className="h-4 w-4" />
+                  Sources
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <p className="text-gray-600 text-lg">
+            Stay updated with latest news integrated into UPSC preparation
+          </p>
+        </div>
+
+        {/* Client Side Components for Filtering and Viewing */}
+        <CurrentAffairsClient 
+          initialArticles={initialArticles} 
+          initialTotal={initialTotal} 
+          sources={sources} 
+        />
+      </div>
+    );
+  } catch (error) {
+    console.error("Error loading Current Affairs in Server Component:", error);
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-red-600 bg-red-50 p-8 rounded-lg border border-red-100">
+          <h3 className="text-lg font-semibold mb-2">Error Loading Current Affairs</h3>
+          <p>Please try again later. Check backend connectivity.</p>
         </div>
       </div>
     );
   }
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-3">
-            <Newspaper className="h-8 w-8 text-blue-600" />
-            <h1 className="text-4xl font-bold">Current Affairs</h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link href="/current-affairs/chunks">
-              <Button variant="outline" className="gap-2">
-                <LayoutGrid className="h-4 w-4" />
-                View Chunks
-              </Button>
-            </Link>
-
-            <Link href="/current-affairs/sources">
-              <Button variant="outline" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Sources
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        <p className="text-gray-600">
-          Stay updated with latest news integrated into UPSC preparation
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-blue-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Total Articles</div>
-          <div className="text-3xl font-bold text-blue-600">
-            {totalArticles}
-          </div>
-        </div>
-
-        <div className="bg-green-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Active Sources</div>
-          <div className="text-3xl font-bold text-green-600">
-            {sources.filter((s) => s.is_active).length}
-          </div>
-        </div>
-
-        <div className="bg-purple-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Showing</div>
-          <div className="text-3xl font-bold text-purple-600">
-            {displayArticles.length}
-          </div>
-        </div>
-      </div>
-
-      {/* Filters (Reset page on filter change) */}
-      <div className="mb-8">
-        <CAFilterBar
-          onFilterChange={(newFilters) => {
-            setFilters(newFilters);
-            setGridPage(1);
-          }}
-          sources={sources.map((s) => ({ id: s.id, name: s.name }))}
-        />
-      </div>
-
-      {/* Views */}
-      <Tabs defaultValue="grid" className="w-full" onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="grid" className="gap-2">
-            <LayoutGrid className="h-4 w-4" />
-            Grid
-          </TabsTrigger>
-          <TabsTrigger value="timeline" className="gap-2">
-            <History className="h-4 w-4" />
-            Timeline
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="grid" className="mt-6">
-          {isGridLoading ? (
-            <div className="flex justify-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-            </div>
-          ) : gridArticles.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Newspaper className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No articles found on this page</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {gridArticles.map((article) => (
-                  <CAArticleCard key={article.id} article={article} />
-                ))}
-              </div>
-
-              {/* Standard Page Paginator */}
-              {gridTotal > PAGE_SIZE && (
-                <div className="flex items-center justify-between border-t pt-6 mb-12">
-                  <div className="text-sm text-gray-500">
-                    Showing{" "}
-                    <span className="font-semibold">
-                      {(gridPage - 1) * PAGE_SIZE + 1}
-                    </span>{" "}
-                    to{" "}
-                    <span className="font-semibold">
-                      {Math.min(gridPage * PAGE_SIZE, gridTotal)}
-                    </span>{" "}
-                    of <span className="font-semibold">{gridTotal}</span>{" "}
-                    articles
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setGridPage((p) => Math.max(1, p - 1))}
-                      disabled={gridPage === 1}
-                      className="gap-1 mr-2"
-                    >
-                      <ChevronLeft className="h-4 w-4" /> Prev
-                    </Button>
-
-                    {getPageNumbers().map((pageNum, idx) =>
-                      pageNum === "..." ? (
-                        <span
-                          key={`ellipsis-${idx}`}
-                          className="px-2 text-gray-500"
-                        >
-                          ...
-                        </span>
-                      ) : (
-                        <Button
-                          key={`page-${pageNum}`}
-                          variant={gridPage === pageNum ? "default" : "outline"}
-                          size="icon"
-                          onClick={() => setGridPage(pageNum as number)}
-                          className={
-                            gridPage === pageNum ? "bg-blue-600 text-white" : ""
-                          }
-                        >
-                          {pageNum}
-                        </Button>
-                      ),
-                    )}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setGridPage((p) => p + 1)}
-                      disabled={gridPage * PAGE_SIZE >= gridTotal}
-                      className="gap-1 ml-2"
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="timeline" className="mt-6">
-          {timelineArticles.length === 0 && !isTimelineLoading ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No articles found</p>
-            </div>
-          ) : (
-            <div className="pb-12">
-              <CATimeline articles={timelineArticles} />
-
-              {/* Load More Button */}
-              {hasNextPage && (
-                <div className="flex justify-center mt-10">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="min-w-[200px]"
-                  >
-                    {isFetchingNextPage ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
-                        Loading...
-                      </>
-                    ) : (
-                      "Load More History"
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
 }
