@@ -9,6 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Filter, LayoutGrid, List, Search } from "lucide-react";
 import { Topic, Subject } from "@/lib/types";
 
+import { useTopics } from "@/lib/hooks/use-topics";
+import { useSubjects } from "@/lib/hooks/use-subjects";
+
 interface TopicsClientProps {
   initialTopics: Topic[];
   initialSubjects: Subject[];
@@ -17,7 +20,20 @@ interface TopicsClientProps {
 export default function TopicsClient({ initialTopics, initialSubjects }: TopicsClientProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredTopics = initialTopics.filter(
+  // Determine if we should use server-side initial data
+  const isInitialState = searchTerm === "" && initialTopics.length > 0 && initialSubjects.length > 0;
+
+  // Client-side query fallback (only enabled if we've deviated from initial server state or server failed)
+  const { data: topicsData, isLoading: isTopicsLoading } = useTopics({ page_size: 200 });
+  const { data: subjectsData, isLoading: isSubjectsLoading } = useSubjects();
+
+  // Extract arrays, falling back to initial data if available and in initial state
+  const topics = isInitialState ? initialTopics : (topicsData || []);
+  const activeSubjects = isInitialState ? initialSubjects : (subjectsData || []);
+
+  const isLoading = (isTopicsLoading || isSubjectsLoading) && !isInitialState;
+
+  const filteredTopics = topics.filter(
     (topic: Topic) =>
       topic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       topic.description?.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -37,7 +53,7 @@ export default function TopicsClient({ initialTopics, initialSubjects }: TopicsC
         <div className="bg-green-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Active Subjects</div>
           <div className="text-3xl font-bold text-green-600">
-            {initialSubjects.length}
+            {activeSubjects.length}
           </div>
         </div>
 
@@ -48,6 +64,13 @@ export default function TopicsClient({ initialTopics, initialSubjects }: TopicsC
           </div>
         </div>
       </div>
+
+      {isLoading && (
+        <div className="mb-8 p-4 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-3 text-blue-800 animate-pulse">
+          <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" />
+          Synchronizing intelligence categories from backup network...
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-8 flex gap-4">

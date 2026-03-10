@@ -9,12 +9,13 @@ import { topicsAPI } from "../api/topics";
 import { PaginationParams } from "../types";
 
 // List all topics
-export function useTopics(params?: PaginationParams) {
+export function useTopics(params?: PaginationParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["topics", params],
     queryFn: () => topicsAPI.list(params),
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 60 * 60 * 1000, // 1 hour — topics rarely change
+    ...options,
   });
 }
 

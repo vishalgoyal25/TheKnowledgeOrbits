@@ -1,79 +1,87 @@
 "use client";
 
 import { useState } from "react";
-import CAArticleCard from "@/components/current-affairs/ca-article-card";
-import CAFilterBar from "@/components/current-affairs/ca-filter-bar";
-import CATimeline from "@/components/current-affairs/ca-timeline";
+import ArticleCard from "@/components/articles/article-card";
+import ArticleTimeline from "@/components/articles/article-timeline";
+import SearchBar from "@/components/search/search-bar";
+import SearchFilters from "@/components/search/search-filters";
+import EmptyState from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  useCAArticles,
-  useInfiniteCAArticles,
-} from "@/lib/hooks/use-current-affairs";
-import { CAArticleListResponse, CAArticle, CASource } from "@/lib/types";
+import { useArticles, useInfiniteArticles } from "@/lib/hooks/use-article";
 import {
   ChevronLeft,
   ChevronRight,
   History,
   LayoutGrid,
   Loader2,
-  Newspaper,
+  Sparkles,
 } from "lucide-react";
+import Link from "next/link";
+import { Article } from "@/lib/types";
 
-interface Props {
-  initialArticles: CAArticle[];
+interface ArticlesClientProps {
+  initialArticles: Article[];
   initialTotal: number;
-  sources: CASource[];
 }
 
-export default function CurrentAffairsClient({ initialArticles, initialTotal, sources }: Props) {
-  const [filters, setFilters] = useState({});
+export default function ArticlesClient({ initialArticles, initialTotal }: ArticlesClientProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [gridPage, setGridPage] = useState(1);
   const [activeTab, setActiveTab] = useState("grid");
   const PAGE_SIZE = 20;
 
-  // Grid Query (Numbered Pagination)
-  // We use the initialArticles only on page 1 with no filters AND if we actually have initial data
-  const isInitialState = gridPage === 1 && Object.keys(filters).length === 0 && initialArticles.length > 0;
+  const filterOptions = [
+    { label: "Approved", value: "approved" },
+    { label: "Pending", value: "pending" },
+    { label: "AI Generated", value: "ai_generated" },
+  ];
 
-  const { data: gridData, isLoading: isGridLoading } = useCAArticles({
-    ...filters,
-    ordering: "-published_at",
+  const filterStatus =
+    activeFilters.find((f) => ["approved", "pending"].includes(f)) || "";
+
+  // Check if we can use server-side initial data
+  // (If initialArticles is empty, we MUST fetch on client even if filters are empty)
+  const isInitialState = gridPage === 1 && Object.keys(activeFilters).length === 0 && searchTerm === "" && initialArticles.length > 0;
+
+  const {
+    data: gridData,
+    isLoading: isGridLoading,
+  } = useArticles({
+    review_status: filterStatus || undefined,
+    ordering: "-created_at",
     limit: PAGE_SIZE,
     offset: (gridPage - 1) * PAGE_SIZE,
   }, {
-    // Skip fetching if we are on the first page with no filters
+    // Only fetch on client if we've deviated from the initial server state
     enabled: !isInitialState || activeTab !== "grid"
   });
 
-  // Timeline Query (Infinite Scroll / Load More)
   const {
     data: timelineData,
     isLoading: isTimelineLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useInfiniteCAArticles({
-    ...filters,
-    ordering: "-published_at",
+  } = useInfiniteArticles({
+    review_status: filterStatus || undefined,
+    ordering: "-created_at",
   }, {
-    // Only enable when user switches to timeline tab or applies filters
-    enabled: activeTab === "timeline" || Object.keys(filters).length > 0
+    enabled: activeTab === "timeline" || !isInitialState
   });
 
-  // Extract arrays, retaining initial data during first-load to prevent "disappearing" content
+  // Extract arrays, falling back to initial data if available and in initial state
+  // We keep the initial data while loading to avoid the "disappearing" effect
   const gridArticles = gridData?.results?.length ? gridData.results : (isInitialState || isGridLoading ? initialArticles : []);
   const gridTotal = gridData?.count ?? (isInitialState || isGridLoading ? initialTotal : 0);
 
   const timelineArticles =
-    timelineData?.pages.flatMap(
-      (page: CAArticleListResponse) => page.results,
-    ) || (isTimelineLoading ? initialArticles : []);
+    timelineData?.pages.flatMap((page) => page.results) || (isTimelineLoading ? initialArticles : []);
   const timelineTotal = timelineData?.pages[0]?.count ?? (isTimelineLoading ? initialTotal : 0);
 
-  const totalArticles = activeTab === "grid" ? gridTotal : timelineTotal;
-  const displayArticles =
-    activeTab === "grid" ? gridArticles : timelineArticles;
+  const totalArticlesCount = activeTab === "grid" ? gridTotal : timelineTotal;
+  const displayArticles = activeTab === "grid" ? gridArticles : timelineArticles;
 
   const totalPages = Math.ceil(gridTotal / PAGE_SIZE);
 
@@ -102,16 +110,16 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
         <div className="bg-blue-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Total Articles</div>
           <div className="text-3xl font-bold text-blue-600">
-            {totalArticles === 0 && (isGridLoading || isTimelineLoading) ? (
+            {totalArticlesCount === 0 && (isGridLoading || isTimelineLoading) ? (
               <Loader2 className="h-8 w-8 animate-spin inline-block" />
-            ) : totalArticles}
+            ) : totalArticlesCount}
           </div>
         </div>
 
         <div className="bg-green-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Active Sources</div>
+          <div className="text-sm text-gray-600">Sync Capacity</div>
           <div className="text-3xl font-bold text-green-600">
-            {sources.filter((s) => s.is_active).length}
+            {initialArticles.length > 0 ? "LIVE" : "SYNC"}
           </div>
         </div>
 
@@ -125,18 +133,32 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mb-8">
-        <CAFilterBar
-          onFilterChange={(newFilters) => {
-            setFilters(newFilters);
+      {/* Search & Filters */}
+      <div className="mb-8 space-y-4">
+        <SearchBar
+          placeholder="Search articles..."
+          onSearch={setSearchTerm}
+          defaultValue={searchTerm}
+        />
+        <SearchFilters
+          filters={filterOptions}
+          activeFilters={activeFilters}
+          onFilterToggle={(val) => {
+            setActiveFilters((prev) =>
+              prev.includes(val)
+                ? prev.filter((f) => f !== val)
+                : [...prev, val],
+            );
+            setGridPage(1); // Reset page on filter
+          }}
+          onClearAll={() => {
+            setActiveFilters([]);
             setGridPage(1);
           }}
-          sources={sources.map((s) => ({ id: s.id, name: s.name }))}
+          label="Filter"
         />
       </div>
 
-      {/* Views */}
       <Tabs defaultValue="grid" className="w-full" onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="grid" className="gap-2">
@@ -150,24 +172,41 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
         </TabsList>
 
         <TabsContent value="grid" className="mt-6">
-          {isGridLoading && !isInitialState ? (
-            <div className="flex justify-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          {(isGridLoading && !isInitialState) ? (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-64 bg-gray-100 animate-pulse rounded-xl" />
+                ))}
             </div>
-          ) : gridArticles.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Newspaper className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No articles found on this page</p>
-            </div>
+          ) : displayArticles.length === 0 ? (
+            <EmptyState
+              title="No articles found"
+              description={
+                searchTerm
+                  ? `No articles match "${searchTerm}". Try a different search.`
+                  : "No articles yet. Generate your first article to get started."
+              }
+              icon={<Sparkles className="h-8 w-8" />}
+              action={
+                !searchTerm ? (
+                  <Link href="/generate">
+                    <Button className="gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Generate Article
+                    </Button>
+                  </Link>
+                ) : undefined
+              }
+            />
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {gridArticles.map((article) => (
-                  <CAArticleCard key={article.id} article={article} />
+                {displayArticles.map((article) => (
+                  <ArticleCard key={article.id} article={article} />
                 ))}
               </div>
 
-              {/* Standard Page Paginator */}
+              {/* Grid Paginator */}
               {gridTotal > PAGE_SIZE && (
                 <div className="flex items-center justify-between border-t pt-6 mb-12">
                   <div className="text-sm text-gray-500">
@@ -196,7 +235,10 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
 
                     {getPageNumbers().map((pageNum, idx) =>
                       pageNum === "..." ? (
-                        <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-2 text-gray-500"
+                        >
                           ...
                         </span>
                       ) : (
@@ -205,7 +247,9 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
                           variant={gridPage === pageNum ? "default" : "outline"}
                           size="icon"
                           onClick={() => setGridPage(pageNum as number)}
-                          className={gridPage === pageNum ? "bg-blue-600 text-white" : ""}
+                          className={
+                            gridPage === pageNum ? "bg-blue-600 text-white" : ""
+                          }
                         >
                           {pageNum}
                         </Button>
@@ -228,15 +272,21 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
           )}
         </TabsContent>
 
-        <TabsContent value="timeline" className="mt-6">
-          {timelineArticles.length === 0 && !isTimelineLoading ? (
+        <TabsContent value="timeline">
+          {(isTimelineLoading && timelineArticles.length === 0) ? (
+            <div className="space-y-6">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-xl" />
+                ))}
+            </div>
+          ) : displayArticles.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No articles found</p>
+              <p className="text-gray-600">No events found in timeline</p>
             </div>
           ) : (
             <div className="pb-12">
-              <CATimeline articles={timelineArticles} />
+              <ArticleTimeline articles={displayArticles} />
 
               {/* Load More Button */}
               {hasNextPage && (

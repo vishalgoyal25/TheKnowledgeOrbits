@@ -19,17 +19,18 @@ import {
 } from "../types";
 
 // List articles
-export function useArticles(params?: ArticleFilterParams) {
+export function useArticles(params?: ArticleFilterParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["articles", params],
     queryFn: () => articlesAPI.list(params),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 min — survive page navigation
+    ...options,
   });
 }
 
 // Infinite List articles (for Timeline Load More)
-export function useInfiniteArticles(params?: ArticleFilterParams) {
+export function useInfiniteArticles(params?: ArticleFilterParams, options?: { enabled?: boolean }) {
   return useInfiniteQuery({
     queryKey: ["articles-infinite", params],
     queryFn: ({ pageParam = 0 }) =>
@@ -43,6 +44,7 @@ export function useInfiniteArticles(params?: ArticleFilterParams) {
     initialPageParam: 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000, // Keep timeline data in memory
+    ...options,
   });
 }
 
