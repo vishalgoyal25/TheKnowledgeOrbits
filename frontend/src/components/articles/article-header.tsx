@@ -1,4 +1,6 @@
-"use client";
+/**
+ * Article header component (Server-side compatible)
+ */
 
 import { Article } from "@/lib/types";
 import BookmarkButton from "./bookmark-button";

@@ -31,17 +31,24 @@ export function useCASource(id: string | null) {
 }
 
 // List CA articles
-export function useCAArticles(params?: CAArticleFilterParams) {
+export function useCAArticles(
+  params?: CAArticleFilterParams,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["ca-articles", params],
     queryFn: () => currentAffairsAPI.listArticles(params),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 min — survive page navigation
+    ...options,
   });
 }
 
 // Infinite List CA articles (for Timeline Load More)
-export function useInfiniteCAArticles(params?: CAArticleFilterParams) {
+export function useInfiniteCAArticles(
+  params?: CAArticleFilterParams,
+  options?: { enabled?: boolean },
+) {
   return useInfiniteQuery({
     queryKey: ["ca-articles-infinite", params],
     queryFn: ({ pageParam = 0 }) =>
@@ -59,6 +66,7 @@ export function useInfiniteCAArticles(params?: CAArticleFilterParams) {
     initialPageParam: 0,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000, // Keep timeline data in memory
+    ...options,
   });
 }
 
