@@ -12,10 +12,10 @@ import {
   Calendar,
   User,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 
 // Revalidate once a day (CA articles don't change once published)
 export const revalidate = 86400;
@@ -50,7 +50,7 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
     const article = await currentAffairsAPI.getArticle(articleId);
 
     if (!article) {
-      return notFound();
+      throw new Error("Article Sync Delayed");
     }
 
     return (
@@ -156,6 +156,27 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
     );
   } catch (error) {
     console.error("Error loading CA article in Server Component:", error);
-    return notFound();
+    
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <div className="max-w-md mx-auto p-8 bg-blue-50 rounded-2xl border border-blue-100 shadow-sm">
+          <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+          <h2 className="text-xl font-bold text-blue-900 mb-2">Sync in Progress...</h2>
+          <p className="text-blue-700 mb-6 font-medium">
+            The News Engine is currently synchronizing this article. Please wait a few moments...
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link href="/current-affairs" className="text-sm text-blue-600 font-bold hover:underline py-2 uppercase tracking-tight">
+              Back to News List
+            </Link>
+          </div>
+        </div>
+        <script dangerouslySetInnerHTML={{ 
+          __html: `setTimeout(() => window.location.reload(), 5000)` 
+        }} />
+      </div>
+    );
   }
 }

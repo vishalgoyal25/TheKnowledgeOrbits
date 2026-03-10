@@ -7,12 +7,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { subjectsAPI } from "../api/subjects";
 
-export function useSubjects() {
+export function useSubjects(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["subjects"],
     queryFn: () => subjectsAPI.list(),
     staleTime: 15 * 60 * 1000, // 15 minutes
     gcTime: 60 * 60 * 1000, // 1 hour — subjects rarely change
+    ...options,
   });
 }
 
