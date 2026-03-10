@@ -42,11 +42,12 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor (add auth token)
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Get token from localStorage
-    const token = tokenManager.getAccessToken();
-
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Only attempt to add tokens if we are in a browser environment
+    if (typeof window !== "undefined") {
+      const token = tokenManager.getAccessToken();
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
 
     return config;
@@ -70,7 +71,7 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = tokenManager.getRefreshToken();
+        const refreshToken = typeof window !== "undefined" ? tokenManager.getRefreshToken() : null;
 
         if (!refreshToken) {
           throw new Error("No refresh token");
@@ -87,7 +88,9 @@ apiClient.interceptors.response.use(
         const { access } = response.data;
 
         // Store new access token
-        tokenManager.setAccessToken(access);
+        if (typeof window !== "undefined") {
+          tokenManager.setAccessToken(access);
+        }
 
         // Retry original request with new token
         if (originalRequest.headers) {
@@ -98,8 +101,11 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed - logout user
         logger.warn("Token refresh failed, logging out user...", refreshError);
-        tokenManager.clearTokens();
-        window.location.href = "/auth/login";
+        
+        if (typeof window !== "undefined") {
+          tokenManager.clearTokens();
+          window.location.href = "/auth/login";
+        }
         return Promise.reject(refreshError);
       }
     }
