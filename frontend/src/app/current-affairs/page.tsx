@@ -69,19 +69,27 @@ export default async function CurrentAffairsPage() {
             Live Sync Active (10m)
           </div>
           <div>
-            Data Snapshot: {new Date().toLocaleTimeString()}
+            Snapshot Time: {new Date().toLocaleTimeString()}
           </div>
         </div>
       </div>
     );
   } catch (error) {
-    console.error("Error loading Current Affairs in Server Component:", error);
+    console.error("ISR Fetch Failed (Likely Render 503). Falling back to Client-side fetch.", error);
+    
+    // Fallback: Render the client component with empty data and let IT handle the fetch
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-red-600 bg-red-50 p-8 rounded-lg border border-red-100">
-          <h3 className="text-lg font-semibold mb-2">Error Loading Current Affairs</h3>
-          <p>Please try again later. Check backend connectivity.</p>
+        <div className="mb-8 p-6 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-4 text-amber-800 animate-in fade-in slide-in-from-top-4">
+          <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+          <p className="text-sm font-medium">Connecting to Intelligence Network... (Service recovering from standby)</p>
         </div>
+
+        <CurrentAffairsClient 
+          initialArticles={[]} 
+          initialTotal={0} 
+          sources={[]} 
+        />
       </div>
     );
   }
