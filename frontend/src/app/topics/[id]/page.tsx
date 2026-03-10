@@ -15,13 +15,13 @@ import { notFound } from "next/navigation";
 // Revalidate every hour
 export const revalidate = 3600;
 
-// Pre-render all topics to make them lightning fast
+// Pre-render topics for stability during build
 export async function generateStaticParams() {
   try {
-    const topics = await topicsAPI.list({ page_size: 1000 });
-    return topics.map((topic) => ({ id: topic.id }));
+    const topics = await topicsAPI.list({ page_size: 200 });
+    return (topics || []).map((topic) => ({ id: topic.id }));
   } catch (error) {
-    console.error("ISR generateStaticParams for Topics failed:", error);
+    console.error("BUILD WARNING: generateStaticParams for Topics failed (likely Render timeout). Skipping pre-build.", error);
     return [];
   }
 }

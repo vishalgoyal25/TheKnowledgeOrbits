@@ -15,15 +15,15 @@ import apiClient from "@/lib/api/client";
 // Revalidate every hour
 export const revalidate = 3600;
 
-// Pre-render top 500 articles to make them lightning fast
+// Pre-render the Latest 100 articles for stability
 export async function generateStaticParams() {
   try {
-    const response = await articlesAPI.list({ limit: 500 });
-    return response.results.map((article: Article) => ({
+    const response = await articlesAPI.list({ limit: 100 });
+    return (response.results || []).map((article: Article) => ({
       id: article.id,
     }));
   } catch (error) {
-    console.error("ISR generateStaticParams for Articles failed:", error);
+    console.error("BUILD WARNING: generateStaticParams for Articles failed (likely Render timeout). skipping pre-build.", error);
     return [];
   }
 }

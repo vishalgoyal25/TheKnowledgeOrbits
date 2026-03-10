@@ -61,6 +61,17 @@ export default async function CurrentAffairsPage() {
           initialTotal={initialTotal} 
           sources={sources} 
         />
+
+        {/* Sync Status (Visible in footer) */}
+        <div className="mt-12 pt-4 border-t border-gray-100 flex justify-between items-center text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Live Sync Active (10m)
+          </div>
+          <div>
+            Data Snapshot: {new Date().toLocaleTimeString()}
+          </div>
+        </div>
       </div>
     );
   } catch (error) {

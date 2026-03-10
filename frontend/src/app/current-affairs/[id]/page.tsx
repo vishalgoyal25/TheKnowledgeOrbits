@@ -24,16 +24,17 @@ export const revalidate = 86400;
 // Allow on-demand generation for items not pre-built
 export const dynamicParams = true;
 
-// Pre-render only the Latest 500 news items for fast build
+// Pre-render only the Latest 100 news items for building stability
+// (Others will be built on-demand via ISR)
 export async function generateStaticParams() {
   try {
     const list = await currentAffairsAPI.listArticles({ 
-      limit: 500, 
+      limit: 100, 
       ordering: "-published_at" 
     });
-    return list.results.map((article) => ({ id: article.id }));
+    return (list.results || []).map((article) => ({ id: article.id }));
   } catch (error) {
-    console.error("ISR generateStaticParams for Current Affairs failed:", error);
+    console.error("BUILD WARNING: generateStaticParams for Current Affairs failed (likely Render timeout). Skipping pre-build.", error);
     return [];
   }
 }
