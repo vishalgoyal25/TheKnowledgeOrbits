@@ -145,11 +145,7 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
             self.request.query_params.get(p) for p in ["topic_id", "review_status"]
         ):
             cache_key = "total_articles_count"
-            cache_service.get_count(cache_key, queryset)
-            # Inject into pagination if standard paginator is used
-            # StandardLimitOffsetPagination will still call count() unless we intercept
-            # For now, we optimize the QuerySet itself
-            pass
+            setattr(queryset, "_custom_count_cache_key", cache_key)
 
         queryset = queryset.select_related("topic", "topic__subject", "created_by")
 

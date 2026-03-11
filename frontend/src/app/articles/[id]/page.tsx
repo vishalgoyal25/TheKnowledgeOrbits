@@ -39,19 +39,19 @@ async function fetchDocumentAsArticle(documentId: string, chunkIndexStr?: string
   try {
     const chunkIndex = chunkIndexStr ? parseInt(chunkIndexStr) : 0;
     
-    // 1. Fetch Document Metadata
-    const docRes = await apiClient.get(`/content/documents/${documentId}/`);
+    // Fetch Document Metadata and Chunks in parallel
+    const [docRes, chunksRes] = await Promise.all([
+      apiClient.get(`/content/documents/${documentId}/`),
+      apiClient.get(`/content/chunks/`, {
+        params: {
+          document: documentId,
+          limit: 20,
+          start_index: Math.max(0, chunkIndex - 1),
+          include_content: "true",
+        },
+      }),
+    ]);
     const doc = docRes.data;
-
-    // 2. Fetch Chunks
-    const chunksRes = await apiClient.get(`/content/chunks/`, {
-      params: {
-        document: documentId,
-        limit: 20,
-        start_index: Math.max(0, chunkIndex - 1),
-        include_content: "true",
-      },
-    });
 
     const chunks = chunksRes.data.results || [];
     chunks.sort((a: { chunk_index: number }, b: { chunk_index: number }) => a.chunk_index - b.chunk_index);
