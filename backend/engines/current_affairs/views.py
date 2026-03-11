@@ -19,8 +19,6 @@ from rest_framework.response import Response
 import structlog
 
 from core.pagination import StandardLimitOffsetPagination, StandardPageNumberPagination
-from engines.shared.services.cache_service import get_cache_service
-
 from .models import CAArticle, CAChunk, CASource, CATopicLink
 from .serializers import (
     CAArticleSerializer,
@@ -150,8 +148,7 @@ class CAArticleViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
         # Atomic Counter Caching for total count
         source_id = self.request.query_params.get("source_id")
         if self.action == "list" and not source_id:
-            cache_svc = get_cache_service()
-            cache_svc.get_count("ca_articles_total_count", fallback_queryset=queryset)
+            setattr(queryset, "_custom_count_cache_key", "ca_articles_total_count")
 
         if source_id:
             queryset = queryset.filter(source_id=source_id)
