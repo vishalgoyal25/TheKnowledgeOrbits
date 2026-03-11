@@ -46,6 +46,8 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+import ArticleSkeleton from "@/components/articles/article-skeleton";
+
 export default async function CAArticleDetailPage({ params }: PageProps) {
   const { id: articleId } = await params;
 
@@ -65,8 +67,7 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
             Back to Current Affairs
           </Button>
         </Link>
-
-        {/* Article Header */}
+        {/* Rest of the valid page content... */}
         <div className="mb-10">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
             <h1 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight tracking-tight">
@@ -172,38 +173,31 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
             </div>
           </CardContent>
         </Card>
-
-        {/* Floating Back to Top Button or similar could go here */}
       </div>
     );
   } catch (error) {
     console.warn("Error loading CA article in Server Component:", error);
 
     return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <div className="max-w-md mx-auto p-8 bg-blue-50 rounded-2xl border border-blue-100 shadow-sm">
-          <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="container mx-auto px-4 py-8 animate-in fade-in duration-700">
+        <div className="mb-8 flex flex-col items-center justify-center p-8 bg-blue-50/50 rounded-3xl border border-blue-100/50 text-center gap-4">
+          <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center animate-bounce">
             <Loader2 className="h-6 w-6 animate-spin" />
           </div>
-          <h2 className="text-xl font-bold text-blue-900 mb-2">
-            Sync in Progress...
-          </h2>
-          <p className="text-blue-700 mb-6 font-medium">
-            The News Engine is currently synchronizing this article. Please wait
-            a few moments...
-          </p>
-          <div className="flex flex-col gap-3">
-            <Link
-              href="/current-affairs"
-              className="text-sm text-blue-600 font-bold hover:underline py-2 uppercase tracking-tight"
-            >
-              Back to News List
-            </Link>
+          <div className="space-y-1">
+            <h2 className="text-xl font-black text-blue-900 uppercase tracking-tight">
+              Sync in Progress
+            </h2>
+            <p className="text-blue-700 font-medium text-sm">
+              The News Engine is refining this intelligence for you. Content
+              will appear momentarily.
+            </p>
           </div>
         </div>
+        <ArticleSkeleton />
         <script
           dangerouslySetInnerHTML={{
-            __html: `setTimeout(() => window.location.reload(), 5000)`,
+            __html: `setTimeout(() => window.location.reload(), 10000)`,
           }}
         />
       </div>

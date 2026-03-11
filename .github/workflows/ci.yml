@@ -150,6 +150,7 @@ jobs:
         env:
           NEXT_PUBLIC_SENTRY_DSN: ""
           SENTRY_AUTH_TOKEN: ""
+          SKIP_BACKEND_WAIT: "true"
 
   # ============================================
   # JOB 4: Deploy to Render (The Gatekeeper)

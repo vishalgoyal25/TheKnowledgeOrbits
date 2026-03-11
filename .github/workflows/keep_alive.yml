@@ -1,12 +1,11 @@
 # =============================================================================
 # Keep-Alive Cron Job
 # =============================================================================
-# Pings the Render backend health endpoint every 10 minutes to prevent
-# Free Tier hibernation. Render spins down free services after 15 minutes
-# of inactivity — this workflow keeps it alive 24/7.
+# Pings the Render backend DEEP health endpoint every 10 minutes to prevent
+# Free Tier hibernation and keep the Database connection pool warm.
 #
-# The /api/v1/health/ endpoint is intercepted at the WSGI/ASGI level
-# (see core/wsgi.py), so it responds in <1ms without loading Django.
+# The /api/v1/health/deep/ endpoint performs a real database query, ensuring
+# the entire stack is ready for ISR build requests.
 # =============================================================================
 
 name: Keep Alive
@@ -26,7 +25,7 @@ jobs:
     timeout-minutes: 2
 
     env:
-      HEALTH_URL: https://theknowledgeorbits-backend.onrender.com/api/v1/health/
+      HEALTH_URL: https://theknowledgeorbits-backend.onrender.com/api/v1/health/deep/
 
     steps:
       - name: Ping health endpoint

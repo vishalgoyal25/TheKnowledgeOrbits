@@ -59,6 +59,16 @@ jobs:
         run: |
           python manage.py scrape_ca
 
+      - name: 📡 Trigger Vercel Revalidation (The Pulse)
+        if: success()
+        env:
+          REVALIDATE_URL: https://theknowledgeorbits.vercel.app/api/revalidate
+          REVALIDATE_SECRET: ${{ secrets.PROD_REVALIDATE_SECRET }}
+        run: |
+          echo "Triggering Vercel pulse for Articles, Topics, and CA..."
+          curl -X GET "${REVALIDATE_URL}?secret=${REVALIDATE_SECRET}&path=all"
+          echo "Pulse sent successfully."
+
       - name: 🔍 Check Environment on Failure
         if: failure()
         working-directory: ./backend

@@ -11,6 +11,7 @@ import { Topic, Subject } from "@/lib/types";
 
 import { useTopics } from "@/lib/hooks/use-topics";
 import { useSubjects } from "@/lib/hooks/use-subjects";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TopicsClientProps {
   initialTopics: Topic[];
@@ -49,34 +50,37 @@ export default function TopicsClient({
     <>
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-blue-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Total Topics</div>
-          <div className="text-3xl font-bold text-blue-600">
+        <div className="bg-blue-50/50 border border-blue-100/50 rounded-2xl p-6 shadow-sm">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">
+            Total Topics
+          </div>
+          <div className="text-3xl font-black text-blue-600">
             {initialTopics.length}
           </div>
         </div>
 
-        <div className="bg-green-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Active Subjects</div>
-          <div className="text-3xl font-bold text-green-600">
+        <div className="bg-emerald-50/50 border border-emerald-100/50 rounded-2xl p-6 shadow-sm">
+          <div className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-1">
+            Active Subjects
+          </div>
+          <div className="text-3xl font-black text-emerald-600">
             {activeSubjects.length}
           </div>
         </div>
 
-        <div className="bg-purple-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Showing</div>
-          <div className="text-3xl font-bold text-purple-600">
-            {filteredTopics.length}
+        <div className="bg-purple-50/50 border border-purple-100/50 rounded-2xl p-6 shadow-sm">
+          <div className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-1">
+            Showing
+          </div>
+          <div className="text-3xl font-black text-purple-600">
+            {isLoading ? (
+              <Skeleton className="h-8 w-12 rounded-lg inline-block" />
+            ) : (
+              filteredTopics.length
+            )}
           </div>
         </div>
       </div>
-
-      {isLoading && (
-        <div className="mb-8 p-4 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-3 text-blue-800 animate-pulse">
-          <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce" />
-          Synchronizing intelligence categories from backup network...
-        </div>
-      )}
 
       {/* Filters */}
       <div className="mb-8 flex gap-4">
@@ -111,7 +115,26 @@ export default function TopicsClient({
 
         {/* Grid View */}
         <TabsContent value="grid">
-          {filteredTopics.length === 0 ? (
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4 shadow-sm"
+                >
+                  <div className="flex gap-2">
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </div>
+                  <Skeleton className="h-8 w-full rounded-lg" />
+                  <Skeleton className="h-16 w-full rounded-xl" />
+                  <div className="pt-4 flex justify-between">
+                    <Skeleton className="h-10 w-28 rounded-xl" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredTopics.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
               <p className="text-gray-600">
                 No topics found matching your search.

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, BookmarkPlus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Article, ArticleSourceMap } from "@/lib/types";
+import ArticleSkeleton from "@/components/articles/article-skeleton";
 
 export default function PrivateArticleFallback({
   articleId,
@@ -20,46 +21,49 @@ export default function PrivateArticleFallback({
     refetch,
   } = useArticle(articleId);
 
+  // Elite 5.1: High-fidelity loading state using shimmering silhouettes
   if (isArticleLoading) {
     return (
-      <div className="container mx-auto px-4 py-32 text-center flex flex-col items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-2">
-          Decrypting Secure Asset
-        </h2>
-        <p className="text-gray-500 font-medium">
-          Authorizing and fetching your privately generated intelligence...
-        </p>
+      <div className="container mx-auto px-4 py-8 animate-in fade-in duration-700">
+        <div className="mb-4 flex gap-2 items-center justify-center p-3 text-blue-600 bg-blue-50/50 rounded-xl border border-blue-100/50 text-xs font-bold uppercase tracking-widest animate-pulse">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Synchronizing Secure Intelligence
+        </div>
+        <ArticleSkeleton />
       </div>
     );
   }
 
+  // Silent Resilience 5.2: Minimalistic error handling that prioritizes the "Shimmer" over a loud Error Bar
   if (isArticleError || !articleData) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <div className="max-w-md mx-auto p-8 bg-amber-50 rounded-2xl border border-amber-100 shadow-sm">
-          <div className="h-12 w-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Loader2 className="h-6 w-6 animate-spin" />
+      <div className="container mx-auto px-4 py-16 text-center animate-in fade-in slide-in-from-bottom-2">
+        <div className="max-w-xl mx-auto p-12 bg-white rounded-3xl border border-gray-100 shadow-xl shadow-blue-500/5 items-center flex flex-col gap-6">
+          <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center rotate-3 scale-110">
+            <Loader2 className="h-8 w-8 animate-spin" />
           </div>
-          <h2 className="text-xl font-bold text-amber-900 mb-2">
-            Asset Unavailable
-          </h2>
-          <p className="text-amber-700 mb-6 font-medium">
-            We couldn't retrieve this article. It might be generating, or you
-            may need to check your connection.
-          </p>
-          <div className="flex flex-col gap-3">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+              Synchronization Delayed
+            </h2>
+            <p className="text-gray-500 font-medium max-w-sm mx-auto leading-relaxed">
+              We're having trouble connecting to the intelligence engine. We'll
+              keep trying in the background, or you can manually trigger a
+              refresh.
+            </p>
+          </div>
+          <div className="flex flex-col w-full gap-3 mt-4">
             <Button
               onClick={() => refetch()}
-              className="w-full bg-amber-600 hover:bg-amber-700"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl shadow-lg shadow-blue-600/20"
             >
-              Manual Retry
+              Force Synchronize
             </Button>
             <Link
               href="/articles"
-              className="text-sm text-amber-600 font-bold hover:underline"
+              className="text-xs text-gray-400 font-bold hover:text-blue-600 uppercase tracking-widest transition-colors"
             >
-              Browse other articles
+              Return to Catalog
             </Link>
           </div>
         </div>
