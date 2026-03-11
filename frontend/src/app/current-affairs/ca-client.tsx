@@ -11,6 +11,7 @@ import {
   useInfiniteCAArticles,
 } from "@/lib/hooks/use-current-affairs";
 import { CAArticleListResponse, CAArticle, CASource } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChevronLeft,
   ChevronRight,
@@ -210,8 +211,23 @@ export default function CurrentAffairsClient({
 
         <TabsContent value="grid" className="mt-6">
           {isGridLoading && !isInitialState ? (
-            <div className="flex justify-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white rounded-xl border border-gray-100 p-5 space-y-4 shadow-sm"
+                >
+                  <Skeleton className="h-4 w-1/4 rounded-full" />
+                  <Skeleton className="h-24 w-full rounded-lg" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-full rounded-full" />
+                    <Skeleton className="h-3 w-3/4 rounded-full" />
+                  </div>
+                  <div className="pt-4 flex justify-between">
+                    <Skeleton className="h-8 w-20 rounded-md" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : gridArticles.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">

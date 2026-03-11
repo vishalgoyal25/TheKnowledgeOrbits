@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Article } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ArticlesClientProps {
   initialArticles: Article[];
@@ -246,8 +247,18 @@ export default function ArticlesClient({
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="h-64 bg-gray-100 animate-pulse rounded-xl"
-                />
+                  className="bg-white rounded-xl border border-gray-100 p-5 space-y-4 shadow-sm"
+                >
+                  <Skeleton className="h-4 w-1/3 rounded-full" />
+                  <Skeleton className="h-20 w-full rounded-lg" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-full rounded-full" />
+                    <Skeleton className="h-3 w-4/5 rounded-full" />
+                  </div>
+                  <div className="pt-4 flex justify-between">
+                    <Skeleton className="h-8 w-24 rounded-md" />
+                  </div>
+                </div>
               ))}
             </div>
           ) : displayArticles.length === 0 ? (

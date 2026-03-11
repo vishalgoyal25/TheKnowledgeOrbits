@@ -14,6 +14,28 @@ def health_check(request: Any) -> HttpResponse:
     return HttpResponse("OK, System is Successfully Running!", status=200)
 
 
+def deep_health_check(request: Any) -> JsonResponse:
+    """
+    Deep health check that verifies Database connectivity.
+    Used by Vercel pre-build to ensure Render is 100% "Hot".
+    """
+    try:
+        from engines.knowledge.models import Program
+
+        # Simple query to verify DB connection
+        count = Program.objects.count()
+        return JsonResponse(
+            {
+                "status": "fully_online",
+                "database": "connected",
+                "payload_check": count >= 0,
+            },
+            status=200,
+        )
+    except Exception as e:
+        return JsonResponse({"status": "waking_up", "error": str(e)}, status=503)
+
+
 def api_index(request: Any) -> JsonResponse:
     """API Index with available modules (Plain Django for speed)."""
     return JsonResponse(
@@ -23,6 +45,7 @@ def api_index(request: Any) -> JsonResponse:
             "status": "online",
             "endpoints": {
                 "health": "/api/v1/health/",
+                "health_deep": "/api/v1/health/deep/",
                 "auth": "/api/v1/auth/",
                 "content": "/api/v1/content/",
                 "knowledge": "/api/v1/knowledge/",
@@ -43,6 +66,7 @@ urlpatterns = [
     path("", health_check, name="health-check"),
     path("api/v1/", api_index, name="api-index"),
     path("api/v1/health/", health_check, name="health-check-v1"),
+    path("api/v1/health/deep/", deep_health_check, name="health-check-deep"),
     # Engine URLs
     path("api/v1/content/", include("engines.content.urls")),
     path("api/v1/knowledge/", include("engines.knowledge.urls")),
