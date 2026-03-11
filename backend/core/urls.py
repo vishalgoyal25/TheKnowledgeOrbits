@@ -33,11 +33,14 @@ def deep_health_check(request: Any) -> JsonResponse:
             status=200,
         )
     except Exception as e:
-        return JsonResponse({
-            "status": "waking_up", 
-            "error_type": type(e).__name__,
-            "error": str(e)[:200]
-        }, status=503)
+        return JsonResponse(
+            {
+                "status": "waking_up",
+                "error_type": type(e).__name__,
+                "error": str(e)[:200],
+            },
+            status=503,
+        )
 
 
 def api_index(request: Any) -> JsonResponse:
