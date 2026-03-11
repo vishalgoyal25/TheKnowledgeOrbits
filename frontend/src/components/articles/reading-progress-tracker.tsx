@@ -19,7 +19,8 @@ export default function ReadingProgressTracker({ articleId }: Props) {
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.scrollY;
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
       const percent = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
 
       updateProgress(Math.min(Math.max(percent, 0), 100), scrollTop);
@@ -36,7 +37,7 @@ export default function ReadingProgressTracker({ articleId }: Props) {
       setTimeout(() => {
         window.scrollTo({
           top: progress.last_position,
-          behavior: "smooth"
+          behavior: "smooth",
         });
       }, 500);
     }

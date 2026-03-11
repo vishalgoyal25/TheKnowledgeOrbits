@@ -30,7 +30,9 @@ export default async function CurrentAffairsPage() {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <Newspaper className="h-8 w-8 text-blue-600" />
-              <h1 className="text-4xl font-bold font-heading tracking-tight">Current Affairs</h1>
+              <h1 className="text-4xl font-bold font-heading tracking-tight">
+                Current Affairs
+              </h1>
             </div>
 
             <div className="flex items-center gap-2">
@@ -56,10 +58,10 @@ export default async function CurrentAffairsPage() {
         </div>
 
         {/* Client Side Components for Filtering and Viewing */}
-        <CurrentAffairsClient 
-          initialArticles={initialArticles} 
-          initialTotal={initialTotal} 
-          sources={sources} 
+        <CurrentAffairsClient
+          initialArticles={initialArticles}
+          initialTotal={initialTotal}
+          sources={sources}
         />
 
         {/* Sync Status (Visible in footer) */}
@@ -68,27 +70,31 @@ export default async function CurrentAffairsPage() {
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Live Sync Active (10m)
           </div>
-          <div>
-            Snapshot Time: {new Date().toLocaleTimeString()}
-          </div>
+          <div>Snapshot Time: {new Date().toLocaleTimeString()}</div>
         </div>
       </div>
     );
   } catch (error) {
-    console.error("ISR Fetch Failed (Likely Render 503). Falling back to Client-side fetch.", error);
-    
+    console.warn(
+      "ISR Fetch Failed (Likely Render 503). Falling back to Client-side fetch.",
+      error,
+    );
+
     // Fallback: Render the client component with empty data and let IT handle the fetch
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 p-6 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-4 text-amber-800 animate-in fade-in slide-in-from-top-4">
           <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-          <p className="text-sm font-medium">Connecting to Intelligence Network... (Service recovering from standby)</p>
+          <p className="text-sm font-medium">
+            Connecting to Intelligence Network... (Service recovering from
+            standby)
+          </p>
         </div>
 
-        <CurrentAffairsClient 
-          initialArticles={[]} 
-          initialTotal={0} 
-          sources={[]} 
+        <CurrentAffairsClient
+          initialArticles={[]}
+          initialTotal={0}
+          sources={[]}
         />
       </div>
     );

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { CAArticle } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
-import { Calendar, ExternalLink } from "lucide-react";
+import { Calendar } from "lucide-react";
 import Link from "next/link";
 
 interface CATimelineProps {
@@ -64,15 +64,6 @@ export default function CATimeline({ articles }: CATimelineProps) {
                         {article.title}
                       </h4>
                     </Link>
-
-                    {article.chunk_count > 0 && (
-                      <Badge
-                        variant="outline"
-                        className="flex-shrink-0 relative z-10 bg-white"
-                      >
-                        {article.chunk_count} chunks
-                      </Badge>
-                    )}
                   </div>
 
                   <p className="text-sm text-gray-600 line-clamp-2 mb-3">
@@ -90,15 +81,6 @@ export default function CATimeline({ articles }: CATimelineProps) {
                         </>
                       )}
                     </div>
-
-                    <a
-                      href={article.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline flex items-center gap-1 relative z-10 p-1 -m-1"
-                    >
-                      Source <ExternalLink className="h-3 w-3" />
-                    </a>
                   </div>
                 </CardContent>
               </Card>

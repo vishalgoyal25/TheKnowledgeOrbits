@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ArticleCard from "@/components/articles/article-card";
 import ArticleTimeline from "@/components/articles/article-timeline";
 import SearchBar from "@/components/search/search-bar";
@@ -9,6 +9,7 @@ import EmptyState from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArticles, useInfiniteArticles } from "@/lib/hooks/use-article";
+import { useAuth } from "@/lib/auth/useAuth";
 import {
   ChevronLeft,
   ChevronRight,
@@ -25,7 +26,11 @@ interface ArticlesClientProps {
   initialTotal: number;
 }
 
-export default function ArticlesClient({ initialArticles, initialTotal }: ArticlesClientProps) {
+export default function ArticlesClient({
+  initialArticles,
+  initialTotal,
+}: ArticlesClientProps) {
+  const { isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [gridPage, setGridPage] = useState(1);
@@ -43,20 +48,27 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
 
   // Check if we can use server-side initial data
   // (If initialArticles is empty, we MUST fetch on client even if filters are empty)
-  const isInitialState = gridPage === 1 && Object.keys(activeFilters).length === 0 && searchTerm === "" && initialArticles.length > 0;
+  const isInitialState =
+    gridPage === 1 &&
+    Object.keys(activeFilters).length === 0 &&
+    searchTerm === "" &&
+    initialArticles.length > 0;
 
-  const {
-    data: gridData,
-    isLoading: isGridLoading,
-  } = useArticles({
-    review_status: filterStatus || undefined,
-    ordering: "-created_at",
-    limit: PAGE_SIZE,
-    offset: (gridPage - 1) * PAGE_SIZE,
-  }, {
-    // Only fetch on client if we've deviated from the initial server state
-    enabled: !isInitialState || activeTab !== "grid"
-  });
+  // If authenticated, we MUST bypass the public server snapshot and fetch fresh private+public data
+  const canUseInitialServerState = isInitialState && !isAuthenticated;
+
+  const { data: gridData, isLoading: isGridLoading } = useArticles(
+    {
+      review_status: filterStatus || undefined,
+      ordering: "-created_at",
+      limit: PAGE_SIZE,
+      offset: (gridPage - 1) * PAGE_SIZE,
+    },
+    {
+      // Only fetch on client if we've deviated from the initial server state or we need private data
+      enabled: !canUseInitialServerState || activeTab !== "grid",
+    },
+  );
 
   const {
     data: timelineData,
@@ -64,24 +76,59 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useInfiniteArticles({
-    review_status: filterStatus || undefined,
-    ordering: "-created_at",
-  }, {
-    enabled: activeTab === "timeline" || !isInitialState
-  });
+  } = useInfiniteArticles(
+    {
+      review_status: filterStatus || undefined,
+      ordering: "-created_at",
+    },
+    {
+      enabled: activeTab === "timeline" || !canUseInitialServerState,
+    },
+  );
+
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Extract arrays, falling back to initial data if available and in initial state
   // We keep the initial data while loading to avoid the "disappearing" effect
-  const gridArticles = gridData?.results?.length ? gridData.results : (isInitialState || isGridLoading ? initialArticles : []);
-  const gridTotal = gridData?.count ?? (isInitialState || isGridLoading ? initialTotal : 0);
+  const gridArticles =
+    gridData?.results !== undefined
+      ? gridData.results
+      : canUseInitialServerState || (isInitialState && isGridLoading)
+        ? initialArticles
+        : [];
+  const gridTotal =
+    gridData?.count ??
+    (canUseInitialServerState || (isInitialState && isGridLoading)
+      ? initialTotal
+      : 0);
 
   const timelineArticles =
-    timelineData?.pages.flatMap((page) => page.results) || (isTimelineLoading ? initialArticles : []);
-  const timelineTotal = timelineData?.pages[0]?.count ?? (isTimelineLoading ? initialTotal : 0);
+    timelineData?.pages.flatMap((page) => page.results) ||
+    (isTimelineLoading || canUseInitialServerState ? initialArticles : []);
+  const timelineTotal =
+    timelineData?.pages[0]?.count ??
+    (isTimelineLoading || canUseInitialServerState ? initialTotal : 0);
 
   const totalArticlesCount = activeTab === "grid" ? gridTotal : timelineTotal;
-  const displayArticles = activeTab === "grid" ? gridArticles : timelineArticles;
+  const displayArticles =
+    activeTab === "grid" ? gridArticles : timelineArticles;
 
   const totalPages = Math.ceil(gridTotal / PAGE_SIZE);
 
@@ -95,9 +142,25 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
       if (gridPage <= 4) {
         pages.push(1, 2, 3, 4, 5, "...", totalPages);
       } else if (gridPage > totalPages - 4) {
-        pages.push(1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+        pages.push(
+          1,
+          "...",
+          totalPages - 4,
+          totalPages - 3,
+          totalPages - 2,
+          totalPages - 1,
+          totalPages,
+        );
       } else {
-        pages.push(1, "...", gridPage - 1, gridPage, gridPage + 1, "...", totalPages);
+        pages.push(
+          1,
+          "...",
+          gridPage - 1,
+          gridPage,
+          gridPage + 1,
+          "...",
+          totalPages,
+        );
       }
     }
     return pages;
@@ -110,9 +173,12 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
         <div className="bg-blue-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Total Articles</div>
           <div className="text-3xl font-bold text-blue-600">
-            {totalArticlesCount === 0 && (isGridLoading || isTimelineLoading) ? (
+            {totalArticlesCount === 0 &&
+            (isGridLoading || isTimelineLoading) ? (
               <Loader2 className="h-8 w-8 animate-spin inline-block" />
-            ) : totalArticlesCount}
+            ) : (
+              totalArticlesCount
+            )}
           </div>
         </div>
 
@@ -126,9 +192,12 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
         <div className="bg-purple-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Showing</div>
           <div className="text-3xl font-bold text-purple-600">
-            {displayArticles.length === 0 && (isGridLoading || isTimelineLoading) ? (
+            {displayArticles.length === 0 &&
+            (isGridLoading || isTimelineLoading) ? (
               <Loader2 className="h-8 w-8 animate-spin inline-block" />
-            ) : displayArticles.length}
+            ) : (
+              displayArticles.length
+            )}
           </div>
         </div>
       </div>
@@ -172,11 +241,14 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
         </TabsList>
 
         <TabsContent value="grid" className="mt-6">
-          {(isGridLoading && !isInitialState) ? (
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-64 bg-gray-100 animate-pulse rounded-xl" />
-                ))}
+          {isGridLoading && !isInitialState ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-64 bg-gray-100 animate-pulse rounded-xl"
+                />
+              ))}
             </div>
           ) : displayArticles.length === 0 ? (
             <EmptyState
@@ -273,11 +345,14 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
         </TabsContent>
 
         <TabsContent value="timeline">
-          {(isTimelineLoading && timelineArticles.length === 0) ? (
+          {isTimelineLoading && timelineArticles.length === 0 ? (
             <div className="space-y-6">
-                {[...Array(3)].map((_, i) => (
-                    <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-xl" />
-                ))}
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-40 bg-gray-100 animate-pulse rounded-xl"
+                />
+              ))}
             </div>
           ) : displayArticles.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
@@ -288,25 +363,18 @@ export default function ArticlesClient({ initialArticles, initialTotal }: Articl
             <div className="pb-12">
               <ArticleTimeline articles={displayArticles} />
 
-              {/* Load More Button */}
+              {/* Infinite Scroll Trigger */}
               {hasNextPage && (
-                <div className="flex justify-center mt-10">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="min-w-[200px]"
-                  >
-                    {isFetchingNextPage ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
-                        Loading...
-                      </>
-                    ) : (
-                      "Load More History"
-                    )}
-                  </Button>
+                <div
+                  ref={observerTarget}
+                  className="flex justify-center mt-10 py-5"
+                >
+                  {isFetchingNextPage && (
+                    <div className="flex items-center text-gray-500 font-medium">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin text-blue-500" />
+                      Loading deeper history...
+                    </div>
+                  )}
                 </div>
               )}
             </div>

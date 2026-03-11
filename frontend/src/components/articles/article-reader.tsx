@@ -17,10 +17,17 @@ interface ArticleReaderProps {
 export default function ArticleReader({ article }: ArticleReaderProps) {
   // Source breakdown counts
   const sourceChunksArr = article.source_chunks || [];
-  const totalSources = sourceChunksArr.length || article.source_chunk_count || 0;
-  const staticSources = sourceChunksArr.filter((s) => s.chunk?.source_type === "static").length || article.static_chunk_count || 0;
-  const caSources = sourceChunksArr.filter((s) => s.chunk?.source_type === "dynamic").length || 
-                  article.ca_chunk_count || article.generation_metadata?.ca_chunks_used || 0;
+  const totalSources =
+    sourceChunksArr.length || article.source_chunk_count || 0;
+  const staticSources =
+    sourceChunksArr.filter((s) => s.chunk?.source_type === "static").length ||
+    article.static_chunk_count ||
+    0;
+  const caSources =
+    sourceChunksArr.filter((s) => s.chunk?.source_type === "dynamic").length ||
+    article.ca_chunk_count ||
+    article.generation_metadata?.ca_chunks_used ||
+    0;
 
   return (
     <div className="min-h-screen bg-white">
@@ -38,9 +45,12 @@ export default function ArticleReader({ article }: ArticleReaderProps) {
         <footer className="mt-12 pt-8 border-t">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-600">
             <div>
-              <p className="font-medium">Knowledge Orchestration by TheKnowledgeOrbits</p>
+              <p className="font-medium">
+                Knowledge Orchestration by TheKnowledgeOrbits
+              </p>
               <p className="flex items-center gap-2 mt-1">
-                Refined from {totalSources} foundational source{totalSources !== 1 ? "s" : ""}
+                Refined from {totalSources} foundational source
+                {totalSources !== 1 ? "s" : ""}
                 {staticSources > 0 && caSources > 0 && (
                   <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">
                     {staticSources} TEXTBOOKS + {caSources} CURRENT AFFAIRS
@@ -48,7 +58,8 @@ export default function ArticleReader({ article }: ArticleReaderProps) {
                 )}
               </p>
               <p className="text-xs mt-2 text-gray-400">
-                Published on {new Date(article.created_at).toLocaleDateString("en-US", {
+                Published on{" "}
+                {new Date(article.created_at).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
@@ -57,7 +68,10 @@ export default function ArticleReader({ article }: ArticleReaderProps) {
             </div>
 
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="px-3 py-1 bg-gray-50 border-gray-200 text-gray-700">
+              <Badge
+                variant="outline"
+                className="px-3 py-1 bg-gray-50 border-gray-200 text-gray-700"
+              >
                 {article.generation_type.replace("_", " ")}
               </Badge>
 

@@ -19,6 +19,7 @@ class StandardPageNumberPagination(PageNumberPagination):
         """
         try:
             from engines.shared.services.cache_service import get_cache_service
+
             cache_service = get_cache_service()
 
             custom_key = getattr(queryset, "_custom_count_cache_key", None)
@@ -54,6 +55,7 @@ class StandardLimitOffsetPagination(LimitOffsetPagination):
         """
         try:
             from engines.shared.services.cache_service import get_cache_service
+
             cache_service = get_cache_service()
 
             custom_key = getattr(queryset, "_custom_count_cache_key", None)

@@ -19,7 +19,10 @@ import {
 } from "../types";
 
 // List articles
-export function useArticles(params?: ArticleFilterParams, options?: { enabled?: boolean }) {
+export function useArticles(
+  params?: ArticleFilterParams,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["articles", params],
     queryFn: () => articlesAPI.list(params),
@@ -30,7 +33,10 @@ export function useArticles(params?: ArticleFilterParams, options?: { enabled?: 
 }
 
 // Infinite List articles (for Timeline Load More)
-export function useInfiniteArticles(params?: ArticleFilterParams, options?: { enabled?: boolean }) {
+export function useInfiniteArticles(
+  params?: ArticleFilterParams,
+  options?: { enabled?: boolean },
+) {
   return useInfiniteQuery({
     queryKey: ["articles-infinite", params],
     queryFn: ({ pageParam = 0 }) =>
