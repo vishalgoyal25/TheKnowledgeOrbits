@@ -9,7 +9,10 @@ import { topicsAPI } from "../api/topics";
 import { PaginationParams } from "../types";
 
 // List all topics
-export function useTopics(params?: PaginationParams, options?: { enabled?: boolean }) {
+export function useTopics(
+  params?: PaginationParams,
+  options?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["topics", params],
     queryFn: () => topicsAPI.list(params),

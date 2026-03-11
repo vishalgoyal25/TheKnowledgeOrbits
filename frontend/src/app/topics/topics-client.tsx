@@ -17,19 +17,25 @@ interface TopicsClientProps {
   initialSubjects: Subject[];
 }
 
-export default function TopicsClient({ initialTopics, initialSubjects }: TopicsClientProps) {
+export default function TopicsClient({
+  initialTopics,
+  initialSubjects,
+}: TopicsClientProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
   // Determine if we should use server-side initial data
-  const isInitialState = searchTerm === "" && initialTopics.length > 0 && initialSubjects.length > 0;
+  const isInitialState =
+    searchTerm === "" && initialTopics.length > 0 && initialSubjects.length > 0;
 
   // Client-side query fallback (only enabled if we've deviated from initial server state or server failed)
-  const { data: topicsData, isLoading: isTopicsLoading } = useTopics({ page_size: 200 });
+  const { data: topicsData, isLoading: isTopicsLoading } = useTopics({
+    page_size: 200,
+  });
   const { data: subjectsData, isLoading: isSubjectsLoading } = useSubjects();
 
   // Extract arrays, falling back to initial data if available and in initial state
-  const topics = isInitialState ? initialTopics : (topicsData || []);
-  const activeSubjects = isInitialState ? initialSubjects : (subjectsData || []);
+  const topics = isInitialState ? initialTopics : topicsData || [];
+  const activeSubjects = isInitialState ? initialSubjects : subjectsData || [];
 
   const isLoading = (isTopicsLoading || isSubjectsLoading) && !isInitialState;
 

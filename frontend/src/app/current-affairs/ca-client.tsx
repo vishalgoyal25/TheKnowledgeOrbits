@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import CAArticleCard from "@/components/current-affairs/ca-article-card";
 import CAFilterBar from "@/components/current-affairs/ca-filter-bar";
 import CATimeline from "@/components/current-affairs/ca-timeline";
@@ -26,7 +26,11 @@ interface Props {
   sources: CASource[];
 }
 
-export default function CurrentAffairsClient({ initialArticles, initialTotal, sources }: Props) {
+export default function CurrentAffairsClient({
+  initialArticles,
+  initialTotal,
+  sources,
+}: Props) {
   const [filters, setFilters] = useState({});
   const [gridPage, setGridPage] = useState(1);
   const [activeTab, setActiveTab] = useState("grid");
@@ -34,17 +38,23 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
 
   // Grid Query (Numbered Pagination)
   // We use the initialArticles only on page 1 with no filters AND if we actually have initial data
-  const isInitialState = gridPage === 1 && Object.keys(filters).length === 0 && initialArticles.length > 0;
+  const isInitialState =
+    gridPage === 1 &&
+    Object.keys(filters).length === 0 &&
+    initialArticles.length > 0;
 
-  const { data: gridData, isLoading: isGridLoading } = useCAArticles({
-    ...filters,
-    ordering: "-published_at",
-    limit: PAGE_SIZE,
-    offset: (gridPage - 1) * PAGE_SIZE,
-  }, {
-    // Skip fetching if we are on the first page with no filters
-    enabled: !isInitialState || activeTab !== "grid"
-  });
+  const { data: gridData, isLoading: isGridLoading } = useCAArticles(
+    {
+      ...filters,
+      ordering: "-published_at",
+      limit: PAGE_SIZE,
+      offset: (gridPage - 1) * PAGE_SIZE,
+    },
+    {
+      // Skip fetching if we are on the first page with no filters
+      enabled: !isInitialState || activeTab !== "grid",
+    },
+  );
 
   // Timeline Query (Infinite Scroll / Load More)
   const {
@@ -53,23 +63,51 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useInfiniteCAArticles({
-    ...filters,
-    ordering: "-published_at",
-  }, {
-    // Only enable when user switches to timeline tab or applies filters
-    enabled: activeTab === "timeline" || Object.keys(filters).length > 0
-  });
+  } = useInfiniteCAArticles(
+    {
+      ...filters,
+      ordering: "-published_at",
+    },
+    {
+      // Only enable when user switches to timeline tab or applies filters
+      enabled: activeTab === "timeline" || Object.keys(filters).length > 0,
+    },
+  );
+
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Extract arrays, retaining initial data during first-load to prevent "disappearing" content
-  const gridArticles = gridData?.results?.length ? gridData.results : (isInitialState || isGridLoading ? initialArticles : []);
-  const gridTotal = gridData?.count ?? (isInitialState || isGridLoading ? initialTotal : 0);
+  const gridArticles = gridData?.results?.length
+    ? gridData.results
+    : isInitialState || isGridLoading
+      ? initialArticles
+      : [];
+  const gridTotal =
+    gridData?.count ?? (isInitialState || isGridLoading ? initialTotal : 0);
 
   const timelineArticles =
     timelineData?.pages.flatMap(
       (page: CAArticleListResponse) => page.results,
     ) || (isTimelineLoading ? initialArticles : []);
-  const timelineTotal = timelineData?.pages[0]?.count ?? (isTimelineLoading ? initialTotal : 0);
+  const timelineTotal =
+    timelineData?.pages[0]?.count ?? (isTimelineLoading ? initialTotal : 0);
 
   const totalArticles = activeTab === "grid" ? gridTotal : timelineTotal;
   const displayArticles =
@@ -87,9 +125,25 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
       if (gridPage <= 4) {
         pages.push(1, 2, 3, 4, 5, "...", totalPages);
       } else if (gridPage > totalPages - 4) {
-        pages.push(1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+        pages.push(
+          1,
+          "...",
+          totalPages - 4,
+          totalPages - 3,
+          totalPages - 2,
+          totalPages - 1,
+          totalPages,
+        );
       } else {
-        pages.push(1, "...", gridPage - 1, gridPage, gridPage + 1, "...", totalPages);
+        pages.push(
+          1,
+          "...",
+          gridPage - 1,
+          gridPage,
+          gridPage + 1,
+          "...",
+          totalPages,
+        );
       }
     }
     return pages;
@@ -104,7 +158,9 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
           <div className="text-3xl font-bold text-blue-600">
             {totalArticles === 0 && (isGridLoading || isTimelineLoading) ? (
               <Loader2 className="h-8 w-8 animate-spin inline-block" />
-            ) : totalArticles}
+            ) : (
+              totalArticles
+            )}
           </div>
         </div>
 
@@ -118,9 +174,12 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
         <div className="bg-purple-50 rounded-lg p-4">
           <div className="text-sm text-gray-600">Showing</div>
           <div className="text-3xl font-bold text-purple-600">
-            {displayArticles.length === 0 && (isGridLoading || isTimelineLoading) ? (
+            {displayArticles.length === 0 &&
+            (isGridLoading || isTimelineLoading) ? (
               <Loader2 className="h-8 w-8 animate-spin inline-block" />
-            ) : displayArticles.length}
+            ) : (
+              displayArticles.length
+            )}
           </div>
         </div>
       </div>
@@ -196,7 +255,10 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
 
                     {getPageNumbers().map((pageNum, idx) =>
                       pageNum === "..." ? (
-                        <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-2 text-gray-500"
+                        >
                           ...
                         </span>
                       ) : (
@@ -205,7 +267,9 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
                           variant={gridPage === pageNum ? "default" : "outline"}
                           size="icon"
                           onClick={() => setGridPage(pageNum as number)}
-                          className={gridPage === pageNum ? "bg-blue-600 text-white" : ""}
+                          className={
+                            gridPage === pageNum ? "bg-blue-600 text-white" : ""
+                          }
                         >
                           {pageNum}
                         </Button>
@@ -238,25 +302,18 @@ export default function CurrentAffairsClient({ initialArticles, initialTotal, so
             <div className="pb-12">
               <CATimeline articles={timelineArticles} />
 
-              {/* Load More Button */}
+              {/* Infinite Scroll Trigger */}
               {hasNextPage && (
-                <div className="flex justify-center mt-10">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="min-w-[200px]"
-                  >
-                    {isFetchingNextPage ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
-                        Loading...
-                      </>
-                    ) : (
-                      "Load More History"
-                    )}
-                  </Button>
+                <div
+                  ref={observerTarget}
+                  className="flex justify-center mt-10 py-5"
+                >
+                  {isFetchingNextPage && (
+                    <div className="flex items-center text-gray-500 font-medium">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin text-blue-500" />
+                      Loading deeper history...
+                    </div>
+                  )}
                 </div>
               )}
             </div>

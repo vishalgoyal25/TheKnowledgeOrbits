@@ -71,7 +71,8 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = typeof window !== "undefined" ? tokenManager.getRefreshToken() : null;
+        const refreshToken =
+          typeof window !== "undefined" ? tokenManager.getRefreshToken() : null;
 
         if (!refreshToken) {
           throw new Error("No refresh token");
@@ -101,7 +102,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed - logout user
         logger.warn("Token refresh failed, logging out user...", refreshError);
-        
+
         if (typeof window !== "undefined") {
           tokenManager.clearTokens();
           window.location.href = "/auth/login";
@@ -110,10 +111,15 @@ apiClient.interceptors.response.use(
       }
     }
 
-    logger.error(
-      `Response error [${error.response?.status}]:`,
-      error.response?.data || error.message,
-    );
+    if (error.response?.status === 404) {
+      logger.warn(`Resource not found [404] for URL: ${error.config?.url}`);
+    } else {
+      logger.error(
+        `Response error [${error.response?.status}]:`,
+        error.response?.data || error.message,
+      );
+    }
+
     return Promise.reject(error);
   },
 );

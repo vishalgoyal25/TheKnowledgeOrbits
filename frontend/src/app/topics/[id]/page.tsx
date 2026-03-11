@@ -21,7 +21,10 @@ export async function generateStaticParams() {
     const topics = await topicsAPI.list({ page_size: 200 });
     return (topics || []).map((topic) => ({ id: topic.id }));
   } catch (error) {
-    console.error("BUILD WARNING: generateStaticParams for Topics failed (likely Render timeout). Skipping pre-build.", error);
+    console.error(
+      "BUILD WARNING: generateStaticParams for Topics failed (likely Render timeout). Skipping pre-build.",
+      error,
+    );
     return [];
   }
 }
@@ -78,7 +81,9 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
               </h1>
             </div>
             <Badge
-              variant={topic.topic_type === "syllabus" ? "default" : "secondary"}
+              variant={
+                topic.topic_type === "syllabus" ? "default" : "secondary"
+              }
               className="text-xs px-3 py-1 uppercase font-bold"
             >
               {topic.topic_type}
@@ -96,7 +101,11 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
               <Hash className="h-5 w-5 mt-0.5 text-gray-400" />
               <div className="flex flex-wrap gap-2.5">
                 {topic.keywords.map((kw, i) => (
-                  <Badge key={i} variant="outline" className="bg-white px-3 py-1 font-medium transition-colors hover:border-blue-300">
+                  <Badge
+                    key={i}
+                    variant="outline"
+                    className="bg-white px-3 py-1 font-medium transition-colors hover:border-blue-300"
+                  >
                     {kw}
                   </Badge>
                 ))}
@@ -108,10 +117,13 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
         {/* Articles Section */}
         <div className="space-y-8">
           <div className="flex items-center justify-between border-b pb-4">
-            <h2 className="text-3xl font-black text-gray-800 font-heading">Study Materials</h2>
+            <h2 className="text-3xl font-black text-gray-800 font-heading">
+              Study Materials
+            </h2>
             {articles.length > 0 && (
               <span className="bg-blue-100 text-blue-700 font-bold px-4 py-1.5 rounded-full text-sm">
-                {articles.length} RELEVANT ARTICLE{articles.length !== 1 ? "S" : ""}
+                {articles.length} RELEVANT ARTICLE
+                {articles.length !== 1 ? "S" : ""}
               </span>
             )}
           </div>
@@ -120,10 +132,14 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
             <div className="text-center py-20 bg-gray-50/50 rounded-xl border border-dashed border-gray-300">
               <div className="max-w-md mx-auto">
                 <p className="text-gray-500 text-lg mb-6">
-                  Our AI engines haven't generated specialized study material for this topic yet.
+                  Our AI engines haven't generated specialized study material
+                  for this topic yet.
                 </p>
                 <Link href={`/generate?topic=${topic.id}`}>
-                  <Button size="lg" className="px-8 shadow-lg shadow-blue-500/20 active:scale-95 transition-transform">
+                  <Button
+                    size="lg"
+                    className="px-8 shadow-lg shadow-blue-500/20 active:scale-95 transition-transform"
+                  >
                     ✨ Generate Intelligence
                   </Button>
                 </Link>
@@ -140,11 +156,12 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
       </div>
     );
   } catch (error) {
-    console.error("Error loading topic details in Server Component:", error);
+    console.warn("Error loading topic details in Server Component:", error);
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center py-12 bg-red-50 text-red-600 rounded-lg border border-red-200">
-          Error retrieving topic. It might not exist or the data service is down.
+          Error retrieving topic. It might not exist or the data service is
+          down.
         </div>
       </div>
     );

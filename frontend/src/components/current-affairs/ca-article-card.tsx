@@ -16,8 +16,9 @@ import { currentAffairsAPI } from "@/lib/api/current-affairs";
 import { CAArticle } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { Calendar, ExternalLink, FileText, Sparkles } from "lucide-react";
+import { Calendar, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useRef } from "react";
 
 interface CAArticleCardProps {
   article: CAArticle;
@@ -41,21 +42,30 @@ export default function CAArticleCard({ article }: CAArticleCardProps) {
 
   const router = useRouter();
   const queryClient = useQueryClient();
+  const hoverTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const handlePrefetch = () => {
-    // Prefetch CA article detail on hover so click feels instant
-    queryClient.prefetchQuery({
-      queryKey: ["ca-article", article.id],
-      queryFn: () => currentAffairsAPI.getArticle(article.id),
-      staleTime: 10 * 60 * 1000,
-    });
+  const handleMouseEnter = () => {
+    // Wait 150ms before deciding the user actually wants to click this
+    hoverTimer.current = setTimeout(() => {
+      queryClient.prefetchQuery({
+        queryKey: ["ca-article", article.id],
+        queryFn: () => currentAffairsAPI.getArticle(article.id),
+        staleTime: 10 * 60 * 1000,
+      });
+    }, 150);
+  };
+
+  const handleMouseLeave = () => {
+    // If they move the mouse away before 150ms, cancel the API call!
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
   };
 
   return (
     <Card
       className="h-full transition-all hover:shadow-lg cursor-pointer"
       onClick={() => router.push(`/current-affairs/${article.id}`)}
-      onMouseEnter={handlePrefetch}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
@@ -101,29 +111,6 @@ export default function CAArticleCard({ article }: CAArticleCardProps) {
             <Calendar className="h-4 w-4" />
             <span>{formatRelativeTime(article.published_at)}</span>
           </div>
-
-          {article.processing_status === "completed" && (
-            <div className="flex items-center gap-1">
-              <FileText className="h-4 w-4" />
-              <span>{article.chunk_count} chunks</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <a
-            href={article.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Badge
-              variant="outline"
-              className="cursor-pointer hover:bg-gray-100 gap-1"
-            >
-              Source <ExternalLink className="h-3 w-3" />
-            </Badge>
-          </a>
         </div>
       </CardFooter>
     </Card>

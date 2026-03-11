@@ -32,20 +32,19 @@ export function useDocumentAsArticle(
   return useQuery({
     queryKey: ["document", documentId, chunkIndex],
     queryFn: async (): Promise<Article> => {
-      // 1. Fetch Document Metadata
-      const docRes = await apiClient.get<DocumentResponse>(
-        `/content/documents/${documentId}/`,
-      );
+      // Fetch Document Metadata and Chunks in parallel to remove network waterfall
+      const [docRes, chunksRes] = await Promise.all([
+        apiClient.get<DocumentResponse>(`/content/documents/${documentId}/`),
+        apiClient.get<ChunkResponse>(`/content/chunks/`, {
+          params: {
+            document: documentId,
+            limit: 20,
+            start_index: Math.max(0, chunkIndex - 1),
+            include_content: "true",
+          },
+        }),
+      ]);
       const doc = docRes.data;
-
-      const chunksRes = await apiClient.get<ChunkResponse>(`/content/chunks/`, {
-        params: {
-          document: documentId,
-          limit: 20,
-          start_index: Math.max(0, chunkIndex - 1),
-          include_content: "true",
-        },
-      });
 
       // Construct content from chunks - Format as continuous text
       const chunks = chunksRes.data.results || [];

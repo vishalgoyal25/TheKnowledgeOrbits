@@ -21,6 +21,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Clock, FileText, Folder, Star } from "lucide-react";
 import Link from "next/link";
+import { useRef } from "react";
 
 interface ArticleCardProps {
   article: Article;
@@ -28,26 +29,35 @@ interface ArticleCardProps {
 
 export default function ArticleCard({ article }: ArticleCardProps) {
   const queryClient = useQueryClient();
+  const hoverTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const handlePrefetch = () => {
-    // Prefetch article detail on hover so click feels instant
-    queryClient.prefetchQuery({
-      queryKey: ["article", article.id],
-      queryFn: async () => {
-        const response = await apiClient.get<Article>(
-          `/articles/${article.id}/`,
-        );
-        return response.data;
-      },
-      staleTime: 5 * 60 * 1000,
-    });
+  const handleMouseEnter = () => {
+    // Wait 150ms before deciding the user actually wants to click this
+    hoverTimer.current = setTimeout(() => {
+      queryClient.prefetchQuery({
+        queryKey: ["article", article.id],
+        queryFn: async () => {
+          const response = await apiClient.get<Article>(
+            `/articles/${article.id}/`,
+          );
+          return response.data;
+        },
+        staleTime: 5 * 60 * 1000,
+      });
+    }, 150);
+  };
+
+  const handleMouseLeave = () => {
+    // If they move the mouse away before 150ms, cancel the API call!
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
   };
 
   return (
     <Link href={`/articles/${article.id}`}>
       <Card
         className="h-full transition-all hover:shadow-lg hover:scale-[1.02]"
-        onMouseEnter={handlePrefetch}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <CardHeader>
           <div className="flex items-start justify-between gap-2">

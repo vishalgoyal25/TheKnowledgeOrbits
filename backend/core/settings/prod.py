@@ -76,6 +76,7 @@ MIDDLEWARE = [  # noqa: F811
     "django.contrib.sessions.middleware.SessionMiddleware",  # Required by Auth (cache-backed)
     "django.middleware.common.CommonMiddleware",
     "django.middleware.http.ConditionalGetMiddleware",  # [NEW] Enables ETags for Phase 7 FE caching
+    "core.middleware.CacheControlMiddleware",  # [NEW] Cache-Control for Vercel/CDN
     "django.middleware.csrf.CsrfViewMiddleware",  # Critical security
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "engines.authorization.middleware.RBACMiddleware",  # After Auth/Identity is established
