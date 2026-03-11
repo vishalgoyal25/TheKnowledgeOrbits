@@ -34,7 +34,7 @@ https
   })
   .on("error", () => {});
 
-const MAX_RETRIES = 60; // 5 minutes total (60 * 5s)
+const MAX_RETRIES = 120; // 10 minutes total (120 * 5s)
 const RETRY_INTERVAL = 5000; // 5 seconds
 
 // CI Bypass: Skip waiting if we are just checking build integrity in GitHub Actions
@@ -62,6 +62,17 @@ function checkHealth(attempt = 1) {
         if (res.statusCode === 200) {
           console.log("✅ [Success] Backend is Hot and Database is Connected!");
           resolve(true);
+        } else if (res.statusCode === 404 && attempt < 30) {
+          // Render Load Balancer often returns 404 while the dynamic routing table is updating
+          console.log(
+            "⏳ [Waking Up] Render Routing Table update... (Status 404)",
+          );
+          resolve(false);
+        } else if (res.statusCode === 503) {
+          console.warn(
+            "🗄️ [DB Wakeup] Backend is up, but Database is still resuming... (Status 503)",
+          );
+          resolve(false);
         } else {
           console.warn(
             `⚠️ [Warning] Backend returned status ${res.statusCode}.`,
@@ -102,7 +113,10 @@ async function start() {
   }
 
   console.error(
-    "🛑 [FATAL] Backend failed to wake up after 5 minutes. Aborting build to prevent scorched cache.",
+    "🛑 [FATAL] Backend failed to wake up after 10 minutes. Aborting build to prevent scorched cache.",
+  );
+  console.error(
+    "💡 TIP: If this persists, manually visit the backend URL or check Supabase project status.",
   );
   process.exit(1); // Fail the build
 }
