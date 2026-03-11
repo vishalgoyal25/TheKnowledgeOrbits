@@ -7,25 +7,38 @@ import { Newspaper, LayoutGrid, Settings } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import CurrentAffairsClient from "./ca-client";
+import { CAArticle, CASource } from "@/lib/types";
 
 // Revalidate every 10 minutes to catch new Ghost worker updates
 export const revalidate = 600;
 
 export default async function CurrentAffairsPage() {
-  // Fetch initial data on the server
-  const [articlesData, sourcesData] = await Promise.all([
-    currentAffairsAPI.listArticles({ limit: 20, ordering: "-published_at" }),
-    currentAffairsAPI.listSources(),
-  ]);
+  let initialArticles: CAArticle[] = [];
+  let initialTotal = 0;
+  let sources: CASource[] = [];
 
-  const initialArticles = articlesData?.results || [];
-  const initialTotal = articlesData?.count || 0;
-  const sources = sourcesData?.results || [];
+  try {
+    // Fetch initial data on the server
+    const [articlesData, sourcesData] = await Promise.all([
+      currentAffairsAPI.listArticles({ limit: 20, ordering: "-published_at" }),
+      currentAffairsAPI.listSources(),
+    ]);
+
+    initialArticles = (articlesData?.results || []) as CAArticle[];
+    initialTotal = articlesData?.count || 0;
+    sources = (sourcesData?.results || []) as CASource[];
+  } catch (error) {
+    console.warn("Build-time fetch failed for Current Affairs:", error);
+  }
 
   // CRITICAL: Total Content Guard (Anti-Poison Logic)
   // If we have no articles during an ISR build/revalidation, we MUST throw.
   // This tells Next.js NOT to cache this empty state, preserving the last good version.
-  if (initialArticles.length === 0) {
+  // We bypass this ONLY during CI (SKIP_BACKEND_WAIT=true) to allow build integrity checks.
+  if (
+    initialArticles.length === 0 &&
+    process.env.SKIP_BACKEND_WAIT !== "true"
+  ) {
     throw new Error(
       "CA data missing during ISR build - Aborting to protect cache",
     );

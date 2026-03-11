@@ -9,19 +9,32 @@ import ArticlesClient from "./articles-client";
 // Revalidate every hour
 export const revalidate = 3600;
 
-export default async function ArticlesPage() {
-  const response = await articlesAPI.list({
-    limit: 20,
-    ordering: "-created_at",
-  });
+import { Article } from "@/lib/types";
 
-  const initialArticles = response?.results || [];
-  const initialTotal = response?.count || 0;
+export default async function ArticlesPage() {
+  let initialArticles: Article[] = [];
+  let initialTotal = 0;
+
+  try {
+    const response = await articlesAPI.list({
+      limit: 20,
+      ordering: "-created_at",
+    });
+
+    initialArticles = response?.results || [];
+    initialTotal = response?.count || 0;
+  } catch (error) {
+    console.warn("Build-time fetch failed for Articles:", error);
+  }
 
   // CRITICAL: Total Content Guard (Anti-Poison Logic)
   // If we have no articles during an ISR build/revalidation, we MUST throw.
   // This tells Next.js NOT to cache this empty state, preserving the last good version.
-  if (initialArticles.length === 0) {
+  // We bypass this ONLY during CI (SKIP_BACKEND_WAIT=true) to allow build integrity checks.
+  if (
+    initialArticles.length === 0 &&
+    process.env.SKIP_BACKEND_WAIT !== "true"
+  ) {
     throw new Error(
       "Articles data missing during ISR build - Aborting to protect cache",
     );

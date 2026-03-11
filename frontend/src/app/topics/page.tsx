@@ -6,21 +6,32 @@ import { subjectsAPI } from "@/lib/api/subjects";
 import { topicsAPI } from "@/lib/api/topics";
 import { BookOpen } from "lucide-react";
 import TopicsClient from "./topics-client";
+import { Topic, Subject } from "@/lib/types";
 
 // Revalidate every hour
 export const revalidate = 3600;
 
 export default async function TopicsPage() {
-  // Fetch data directly from API (Server Side)
-  const [topics, subjects] = await Promise.all([
-    topicsAPI.list({ page_size: 200 }),
-    subjectsAPI.list(),
-  ]);
+  let topics: Topic[] = [];
+  let subjects: Subject[] = [];
+
+  try {
+    // Fetch data directly from API (Server Side)
+    const [topicsRes, subjectsRes] = await Promise.all([
+      topicsAPI.list({ page_size: 200 }),
+      subjectsAPI.list(),
+    ]);
+    topics = (topicsRes || []) as Topic[];
+    subjects = (subjectsRes || []) as Subject[];
+  } catch (error) {
+    console.warn("Build-time fetch failed for Topics:", error);
+  }
 
   // CRITICAL: Total Content Guard (Anti-Poison Logic)
   // If we have no topics during an ISR build/revalidation, we MUST throw.
   // This tells Next.js NOT to cache this empty state, preserving the last good version.
-  if (topics.length === 0) {
+  // We bypass this ONLY during CI (SKIP_BACKEND_WAIT=true) to allow build integrity checks.
+  if (topics.length === 0 && process.env.SKIP_BACKEND_WAIT !== "true") {
     throw new Error(
       "Topics data missing during ISR build - Aborting to protect cache",
     );
