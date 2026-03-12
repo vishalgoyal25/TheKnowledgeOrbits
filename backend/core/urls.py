@@ -20,15 +20,25 @@ def deep_health_check(request: Any) -> JsonResponse:
     Used by Vercel pre-build to ensure Render is 100% "Hot".
     """
     try:
+        from engines.article_generation.models import Article
+        from engines.current_affairs.models import CAArticle
         from engines.knowledge.models import Program
 
-        # Simple query to verify DB connection
-        count = Program.objects.count()
+        # Verify DB connection with multiple critical tables
+        # This provides a much stronger signal for the Vercel pre-build
+        program_count = Program.objects.count()
+        article_count = Article.objects.count()
+        ca_article_count = CAArticle.objects.count()
+
         return JsonResponse(
             {
                 "status": "fully_online",
                 "database": "connected",
-                "payload_check": count >= 0,
+                "checks": {
+                    "programs": program_count >= 0,
+                    "articles": article_count >= 0,
+                    "ca_articles": ca_article_count >= 0,
+                },
             },
             status=200,
         )
