@@ -34,7 +34,8 @@ class StandardPageNumberPagination(PageNumberPagination):
             cache_key = f"q_count_{model_name}_{query_hash}"
 
             return cache_service.get_count(cache_key, queryset)
-        except (AttributeError, TypeError, ValueError):
+        except Exception:
+            # Fallback to standard count if cache/redis is unavailable
             return super().get_count(queryset)
 
 
@@ -70,5 +71,6 @@ class StandardLimitOffsetPagination(LimitOffsetPagination):
             cache_key = f"q_count_{model_name}_{query_hash}"
 
             return cache_service.get_count(cache_key, queryset)
-        except (AttributeError, TypeError, ValueError):
+        except Exception:
+            # Fallback to standard count if cache/redis is unavailable
             return super().get_count(queryset)
