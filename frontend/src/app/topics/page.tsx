@@ -25,16 +25,10 @@ export default async function TopicsPage() {
     subjects = (subjectsRes || []) as Subject[];
   } catch (error) {
     console.warn("Build-time fetch failed for Topics:", error);
-  }
-
-  // CRITICAL: Total Content Guard (Anti-Poison Logic)
-  // If we have no topics during an ISR build/revalidation, we MUST throw.
-  // This tells Next.js NOT to cache this empty state, preserving the last good version.
-  // We bypass this ONLY during CI (SKIP_BACKEND_WAIT=true) to allow build integrity checks.
-  if (topics.length === 0 && process.env.SKIP_BACKEND_WAIT !== "true") {
-    throw new Error(
-      "Topics data missing during ISR build - Aborting to protect cache",
-    );
+    // CRITICAL: ONLY throw if the actual fetch failed during build/revalidation.
+    if (process.env.SKIP_BACKEND_WAIT !== "true") {
+      throw new Error("Topics API unreachable during ISR build - Aborting to protect cache");
+    }
   }
 
   return (
