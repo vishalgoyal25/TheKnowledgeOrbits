@@ -35,8 +35,10 @@ class Document(models.Model):
     source_type = models.CharField(
         max_length=50,
         choices=[
-            ("static", "Static Content (NCERT, Books)"),
-            ("dynamic", "Dynamic Content (Web, News)"),
+            ("ncert", "NCERT"),
+            ("standard_book", "Standard Book"),
+            ("static", "Static Notes"),
+            ("dynamic", "Current Affairs/Dynamic"),
         ],
         help_text="Content category for retrieval strategy",
     )
@@ -126,8 +128,10 @@ class Chunk(models.Model):
     source_type = models.CharField(
         max_length=50,
         choices=[
-            ("static", "Static Content"),
-            ("dynamic", "Dynamic Content (Current Affairs)"),
+            ("ncert", "NCERT"),
+            ("standard_book", "Standard Book"),
+            ("static", "Static Notes"),
+            ("dynamic", "Current Affairs/Dynamic"),
         ],
         help_text="Matches parent document's source_type for efficient filtering",
     )

@@ -143,3 +143,31 @@ class IngestionJobSerializer(serializers.ModelSerializer):  # type: ignore
             "progress_percentage",
             "created_at",
         ]
+
+
+class AdminIngestionSerializer(serializers.Serializer):  # type: ignore
+    """Deeply strict serializer for admin-only secure ingestion."""
+
+    file = serializers.FileField(required=True)
+    title = serializers.CharField(max_length=500, required=True)
+    source_type = serializers.ChoiceField(
+        choices=["static", "ncert", "standard_book", "dynamic"], required=True
+    )
+    source_edition = serializers.CharField(
+        max_length=50, required=False, allow_blank=True
+    )
+    source_version = serializers.CharField(
+        max_length=20, required=False, allow_blank=True
+    )
+    isbn = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    publication_year = serializers.IntegerField(required=False, allow_null=True)
+
+    # Strictly bind to Knowledge Engine
+    program_id = serializers.UUIDField(required=True)
+    subject_id = serializers.UUIDField(required=True)
+
+    # 100% Accuracy Overrides
+    chapter_name = serializers.CharField(
+        max_length=200, required=False, allow_blank=True
+    )
+    starting_page_offset = serializers.IntegerField(required=False, default=1)

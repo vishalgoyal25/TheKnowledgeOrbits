@@ -1,35 +1,35 @@
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: TheKnowledgeOrbits_postgres
-    env_file:
-      - backend/.env
-    # Note: postgres image looks for POSTGRES_DB/USER/PASSWORD in env_file automatically
-    ports:
-      - "5435:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app_network
+  # postgres:
+  #   image: pgvector/pgvector:pg16
+  #   container_name: TheKnowledgeOrbits_postgres
+  #   env_file:
+  #     - backend/.env
+  #   # Note: postgres image looks for POSTGRES_DB/USER/PASSWORD in env_file automatically
+  #   ports:
+  #     - "5435:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - app_network
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: TheKnowledgeOrbits_pgadmin
-    env_file:
-      - backend/.env
-    # Note: pgadmin looks for PGADMIN_DEFAULT_EMAIL/PASSWORD in env_file automatically
-    ports:
-      - "1993:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - app_network
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   container_name: TheKnowledgeOrbits_pgadmin
+  #   env_file:
+  #     - backend/.env
+  #   # Note: pgadmin looks for PGADMIN_DEFAULT_EMAIL/PASSWORD in env_file automatically
+  #   ports:
+  #     - "1993:80"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - app_network
 
   backend:
     build:
@@ -45,14 +45,14 @@ services:
       - ./backend:/app
     ports:
       - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
     env_file:
       - backend/.env
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+    # environment:
+    #   - DB_HOST=postgres
+    #   - DB_PORT=5432
     networks:
       - app_network
 
@@ -64,12 +64,12 @@ services:
       - ./backend:/app
     depends_on:
       - backend
-      - postgres
+      # - postgres
     env_file:
       - backend/.env
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
+    # environment:
+    #   - DB_HOST=postgres
+    #   - DB_PORT=5432
     networks:
       - app_network
 
@@ -89,6 +89,7 @@ services:
 
 volumes:
   postgres_data:
+  # Kept root key to avoid parser errors but commented out the actual volume mapping inside services
 
 networks:
   app_network:

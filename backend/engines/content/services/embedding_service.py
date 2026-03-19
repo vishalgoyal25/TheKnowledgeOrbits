@@ -104,7 +104,9 @@ class EmbeddingService:
         return cls.generate_embeddings_batch([text])[0]
 
     @classmethod
-    def generate_embeddings_batch(cls, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings_batch(
+        cls, texts: List[str], force_local: bool = False
+    ) -> List[List[float]]:
         """Entry point for batch embedding (Hybrid Logic)."""
         if not texts:
             return []
@@ -128,7 +130,7 @@ class EmbeddingService:
         default_use_api = "True" if (is_render or has_token) else "False"
         use_api = os.getenv("USE_EMBEDDING_API", default_use_api).lower() == "true"
 
-        if use_api and has_token:
+        if use_api and has_token and not force_local:
             logger.debug("generating_embeddings_via_api", count=len(valid_indices))
             try:
                 valid_embeddings = cls._generate_api_embedding(valid_texts)
@@ -140,7 +142,7 @@ class EmbeddingService:
                     logger.error("hf_api_failed_on_render_critical", error=str(e))
                     raise e
         else:
-            if is_render:
+            if is_render and not force_local:
                 logger.warning(
                     "local_embedding_on_render_dangerous",
                     msg="Memory limit 512MB likely to be exceeded",

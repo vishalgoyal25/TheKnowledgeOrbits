@@ -8,12 +8,13 @@ from typing import Any, Optional, cast
 
 from django.db.models import QuerySet
 
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, views
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
+from django.conf import settings
 
 import structlog
 
@@ -29,6 +30,7 @@ from engines.content.serializers import (
     DocumentUploadSerializer,
     EmbeddingSerializer,
     IngestionJobSerializer,
+    AdminIngestionSerializer,
 )
 from engines.content.services.ingestion_service import IngestionService
 
@@ -277,3 +279,72 @@ class IngestionJobViewSet(viewsets.ReadOnlyModelViewSet):  # type: ignore
             queryset = queryset.filter(document_id=document_id)
 
         return queryset.order_by("-created_at")
+
+
+class AdminIngestView(views.APIView):
+    """
+    Highly secure Admin-only view to ingest massive PDFs directly into the content engine,
+    while mapping them safely directly into the Knowledge schema.
+    """
+
+    parser_classes = [MultiPartParser, FormParser]
+    authentication_classes = []  # Bypass Django JWT checking entirely
+    permission_classes = [
+        AllowAny
+    ]  # We use custom X-Admin-Key to bypass JWT for local ingest UI.
+
+    def post(self, request, *args, **kwargs):
+        # Secure Token Check (Custom Header)
+        auth_header = request.headers.get("X-Admin-Key")
+        expected_key = getattr(settings, "INTERNAL_ADMIN_KEY", "")
+
+        if not getattr(settings, "INTERNAL_ADMIN_KEY", None):
+            return Response(
+                {"error": "Admin Key missing from backend config"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if not auth_header or auth_header != expected_key:
+            return Response(
+                {"error": "Unauthorized internal admin access."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        serializer = AdminIngestionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+
+        # Build precise metadata
+        metadata = {
+            "program_id": str(data["program_id"]),
+            "subject_id": str(data["subject_id"]),
+            "ingested_via": "secure_admin_ui",
+        }
+
+        try:
+            result = IngestionService.ingest_document(
+                file=data["file"],
+                title=data["title"],
+                source_type=data["source_type"],
+                source_edition=data.get("source_edition", ""),
+                source_version=data.get("source_version", "EMPTY"),
+                isbn=data.get("isbn", "EMPTY"),
+                publication_year=data.get("publication_year", None),
+                metadata=metadata,
+                chapter_name_override=data.get("chapter_name", ""),
+                starting_page_offset=int(data.get("starting_page_offset", 1)),
+            )
+
+            result["message"] = (
+                "Secure Admin Ingestion successful. PDF processed and ready for Generation."
+            )
+            return Response(result, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            return Response(
+                {"error": "Admin Ingestion failed", "message": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -8,6 +8,7 @@ from rest_framework.routers import DefaultRouter
 
 from engines.knowledge.views import (
     ChunkTopicMapViewSet,
+    HierarchyListView,
     ModuleViewSet,
     ProgramViewSet,
     SearchViewSet,
@@ -26,5 +27,6 @@ router.register(r"themes", ThemeViewSet, basename="theme")
 router.register(r"search", SearchViewSet, basename="search")
 
 urlpatterns = [
+    path("hierarchy/", HierarchyListView.as_view(), name="hierarchy"),
     path("", include(router.urls)),
 ]

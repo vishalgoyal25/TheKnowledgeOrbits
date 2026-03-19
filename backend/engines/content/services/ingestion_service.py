@@ -40,7 +40,12 @@ class IngestionService:
         title: str,
         source_type: str,
         source_edition: Optional[str] = None,
+        source_version: str = "EMPTY",
+        isbn: str = "EMPTY",
+        publication_year: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        chapter_name_override: str = "",
+        starting_page_offset: int = 1,
     ) -> Dict[str, Any]:
         """
         Orchestrates the full ingestion pipeline from file upload to embedding storage.
@@ -86,16 +91,32 @@ class IngestionService:
                 file_path=file_path,
                 source_type=source_type,
                 source_edition=source_edition or "",
-                metadata=metadata or {},
+                source_version=source_version,
+                isbn=isbn,
+                publication_year=publication_year,
+                metadata={
+                    **(metadata or {}),
+                    "original_filename": file.name,
+                    "ingestion_info": {
+                        "chapter_name_override": chapter_name_override,
+                        "starting_page_offset": starting_page_offset,
+                        "processed_at": timezone.now().isoformat(),
+                    },
+                },
             )
 
             # Step 4: Link job to document
             job.document = document
             job.status = "processing"
+            job.started_at = timezone.now()
             job.save()
 
             # Step 5: Extract text BY PAGE
-            pages_data = cls._extract_text_by_pages(file)
+            pages_data = cls._extract_text_by_pages(
+                file=file,
+                starting_page_offset=starting_page_offset,
+                chapter_name_override=chapter_name_override,
+            )
 
             # Update total pages
             job.total_pages = len(pages_data)
@@ -105,6 +126,7 @@ class IngestionService:
             all_chunks = []
             global_chunk_index = 0
 
+            processed_count = 0
             for page_data in pages_data:
                 page_num = page_data["page_number"]
                 page_text = page_data["text"]
@@ -114,9 +136,13 @@ class IngestionService:
                 page_chunks = ChunkingService.chunk_text(
                     text=page_text,
                     document_id=str(document.id),
-                    page_number=page_num,  # PASS PAGE NUMBER
+                    page_number=page_num,  # PASS PAGE LABEL
                     chapter_name=chapter,
                 )
+
+                # Ensure chunk.source_type matches document.source_type
+                for chunk in page_chunks:
+                    chunk["source_type"] = source_type
 
                 # Update chunk index to be globally unique for this document
                 for chunk in page_chunks:
@@ -126,7 +152,8 @@ class IngestionService:
                 all_chunks.extend(page_chunks)
 
                 # Update progress
-                job.processed_pages = page_num
+                processed_count += 1
+                job.processed_pages = processed_count
                 job.save()
 
             # Step 7: Store all chunks in database
@@ -309,7 +336,12 @@ class IngestionService:
             raise ValueError(f"Could not extract text from file: {str(e)}")
 
     @classmethod
-    def _extract_text_by_pages(cls, file: UploadedFile) -> List[Dict[str, Any]]:
+    def _extract_text_by_pages(
+        cls,
+        file: UploadedFile,
+        starting_page_offset: int = 1,
+        chapter_name_override: str = "",
+    ) -> List[Dict[str, Any]]:
         """
         Extract text from a file while maintaining page-level isolation.
 
@@ -339,7 +371,11 @@ class IngestionService:
                     text = str(content)
 
                 pages_data.append(
-                    {"page_number": 1, "text": text, "chapter": "Unknown Chapter"}
+                    {
+                        "page_number": starting_page_offset,
+                        "text": text,
+                        "chapter": chapter_name_override or "Unknown Chapter",
+                    }
                 )
 
             # PDF FILE (multi-page)
@@ -357,19 +393,25 @@ class IngestionService:
                     total_pages = len(pdf.pages)
                     logger.info("pdf_opened", pages=total_pages)
 
-                    for page_num, page in enumerate(pdf.pages, 1):
+                    for offset_idx, page in enumerate(
+                        pdf.pages, start=starting_page_offset
+                    ):
                         try:
                             page_text = page.extract_text()
 
                             if page_text:
-                                # Try to detect new chapter on this page
-                                detected = cls._detect_chapter_from_page(page_text)
-                                if detected != "Unknown Chapter":
-                                    current_chapter = detected
+                                # Prioritize explicit override if provided
+                                if chapter_name_override:
+                                    current_chapter = chapter_name_override
+                                else:
+                                    # Try to detect new chapter on this page
+                                    detected = cls._detect_chapter_from_page(page_text)
+                                    if detected != "Unknown Chapter":
+                                        current_chapter = detected
 
                                 pages_data.append(
                                     {
-                                        "page_number": page_num,
+                                        "page_number": offset_idx,
                                         "text": page_text,
                                         "chapter": current_chapter,
                                     }
@@ -377,18 +419,18 @@ class IngestionService:
 
                                 logger.debug(
                                     "page_extracted",
-                                    page=page_num,
+                                    page=offset_idx,
                                     chapter=current_chapter,
                                     length=len(page_text),
                                 )
                             else:
-                                logger.warning("empty_page", page=page_num)
+                                logger.warning("empty_page", page=offset_idx)
 
                         except Exception as page_error:
                             sentry_sdk.capture_exception(page_error)
                             logger.error(
                                 "page_extraction_failed",
-                                page=page_num,
+                                page=offset_idx,
                                 error=str(page_error),
                             )
                             continue
@@ -428,28 +470,39 @@ class IngestionService:
         """
         from engines.content.models import Embedding
 
-        logger.info("generating_embeddings", chunk_count=len(chunks))
+        if not chunks:
+            return
 
-        for chunk in chunks:
-            try:
-                embedding_data = EmbeddingService.create_embedding_record(
-                    content_type="chunk",
-                    content_id=str(chunk.id),
-                    text=chunk.chunk_text,
+        logger.info("generating_embeddings_bulk", chunk_count=len(chunks))
+
+        # 1. EXTRACT BATCHED TEXTS FOR SIMD/CPU MATRICES (Step 2)
+        texts = [chunk.chunk_text for chunk in chunks]
+
+        try:
+            # 2. INSTRUCT LOCAL CPU TO CALCULATE ALL DIMENSIONS SIMULTANEOUSLY (Bypassing API timeouts for Mass Ingestion)
+            vectors = EmbeddingService.generate_embeddings_batch(
+                texts, force_local=True
+            )
+
+            # 3. PREPARE MASSIVE SQL PAYLOAD
+            embedding_objects = []
+            for chunk, vector in zip(chunks, vectors):
+                embedding_objects.append(
+                    Embedding(
+                        content_type="chunk",
+                        content_id=str(chunk.id),
+                        vector=vector,
+                        model_name=EmbeddingService.MODEL_NAME,
+                    )
                 )
 
-                # CREATE THE RECORD IN DATABASE
-                Embedding.objects.create(
-                    content_type=embedding_data["content_type"],
-                    content_id=embedding_data["content_id"],
-                    vector=embedding_data["vector"],
-                    model_name=embedding_data["model_name"],
-                )
+            # 4. MASSIVE SUPABASE BULK INSERT (Step 3) - Network Efficiency
+            Embedding.objects.bulk_create(embedding_objects, batch_size=100)
 
-                logger.info("embedding_created", chunk_id=str(chunk.id))
+            logger.info(
+                "embeddings_bulk_inserted_successfully", count=len(embedding_objects)
+            )
 
-            except Exception as e:
-                sentry_sdk.capture_exception(e)
-                logger.error(
-                    "embedding_generation_failed", chunk_id=str(chunk.id), error=str(e)
-                )
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            logger.error("embedding_bulk_generation_failed", error=str(e))

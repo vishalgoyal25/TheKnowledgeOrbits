@@ -87,7 +87,7 @@ export default function Footer() {
           {/* Links Columns */}
           <div className="grid grid-cols-2 lg:grid-cols-3 lg:col-span-3 gap-8">
             <div>
-              <h3 className="font-bold text-gray-900 mb-6 text-sm uppercase tracking-wider text-blue-600">
+              <h3 className="font-bold mb-6 text-sm uppercase tracking-wider text-blue-600">
                 Platform
               </h3>
               <ul className="space-y-4">
@@ -105,7 +105,7 @@ export default function Footer() {
             </div>
 
             <div>
-              <h3 className="font-bold text-gray-900 mb-6 text-sm uppercase tracking-wider text-green-600">
+              <h3 className="font-bold mb-6 text-sm uppercase tracking-wider text-green-600">
                 Resources
               </h3>
               <ul className="space-y-4">
@@ -123,7 +123,7 @@ export default function Footer() {
             </div>
 
             <div>
-              <h3 className="font-bold text-gray-900 mb-6 text-sm uppercase tracking-wider text-purple-600">
+              <h3 className="font-bold mb-6 text-sm uppercase tracking-wider text-purple-600">
                 Legal
               </h3>
               <ul className="space-y-4">
