@@ -31,7 +31,9 @@ export default async function CurrentAffairsPage() {
     console.warn("Build-time fetch failed for Current Affairs:", error);
     // CRITICAL: ONLY throw if the actual fetch failed during build/revalidation.
     if (process.env.SKIP_BACKEND_WAIT !== "true") {
-      throw new Error("CA API unreachable during ISR build - Aborting to protect cache");
+      throw new Error(
+        "CA API unreachable during ISR build - Aborting to protect cache",
+      );
     }
   }
 

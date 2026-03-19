@@ -27,7 +27,9 @@ export default async function TopicsPage() {
     console.warn("Build-time fetch failed for Topics:", error);
     // CRITICAL: ONLY throw if the actual fetch failed during build/revalidation.
     if (process.env.SKIP_BACKEND_WAIT !== "true") {
-      throw new Error("Topics API unreachable during ISR build - Aborting to protect cache");
+      throw new Error(
+        "Topics API unreachable during ISR build - Aborting to protect cache",
+      );
     }
   }
 
