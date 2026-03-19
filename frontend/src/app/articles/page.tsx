@@ -28,7 +28,9 @@ export default async function ArticlesPage() {
     // CRITICAL: ONLY throw if the actual fetch failed during build/revalidation.
     // This prevents "Poisoning" the cache with a failed state.
     if (process.env.SKIP_BACKEND_WAIT !== "true") {
-      throw new Error("Articles API unreachable during ISR build - Aborting to protect cache");
+      throw new Error(
+        "Articles API unreachable during ISR build - Aborting to protect cache",
+      );
     }
   }
 
