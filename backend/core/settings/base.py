@@ -224,6 +224,7 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
+    "x-admin-key",
 ]
 
 # CSRF Trusted Origins (Managed by Switchboard above)
@@ -372,3 +373,6 @@ CACHE_TTL = {
     "weekly_stats": 600,  # 10 minutes
     "monthly_stats": 1800,  # 30 minutes
 }
+
+# Admin Security
+INTERNAL_ADMIN_KEY = env("INTERNAL_ADMIN_KEY", default="")

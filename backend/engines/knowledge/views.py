@@ -8,7 +8,7 @@ from typing import Any, Optional, cast
 
 from django.db.models import QuerySet
 
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, views
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -453,3 +453,55 @@ class SearchViewSet(viewsets.ViewSet):
         )
 
         return Response(results)
+
+
+class HierarchyListView(views.APIView):
+    """
+    Returns the complete, deeply nested UPSC hierarchy:
+    Program -> Subjects -> Modules -> Topics -> SubTopics.
+    Used for highly efficient populating of UI chained dropdowns in one network request.
+    GET /api/v1/knowledge/hierarchy/
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        cache_key = "master_hierarchy_list"
+        cached = cache_service.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        programs = Program.objects.filter(is_active=True)
+        response_data = []
+
+        for p in programs:
+            p_data = {"id": str(p.id), "name": p.name, "subjects": []}
+            subjects = Subject.objects.filter(program=p, is_active=True).order_by(
+                "order_index"
+            )
+            for s in subjects:
+                s_data = {"id": str(s.id), "name": s.name, "modules": []}
+                modules = Module.objects.filter(subject=s, is_active=True).order_by(
+                    "order_index"
+                )
+                for m in modules:
+                    m_data = {"id": str(m.id), "name": m.name, "topics": []}
+                    root_topics = Topic.objects.filter(
+                        module=m, parent_topic__isnull=True, is_active=True
+                    ).order_by("order_index")
+                    for t in root_topics:
+                        t_data = {"id": str(t.id), "name": t.name, "sub_topics": []}
+                        sub_topics = Topic.objects.filter(
+                            parent_topic=t, is_active=True
+                        ).order_by("order_index")
+                        for st in sub_topics:
+                            t_data["sub_topics"].append(
+                                {"id": str(st.id), "name": st.name}
+                            )
+                        m_data["topics"].append(t_data)
+                    s_data["modules"].append(m_data)
+                p_data["subjects"].append(s_data)
+            response_data.append(p_data)
+
+        cache_service.set(cache_key, response_data, 3600)  # 1 hour
+        return Response(response_data)

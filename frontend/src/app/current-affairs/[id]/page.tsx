@@ -163,12 +163,27 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Content */}
+        {/* Content Section (Truncated for Legal Safety) */}
         <Card className="border-none shadow-none bg-white">
           <CardContent className="px-0 pt-0">
             <div className="prose prose-lg max-w-none prose-slate">
               <div className="whitespace-pre-wrap text-gray-800 leading-[1.8] text-xl font-serif">
-                {article.content}
+                {article.content?.substring(0, 350)}
+                {(article.content?.length || 0) > 350 && (
+                  <span className="text-gray-500 font-sans text-sm block mt-6 p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                    ... [Analysis truncated for legal compliance. To read the
+                    full in-depth coverage, please visit the original source:{" "}
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 font-bold hover:underline"
+                    >
+                      {article.source_name}
+                    </a>
+                    ]
+                  </span>
+                )}
               </div>
             </div>
           </CardContent>

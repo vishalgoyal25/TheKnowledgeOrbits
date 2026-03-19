@@ -207,8 +207,13 @@ class ArticleGenerationService:
             for idx, chunk in enumerate(static_chunks, 1):
                 doc_title = chunk.document.title if chunk.document else "Textbook"
                 page_info = f", Page {chunk.page_number}" if chunk.page_number else ""
+                chapter_info = (
+                    f", Chapter: {chunk.chapter_name}" if chunk.chapter_name else ""
+                )
 
-                context_parts.append(f"[Source {idx}: {doc_title}{page_info}]")
+                context_parts.append(
+                    f"[Source {idx}: {doc_title}{page_info}{chapter_info}]"
+                )
                 context_parts.append(chunk.chunk_text)
                 context_parts.append("---\n")
 

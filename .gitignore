@@ -87,3 +87,5 @@ agentic_dev/
 *.sql
 *.patch
 *_errors.txt
+
+backend/data_storage/

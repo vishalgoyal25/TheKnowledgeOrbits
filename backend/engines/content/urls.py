@@ -12,6 +12,7 @@ from engines.content.views import (
     DocumentViewSet,
     EmbeddingViewSet,
     IngestionJobViewSet,
+    AdminIngestView,
 )
 
 router = DefaultRouter()
@@ -22,5 +23,6 @@ router.register(r"assets", AssetViewSet, basename="asset")
 router.register(r"jobs", IngestionJobViewSet, basename="ingestion-job")
 
 urlpatterns = [
+    path("admin-ingest/", AdminIngestView.as_view(), name="admin-ingest"),
     path("", include(router.urls)),
 ]

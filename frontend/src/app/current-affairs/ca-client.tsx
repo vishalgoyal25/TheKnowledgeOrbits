@@ -6,6 +6,7 @@ import CAFilterBar from "@/components/current-affairs/ca-filter-bar";
 import CATimeline from "@/components/current-affairs/ca-timeline";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
 import {
   useCAArticles,
   useInfiniteCAArticles,
@@ -19,6 +20,7 @@ import {
   LayoutGrid,
   Loader2,
   Newspaper,
+  Scale,
 } from "lucide-react";
 
 interface Props {
@@ -182,6 +184,46 @@ export default function CurrentAffairsClient({
               displayArticles.length
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Educational & Legal Disclaimer Banner (Prominent Notice) */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 flex items-start gap-4">
+        <div className="h-10 w-10 shrink-0 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600">
+          <Scale className="h-5 w-5" />
+        </div>
+        <div className="flex-1">
+          <h4 className="text-sm font-bold text-amber-900 uppercase tracking-wider mb-1">
+            Educational Notice & Terms
+          </h4>
+          <p className="text-xs text-amber-800 leading-relaxed">
+            TheKnowledgeOrbits is a{" "}
+            <strong>non-commercial hobby project</strong> for technical
+            learning. Content is synthesized from public news for academic
+            dissemination. By continuing, you acknowledge our{" "}
+            <Link
+              href="/terms"
+              className="underline font-bold hover:text-amber-600"
+            >
+              Terms of Service
+            </Link>
+            ,{" "}
+            <Link
+              href="/privacy"
+              className="underline font-bold hover:text-amber-600"
+            >
+              Privacy Policy
+            </Link>
+            , and{" "}
+            <Link
+              href="/cookies"
+              className="underline font-bold hover:text-amber-600"
+            >
+              Cookie Policy
+            </Link>
+            . We prioritize source attribution and encourage reading original
+            coverage.
+          </p>
         </div>
       </div>
 
