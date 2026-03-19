@@ -25,19 +25,11 @@ export default async function ArticlesPage() {
     initialTotal = response?.count || 0;
   } catch (error) {
     console.warn("Build-time fetch failed for Articles:", error);
-  }
-
-  // CRITICAL: Total Content Guard (Anti-Poison Logic)
-  // If we have no articles during an ISR build/revalidation, we MUST throw.
-  // This tells Next.js NOT to cache this empty state, preserving the last good version.
-  // We bypass this ONLY during CI (SKIP_BACKEND_WAIT=true) to allow build integrity checks.
-  if (
-    initialArticles.length === 0 &&
-    process.env.SKIP_BACKEND_WAIT !== "true"
-  ) {
-    throw new Error(
-      "Articles data missing during ISR build - Aborting to protect cache",
-    );
+    // CRITICAL: ONLY throw if the actual fetch failed during build/revalidation.
+    // This prevents "Poisoning" the cache with a failed state.
+    if (process.env.SKIP_BACKEND_WAIT !== "true") {
+      throw new Error("Articles API unreachable during ISR build - Aborting to protect cache");
+    }
   }
 
   return (
