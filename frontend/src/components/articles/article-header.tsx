@@ -33,17 +33,17 @@ export default function ArticleHeader({ article }: Props) {
               {article.topic.name}
             </span>
           )}
-          <span>{article.word_count.toLocaleString()} words</span>
+          <span>{(article?.word_count ?? 0).toLocaleString()} words</span>
           <span className="flex items-center gap-1">
             <Calendar className="h-4 w-4" />
-            {formatDate(article.created_at)}
+            {formatDate(article?.created_at || new Date().toISOString())}
           </span>
           <div className="flex items-center gap-1">
             <Star
-              className={`h-4 w-4 ${getQualityColor(article.quality_score)}`}
+              className={`h-4 w-4 ${getQualityColor(article?.quality_score ?? 100)}`}
             />
-            <span className={getQualityColor(article.quality_score)}>
-              Quality: {article.quality_score.toFixed(0)}%
+            <span className={getQualityColor(article?.quality_score ?? 100)}>
+              Quality: {(article?.quality_score ?? 100).toFixed(0)}%
             </span>
           </div>
         </div>

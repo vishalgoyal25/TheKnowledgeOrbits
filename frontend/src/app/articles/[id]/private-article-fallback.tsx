@@ -110,13 +110,17 @@ export default function PrivateArticleFallback({
         return (
           <div className="mt-8 max-w-3xl mx-auto">
             <SourceAttribution
-              sources={sourceChunks.map((s: ArticleSourceMap) => ({
+              sources={(sourceChunks || []).map((s: ArticleSourceMap) => ({
                 title:
                   s.chunk_text?.slice(0, 80) ||
+                  s.chunk?.chunk_text?.slice(0, 80) ||
                   s.chunk_contribution ||
-                  "Source",
-                document_title: s.chapter_name || "Knowledge Base",
-                chunk_index: s.sequence_order ?? 0,
+                  "Secure Intelligence Source",
+                document_title:
+                  s.chapter_name ||
+                  s.chunk?.document_title ||
+                  "Knowledge Module",
+                chunk_index: s.sequence_order ?? s.chunk?.chunk_index ?? 0,
                 relevance_score: s.relevance_weight,
               }))}
             />

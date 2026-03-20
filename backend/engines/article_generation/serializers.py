@@ -131,6 +131,7 @@ class ArticleGenerationJobSerializer(serializers.ModelSerializer):  # type: igno
 
     topic = TopicSerializer(read_only=True)
     article = ArticleListSerializer(read_only=True)
+    article_id = serializers.ReadOnlyField(source="article.id")
 
     class Meta:
         model = ArticleGenerationJob
@@ -138,6 +139,7 @@ class ArticleGenerationJobSerializer(serializers.ModelSerializer):  # type: igno
             "id",
             "topic",
             "article",
+            "article_id",
             "status",
             "error_log",
             "requested_by",

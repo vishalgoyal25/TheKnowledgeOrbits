@@ -41,7 +41,7 @@ repos:
 
       - id: backend-pytest
         name: Backend Laboratory (Pytest)
-        entry: powershell -Command "docker exec TheKnowledgeOrbits_backend pytest engines/ -q"
+        entry: powershell -Command "docker exec TheKnowledgeOrbits_backend pytest engines/ --reuse-db -q"
         language: system
         always_run: true
         pass_filenames: false

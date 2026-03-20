@@ -16,17 +16,19 @@ interface ArticleReaderProps {
 
 export default function ArticleReader({ article }: ArticleReaderProps) {
   // Source breakdown counts
-  const sourceChunksArr = article.source_chunks || [];
+  const sourceChunksArr = article?.source_chunks || [];
   const totalSources =
-    sourceChunksArr.length || article.source_chunk_count || 0;
+    sourceChunksArr.length || article?.source_chunk_count || 0;
+
   const staticSources =
-    sourceChunksArr.filter((s) => s.chunk?.source_type === "static").length ||
-    article.static_chunk_count ||
+    sourceChunksArr.filter((s) => s?.chunk?.source_type === "static").length ||
+    article?.static_chunk_count ||
     0;
+
   const caSources =
-    sourceChunksArr.filter((s) => s.chunk?.source_type === "dynamic").length ||
-    article.ca_chunk_count ||
-    article.generation_metadata?.ca_chunks_used ||
+    sourceChunksArr.filter((s) => s?.chunk?.source_type === "dynamic").length ||
+    article?.ca_chunk_count ||
+    article?.generation_metadata?.ca_chunks_used ||
     0;
 
   return (
@@ -72,7 +74,7 @@ export default function ArticleReader({ article }: ArticleReaderProps) {
                 variant="outline"
                 className="px-3 py-1 bg-gray-50 border-gray-200 text-gray-700"
               >
-                {article.generation_type.replace("_", " ")}
+                {(article?.generation_type || "ai_generated").replace("_", " ")}
               </Badge>
 
               {caSources > 0 && (
