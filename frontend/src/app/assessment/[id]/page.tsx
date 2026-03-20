@@ -17,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -154,6 +153,7 @@ export default function TakeQuizPage() {
       { attempt_id: attemptId, answers },
       {
         onSuccess: (result) => {
+          setShowSubmitDialog(false);
           router.push(`/assessment/results/${result.id}`);
         },
       },
@@ -320,13 +320,18 @@ export default function TakeQuizPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Review Answers</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleSubmit}
+            <AlertDialogCancel disabled={submitQuizMutation.isPending}>
+              Review Answers
+            </AlertDialogCancel>
+            <Button
+              onClick={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}
               disabled={submitQuizMutation.isPending}
             >
               {submitQuizMutation.isPending ? "Submitting..." : "Submit"}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

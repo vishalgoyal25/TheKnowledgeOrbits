@@ -72,15 +72,20 @@ class ArticleGenerationService:
             # Fetch static chunks (Textbooks/NCERT)
             static_chunks = ArticleGenerationService._fetch_chunks(topic)
 
-            if not static_chunks:
-                logger.warning("no_static_chunks_found", topic_id=topic_id)
-                raise ValueError(f"No source material found for topic: {topic.name}")
-
             # Fetch CA chunks if requested
             ca_chunks: List[CAChunk] = []
             if include_ca:
-                ca_chunks = ArticleGenerationService._fetch_ca_chunks(topic)
+                # Increased window to 180 days to ensure recent news is captured
+                ca_chunks = ArticleGenerationService._fetch_ca_chunks(topic, days=180)
                 logger.info("ca_chunks_fetched", count=len(ca_chunks))
+
+            # Validate that we have at least SOME source material (Static OR CA)
+            if not static_chunks and not ca_chunks:
+                logger.warning("no_source_material_found", topic_id=topic_id)
+                raise ValueError(
+                    f"No source material (Static or Current Affairs) found for topic: {topic.name}. "
+                    "Please ingest relevant material first."
+                )
 
             # Assemble RAG context
             context = ArticleGenerationService._assemble_context(
