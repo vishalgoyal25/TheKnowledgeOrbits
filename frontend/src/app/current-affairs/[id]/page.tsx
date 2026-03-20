@@ -191,7 +191,7 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
       </div>
     );
   } catch (error) {
-    console.warn("Error loading CA article in Server Component:", error);
+    console.warn("Error loading CA article in Server Component:", error instanceof Error ? error.message : String(error));
 
     return (
       <div className="container mx-auto px-4 py-8 animate-in fade-in duration-700">
