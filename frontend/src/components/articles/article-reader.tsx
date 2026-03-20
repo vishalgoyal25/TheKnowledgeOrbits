@@ -61,11 +61,13 @@ export default function ArticleReader({ article }: ArticleReaderProps) {
               </p>
               <p className="text-xs mt-2 text-gray-400">
                 Published on{" "}
-                {new Date(article.created_at).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
+                {article.created_at && !isNaN(new Date(article.created_at).getTime())
+                  ? new Date(article.created_at).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })
+                  : "Recently"}
               </p>
             </div>
 

@@ -12,24 +12,8 @@ import Link from "next/link";
 import apiClient from "@/lib/api/client";
 import PrivateArticleFallback from "./private-article-fallback";
 
-// Revalidate every hour
-export const revalidate = 3600;
-
-// Pre-render the Latest 100 articles for stability
-export async function generateStaticParams() {
-  try {
-    const response = await articlesAPI.list({ limit: 100 });
-    return (response.results || []).map((article: Article) => ({
-      id: article.id,
-    }));
-  } catch (error) {
-    console.error(
-      "BUILD WARNING: generateStaticParams for Articles failed (likely Render timeout). skipping pre-build.",
-      error,
-    );
-    return [];
-  }
-}
+// Force dynamic rendering to exactly mirror localhost behavior and prevent ISR cache crashes
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -151,21 +135,21 @@ export default async function ArticleDetailPage({
           return (
             <div className="mt-8 max-w-3xl mx-auto">
               <SourceAttribution
-                sources={(sourceChunks as unknown as ArticleSourceMap[]).map(
-                  (s: ArticleSourceMap) => ({
+                sources={(sourceChunks as unknown as ArticleSourceMap[])
+                  .filter((s) => s != null)
+                  .map((s: ArticleSourceMap) => ({
                     title:
-                      s.chunk_text?.slice(0, 80) ||
-                      s.chunk?.chunk_text?.slice(0, 80) ||
-                      s.chunk_contribution ||
+                      s?.chunk_text?.slice?.(0, 80) ||
+                      s?.chunk?.chunk_text?.slice?.(0, 80) ||
+                      s?.chunk_contribution ||
                       "Contextual Source",
                     document_title:
-                      s.chapter_name ||
-                      s.chunk?.document_title ||
+                      s?.chapter_name ||
+                      s?.chunk?.document_title ||
                       "Knowledge Cluster",
-                    chunk_index: s.sequence_order ?? s.chunk?.chunk_index ?? 0,
-                    relevance_score: s.relevance_weight,
-                  }),
-                )}
+                    chunk_index: s?.sequence_order ?? s?.chunk?.chunk_index ?? 0,
+                    relevance_score: s?.relevance_weight ?? 1,
+                  }))}
               />
             </div>
           );
