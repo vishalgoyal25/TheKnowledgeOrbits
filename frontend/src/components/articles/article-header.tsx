@@ -40,7 +40,9 @@ export default function ArticleHeader({ article }: Props) {
           </span>
           <div className="flex items-center gap-1">
             <Star
-              className={`h-4 w-4 ${getQualityColor(article?.quality_score ?? 100)}`}
+              className={`h-4 w-4 ${getQualityColor(
+                article?.quality_score ?? 100,
+              )}`}
             />
             <span className={getQualityColor(article?.quality_score ?? 100)}>
               Quality: {(article?.quality_score ?? 100).toFixed(0)}%

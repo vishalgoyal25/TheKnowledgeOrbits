@@ -3,7 +3,7 @@
  */
 
 import { articlesAPI } from "@/lib/api/articles";
-import { Article } from "@/lib/types";
+import { Article, ArticleSourceMap } from "@/lib/types";
 import ArticleReader from "@/components/articles/article-reader";
 import SourceAttribution from "@/components/quiz/source-attribution";
 import { Button } from "@/components/ui/button";
@@ -145,24 +145,27 @@ export default async function ArticleDetailPage({
 
         {/* Source Attribution (Server side rendering for SEO and speed) */}
         {(() => {
-          const sourceChunks = article.source_chunks;
+          const sourceChunks = article?.source_chunks;
           if (!sourceChunks || sourceChunks.length === 0) return null;
+
           return (
             <div className="mt-8 max-w-3xl mx-auto">
               <SourceAttribution
-                sources={(sourceChunks || []).map((s) => ({
-                  title:
-                    s.chunk_text?.slice(0, 80) ||
-                    s.chunk?.chunk_text?.slice(0, 80) ||
-                    s.chunk_contribution ||
-                    "Contextual Source",
-                  document_title:
-                    s.chapter_name ||
-                    s.chunk?.document_title ||
-                    "Knowledge Cluster",
-                  chunk_index: s.sequence_order ?? s.chunk?.chunk_index ?? 0,
-                  relevance_score: s.relevance_weight,
-                }))}
+                sources={(sourceChunks as unknown as ArticleSourceMap[]).map(
+                  (s: ArticleSourceMap) => ({
+                    title:
+                      s.chunk_text?.slice(0, 80) ||
+                      s.chunk?.chunk_text?.slice(0, 80) ||
+                      s.chunk_contribution ||
+                      "Contextual Source",
+                    document_title:
+                      s.chapter_name ||
+                      s.chunk?.document_title ||
+                      "Knowledge Cluster",
+                    chunk_index: s.sequence_order ?? s.chunk?.chunk_index ?? 0,
+                    relevance_score: s.relevance_weight,
+                  }),
+                )}
               />
             </div>
           );
