@@ -91,7 +91,7 @@ async function fetchDocumentAsArticle(
       slug: doc.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     } as unknown as Article;
   } catch (error) {
-    console.error("Error fetching document as article on server:", error);
+    console.error("Error fetching document as article on server:", error instanceof Error ? error.message : String(error));
     return null;
   }
 }
@@ -175,7 +175,7 @@ export default async function ArticleDetailPage({
   } catch (error) {
     console.warn(
       "ISR Fetch Failed (Likely a Private Article or 404). Falling back to Secure Client Component:",
-      error,
+      error instanceof Error ? error.message : "Unknown error",
     );
 
     // This is the true power of React Server Components:
