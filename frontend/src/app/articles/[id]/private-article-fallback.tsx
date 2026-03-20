@@ -105,24 +105,26 @@ export default function PrivateArticleFallback({
 
       {/* Source Attribution */}
       {(() => {
-        const sourceChunks = article.source_chunks;
+        const sourceChunks = article?.source_chunks;
         if (!sourceChunks || sourceChunks.length === 0) return null;
         return (
           <div className="mt-8 max-w-3xl mx-auto">
             <SourceAttribution
-              sources={(sourceChunks || []).map((s: ArticleSourceMap) => ({
-                title:
-                  s.chunk_text?.slice(0, 80) ||
-                  s.chunk?.chunk_text?.slice(0, 80) ||
-                  s.chunk_contribution ||
-                  "Secure Intelligence Source",
-                document_title:
-                  s.chapter_name ||
-                  s.chunk?.document_title ||
-                  "Knowledge Module",
-                chunk_index: s.sequence_order ?? s.chunk?.chunk_index ?? 0,
-                relevance_score: s.relevance_weight,
-              }))}
+              sources={(sourceChunks as unknown as ArticleSourceMap[]).map(
+                (s: ArticleSourceMap) => ({
+                  title:
+                    s.chunk_text?.slice(0, 80) ||
+                    s.chunk?.chunk_text?.slice(0, 80) ||
+                    s.chunk_contribution ||
+                    "Secure Intelligence Source",
+                  document_title:
+                    s.chapter_name ||
+                    s.chunk?.document_title ||
+                    "Knowledge Module",
+                  chunk_index: s.sequence_order ?? s.chunk?.chunk_index ?? 0,
+                  relevance_score: s.relevance_weight,
+                }),
+              )}
             />
           </div>
         );
