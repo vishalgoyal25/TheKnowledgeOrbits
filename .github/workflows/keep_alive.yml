@@ -1,46 +1,54 @@
-# =============================================================================
-# Keep-Alive Cron Job
-# =============================================================================
-# Pings the Render backend DEEP health endpoint every 10 minutes to prevent
-# Free Tier hibernation and keep the Database connection pool warm.
-#
-# The /api/v1/health/deep/ endpoint performs a real database query, ensuring
-# the entire stack is ready for ISR build requests.
-# =============================================================================
-
-name: Keep Alive
-
+# # =============================================================================
+# # Keep-Alive Cron Job (DISABLED - Render Paid Tier in use)
+# # =============================================================================
+# # Pings the Render backend DEEP health endpoint every 10 minutes to prevent
+# # Free Tier hibernation and keep the Database connection pool warm.
+# #
+# # The /api/v1/health/deep/ endpoint performs a real database query, ensuring
+# # the entire stack is ready for ISR build requests.
+# # =============================================================================
+# 
+# name: Keep Alive
+# 
+# on:
+#   schedule:
+#     # Every 10 minutes, 24/7
+#     - cron: "*/10 * * * *"
+# 
+#   # Allow manual trigger from GitHub Actions UI
+#   workflow_dispatch:
+# 
+# jobs:
+#   ping:
+#     name: Ping Render Backend
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 2
+# 
+#     env:
+#       HEALTH_URL: https://theknowledgeorbits-backend.onrender.com/api/v1/health/deep/
+# 
+#     steps:
+#       - name: Ping health endpoint
+#       - run: |
+#           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+#             --max-time 30 \
+#             --retry 3 \
+#             --retry-delay 5 \
+#             "$HEALTH_URL")
+# 
+#           echo "Health check response: $RESPONSE"
+# 
+#           if [ "$RESPONSE" -eq 200 ]; then
+#             echo "✅ Backend is alive"
+#           else
+#             echo "⚠️ Backend returned $RESPONSE — may be cold-starting"
+#             exit 1
+#           fi
+name: Disabled Workflow
 on:
-  schedule:
-    # Every 10 minutes, 24/7
-    - cron: "*/10 * * * *"
-
-  # Allow manual trigger from GitHub Actions UI
   workflow_dispatch:
-
 jobs:
-  ping:
-    name: Ping Render Backend
+  disabled:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
-
-    env:
-      HEALTH_URL: https://theknowledgeorbits-backend.onrender.com/api/v1/health/deep/
-
     steps:
-      - name: Ping health endpoint
-        run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 30 \
-            --retry 3 \
-            --retry-delay 5 \
-            "$HEALTH_URL")
-
-          echo "Health check response: $RESPONSE"
-
-          if [ "$RESPONSE" -eq 200 ]; then
-            echo "✅ Backend is alive"
-          else
-            echo "⚠️ Backend returned $RESPONSE — may be cold-starting"
-            exit 1
-          fi
+      - run: echo "This workflow is disabled."
