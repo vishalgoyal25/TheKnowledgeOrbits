@@ -1,13 +1,13 @@
-# # =============================================================================
-# # Keep-Alive Cron Job (DISABLED - Render Paid Tier in use)
-# # =============================================================================
-# # Pings the Render backend DEEP health endpoint every 10 minutes to prevent
-# # Free Tier hibernation and keep the Database connection pool warm.
-# #
-# # The /api/v1/health/deep/ endpoint performs a real database query, ensuring
-# # the entire stack is ready for ISR build requests.
-# # =============================================================================
-# 
+# =============================================================================
+# Keep-Alive Cron Job (DISABLED - Render Paid Tier in use)
+# =============================================================================
+# Pings the Render backend DEEP health endpoint every 10 minutes to prevent
+# Free Tier hibernation and keep the Database connection pool warm.
+#
+# The /api/v1/health/deep/ endpoint performs a real database query, ensuring
+# the entire stack is ready for ISR build requests.
+# =============================================================================
+#
 # name: Keep Alive
 # 
 # on:
@@ -29,7 +29,7 @@
 # 
 #     steps:
 #       - name: Ping health endpoint
-#       - run: |
+#         run: |
 #           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
 #             --max-time 30 \
 #             --retry 3 \
@@ -44,11 +44,3 @@
 #             echo "⚠️ Backend returned $RESPONSE — may be cold-starting"
 #             exit 1
 #           fi
-name: Disabled Workflow
-on:
-  workflow_dispatch:
-jobs:
-  disabled:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "This workflow is disabled."
