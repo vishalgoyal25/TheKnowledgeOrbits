@@ -75,7 +75,10 @@ async function fetchDocumentAsArticle(
       slug: doc.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     } as unknown as Article;
   } catch (error) {
-    console.error("Error fetching document as article on server:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "Error fetching document as article on server:",
+      error instanceof Error ? error.message : String(error),
+    );
     return null;
   }
 }
@@ -147,7 +150,8 @@ export default async function ArticleDetailPage({
                       s?.chapter_name ||
                       s?.chunk?.document_title ||
                       "Knowledge Cluster",
-                    chunk_index: s?.sequence_order ?? s?.chunk?.chunk_index ?? 0,
+                    chunk_index:
+                      s?.sequence_order ?? s?.chunk?.chunk_index ?? 0,
                     relevance_score: s?.relevance_weight ?? 1,
                   }))}
               />
