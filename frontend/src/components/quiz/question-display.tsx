@@ -104,10 +104,7 @@ export default function QuestionDisplay({
 
       <CardContent className="space-y-6">
         {/* Options */}
-        <RadioGroup
-          value={selectedAnswer}
-          className="space-y-3"
-        >
+        <RadioGroup value={selectedAnswer} className="space-y-3">
           {Object.entries(question.options).map(([key, value]) => {
             const isCorrect = showAnswer && key === question.correct_answer;
             const isSelected = key === selectedAnswer;
