@@ -106,7 +106,6 @@ export default function QuestionDisplay({
         {/* Options */}
         <RadioGroup
           value={selectedAnswer}
-          onValueChange={readOnly ? undefined : onAnswerChange}
           className="space-y-3"
         >
           {Object.entries(question.options).map(([key, value]) => {
@@ -117,15 +116,16 @@ export default function QuestionDisplay({
             return (
               <div
                 key={key}
-                onClick={() => {
+                onClick={(e) => {
                   if (readOnly) return;
+                  e.preventDefault(); // Prevent double triggers from label/radio defaults
                   if (isSelected) {
                     onAnswerChange(""); // Toggle off if already selected
                   } else {
                     onAnswerChange(key); // Select if not selected
                   }
                 }}
-                className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-colors cursor-pointer ${
+                className={`flex items-start space-x-3 p-4 rounded-lg border-2 transition-all duration-75 cursor-pointer ${
                   isCorrect
                     ? "bg-green-50 border-green-300"
                     : isWrong
@@ -140,14 +140,10 @@ export default function QuestionDisplay({
                   id={`${question.id}-${key}`}
                   disabled={readOnly}
                   className="mt-1"
-                  // Prevent the RadioGroup internal logic from interfering with our manual toggle
-                  onClick={(e) => e.stopPropagation()}
                 />
                 <Label
                   htmlFor={`${question.id}-${key}`}
                   className="flex-1 cursor-pointer leading-relaxed"
-                  // Ensure label click triggers our div onClick correctly
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <span className="font-semibold mr-2">{key}.</span>
                   {value}

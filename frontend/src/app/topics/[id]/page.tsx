@@ -156,7 +156,10 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
       </div>
     );
   } catch (error) {
-    console.warn("Error loading topic details in Server Component:", error instanceof Error ? error.message : String(error));
+    console.warn(
+      "Error loading topic details in Server Component:",
+      error instanceof Error ? error.message : String(error),
+    );
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center py-12 bg-red-50 text-red-600 rounded-lg border border-red-200">

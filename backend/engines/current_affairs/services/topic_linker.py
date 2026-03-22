@@ -1,4 +1,4 @@
-import sentry_sdk
+import sentry_sdk  # type: ignore
 
 """
 Topic Linker Service
@@ -6,15 +6,17 @@ Topic Linker Service
 Auto-links CA chunks to syllabus topics using semantic similarity
 """
 
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Optional, cast
 
-import numpy as np
-import structlog
+import numpy as np  # type: ignore
+import structlog  # type: ignore
 
-from engines.content.models import Embedding
-from engines.knowledge.models import Topic
+from engines.content.models import Embedding  # type: ignore
+from engines.knowledge.models import ChunkTopicMap, Topic  # type: ignore
 
-from ..models import CAChunk, CATopicLink
+from ..models import CAChunk, CATopicLink  # type: ignore
+
+from collections import defaultdict
 
 logger = structlog.get_logger(__name__)
 
@@ -26,7 +28,7 @@ def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         logger.info("lazy_loading_sentence_transformer")
-        from sentence_transformers import SentenceTransformer
+        from sentence_transformers import SentenceTransformer  # type: ignore
 
         _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     return _embedding_model
@@ -39,9 +41,12 @@ class TopicLinkerService:
     MAX_LINKS_PER_CHUNK = 3  # Max topics per chunk
 
     @staticmethod
-    def link_chunk_to_topics(ca_chunk: CAChunk) -> int:
+    def link_chunk_to_topics(
+        ca_chunk: CAChunk, topic_embeddings: Optional[Dict[str, np.ndarray]] = None
+    ) -> int:
         """
-        Link a single CA chunk to relevant topics
+        Link a single CA chunk to relevant topics.
+        Optionally accepts pre-calculated topic_embeddings to avoid redundant work in batches.
 
         Returns:
             int: Number of topics linked
@@ -55,8 +60,6 @@ class TopicLinkerService:
                 logger.warning(
                     "CA chunk has no embedding", extra={"chunk_id": chunks_id_str}
                 )
-                # Attempt to fix missing embedding if content exists?
-                # No, that's processor's job.
                 return 0
 
             try:
@@ -69,8 +72,10 @@ class TopicLinkerService:
 
             ca_vector = np.array(ca_embedding.vector)
 
-            # Get all topic embeddings (hybrid approach: chunk-based + description-based)
-            topic_embeddings = TopicLinkerService._get_topic_embeddings()
+            # Get all topic embeddings (hybrid approach)
+            # Use provided embeddings if in a batch, otherwise fetch fresh
+            if topic_embeddings is None:
+                topic_embeddings = TopicLinkerService._get_topic_embeddings()
 
             if not topic_embeddings:
                 logger.warning("no_topic_embeddings_available")
@@ -98,11 +103,15 @@ class TopicLinkerService:
             # Sort by similarity (descending)
             similarities.sort(key=lambda x: cast(float, x["similarity"]), reverse=True)
 
-            # Take top N
-            top_similarities = similarities[: TopicLinkerService.MAX_LINKS_PER_CHUNK]
+            # Take top N (Max 3 links per chunk)
+            top_similarities = []
+            for i in range(len(similarities)):
+                if i >= 3:  # Hard limit for safety and linter clarity
+                    break
+                top_similarities.append(similarities[i])
 
             # Create links
-            links_created = 0
+            linked_ids = set()
             current_topic_ids = []
 
             for sim in top_similarities:
@@ -110,7 +119,7 @@ class TopicLinkerService:
                 current_topic_ids.append(topic.id)
 
                 # Create or update link
-                link, created = CATopicLink.objects.update_or_create(
+                _, created = CATopicLink.objects.update_or_create(
                     ca_chunk=ca_chunk,
                     topic=topic,
                     defaults={
@@ -120,9 +129,11 @@ class TopicLinkerService:
                 )
 
                 if created:
-                    links_created += 1
+                    linked_ids.add(str(topic.id))
 
-            if links_created == 0:
+            final_count = len(linked_ids)
+
+            if final_count == 0:
                 logger.debug(
                     "no_strong_topic_links_found",
                     chunk_id=chunks_id_str,
@@ -133,13 +144,13 @@ class TopicLinkerService:
 
             logger.info(
                 "linked_ca_chunk_to_topics",
-                links_created=links_created,
+                links_created=final_count,
                 chunk_id=chunks_id_str,
                 topics=[str(tid) for tid in current_topic_ids],
                 max_similarity=max_sim,
             )
 
-            return links_created
+            return int(final_count)
 
         except Exception as e:
             sentry_sdk.capture_exception(e)
@@ -154,60 +165,79 @@ class TopicLinkerService:
     @staticmethod
     def _get_topic_embeddings() -> Dict[str, np.ndarray]:  # type: ignore
         """
-        Get representative embeddings for each topic.
+        Get representative embeddings for each topic using an optimized bulk strategy.
 
-        Strategy:
-        1. Try to get average of mapped static chunks (Content <> Knowledge).
-        2. If NO chunks are mapped (Cold Start), generate embedding from Topic Name + Description.
         """
-        from engines.knowledge.models import ChunkTopicMap
-
         topic_embeddings = {}
 
-        # Get all active topics
-        topics = Topic.objects.filter(is_active=True)
+        # 1. Fetch all active topics
+        topics = list(Topic.objects.filter(is_active=True))
+        if not topics:
+            return {}
 
-        # Optimization: Generate all descriptions first to batch encode?
-        # For simplicity/speed of implementation now, we loop.
+        # 2. Optimized Bulk Query for Mappings
+        # Get all chunk IDs mapped to these topics in ONE query
+        topic_ids = [str(t.id) for t in topics]
+        mappings = ChunkTopicMap.objects.filter(topic_id__in=topic_ids).values(
+            "topic_id", "chunk_id"
+        )
 
+        topic_to_chunk_ids = defaultdict(list)
+        for m in mappings:
+            topic_to_chunk_ids[str(m["topic_id"])].append(str(m["chunk_id"]))
+
+        # 3. Optimized Bulk Query for Embeddings
+        # Collect ALL unique chunk IDs that we need vectors for
+        all_chunk_ids = set()
+        for cids in topic_to_chunk_ids.values():
+            all_chunk_ids.update(cids)
+
+        # Fetch all relevant embeddings in ONE query
+        embeddings_qs = Embedding.objects.filter(
+            content_type="chunk", content_id__in=list(all_chunk_ids)
+        )
+
+        chunk_id_to_vector = {
+            str(e.content_id): np.array(e.vector) for e in embeddings_qs
+        }
+
+        # 4. Group and Average Vectors
+        topics_needing_encoding = []
         for topic in topics:
-            # 1. Try Chunk-Based Embedding
-            chunk_ids = ChunkTopicMap.objects.filter(topic=topic).values_list(
-                "chunk_id", flat=True
-            )[:10]
+            tid = str(topic.id)
+            cids = topic_to_chunk_ids.get(tid, [])
+            vectors = [
+                chunk_id_to_vector[cid] for cid in cids if cid in chunk_id_to_vector
+            ]
 
-            avg_vector = None
+            if vectors:
+                topic_embeddings[tid] = np.mean(vectors, axis=0)
+            else:
+                topics_needing_encoding.append(topic)
 
-            if chunk_ids:
-                embeddings = Embedding.objects.filter(
-                    content_type="chunk", content_id__in=[str(cid) for cid in chunk_ids]
-                )
+        # 5. Batch Encode topics without existing chunk mappings (Cold Start)
+        if topics_needing_encoding:
+            logger.info(
+                f"Batch encoding {len(topics_needing_encoding)} Cold Start topics"
+            )
 
-                if embeddings.exists():
-                    vectors = [np.array(emb.vector) for emb in embeddings]
-                    # vectors is list of numpy arrays. mean over axis 0.
-                    # Ensure vectors are not empty/malformed
-                    if vectors:
-                        avg_vector = np.mean(vectors, axis=0)
-
-            # 2. Fallback: Description-Based Embedding (Cold Start Support)
-            if avg_vector is None:
-                # Construct rich text representation of the topic
-                topic_text = f"{topic.name}. {topic.description}"
+            # Form texts for batch processing (faster than one by one)
+            encoding_texts = []
+            for topic in topics_needing_encoding:
+                text = f"{topic.name}. {topic.description}"
                 if topic.keywords:
-                    topic_text += f" Keywords: {', '.join(topic.keywords)}"
+                    text += f" Keywords: {', '.join(topic.keywords)}"
+                encoding_texts.append(text)
 
-                # Generate embedding on the fly
-                # Note: This is slower but runs only once per topic per batch usually
-                # We should cache this in future, but fine for now.
-                model = get_embedding_model()
-                avg_vector = model.encode(topic_text)
+            # Bulk encode using the model
+            model = get_embedding_model()
+            vectors = model.encode(encoding_texts, convert_to_numpy=True)
 
-            topic_embeddings[str(topic.id)] = np.array(avg_vector)
+            for i, topic in enumerate(topics_needing_encoding):
+                topic_embeddings[str(topic.id)] = vectors[i]
 
-        logger.info(f"Loaded {len(topic_embeddings)} topic embeddings")
-
-        return cast(Dict[str, np.ndarray], topic_embeddings)  # type: ignore
+        logger.info(f"Successfully loaded {len(topic_embeddings)} topic embeddings")
+        return topic_embeddings
 
     @staticmethod
     def _cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:  # type: ignore
@@ -239,8 +269,14 @@ class TopicLinkerService:
 
         logger.info("bulk_linking_unlinked_chunks", count=unlinked_chunks.count())
 
+        # CRITICAL OPTIMIZATION: Load all topic embeddings ONCE for the entire batch
+        topic_embeddings = TopicLinkerService._get_topic_embeddings()
+
         for chunk in unlinked_chunks:
-            links = TopicLinkerService.link_chunk_to_topics(chunk)
+            # Pass the pre-calculated embeddings to avoid redundant re-calculation
+            links = TopicLinkerService.link_chunk_to_topics(
+                chunk, topic_embeddings=topic_embeddings
+            )
             processed_chunks_count += 1
             total_links_created += links
 
