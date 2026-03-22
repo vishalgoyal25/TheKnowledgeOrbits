@@ -159,7 +159,7 @@ export default function Sidebar() {
           )}
 
           {isCollapsed && (
-            <div className="absolute left-14 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+            <div className="absolute right-14 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
               {item.title}
             </div>
           )}
@@ -171,8 +171,8 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "absolute left-0 top-0 flex flex-col bg-white transition-all duration-300 ease-in-out z-40 h-[calc(100vh-112px)]",
-        isCollapsed ? "w-0 border-r-0" : "w-64 border-r",
+        "absolute right-0 top-0 flex flex-col bg-white transition-all duration-300 ease-in-out z-40 h-[calc(100vh-112px)]",
+        isCollapsed ? "w-0 border-l-0" : "w-64 border-l",
       )}
     >
       {/* Collapse Toggle */}
@@ -180,16 +180,16 @@ export default function Sidebar() {
         variant="default"
         size="icon"
         className={cn(
-          "fixed top-[120px] h-10 w-10 rounded-r-xl rounded-l-none border-l-0 shadow-lg bg-blue-600 hover:bg-blue-700 text-white z-50 transition-all duration-300 ease-in-out",
-          isCollapsed ? "left-0" : "left-64",
+          "fixed top-[170px] h-10 w-10 rounded-l-xl rounded-r-none border-r-0 shadow-[theme(colors.blue.300/30)_0_4px_12px_-2px] bg-blue-600 hover:bg-blue-700 text-white z-50 transition-all duration-300 ease-in-out",
+          isCollapsed ? "right-0" : "right-64",
         )}
         onClick={toggleSidebar}
         suppressHydrationWarning
       >
         {isCollapsed ? (
-          <ChevronRight className="h-5 w-5" />
-        ) : (
           <ChevronLeft className="h-5 w-5" />
+        ) : (
+          <ChevronRight className="h-5 w-5" />
         )}
       </Button>
 

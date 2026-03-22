@@ -43,6 +43,20 @@ export const subjectsAPI = {
     const response = await apiClient.get("/knowledge/modules/", {
       params: { subject_id: subjectId },
     });
+    return Array.isArray(response.data)
+      ? response.data
+      : response.data.results || [];
+  },
+
+  // Get module by ID
+  getModuleById: async (id: string) => {
+    const response = await apiClient.get(`/knowledge/modules/${id}/`);
+    return response.data;
+  },
+
+  // Get complete master hierarchy for Navigation
+  getHierarchy: async () => {
+    const response = await apiClient.get("/knowledge/hierarchy/");
     return response.data;
   },
 };

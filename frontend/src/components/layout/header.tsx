@@ -6,120 +6,442 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
+  Search,
+  Newspaper,
+  ChevronDown,
   BookOpen,
   FileText,
   Folder,
   Sparkles,
-  Search,
-  LayoutDashboard,
-  Newspaper,
-  BookMarked,
-  Bookmark,
-  FileQuestion,
+  Menu,
+  X,
+  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth/useAuth";
 import UserMenu from "@/components/auth/UserMenu";
 import { useSearch } from "@/lib/hooks/use-search";
 import { SearchResult } from "@/lib/api/search";
+import { subjectsAPI } from "@/lib/api/subjects";
 
-/**
- * Header component — the primary navigation and global command center.
- * Features a semantic search bar with real-time AI results, responsive
- * horizontal navigation, and user authentication menus.
- */
+interface TopicData {
+  id: string;
+  name: string;
+  sub_topics?: { id: string; name: string }[];
+}
+
+interface ModuleData {
+  id: string;
+  name: string;
+  topics?: TopicData[];
+}
+
+interface SubjectData {
+  id: string;
+  name: string;
+  modules: ModuleData[];
+  description?: string;
+}
+
+const NEWS_SUBJECT: SubjectData = {
+  id: "news",
+  name: "News",
+  description: "Global news updates and current affairs categorized by theme.",
+  modules: [
+    { id: "news-world", name: "World", topics: [{ id: "news-un", name: "United Nations" }, { id: "news-global-economy", name: "Global Economy" }] },
+    { id: "news-politics", name: "Politics", topics: [{ id: "news-elections", name: "Elections" }, { id: "news-policy", name: "Policy Updates" }] },
+    { id: "news-climate", name: "Climate Crisis", topics: [{ id: "news-cop28", name: "COP28" }, { id: "news-emissions", name: "Carbon Emissions" }] },
+    { id: "news-middle-east", name: "Middle East", topics: [{ id: "news-peace", name: "Peace Process" }, { id: "news-oil", name: "Energy Market" }] },
+    { id: "news-science", name: "Science", topics: [{ id: "news-space", name: "Space Exploration" }, { id: "news-bio", name: "Biotech" }] },
+    { id: "news-tech", name: "Tech", topics: [{ id: "news-ai", name: "Artificial Intelligence" }, { id: "news-chips", name: "Semiconductors" }] },
+    { id: "news-business", name: "Business", topics: [{ id: "news-markets", name: "Stock Markets" }, { id: "news-trade", name: "World Trade" }] },
+  ],
+};
+
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Use debounced search query to prevent excessive API calls
+  // Dynamic Content Hierarchy State
+  const [hierarchyData, setHierarchyData] = useState<SubjectData[]>([]);
+  const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
+  const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null);
+
+  // Drawer-specific state for the Explorer
+  const [drawerActiveSubjectId, setDrawerActiveSubjectId] = useState<string | null>(null);
+  const [drawerActiveModuleId, setDrawerActiveModuleId] = useState<string | null>(null);
+
+  const currentSubjectId = useMemo(() => {
+    if (!hierarchyData || hierarchyData.length === 0) return null;
+    const directSubject = hierarchyData.find((s: SubjectData) => pathname.includes(`/subjects/${s.id}`) || pathname.includes(`/news`));
+    if (directSubject) return directSubject.id;
+    for (const subject of hierarchyData) {
+      if (subject.modules?.some((m: ModuleData) => pathname.includes(`/modules/${m.id}`))) {
+        return subject.id;
+      }
+    }
+    return hierarchyData[0].id;
+  }, [pathname, hierarchyData]);
+
+  const displaySubjectId = hoveredSubject || currentSubjectId;
+
+  useEffect(() => {
+    const fetchHierarchy = async () => {
+      try {
+        const data = await subjectsAPI.getHierarchy();
+        if (data && data.length > 0) {
+          const backendSubjects = data[0].subjects || [];
+          setHierarchyData([NEWS_SUBJECT, ...backendSubjects]);
+        } else {
+          setHierarchyData([NEWS_SUBJECT]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dynamic hierarchy:", err);
+      }
+    };
+    fetchHierarchy();
+  }, []);
+
   const [debouncedQuery, setDebouncedQuery] = useState("");
-
-  // Debounce logic: wait 300ms after last keystroke
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch results using our semantic search hook
   const { data: searchResults, isLoading: isSearching } = useSearch(
-    { q: debouncedQuery, limit: 5 },
+    { q: debouncedQuery, limit: 10 },
     debouncedQuery.length >= 2,
   );
 
-  /**
-   * Redirects user to the full search page on enter.
-   */
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       setIsFocused(false);
+      setIsMobileSearchOpen(false);
+      setIsDrawerOpen(false);
       router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 
-  const navItems = [
-    {
-      href: "/dashboard",
-      label: "Dashboard",
-      icon: LayoutDashboard,
-      protected: false,
-    },
-    { href: "/articles", label: "Articles", icon: FileText, protected: false },
-    { href: "/topics", label: "Topics", icon: Folder, protected: false },
-    {
-      href: "/assessment",
-      label: "Quizzes",
-      icon: FileQuestion,
-      protected: false,
-    },
-    { href: "/generate", label: "Generate", icon: Sparkles, protected: false },
-    {
-      href: "/current-affairs",
-      label: "Current Affairs",
-      icon: Newspaper,
-      protected: false,
-    },
-    {
-      href: "/notebook",
-      label: "My Notebook",
-      icon: BookMarked,
-      protected: true,
-    },
-    { href: "/bookmarks", label: "Bookmarks", icon: Bookmark, protected: true },
-  ];
+  // ── FEATURE 1: Close drawer on back/forward browser navigation ──────────
+  useEffect(() => {
+    setIsDrawerOpen(false);
+  }, [pathname]);
+
+  // ── FEATURE 2: Pre-select active Subject/Module from URL when drawer opens ─
+  useEffect(() => {
+    if (!isDrawerOpen || hierarchyData.length === 0) return;
+
+    // Find active subject from current URL
+    let activeSubject: string | null = null;
+    let activeModule: string | null = null;
+
+    for (const subject of hierarchyData) {
+      if (
+        pathname.includes(`/subjects/${subject.id}`) ||
+        (subject.id === "news" && pathname.includes("/current-affairs"))
+      ) {
+        activeSubject = subject.id;
+        break;
+      }
+      const matchedModule = subject.modules?.find((m) =>
+        pathname.includes(`/modules/${m.id}`)
+      );
+      if (matchedModule) {
+        activeSubject = subject.id;
+        activeModule = matchedModule.id;
+        break;
+      }
+      const matchedTopic = subject.modules?.find((m) =>
+        m.topics?.some((t) => pathname.includes(`/topics/${t.id}`))
+      );
+      if (matchedTopic) {
+        activeSubject = subject.id;
+        activeModule = matchedTopic.id;
+        break;
+      }
+    }
+
+    setDrawerActiveSubjectId(activeSubject ?? hierarchyData[0]?.id ?? null);
+    setDrawerActiveModuleId(activeModule);
+  }, [isDrawerOpen, pathname, hierarchyData]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+      {/* MOBILE SEARCH OVERLAY (Only visible when toggled on mobile) */}
+      {isMobileSearchOpen && (
+        <div className="md:hidden absolute inset-0 bg-white z-[60] flex items-center px-4 animate-in slide-in-from-top duration-300">
+          <form onSubmit={handleSearchSubmit} className="flex-1 relative flex items-center">
+            <Search className="absolute left-3 h-4 w-4 text-slate-400" />
+            <Input
+              autoFocus
+              className="pl-10 pr-10 h-11 bg-slate-50 border-none focus:ring-0"
+              placeholder="Search orbits..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button 
+              type="button"
+              onClick={() => setIsMobileSearchOpen(false)}
+              className="absolute right-3 p-1 text-slate-400 hover:text-slate-900"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* LAYER 1: TOP BAR (Brand, Search, Utility) */}
       <div className="border-b bg-white/50 relative z-50">
         <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between gap-8">
-            {/* Logo */}
-            <Link
-              href="/"
-              className="flex items-center space-x-2 flex-shrink-0"
-            >
-              <BookOpen className="h-7 w-7 text-blue-600" />
-              <div className="flex flex-col">
-                <span className="text-xl font-black text-slate-900 tracking-tight leading-none">
-                  TheKnowledgeOrbits
-                </span>
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1">
-                  AI-Powered UPSC OS
-                </span>
-              </div>
-            </Link>
+          <div className="flex h-16 items-center justify-between gap-4">
+            {/* Hamburger + Logo Group */}
+            <div className="flex items-center gap-2 md:gap-4 shrink-0">
+              {/* SYLLABUS EXPLORER HAMBURGER */}
+              <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="shrink-0 -ml-2 hover:bg-slate-100">
+                    <Menu className="h-6 w-6 text-slate-700" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-full sm:max-w-4xl p-0 flex flex-col overflow-hidden">
+                  {/* ── FEATURE 3: Staggered slide-in header ─────────── */}
+                  <SheetHeader className="p-6 border-b bg-slate-50 animate-in slide-in-from-left duration-300">
+                    <SheetTitle className="flex items-center gap-3">
+                      <BookOpen className="h-6 w-6 text-blue-600" />
+                      <span className="font-black tracking-tight text-xl uppercase">Syllabus Explorer</span>
+                    </SheetTitle>
+                  </SheetHeader>
+                  
+                  {/* EXPLORER MATRIX — each column animates in with stagger */}
+                  <div className="flex-1 flex overflow-hidden">
 
-            {/* Central Search Bar (Professional Global Command) */}
-            <div className="flex-1 max-w-xl hidden md:block relative">
+                    {/* COL 1: SUBJECTS + DRAWER SEARCH — slides in first */}
+                    <div className="w-[180px] sm:w-[280px] border-r overflow-y-auto no-scrollbar bg-slate-50/50 flex flex-col animate-in slide-in-from-left duration-300 delay-75">
+                      {/* BBC-STYLE DRAWER SEARCH BAR */}
+                      <div className="p-4 border-b bg-white relative">
+                        <form onSubmit={handleSearchSubmit} className="relative group/drawer-search">
+                          <Input
+                            type="search"
+                            placeholder="Search news, topics and more"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onFocus={() => setIsFocused(true)}
+                            onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                            className="pr-10 h-10 bg-slate-100 border-none focus:bg-white focus:ring-1 focus:ring-slate-300 transition-all rounded-sm text-sm"
+                          />
+                          <button 
+                            type="submit"
+                            className="absolute right-0 top-0 h-full w-10 flex items-center justify-center bg-slate-800 text-white hover:bg-slate-900 transition-colors rounded-sm"
+                          >
+                            <Search className="h-4 w-4" />
+                          </button>
+                        </form>
+
+                        {/* DRAWER SMART DROPDOWN RESULTS */}
+                        {isFocused && searchQuery.length >= 2 && (
+                          <div className="absolute top-full left-4 right-4 mt-1 bg-white rounded-md shadow-2xl border border-slate-200 overflow-hidden max-h-[60vh] overflow-y-auto z-[100] animate-in fade-in slide-in-from-top-1">
+                            {isSearching ? (
+                              <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                                <Sparkles className="h-4 w-4 animate-spin text-blue-500" /> Thinking...
+                              </div>
+                            ) : searchResults && searchResults.length > 0 ? (
+                              <div className="py-2">
+                                {searchResults.map((result: SearchResult) => (
+                                  <Link
+                                    key={result.id}
+                                    href={result.url || "#"}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault(); 
+                                      setIsFocused(false);
+                                      setIsDrawerOpen(false);
+                                      setSearchQuery("");
+                                      router.push(result.url || "#");
+                                    }}
+                                    className="block px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50"
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <div className={cn(
+                                        "h-7 w-7 rounded flex items-center justify-center shrink-0 mt-0.5 text-white",
+                                        result.type === "topic" ? "bg-purple-500" : result.type === "current_affair" ? "bg-emerald-500" : "bg-blue-500",
+                                      )}>
+                                        {result.type === "topic" ? <Folder className="h-3.5 w-3.5" /> : result.type === "current_affair" ? <Newspaper className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                                      </div>
+                                      <div>
+                                        <h4 className="text-[13px] font-bold text-slate-900 line-clamp-1 leading-tight">{result.title}</h4>
+                                        <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">{result.snippet}</p>
+                                      </div>
+                                    </div>
+                                  </Link>
+                                ))}
+                                <button
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setIsFocused(false);
+                                    setIsDrawerOpen(false);
+                                    router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+                                  }}
+                                  className="block w-full py-2 text-center text-xs font-bold text-blue-600 bg-blue-50/50 hover:bg-blue-100 transition-colors"
+                                >
+                                  View all results
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center">
+                                <p className="text-slate-500 text-xs">No results found.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-3 space-y-1">
+                        <div className="px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Map</div>
+                        <Link href="/" onClick={() => setIsDrawerOpen(false)} className={cn("flex items-center px-3 py-2.5 text-sm font-bold rounded-lg transition-all", pathname === "/" ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-white")}>Home</Link>
+                        <Link href="/about" onClick={() => setIsDrawerOpen(false)} className={cn("flex items-center px-3 py-2.5 text-sm font-bold rounded-lg transition-all", pathname === "/about" ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-white")}>About</Link>
+                        <Link href="/contact" onClick={() => setIsDrawerOpen(false)} className={cn("flex items-center px-3 py-2.5 text-sm font-bold rounded-lg transition-all", pathname === "/contact" ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-white")}>Contact Us</Link>
+                        
+                        <div className="mt-6 px-3 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Core Subjects</div>
+                        {hierarchyData.map((s) => {
+                          const isCurrentSubject = drawerActiveSubjectId === s.id;
+                          return (
+                            <button
+                              key={s.id}
+                              onMouseEnter={() => setDrawerActiveSubjectId(s.id)}
+                              onClick={() => { setDrawerActiveSubjectId(s.id); setDrawerActiveModuleId(null); }}
+                              className={cn(
+                                "w-full flex items-center justify-between px-3 py-2.5 text-sm font-bold rounded-lg transition-all text-left",
+                                isCurrentSubject
+                                  ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                                  : "text-slate-600 hover:bg-white/50"
+                              )}
+                            >
+                              <span>{s.name}</span>
+                              <ChevronRight className={cn("h-4 w-4 transition-transform duration-200", isCurrentSubject ? "opacity-100 translate-x-0.5" : "opacity-40")} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* COL 2: MODULES — slides in second with a slightly longer delay */}
+                    <div className={cn(
+                      "w-[180px] sm:w-[260px] border-r overflow-y-auto no-scrollbar animate-in slide-in-from-left duration-300 delay-150",
+                      !drawerActiveSubjectId && "bg-slate-50/20"
+                    )}>
+                      {drawerActiveSubjectId ? (
+                        <div className="p-3 space-y-1">
+                          <div className="px-3 py-2 text-[10px] font-black text-blue-400 uppercase tracking-widest">Modules</div>
+                          {hierarchyData.find(s => s.id === drawerActiveSubjectId)?.modules?.map((m) => {
+                            const isCurrentModule = drawerActiveModuleId === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                onMouseEnter={() => setDrawerActiveModuleId(m.id)}
+                                onClick={() => setDrawerActiveModuleId(m.id)}
+                                className={cn(
+                                  "w-full flex items-center justify-between px-3 py-2.5 text-sm font-bold rounded-lg transition-all text-left",
+                                  isCurrentModule
+                                    ? "bg-slate-800 text-white shadow-sm"
+                                    : "text-slate-600 hover:bg-slate-50"
+                                )}
+                              >
+                                <span className="line-clamp-1">{m.name}</span>
+                                <ChevronRight className={cn("h-4 w-4 transition-transform duration-200 shrink-0", isCurrentModule ? "opacity-100 translate-x-0.5" : "opacity-40")} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center p-8 text-center">
+                          <p className="text-xs text-slate-400 font-medium italic">Hover a subject to explore modules</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* COL 3: TOPICS — slides in last with the longest delay */}
+                    <div className="flex-1 overflow-y-auto no-scrollbar bg-white animate-in slide-in-from-left duration-300 delay-200">
+                      {drawerActiveModuleId ? (
+                        <div className="p-4 space-y-1">
+                          <div className="px-3 py-2 text-[10px] font-black text-emerald-500 uppercase tracking-widest">Syllabus Topics</div>
+                          {(() => {
+                            const activeModule = hierarchyData
+                              .find(s => s.id === drawerActiveSubjectId)
+                              ?.modules?.find(m => m.id === drawerActiveModuleId);
+                            const isNewsModule = drawerActiveSubjectId === "news";
+                            // Build flat list: root topics + their sub_topics
+                            const flatTopics: { id: string; name: string; isSubTopic?: boolean }[] = [];
+                            activeModule?.topics?.forEach(t => {
+                              flatTopics.push({ id: t.id, name: t.name });
+                              t.sub_topics?.forEach(st => flatTopics.push({ id: st.id, name: st.name, isSubTopic: true }));
+                            });
+                            return flatTopics.map((t, i) => {
+                              const isActiveTopic = pathname.includes(`/topics/${t.id}`);
+                              // News topics go to /current-affairs, real topics go to /topics/:id/articles
+                              const href = isNewsModule ? "/current-affairs" : `/topics/${t.id}/articles`;
+                              return (
+                                <Link
+                                  key={t.id}
+                                  href={href}
+                                  onClick={() => setIsDrawerOpen(false)}
+                                  style={{ animationDelay: `${i * 20}ms` }}
+                                  className={cn(
+                                    "block rounded-lg transition-all border-l-2 animate-in fade-in slide-in-from-right-2 duration-200",
+                                    t.isSubTopic ? "px-5 py-2 text-[11px] font-medium" : "px-3 py-2.5 text-xs font-bold",
+                                    isActiveTopic
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-500"
+                                      : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 border-transparent hover:border-emerald-400"
+                                  )}
+                                >
+                                  {t.name}
+                                </Link>
+                              );
+                            });
+                          })()}
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center p-8 text-center">
+                          <FileText className="h-12 w-12 text-slate-100 mb-2 mx-auto" strokeWidth={1} />
+                          <p className="text-xs text-slate-400 font-medium italic px-4">Select a module to jump directly to topics</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              {/* Logo */}
+              <Link href="/" className="flex items-center space-x-2 shrink-0">
+                <BookOpen className="h-7 w-7 text-blue-600" />
+                <div className="flex flex-col">
+                  <span className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-none">
+                    TheKnowledgeOrbits
+                  </span>
+                  <span className="hidden sm:inline-block text-[10px] font-bold text-blue-600 uppercase tracking-widest mt-1">
+                    AI-Powered UPSC OS
+                  </span>
+                </div>
+              </Link>
+            </div>
+
+            {/* Central Search Bar - (DESKTOP / LANDSCAPE) */}
+            <div className="hidden md:block flex-1 max-w-xl relative">
               <form onSubmit={handleSearchSubmit} className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors pointer-events-none" />
                 <Input
@@ -128,186 +450,186 @@ export default function Header() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setIsFocused(true)}
-                  onBlur={() => setTimeout(() => setIsFocused(false), 200)} // Delay to allow click
+                  onBlur={() => setTimeout(() => setIsFocused(false), 200)}
                   className="pl-10 pr-4 h-11 bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all rounded-xl w-full"
                 />
               </form>
 
               {/* SMART DROPDOWN RESULTS */}
               {isFocused && searchQuery.length >= 2 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden max-h-[80vh] overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden max-h-[80vh] overflow-y-auto z-[70] animate-in fade-in slide-in-from-top-2">
                   {isSearching ? (
                     <div className="p-4 text-center text-sm text-slate-500 flex items-center justify-center gap-2">
-                      <Sparkles className="h-4 w-4 animate-spin text-blue-500" />{" "}
-                      Thinking...
+                      <Sparkles className="h-4 w-4 animate-spin text-blue-500" /> Thinking...
                     </div>
                   ) : searchResults && searchResults.length > 0 ? (
                     <div className="py-2">
-                      <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Top Results
-                      </div>
                       {searchResults.map((result: SearchResult) => (
                         <Link
                           key={result.id}
                           href={result.url || "#"}
-                          className="block px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0"
+                          onMouseDown={(e) => {
+                            // FAST NAVIGATION: Capture before onBlur hides the dropdown
+                            e.preventDefault();
+                            setIsFocused(false);
+                            setSearchQuery("");
+                            router.push(result.url || "#");
+                          }}
+                          className="block px-4 py-3 hover:bg-slate-50 transition-colors"
                         >
                           <div className="flex items-start gap-3">
-                            <div
-                              className={cn(
-                                "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
-                                result.type === "topic"
-                                  ? "bg-purple-100 text-purple-600"
-                                  : result.type === "current_affair"
-                                    ? "bg-emerald-100 text-emerald-600"
-                                    : "bg-blue-100 text-blue-600",
-                              )}
-                            >
-                              {result.type === "topic" ? (
-                                <Folder className="h-4 w-4" />
-                              ) : result.type === "current_affair" ? (
-                                <Newspaper className="h-4 w-4" />
-                              ) : (
-                                <FileText className="h-4 w-4" />
-                              )}
+                            <div className={cn(
+                              "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
+                              result.type === "topic" ? "bg-purple-100 text-purple-600" : result.type === "current_affair" ? "bg-emerald-100 text-emerald-600" : "bg-blue-100 text-blue-600",
+                            )}>
+                              {result.type === "topic" ? <Folder className="h-4 w-4" /> : result.type === "current_affair" ? <Newspaper className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                             </div>
                             <div>
-                              <h4 className="text-sm font-bold text-slate-900 line-clamp-1">
-                                {result.title}
-                              </h4>
-                              <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                                {result.snippet}
-                              </p>
-                              <div className="flex gap-2 mt-1.5">
-                                {typeof result.metadata?.subject ===
-                                  "string" && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                                    {result.metadata.subject}
-                                  </span>
-                                )}
-                                {typeof result.metadata?.date === "string" && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                                    {result.metadata.date}
-                                  </span>
-                                )}
-                              </div>
+                              <h4 className="text-sm font-bold text-slate-900 line-clamp-1">{result.title}</h4>
+                              <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{result.snippet}</p>
                             </div>
                           </div>
                         </Link>
                       ))}
-                      <Link
-                        href={`/search?q=${encodeURIComponent(searchQuery)}`}
-                        className="block p-3 text-center text-sm font-bold text-blue-600 hover:bg-blue-50 transition-colors border-t border-slate-100"
-                      >
-                        View all results
-                      </Link>
                     </div>
-                  ) : (
-                    <div className="p-8 text-center">
-                      <p className="text-slate-500 text-sm">
-                        No orbits found for "{searchQuery}"
-                      </p>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
 
             {/* Top Right Utility */}
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 sm:gap-6">
               <nav className="hidden xl:flex items-center gap-6 text-sm font-semibold text-slate-600">
-                <Link
-                  href="/"
-                  className="hover:text-blue-600 transition-colors"
-                >
-                  Home
-                </Link>
-                <Link
-                  href="/about"
-                  className="hover:text-blue-600 transition-colors"
-                >
-                  About
-                </Link>
-                <Link
-                  href="/contact"
-                  className="hover:text-blue-600 transition-colors"
-                >
-                  Contact Us
-                </Link>
+                <Link href="/" className="hover:text-blue-600 transition-colors">Home</Link>
+                <Link href="/about" className="hover:text-blue-600 transition-colors">About</Link>
+                <Link href="/contact" className="hover:text-blue-600 transition-colors">Contact Us</Link>
               </nav>
 
-              <div className="flex items-center space-x-2 border-l pl-6 border-slate-200 h-8">
-                {!isLoading &&
-                  (isAuthenticated ? (
+              {/* MOBILE SEARCH TRIGGER */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="md:hidden text-slate-600"
+                onClick={() => setIsMobileSearchOpen(true)}
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+
+              <div className="flex items-center space-x-2 sm:border-l pl-0 sm:pl-6 border-slate-200 h-8">
+                {!isLoading && (
+                  isAuthenticated ? (
                     <UserMenu />
                   ) : (
                     <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                        className="hidden sm:inline-flex font-bold"
-                      >
+                      <Button variant="ghost" size="sm" asChild className="hidden lg:inline-flex font-bold">
                         <Link href="/auth/login">Login</Link>
                       </Button>
-                      <Button
-                        size="sm"
-                        asChild
-                        className="bg-blue-600 hover:bg-blue-700 font-bold shadow-md shadow-blue-200"
-                      >
+                      <Button size="sm" asChild className="bg-blue-600 hover:bg-blue-700 font-bold shadow-md shadow-blue-200 whitespace-nowrap">
                         <Link href="/auth/register">Join Pro</Link>
                       </Button>
                     </>
-                  ))}
+                  )
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* LAYER 2: FEATURE BAR (Horizontal Navigation) */}
-      <div className="bg-white border-b relative z-40 shadow-sm">
+      {/* TIER 1: SUBJECTS (Horizontal Ribbon) */}
+      <div 
+        className="bg-white border-b relative z-40 shadow-sm overflow-hidden"
+        onMouseLeave={() => setHoveredSubject(null)}
+      >
         <div className="container mx-auto px-4">
-          <nav className="flex items-center h-12 overflow-x-auto no-scrollbar gap-2 scroll-smooth">
-            {navItems
-              .filter((item) => !item.protected || isAuthenticated)
-              .map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center space-x-2 px-4 h-full text-sm font-bold transition-all border-b-2 whitespace-nowrap shrink-0 group",
-                      isActive
-                        ? "text-blue-600 border-blue-600 bg-blue-50/50"
-                        : "text-slate-500 border-transparent hover:text-slate-900 hover:bg-slate-50",
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        "h-4 w-4 transition-transform group-hover:scale-110",
-                        isActive ? "text-blue-600" : "text-slate-400",
-                      )}
-                    />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-
-            {/* Future Scaling Space */}
-            <div className="ml-auto flex items-center gap-2 pl-4 border-l border-slate-100 hidden lg:flex">
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter cursor-default select-none">
-                More Modules Loading...
-              </span>
-            </div>
+          <nav className="flex items-center h-12 overflow-x-auto no-scrollbar scroll-smooth">
+            {hierarchyData.map((subject) => {
+              const isActive = displaySubjectId === subject.id;
+              const isNews = subject.id === "news";
+              return (
+                <Link
+                  key={subject.id}
+                  href={isNews ? "/current-affairs" : `/subjects/${subject.id}`}
+                  className={cn(
+                    "flex items-center px-5 h-full text-sm font-bold transition-all whitespace-nowrap shrink-0 border-b-2 border-r border-slate-200 group",
+                    isActive
+                      ? isNews ? "text-red-600 border-b-red-600 bg-red-50/50" : "text-blue-700 border-b-blue-700 bg-blue-50/50"
+                      : "text-slate-600 border-b-transparent hover:text-slate-900 hover:bg-slate-50"
+                  )}
+                  onMouseEnter={() => setHoveredSubject(subject.id)}
+                >
+                  {subject.name}
+                </Link>
+              );
+            })}
           </nav>
         </div>
+
+        {/* TIER 2: MODULES (Swipable Ribbon) */}
+        {displaySubjectId && (
+          <div 
+            className="bg-slate-50 shadow-inner border-b relative z-30 block"
+            onMouseLeave={() => setHoveredModuleId(null)}
+          >
+            <div className="container mx-auto px-4">
+              <nav className="flex items-center h-9 overflow-x-auto no-scrollbar scroll-smooth w-full relative z-[100]">
+                {hierarchyData
+                  .find((s) => s.id === displaySubjectId)
+                  ?.modules?.map((module: ModuleData) => {
+                    const isActiveModule = pathname.includes(`/modules/${module.id}`);
+                    const isHovered = hoveredModuleId === module.id;
+                    const allTopics = [
+                      ...(module.topics || []),
+                      ...(module.topics?.flatMap((t) => t.sub_topics || []) || []),
+                    ];
+                    const hasTopics = allTopics.length > 0;
+
+                    return (
+                      <div
+                        key={module.id}
+                        className="h-full shrink-0 flex items-center border-r border-slate-300 relative group/module"
+                        onMouseEnter={() => setHoveredModuleId(module.id)}
+                      >
+                        <Link
+                          href={`/modules/${module.id}`}
+                          className={cn(
+                            "flex items-center px-4 h-full text-[11px] font-bold uppercase tracking-wider transition-all whitespace-nowrap",
+                            isActiveModule || isHovered ? "bg-slate-200 text-slate-900" : "bg-transparent text-slate-600 hover:bg-slate-200/50"
+                          )}
+                        >
+                          {module.name}
+                          {hasTopics && (
+                            <ChevronDown className={cn("ml-1.5 h-3 w-3 transition-transform", isHovered && "rotate-180")} />
+                          )}
+                        </Link>
+
+                        {/* DESKTOP DROPDOWN LIST (Hidden on mobile small screens to prevent clipping) */}
+                        <div className="hidden sm:block">
+                          {isHovered && hasTopics && (
+                            <div className="absolute top-9 left-0 w-[280px] bg-white border border-slate-200 shadow-xl z-[100] animate-in fade-in slide-in-from-top-1 duration-200 flex flex-col py-1.5 rounded-b-md">
+                              <div className="max-h-[60vh] overflow-y-auto no-scrollbar">
+                                {allTopics.map((topic) => (
+                                  <Link
+                                    key={topic.id}
+                                    href={`/topics/${topic.id}/articles`}
+                                    className="block px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-700 transition-all border-l-[3px] border-transparent hover:border-blue-600"
+                                  >
+                                    {topic.name}
+                                  </Link>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </nav>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );
 }
+

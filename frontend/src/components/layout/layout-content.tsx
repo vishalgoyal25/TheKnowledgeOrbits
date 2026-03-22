@@ -18,15 +18,15 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <main className="flex-1 overflow-y-auto bg-gray-50 flex flex-col scroll-smooth">
       <div className="relative flex flex-1">
-        <Sidebar />
         <div
           className={cn(
             "flex-1 min-w-0 transition-all duration-300 ease-in-out",
-            !isHomePage && (isCollapsed ? "lg:pl-0" : "lg:pl-64"),
+            !isHomePage && (isCollapsed ? "lg:pr-0" : "lg:pr-64"),
           )}
         >
           {children}
         </div>
+        <Sidebar />
       </div>
       <Footer />
     </main>
