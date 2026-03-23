@@ -29,7 +29,8 @@ export default function ModuleCard({ module }: ModuleCardProps) {
 
         <CardContent>
           <p className="text-sm text-slate-600 line-clamp-3 mb-4">
-            {module.description || "Explore all categorized syllabus topics naturally grouped inside this module map."}
+            {module.description ||
+              "Explore all categorized syllabus topics naturally grouped inside this module map."}
           </p>
         </CardContent>
 

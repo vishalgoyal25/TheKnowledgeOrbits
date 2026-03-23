@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTopics } from "@/lib/hooks/use-topics";
 import { Topic } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,20 +24,21 @@ export default function TopicSelector({
   selectedTopicId,
 }: TopicSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: topicsData, isLoading } = useTopics();
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce the search so we don't fire API on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch all topics — pass a large page_size and server-side search filter
+  const { data: topicsData, isLoading } = useTopics({
+    page_size: 1000,
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+  });
 
   const topics = topicsData || [];
-
-  // Filter topics
-  const filteredTopics = topics.filter(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (topic: any) =>
-      topic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      topic.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      topic.keywords?.some((k: string) =>
-        k.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-  );
 
   if (isLoading) {
     return (
@@ -48,6 +49,19 @@ export default function TopicSelector({
       </div>
     );
   }
+
+  // Client-side filter for instant response while debounce / API catches up
+  const filteredTopics = searchTerm
+    ? topics.filter(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (topic: any) =>
+          topic.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          topic.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          topic.keywords?.some((k: string) =>
+            k.toLowerCase().includes(searchTerm.toLowerCase()),
+          ),
+      )
+    : topics;
 
   return (
     <div className="space-y-4">

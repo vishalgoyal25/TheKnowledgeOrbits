@@ -1,6 +1,7 @@
 """Core Pagination Classes."""
 
 from rest_framework.pagination import LimitOffsetPagination, PageNumberPagination
+from engines.shared.services.cache_service import get_cache_service
 
 
 class StandardPageNumberPagination(PageNumberPagination):
@@ -11,15 +12,13 @@ class StandardPageNumberPagination(PageNumberPagination):
 
     page_size = 20
     page_size_query_param = "page_size"
-    max_page_size = 100
+    max_page_size = 1000
 
     def get_count(self, queryset):
         """
         Determine an object count, supporting caching to avoid expensive SELECT COUNT(*).
         """
         try:
-            from engines.shared.services.cache_service import get_cache_service
-
             cache_service = get_cache_service()
 
             custom_key = getattr(queryset, "_custom_count_cache_key", None)
