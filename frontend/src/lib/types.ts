@@ -123,6 +123,26 @@ export interface Subject {
   is_active: boolean;
 }
 
+// Hierarchy Types (for Navigation/Syllabus Explorer)
+export interface HierarchyTopic {
+  id: string;
+  name: string;
+  sub_topics?: { id: string; name: string }[];
+}
+
+export interface HierarchyModule {
+  id: string;
+  name: string;
+  topics?: HierarchyTopic[];
+}
+
+export interface HierarchySubject {
+  id: string;
+  name: string;
+  description?: string;
+  modules: HierarchyModule[];
+}
+
 // Program Types
 export interface Program {
   id: string;

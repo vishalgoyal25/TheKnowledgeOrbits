@@ -12,6 +12,7 @@ import { SidebarProvider } from "@/components/providers/sidebar-provider";
 import { LayoutContent } from "@/components/layout/layout-content";
 import FeedbackButton from "@/components/support/feedback-button";
 import { GlobalErrorBoundary } from "@/components/shared/GlobalErrorBoundary";
+import { getHierarchyData } from "@/lib/api/server-hierarchy";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,11 +22,14 @@ export const metadata: Metadata = {
     "Master UPSC CSE with AI-generated articles and intelligent learning paths",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Fetch hierarchy in parallel (server-side). This is cached for 30 min.
+  const initialHierarchy = await getHierarchyData();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
@@ -34,7 +38,8 @@ export default function RootLayout({
             <AuthProvider>
               <SidebarProvider>
                 <div className="min-h-screen flex flex-col">
-                  <Header />
+                  {/* Pass the server-baked hierarchy to the Client Header */}
+                  <Header initialHierarchy={initialHierarchy} />
                   <LayoutContent>{children}</LayoutContent>
                   <FeedbackButton />
                   <Toaster />
