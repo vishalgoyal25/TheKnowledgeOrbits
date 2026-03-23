@@ -5,23 +5,32 @@
 
 import { HierarchySubject } from "@/lib/types";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 export async function getHierarchyData(): Promise<HierarchySubject[]> {
   try {
     const res = await fetch(`${BACKEND_URL}/knowledge/hierarchy/`, {
       // Revalidate every 30 minutes (1800 seconds) in the background
       next: { revalidate: 1800 },
-      // Important: No-cache during local development if needed, 
+      // Important: No-cache during local development if needed,
       // but ISR is primarily for production speed.
     });
 
     if (!res.ok) {
-        console.warn("Hierarchy fetch failed on server, falling back to empty list.");
-        return [];
+      console.warn(
+        "Hierarchy fetch failed on server, falling back to empty list.",
+      );
+      return [];
     }
 
     const data = await res.json();
+
+    // If the data is an array of programs with nested subjects, flatten it.
+    if (Array.isArray(data) && data[0]?.subjects) {
+      return data.flatMap((program) => program.subjects || []);
+    }
+
     return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error("ISR Hierarchy fetch error:", error);
