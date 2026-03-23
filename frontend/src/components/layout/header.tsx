@@ -34,27 +34,9 @@ import UserMenu from "@/components/auth/UserMenu";
 import { useSearch } from "@/lib/hooks/use-search";
 import { SearchResult } from "@/lib/api/search";
 import { subjectsAPI } from "@/lib/api/subjects";
+import { HierarchySubject, HierarchyModule, HierarchyTopic } from "@/lib/types";
 
-interface TopicData {
-  id: string;
-  name: string;
-  sub_topics?: { id: string; name: string }[];
-}
-
-interface ModuleData {
-  id: string;
-  name: string;
-  topics?: TopicData[];
-}
-
-interface SubjectData {
-  id: string;
-  name: string;
-  modules: ModuleData[];
-  description?: string;
-}
-
-const NEWS_SUBJECT: SubjectData = {
+const NEWS_SUBJECT: HierarchySubject = {
   id: "news",
   name: "News",
   description: "Global news updates and current affairs categorized by theme.",
@@ -118,7 +100,11 @@ const NEWS_SUBJECT: SubjectData = {
   ],
 };
 
-export default function Header() {
+interface HeaderProps {
+  initialHierarchy?: HierarchySubject[];
+}
+
+export default function Header({ initialHierarchy }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
@@ -127,8 +113,10 @@ export default function Header() {
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Dynamic Content Hierarchy State
-  const [hierarchyData, setHierarchyData] = useState<SubjectData[]>([]);
+  // Dynamic Content Hierarchy State (Initialized with server-side data for 0s wait)
+  const [hierarchyData, setHierarchyData] = useState<HierarchySubject[]>(
+    initialHierarchy ? [NEWS_SUBJECT, ...initialHierarchy] : [NEWS_SUBJECT],
+  );
   const [hoveredSubject, setHoveredSubject] = useState<string | null>(null);
   const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{
@@ -136,7 +124,7 @@ export default function Header() {
     top: number;
   } | null>(null);
   const [hoveredModuleTopics, setHoveredModuleTopics] = useState<
-    { id: string; name: string; sub_topics?: { id: string; name: string }[] }[]
+    HierarchyTopic[]
   >([]);
   // Sub-topic flyout state
   const [hoveredTopicSubtopics, setHoveredTopicSubtopics] = useState<
@@ -179,13 +167,13 @@ export default function Header() {
   const currentSubjectId = useMemo(() => {
     if (!hierarchyData || hierarchyData.length === 0) return null;
     const directSubject = hierarchyData.find(
-      (s: SubjectData) =>
+      (s: HierarchySubject) =>
         pathname.includes(`/subjects/${s.id}`) || pathname.includes(`/news`),
     );
     if (directSubject) return directSubject.id;
     for (const subject of hierarchyData) {
       if (
-        subject.modules?.some((m: ModuleData) =>
+        subject.modules?.some((m: HierarchyModule) =>
           pathname.includes(`/modules/${m.id}`),
         )
       ) {
@@ -198,21 +186,29 @@ export default function Header() {
   const displaySubjectId = hoveredSubject || currentSubjectId;
 
   useEffect(() => {
+    // Only fetch if we don't have server-side data, or as a background refresh.
     const fetchHierarchy = async () => {
       try {
         const data = await subjectsAPI.getHierarchy();
         if (data && data.length > 0) {
           const backendSubjects = data[0].subjects || [];
           setHierarchyData([NEWS_SUBJECT, ...backendSubjects]);
-        } else {
-          setHierarchyData([NEWS_SUBJECT]);
         }
       } catch (err) {
-        console.error("Failed to fetch dynamic hierarchy:", err);
+        // Silent fail: If background fetch fails, we keep a the server-side data.
+        console.warn(
+          "Background hierarchy fetch failed, using cached version.",
+          err,
+        );
       }
     };
-    fetchHierarchy();
-  }, []);
+
+    // If we have no data at all (neither server nor client), we MUST fetch.
+    if (hierarchyData.length <= 1) {
+      // 1 because NEWS_SUBJECT is always there
+      fetchHierarchy();
+    }
+  }, [hierarchyData.length]);
 
   const [debouncedQuery, setDebouncedQuery] = useState("");
   useEffect(() => {
@@ -601,22 +597,26 @@ export default function Header() {
                             }[] = [];
                             const seenIds = new Set<string>();
 
-                            activeModule?.topics?.forEach((t) => {
-                              if (!seenIds.has(t.id)) {
-                                flatTopics.push({ id: t.id, name: t.name });
-                                seenIds.add(t.id);
-                              }
-                              t.sub_topics?.forEach((st) => {
-                                if (!seenIds.has(st.id)) {
-                                  flatTopics.push({
-                                    id: st.id,
-                                    name: st.name,
-                                    isSubTopic: true,
-                                  });
-                                  seenIds.add(st.id);
+                            activeModule?.topics?.forEach(
+                              (t: HierarchyTopic) => {
+                                if (!seenIds.has(t.id)) {
+                                  flatTopics.push({ id: t.id, name: t.name });
+                                  seenIds.add(t.id);
                                 }
-                              });
-                            });
+                                t.sub_topics?.forEach(
+                                  (st: { id: string; name: string }) => {
+                                    if (!seenIds.has(st.id)) {
+                                      flatTopics.push({
+                                        id: st.id,
+                                        name: st.name,
+                                        isSubTopic: true,
+                                      });
+                                      seenIds.add(st.id);
+                                    }
+                                  },
+                                );
+                              },
+                            );
 
                             return flatTopics.map((t, i) => {
                               const isActiveTopic = pathname.includes(
@@ -854,16 +854,17 @@ export default function Header() {
               <nav className="flex items-center h-9 overflow-x-auto overflow-y-visible no-scrollbar scroll-smooth w-full relative z-[100]">
                 {hierarchyData
                   .find((s) => s.id === displaySubjectId)
-                  ?.modules?.map((module: ModuleData) => {
+                  ?.modules?.map((module: HierarchyModule) => {
                     const isActiveModule = pathname.includes(
                       `/modules/${module.id}`,
                     );
                     const isHovered = hoveredModuleId === module.id;
                     const allTopics: { id: string; name: string }[] = [];
-                    module.topics?.forEach((t) => {
+                    module.topics?.forEach((t: HierarchyTopic) => {
                       allTopics.push({ id: t.id, name: t.name });
-                      t.sub_topics?.forEach((st) =>
-                        allTopics.push({ id: st.id, name: st.name }),
+                      t.sub_topics?.forEach(
+                        (st: { id: string; name: string }) =>
+                          allTopics.push({ id: st.id, name: st.name }),
                       );
                     });
                     const hasTopics = allTopics.length > 0;
@@ -878,7 +879,7 @@ export default function Header() {
                           ).getBoundingClientRect();
                           setDropdownPos({ left: rect.left, top: rect.bottom });
                           const topics =
-                            module.topics?.map((t) => ({
+                            module.topics?.map((t: HierarchyTopic) => ({
                               id: t.id,
                               name: t.name,
                               sub_topics: t.sub_topics || [],
