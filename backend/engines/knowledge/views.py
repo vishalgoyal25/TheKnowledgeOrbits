@@ -466,7 +466,7 @@ class HierarchyListView(views.APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, *args, **kwargs):
-        cache_key = "master_hierarchy_list_v2"  # bumped to bust stale cache
+        cache_key = "master_hierarchy_list_v3"  # bumped to bust stale cache
         cached = cache_service.get(cache_key)
         if cached:
             return Response(cached)
@@ -486,14 +486,13 @@ class HierarchyListView(views.APIView):
                 )
                 for m in modules:
                     m_data = {"id": str(m.id), "name": m.name, "topics": []}
-                    # Return ALL topics for the module (root + children) so the
-                    # drawer can display the complete syllabus list.
-                    all_topics = Topic.objects.filter(
-                        module=m, is_active=True
+                    # Return only top-level (root) topics.
+                    # Children will be nested in sub_topics to prevent duplicates.
+                    root_topics = Topic.objects.filter(
+                        module=m, parent_topic__isnull=True, is_active=True
                     ).order_by("order_index")
-                    for t in all_topics:
+                    for t in root_topics:
                         t_data = {"id": str(t.id), "name": t.name, "sub_topics": []}
-                        # Still include direct children for any nested expansions
                         sub_topics = Topic.objects.filter(
                             parent_topic=t, is_active=True
                         ).order_by("order_index")
