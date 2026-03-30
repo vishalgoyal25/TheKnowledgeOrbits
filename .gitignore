@@ -89,3 +89,11 @@ agentic_dev/
 *_errors.txt
 
 backend/data_storage/
+
+.agent/
+.specify/
+specs/
+
+.agent
+.specify
+specs

@@ -36,12 +36,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "cloudinary_storage",  # Must be before staticfiles
     "django.contrib.staticfiles",
-    "cloudinary",          # Cloudinary integration
+    "cloudinary",  # Cloudinary integration
     # Third-party (DRF converts Python objects → JSON.)
-    "rest_framework", # This enables backend → frontend JSON communication.
-    "rest_framework_simplejwt", # This handles JWT authentication (access/refresh tokens).
-    "corsheaders", # This allows frontend to communicate with backend.
-    "pgvector", # This enables vector storage for AI embeddings.
+    "rest_framework",  # This enables backend → frontend JSON communication.
+    "rest_framework_simplejwt",  # This handles JWT authentication (access/refresh tokens).
+    "corsheaders",  # This allows frontend to communicate with backend.
+    "pgvector",  # This enables vector storage for AI embeddings.
     "background_task",
     # Local engines (will be added as we build them)
     "engines.content",

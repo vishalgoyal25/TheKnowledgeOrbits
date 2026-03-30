@@ -664,22 +664,22 @@ types/
 
 ## 4. FILE COUNT SUMMARY
 
-| Area                        | .py files | .ts/.tsx files |
-|-----------------------------|-----------|----------------|
-| Backend Core                | 10        | —              |
-| Auth Engine                 | 12        | —              |
-| Authorization Engine        | 15        | —              |
-| Content Engine              | 16        | —              |
-| Knowledge Engine            | 14        | —              |
-| Assessment Engine           | 18        | —              |
-| User State Engine           | 15        | —              |
-| Analytics Engine            | 15        | —              |
-| Article Generation Engine   | 16        | —              |
-| Current Affairs Engine      | 19        | —              |
-| Support Engine              | 9         | —              |
-| Shared Services             | 4         | —              |
-| Frontend Pages              | —         | 36             |
-| Frontend Components         | —         | 90             |
-| Frontend Lib/API/Hooks      | —         | 34             |
-| Frontend Config             | —         | 8              |
-| **TOTAL**                   | **~163**  | **~168**       |
+| Area                      | .py files | .ts/.tsx files |
+| ------------------------- | --------- | -------------- |
+| Backend Core              | 10        | —              |
+| Auth Engine               | 12        | —              |
+| Authorization Engine      | 15        | —              |
+| Content Engine            | 16        | —              |
+| Knowledge Engine          | 14        | —              |
+| Assessment Engine         | 18        | —              |
+| User State Engine         | 15        | —              |
+| Analytics Engine          | 15        | —              |
+| Article Generation Engine | 16        | —              |
+| Current Affairs Engine    | 19        | —              |
+| Support Engine            | 9         | —              |
+| Shared Services           | 4         | —              |
+| Frontend Pages            | —         | 36             |
+| Frontend Components       | —         | 90             |
+| Frontend Lib/API/Hooks    | —         | 34             |
+| Frontend Config           | —         | 8              |
+| **TOTAL**                 | **~163**  | **~168**       |

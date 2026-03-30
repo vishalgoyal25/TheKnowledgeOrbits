@@ -41,4 +41,3 @@ django-redis>=5.4.0
 # Storage (Cloudinary Direct SDK)
 cloudinary==1.38.0
 django-cloudinary-storage==0.3.0
-

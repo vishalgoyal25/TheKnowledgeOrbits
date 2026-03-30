@@ -8,55 +8,55 @@
 
 ## 1. BACKEND
 
-| Layer        | Tool                          | Version | Purpose               |
-| ------------ | ----------------------------- | ------- | --------------------- |
-| Framework    | Django                        | 5.0     | Core backend          |
-| API          | Django REST Framework         | 3.15    | REST APIs             |
-| Auth         | djangorestframework-simplejwt | latest  | JWT tokens            |
-| Password     | django[argon2]                | latest  | Argon2 hashing only   |
-| DB           | PostgreSQL                    | 16      | Primary database      |
-| Vector       | pgvector                      | latest  | Embeddings storage    |
-| Cache        | Redis                         | 7.0     | Caching + session     |
-| Task Queue   | Celery                        | 5.0     | Async background jobs |
-| Task Monitor | Flower                        | latest  | Celery dashboard      |
-| ORM Extras   | django-environ                | latest  | Env config            |
-| CORS         | django-cors-headers           | 4.6+    | Cross-origin headers  |
-| DB Adapter   | psycopg2-binary               | 2.9+    | PostgreSQL driver     |
-| Cache Layer  | django-redis                  | 5.4+    | Django Redis backend  |
-| RSS Scraping | feedparser                    | 6.0+    | RSS/Atom feed parsing |
-| HTML Parse   | beautifulsoup4                | 4.12+   | News content parsing  |
-| WSGI Server  | gunicorn                      | 23.0+   | Production app server |
-| Static Files | whitenoise                    | 6.9+    | Serve static on Render|
-| Formatter    | black                         | 24.x    | Code auto-formatting  |
-| Imports      | isort                         | 5.13+   | Import sorting        |
-| Type Check   | mypy + django-stubs           | latest  | Static type analysis  |
-| Linter       | ruff                          | latest  | Fast Python linter    |
+| Layer        | Tool                          | Version | Purpose                |
+| ------------ | ----------------------------- | ------- | ---------------------- |
+| Framework    | Django                        | 5.0     | Core backend           |
+| API          | Django REST Framework         | 3.15    | REST APIs              |
+| Auth         | djangorestframework-simplejwt | latest  | JWT tokens             |
+| Password     | django[argon2]                | latest  | Argon2 hashing only    |
+| DB           | PostgreSQL                    | 16      | Primary database       |
+| Vector       | pgvector                      | latest  | Embeddings storage     |
+| Cache        | Redis                         | 7.0     | Caching + session      |
+| Task Queue   | Celery                        | 5.0     | Async background jobs  |
+| Task Monitor | Flower                        | latest  | Celery dashboard       |
+| ORM Extras   | django-environ                | latest  | Env config             |
+| CORS         | django-cors-headers           | 4.6+    | Cross-origin headers   |
+| DB Adapter   | psycopg2-binary               | 2.9+    | PostgreSQL driver      |
+| Cache Layer  | django-redis                  | 5.4+    | Django Redis backend   |
+| RSS Scraping | feedparser                    | 6.0+    | RSS/Atom feed parsing  |
+| HTML Parse   | beautifulsoup4                | 4.12+   | News content parsing   |
+| WSGI Server  | gunicorn                      | 23.0+   | Production app server  |
+| Static Files | whitenoise                    | 6.9+    | Serve static on Render |
+| Formatter    | black                         | 24.x    | Code auto-formatting   |
+| Imports      | isort                         | 5.13+   | Import sorting         |
+| Type Check   | mypy + django-stubs           | latest  | Static type analysis   |
+| Linter       | ruff                          | latest  | Fast Python linter     |
 
 ---
 
 ## 2. FRONTEND
 
-| Layer         | Tool           | Version | Purpose                 |
-| ------------- | -------------- | ------- | ----------------------- |
-| Framework     | Next.js        | 16      | App Router, SSR         |
-| Language      | TypeScript     | 5.x     | Type safety             |
-| UI Components | shadcn/ui      | latest  | Base component library  |
-| Styling       | Tailwind CSS   | 3.x     | Utility-first CSS       |
-| Data Fetching | TanStack Query | 5.x     | Server state management |
-| Logging       | chalk          | latest  | Colored Node.js logs    |
-| HTTP Client   | axios          | 1.x     | API request handling    |
-| Animations    | framer-motion  | 12.x    | Page & UI animations    |
-| Forms         | react-hook-form| 7.x     | Controlled form state   |
-| Validation    | zod            | 4.x     | Schema validation       |
-| Toasts        | sonner         | 2.x     | Toast notifications     |
-| Markdown      | react-markdown | 10.x    | Render Markdown content |
-| Icons         | lucide-react   | latest  | Icon component library  |
-| Cookies       | js-cookie      | 3.x     | Client cookie access    |
-| Utilities     | lodash         | 4.x     | General utility helpers |
-| Date Utils    | date-fns       | 4.x     | Date formatting         |
-| Charts        | recharts       | 3.x     | Analytics/stat charts   |
-| Formatter     | prettier       | 3.x     | Code auto-formatting    |
-| Linter        | eslint         | 8.x     | JS/TS linting           |
+| Layer         | Tool            | Version | Purpose                 |
+| ------------- | --------------- | ------- | ----------------------- |
+| Framework     | Next.js         | 16      | App Router, SSR         |
+| Language      | TypeScript      | 5.x     | Type safety             |
+| UI Components | shadcn/ui       | latest  | Base component library  |
+| Styling       | Tailwind CSS    | 3.x     | Utility-first CSS       |
+| Data Fetching | TanStack Query  | 5.x     | Server state management |
+| Logging       | chalk           | latest  | Colored Node.js logs    |
+| HTTP Client   | axios           | 1.x     | API request handling    |
+| Animations    | framer-motion   | 12.x    | Page & UI animations    |
+| Forms         | react-hook-form | 7.x     | Controlled form state   |
+| Validation    | zod             | 4.x     | Schema validation       |
+| Toasts        | sonner          | 2.x     | Toast notifications     |
+| Markdown      | react-markdown  | 10.x    | Render Markdown content |
+| Icons         | lucide-react    | latest  | Icon component library  |
+| Cookies       | js-cookie       | 3.x     | Client cookie access    |
+| Utilities     | lodash          | 4.x     | General utility helpers |
+| Date Utils    | date-fns        | 4.x     | Date formatting         |
+| Charts        | recharts        | 3.x     | Analytics/stat charts   |
+| Formatter     | prettier        | 3.x     | Code auto-formatting    |
+| Linter        | eslint          | 8.x     | JS/TS linting           |
 
 ---
 
@@ -117,8 +117,8 @@
 
 ## 6. TESTING
 
-| Tool         | Purpose                             |
-| ------------ | ----------------------------------- |
+| Tool             | Purpose                             |
+| ---------------- | ----------------------------------- |
 | pytest           | Python test runner                  |
 | pytest-django    | Django integration for pytest       |
 | pytest-cov       | Test coverage reporting             |

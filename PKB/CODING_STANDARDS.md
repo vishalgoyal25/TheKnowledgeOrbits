@@ -260,19 +260,17 @@ test(assessment): add quiz generation tests
 - Fixtures via factory_boy
 - No test touches another engine's DB directly
 - Coverage targets: Models 90%, Services 85%, Views 80%
-+
-+---
-+
-+## 11. COMPLIANCE & IMPLEMENTATION STATUS
-+
-+- [x] **Core Principles:** SOLID, DRY, and KISS principles enforced in engine design.
-+- [x] **Python Standards:** Type hints, docstrings, and `structlog` mandatory in all `engines/`.
-+- [x] **Frontend Standards:** TypeScript interfaces and `chalk` logging active in `frontend/`.
-+- [x] **Django Models:** UUID primary keys, `db_table` naming, and `help_text` active on all models.
-+- [x] **Security:** Argon2 hashing and JWT (HttpOnly cookies) active in Auth engine.
-+- [x] **Logging:** Structured logging (Python) and colored logs (Node.js) fully integrated.
-+- [x] **API:** Versioned REST APIs (`/api/v1/`) established as the standard.
-+- [x] **Git:** Conventional commits enforced via `pre-commit` and `commitlint`.
-+- [x] **Database:** pgvector and UUID-based schema verified in production-ready migrations.
-+- [x] **Testing:** `pytest` + `factory_boy` testing suite active with coverage monitoring.
-+
+
+* +---
+* +## 11. COMPLIANCE & IMPLEMENTATION STATUS
+* +- [x] **Core Principles:** SOLID, DRY, and KISS principles enforced in engine design.
+  +- [x] **Python Standards:** Type hints, docstrings, and `structlog` mandatory in all `engines/`.
+  +- [x] **Frontend Standards:** TypeScript interfaces and `chalk` logging active in `frontend/`.
+  +- [x] **Django Models:** UUID primary keys, `db_table` naming, and `help_text` active on all models.
+  +- [x] **Security:** Argon2 hashing and JWT (HttpOnly cookies) active in Auth engine.
+  +- [x] **Logging:** Structured logging (Python) and colored logs (Node.js) fully integrated.
+  +- [x] **API:** Versioned REST APIs (`/api/v1/`) established as the standard.
+  +- [x] **Git:** Conventional commits enforced via `pre-commit` and `commitlint`.
+  +- [x] **Database:** pgvector and UUID-based schema verified in production-ready migrations.
+  +- [x] **Testing:** `pytest` + `factory_boy` testing suite active with coverage monitoring.
+*
