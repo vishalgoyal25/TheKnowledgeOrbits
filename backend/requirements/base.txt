@@ -37,3 +37,8 @@ beautifulsoup4>=4.12.3
 # Caching
 redis>=5.0.0
 django-redis>=5.4.0
+
+# Storage (Cloudinary Direct SDK)
+cloudinary==1.38.0
+django-cloudinary-storage==0.3.0
+

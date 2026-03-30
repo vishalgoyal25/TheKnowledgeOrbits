@@ -2,7 +2,7 @@
 
 ## TheKnowledgeOrbits — Project Folder Structure
 
-**PKB File #7 | Version: 1.0 | Date: Feb 2026**
+**PKB File #7 | Version: 1.2 | Date: March 2026**
 
 ---
 
@@ -27,19 +27,18 @@ TheKnowledgeOrbits/
 
 ---
 
-## 2. BACKEND (Django)
+## 2. BACKEND STRUCTURE (Django)
 
 ```
 backend/
 ├── manage.py
 ├── requirements.txt
-├── pyproject.toml              # Bandit, black, mypy config
-├── setup.cfg                   # Flake8, pytest config
-├── .env
-├── .env.example
+├── pyproject.toml              # Ruff, Pytest, Black configuration
+├── conftest.py                 # Global test fixtures
+├── .env / .env.example         # Environment configuration
 │
 ├── core/                       # Django project root
-│   ├── __init__.py
+│   ├── __init__.py / asgi.py / wsgi.py
 │   ├── settings/
 │   │   ├── __init__.py
 │   │   ├── base.py             # Common settings
@@ -107,21 +106,17 @@ backend/
 │   ├── privacy/                # Privacy Engine (Phase 10+)
 │   └── reporting/              # Reporting Engine (Phase 10+)
 │
-├── shared/                     # Shared utilities (NO engine logic here)
-│   ├── __init__.py
+├── shared/                     # Shared cross-engine utilities
 │   ├── base_models.py          # Abstract base model (UUID, timestamps)
 │   ├── exceptions.py           # Custom exception hierarchy
-│   ├── permissions.py          # RBAC permission classes
-│   ├── decorators.py           # @require_role etc.
+│   ├── permissions.py          # DRF permission classes
 │   ├── event_bus.py            # Event emission/listening
 │   └── utils.py                # Pure utility functions
-│
-└── conftest.py                 # Global pytest fixtures
 ```
 
 ---
 
-## 3. FRONTEND (Next.js)
+## 3. FRONTEND STRUCTURE (Next.js)
 
 ```
 frontend/
@@ -129,41 +124,38 @@ frontend/
 ├── tsconfig.json
 ├── next.config.ts
 ├── tailwind.config.ts
-├── .env.local
-├── .env.local.example
+├── .env.local / sentry.*.ts
 │
 ├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Home page
-│   │   ├── auth/
-│   │   │   ├── login/page.tsx
-│   │   │   └── register/page.tsx
-│   │   ├── dashboard/page.tsx
-│   │   ├── articles/
-│   │   │   ├── page.tsx        # Article listing
-│   │   │   └── [slug]/page.tsx # Article detail
-│   │   ├── quizzes/
-│   │   │   ├── page.tsx
-│   │   │   └── [id]/page.tsx
-│   │   └── progress/page.tsx
+│   ├── app/                    # Routing & Pages
+│   │   ├── layout.tsx / page.tsx
+│   │   ├── (auth)/             # Auth group: login, register, verify
+│   │   ├── (dashboard)/        # Dashboard group: overview, activity
+│   │   ├── articles/[id]/      # Dynamic article reader
+│   │   ├── notebook/           # User study notebook
+│   │   ├── search/             # Global search results
+│   │   └── topics/[id]/        # Syllabus navigation pages
 │   │
-│   ├── components/             # Reusable UI components
-│   │   ├── layout/             # Header, Sidebar, Footer
-│   │   ├── auth/               # Login, Register forms
-│   │   ├── article/            # Article card, reader
-│   │   ├── quiz/               # Quiz UI, timer, results
-│   │   └── shared/             # Buttons, inputs, modals
+│   ├── components/             # UI Components
+│   │   ├── ui/                 # shadcn/ui primitives (badge, button, etc.)
+│   │   ├── layout/             # sidebar, header, navigation
+│   │   ├── article/            # reader, skeleton, source-display
+│   │   ├── quiz/               # timer, question-pallete, results
+│   │   ├── dashboard/          # charts, stat-cards, insights
+│   │   ├── search/             # results, filters
+│   │   └── shared/             # empty-states, loading, error-boundaries
 │   │
-│   ├── hooks/                  # Custom React hooks
-│   ├── lib/                    # API client, utils
-│   │   ├── api.ts              # Axios/fetch wrapper
-│   │   └── utils.ts
-│   ├── types/                  # Global TypeScript types
-│   └── styles/                 # Global CSS
-│       └── globals.css
-│
-└── public/                     # Static assets
+│   ├── hooks/                  # React Utility hooks (use-toast, etc.)
+│   ├── lib/                    # Logic & API layer
+│   │   ├── auth/               # AuthContext, token-manager
+│   │   ├── api/                # Engine clients (auth, quiz, etc.)
+│   │   ├── hooks/              # Data fetching hooks (use-quiz, use-article)
+│   │   ├── logger/             # Client-side logging setup
+│   │   └── utils/              # Markdown & date formatting
+│   │
+│   ├── styles/                 # global.css & Tailwind themes
+│   ├── types/                  # Dashboard & Notebook interfaces
+│   └── proxy.ts                # API request mediation
 ```
 
 ---
@@ -205,7 +197,7 @@ PKB/
 ├── CODING_STANDARDS.md         # #4  — How to write code
 ├── WORKING_RULES.md            # #5  — Highest authority rules
 ├── DATABASE_SCHEMA.md          # #6  — All table definitions
-├── COMPLETE_FOLDER_STRUCTURE.md# #7  — This file
+├── COMPLETE_FOLDER_STRUCTURE.md# #7  — This file (UPDATED)
 ├── ENGINE_CATALOG.md           # #8  — Per-engine contracts
 ├── API_REFERENCE.md            # #9  — All endpoints
 ├── DATA_FLOW_PATTERNS.md       # #10 — Validation, retry, idempotency
@@ -218,29 +210,10 @@ PKB/
 
 ---
 
-## 6. DOCKER & SCRIPTS
+## 6. RULES
 
-```
-docker/
-├── backend.Dockerfile
-├── frontend.Dockerfile
-└── nginx.conf                  # Reverse proxy (prod)
-
-scripts/
-├── setup.sh                    # One-time project setup
-├── seed_data.py                # Seed DB with test data
-└── ingest_ncert.py             # NCERT PDF ingestion script
-
-docker-compose.yml              # Local: backend + frontend + postgres + redis
-Justfile                        # just dev, just test, just migrate, etc.
-```
-
----
-
-## 7. RULES
-
-- Every engine folder follows the SAME internal structure
-- Only `shared/` contains reusable code — no engine imports another engine
-- `agentic_dev/` is development-only. Never deployed to production
-- Phase markers in engine comments indicate when that engine is built
-- New engines are added to `engines/` only when their phase begins
+- No file without a clear purpose in this structure.
+- `src/lib/api/` must follow engine naming from backend (L0-L2).
+- All UI components must reside in `src/components/` (subdivided by domain or primitive).
+- `(group)/` folders in `app/` are for logical separation only and don't affect URL paths.
+- All new files must be reflected in the PKB if they introduce new patterns.

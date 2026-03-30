@@ -34,12 +34,14 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "cloudinary_storage",  # Must be before staticfiles
     "django.contrib.staticfiles",
-    # Third-party
-    "rest_framework",
-    "rest_framework_simplejwt",
-    "corsheaders",
-    "pgvector",
+    "cloudinary",          # Cloudinary integration
+    # Third-party (DRF converts Python objects → JSON.)
+    "rest_framework", # This enables backend → frontend JSON communication.
+    "rest_framework_simplejwt", # This handles JWT authentication (access/refresh tokens).
+    "corsheaders", # This allows frontend to communicate with backend.
+    "pgvector", # This enables vector storage for AI embeddings.
     "background_task",
     # Local engines (will be added as we build them)
     "engines.content",
@@ -162,6 +164,18 @@ STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 # Media files
 MEDIA_URL = "media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# =====================================
+# CLOUDINARY CONFIGURATION
+# =====================================
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME", default=""),
+    "API_KEY": env("CLOUDINARY_API_KEY", default=""),
+    "API_SECRET": env("CLOUDINARY_API_SECRET", default=""),
+}
+
+# Set Cloudinary as the default storage for media files
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

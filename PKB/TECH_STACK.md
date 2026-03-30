@@ -2,7 +2,7 @@
 
 ## TheKnowledgeOrbits — Authorized Technology Stack
 
-**PKB File #2 | Version: 1.0 | Date: Feb 2026**
+**PKB File #2 | Version: 1.1 | Date: March 2026**
 
 ---
 
@@ -20,6 +20,17 @@
 | Task Queue   | Celery                        | 5.0     | Async background jobs |
 | Task Monitor | Flower                        | latest  | Celery dashboard      |
 | ORM Extras   | django-environ                | latest  | Env config            |
+| CORS         | django-cors-headers           | 4.6+    | Cross-origin headers  |
+| DB Adapter   | psycopg2-binary               | 2.9+    | PostgreSQL driver     |
+| Cache Layer  | django-redis                  | 5.4+    | Django Redis backend  |
+| RSS Scraping | feedparser                    | 6.0+    | RSS/Atom feed parsing |
+| HTML Parse   | beautifulsoup4                | 4.12+   | News content parsing  |
+| WSGI Server  | gunicorn                      | 23.0+   | Production app server |
+| Static Files | whitenoise                    | 6.9+    | Serve static on Render|
+| Formatter    | black                         | 24.x    | Code auto-formatting  |
+| Imports      | isort                         | 5.13+   | Import sorting        |
+| Type Check   | mypy + django-stubs           | latest  | Static type analysis  |
+| Linter       | ruff                          | latest  | Fast Python linter    |
 
 ---
 
@@ -33,6 +44,19 @@
 | Styling       | Tailwind CSS   | 3.x     | Utility-first CSS       |
 | Data Fetching | TanStack Query | 5.x     | Server state management |
 | Logging       | chalk          | latest  | Colored Node.js logs    |
+| HTTP Client   | axios          | 1.x     | API request handling    |
+| Animations    | framer-motion  | 12.x    | Page & UI animations    |
+| Forms         | react-hook-form| 7.x     | Controlled form state   |
+| Validation    | zod            | 4.x     | Schema validation       |
+| Toasts        | sonner         | 2.x     | Toast notifications     |
+| Markdown      | react-markdown | 10.x    | Render Markdown content |
+| Icons         | lucide-react   | latest  | Icon component library  |
+| Cookies       | js-cookie      | 3.x     | Client cookie access    |
+| Utilities     | lodash         | 4.x     | General utility helpers |
+| Date Utils    | date-fns       | 4.x     | Date formatting         |
+| Charts        | recharts       | 3.x     | Analytics/stat charts   |
+| Formatter     | prettier       | 3.x     | Code auto-formatting    |
+| Linter        | eslint         | 8.x     | JS/TS linting           |
 
 ---
 
@@ -95,11 +119,15 @@
 
 | Tool         | Purpose                             |
 | ------------ | ----------------------------------- |
-| pytest       | Python test runner                  |
-| factory_boy  | Test fixture factories              |
-| faker        | Fake data generation                |
-| Schemathesis | API property-based testing          |
-| Locust       | Load/performance testing (Phase 8+) |
+| pytest           | Python test runner                  |
+| pytest-django    | Django integration for pytest       |
+| pytest-cov       | Test coverage reporting             |
+| factory_boy      | Test fixture factories              |
+| faker            | Fake data generation                |
+| Schemathesis     | API property-based testing          |
+| jest             | Frontend JavaScript test runner     |
+| @testing-library | React component testing utilities   |
+| Locust           | Load/performance testing (Phase 8+) |
 
 ---
 
@@ -146,3 +174,18 @@
 - ❌ No library added without updating this file first
 - ✅ Agents read this file to validate imports
 - ✅ All tools phased per EXECUTION_ROADMAP.md
+
+---
+
+## 11. IMPLEMENTATION & VERIFICATION STATUS
+
+- [x] **Backend Core:** Django, DRF, simplejwt, argon2, CORS, psycopg2 all active.
+- [x] **Async:** Celery + Redis configured; `django-redis` cache backend live.
+- [x] **AI/ML:** GROQ API, sentence-transformers, feedparser + beautifulsoup4 active.
+- [x] **Frontend Core:** Next.js 16, TanStack Query, shadcn/ui, Tailwind active.
+- [x] **Frontend UX:** axios, framer-motion, react-hook-form, zod, sonner, recharts active.
+- [x] **Markdown Rendering:** react-markdown + remark-gfm verified in article reader.
+- [x] **Observability:** structlog (backend) + Sentry (frontend via @sentry/nextjs) active.
+- [x] **Testing:** pytest + pytest-django + factory_boy (backend); jest + @testing-library (frontend).
+- [x] **Production:** gunicorn + whitenoise (backend); Render + Vercel (deployed).
+- [x] **Code Quality:** black, isort, mypy, ruff (backend); prettier, eslint (frontend) enforced via pre-commit.

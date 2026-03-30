@@ -29,16 +29,16 @@ Environment, skeleton, CI. Zero business logic.
 
 ### Deliverables
 
-- Mono-repo structure (backend/ + frontend/ + PKB/)
-- Django 5 + DRF skeleton (`core/` project, `engines/` package)
-- Next.js 16 + TypeScript skeleton (App Router)
-- PostgreSQL 16 + pgvector on Supabase
-- Redis 7.0 (local via Docker Compose)
-- Docker Compose: backend + frontend + postgres + redis
-- GitHub Actions CI pipeline (lint + test on PR)
-- direnv + .env configured
-- pre-commit hooks active (commitlint enforced)
-- Justfile with: `just dev`, `just test`, `just migrate`
+- [x] Mono-repo structure (backend/ + frontend/ + PKB/)
+- [x] Django 5 + DRF skeleton (`core/` project, `engines/` package)
+- [x] Next.js 16 + TypeScript skeleton (App Router)
+- [x] PostgreSQL 16 + pgvector on Supabase
+- [x] Redis 7.0 (local via Docker Compose)
+- [x] Docker Compose: backend + frontend + postgres + redis
+- [x] GitHub Actions CI pipeline (lint + test on PR)
+- [x] direnv + .env configured
+- [x] pre-commit hooks active (commitlint enforced)
+- [x] Justfile with: `just dev`, `just test`, `just migrate`
 
 ### Tools Activated This Phase
 
@@ -84,21 +84,21 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 
 **Content Engine deliverables:**
 
-- PDF upload endpoint
-- Text extraction (pdfplumber)
-- Chunking service (1200 chars)
-- Embedding generation (sentence-transformers, 384-dim)
-- Ingestion job tracking (pending → processing → done/failed)
-- Tables: content_document, content_chunk, content_embedding, content_asset, content_ingestion_job
+- [x] PDF upload endpoint
+- [x] Text extraction (pdfplumber)
+- [x] Chunking service (1200 chars)
+- [x] Embedding generation (sentence-transformers, 384-dim)
+- [x] Ingestion job tracking (pending → processing → done/failed)
+- [x] Tables: content_document, content_chunk, content_embedding, content_asset, content_ingestion_job
 
 **Auth Engine deliverables:**
 
-- Register, login, verify-email, refresh-token
-- Argon2 password hashing
-- JWT issuance (access 5 min, refresh 7 days)
-- HttpOnly cookie setting
-- Tables: auth_user, auth_role, auth_role_assignment
-- Seed: admin, content_manager, student, free_user roles
+- [x] Register, login, verify-email, refresh-token
+- [x] Argon2 password hashing
+- [x] JWT issuance (access 5 min, refresh 7 days)
+- [x] HttpOnly cookie setting
+- [x] Tables: auth_user, auth_role, auth_role_assignment
+- [x] Seed: admin, content_manager, student, free_user roles
 
 **Tools Activated This Phase**
 | Tool | Why now |
@@ -119,10 +119,10 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 
 **Deliverables:**
 
-- Program / Subject / Module / Topic CRUD
-- Chunk-topic mapping (many-to-many)
-- Basic text search across topics + chunks
-- Tables: knowledge_program, knowledge_subject, knowledge_module, knowledge_topic, knowledge_chunk_topic_map
+- [x] Program / Subject / Module / Topic CRUD
+- [x] Chunk-topic mapping (many-to-many)
+- [x] Basic text search across topics + chunks
+- [x] Tables: knowledge_program, knowledge_subject, knowledge_module, knowledge_topic, knowledge_chunk_topic_map
 
 **Tests:** 15+ passing
 
@@ -132,24 +132,24 @@ All 5 criteria pass → Phase 1 begins. If not → fix before proceeding.
 
 **Assessment Engine deliverables:**
 
-- Quiz generation from chunks (GROQ MCQ generation)
-- Quiz start / submit-answer / submit-quiz flow
-- Auto-grading + explanation generation
-- Tables: assessment_quiz, assessment_question, assessment_quiz_attempt, assessment_question_response
+- [x] Quiz generation from chunks (GROQ MCQ generation)
+- [x] Quiz start / submit-answer / submit-quiz flow
+- [x] Auto-grading + explanation generation
+- [x] Tables: assessment_quiz, assessment_question, assessment_quiz_attempt, assessment_question_response
 
 **User State Engine deliverables:**
 
-- Event recording (append-only)
-- Progress computation
-- Topic mastery tracking
-- Bookmarks + reading progress
-- Tables: userstate_event, userstate_progress, userstate_topic_mastery, userstate_bookmark, userstate_reading_progress
+- [x] Event recording (append-only)
+- [x] Progress computation
+- [x] Topic mastery tracking
+- [x] Bookmarks + reading progress
+- [x] Tables: userstate_event, userstate_progress, userstate_topic_mastery, userstate_bookmark, userstate_reading_progress
 
 **Analytics Engine deliverables:**
 
-- Daily aggregation skeleton (cron stub)
-- Insight table + basic weak_topic detection logic
-- Tables: analytics_daily_aggregate, analytics_insight
+- [x] Daily aggregation skeleton (cron stub)
+- [x] Insight table + basic weak_topic detection logic
+- [x] Tables: analytics_daily_aggregate, analytics_insight
 
 **Tools Activated This Phase**
 | Tool | Why now |
@@ -182,28 +182,28 @@ RAG pipeline live. Articles generated from chunks. CA ingestion running.
 
 ### Week 5: Article Generation Engine (Static)
 
-- Chunk selection by topic (via Knowledge Engine API)
-- RAG: retrieve chunks → GROQ generates narrative
-- Source attribution (article_source_map)
-- Quality scoring before publish
-- Tables: article_article, article_source_map
+- [x] Chunk selection by topic (via Knowledge Engine API)
+- [x] RAG: retrieve chunks → GROQ generates narrative
+- [x] Source attribution (article_source_map)
+- [x] Quality scoring before publish
+- [x] Tables: article_article, article_source_map
 
 ### Week 6: Current Affairs Engine
 
-- RSS scraping (The Hindu, Indian Express)
-- CA chunking + embedding (same 384-dim space)
-- Semantic topic classification → ca_topic_link
-- Expiry date management
-- Tables: ca_source, ca_article, ca_chunk, ca_topic_link
-- Cron: RSS scrape 6 AM IST, CA expiry cleanup 6:30 AM IST
+- [x] RSS scraping (The Hindu, Indian Express)
+- [x] CA chunking + embedding (same 384-dim space)
+- [x] Semantic topic classification → ca_topic_link
+- [x] Expiry date management
+- [x] Tables: ca_source, ca_article, ca_chunk, ca_topic_link
+- [x] Cron: RSS scrape 6 AM IST, CA expiry cleanup 6:30 AM IST
 
 ### Week 7: Integrated Article Generation
 
-- Merge static chunks + CA chunks for same topic
-- Context blending in GROQ prompt
-- Integrated article output with source types marked
-- Event: `article_generated` emitted on completion
-- Event: `ca_chunks_classified` emitted after daily scrape
+- [x] Merge static chunks + CA chunks for same topic
+- [x] Context blending in GROQ prompt
+- [x] Integrated article output with source types marked
+- [x] Event: `article_generated` emitted on completion
+- [x] Event: `ca_chunks_classified` emitted after daily scrape
 
 ### Phase 2 Success Criteria
 
@@ -227,24 +227,24 @@ User-facing Next.js app consuming all Phase 1–2 APIs.
 
 ### Week 8: Core UI
 
-- Auth pages: login, register, email verify
-- Article listing (topic-filtered)
-- Article reader (with source attribution toggle)
-- Progress dashboard (basic stats)
+- [x] Auth pages: login, register, email verify
+- [x] Article listing (topic-filtered)
+- [x] Article reader (with source attribution toggle)
+- [x] Progress dashboard (basic stats)
 
 ### Week 9: Quiz UI
 
-- Quiz listing (by topic, difficulty)
-- Quiz taking: timed interface, answer selection
-- Results page: score, correct/incorrect, explanations
-- Frontend fires `article_read` event on article completion
+- [x] Quiz listing (by topic, difficulty)
+- [x] Quiz taking: timed interface, answer selection
+- [x] Results page: score, correct/incorrect, explanations
+- [x] Frontend fires `article_read` event on article completion
 
 ### Week 10: Search + Polish
 
-- Search bar → Knowledge Engine search API
-- Mobile responsive layout
-- Error boundaries + loading states
-- Toast notifications for feedback
+- [x] Search bar → Knowledge Engine search API
+- [x] Mobile responsive layout
+- [x] Error boundaries + loading states
+- [x] Toast notifications for feedback
 
 ### Tools Activated This Phase
 
@@ -277,21 +277,21 @@ Content-populated, production-deployed, monitored. PUBLIC BETA.
 
 ### Week 11: Content Population
 
-- Ingest 5 NCERT books (History, Polity, Geography, Economy, Science)
-- Map all chunks to syllabus topics
-- Generate 100+ articles (static + integrated)
-- Generate 50+ quizzes across subjects
-- CA scraping live and running
+- [x] Ingest 5 NCERT books (History, Polity, Geography, Economy, Science)
+- [x] Map all chunks to syllabus topics
+- [x] Generate 100+ articles (static + integrated)
+- [x] Generate 50+ quizzes across subjects
+- [x] CA scraping live and running
 
 ### Week 12: Production Deploy
 
-- E2E test suite passes
-- Deploy backend → Render
-- Deploy frontend → Vercel
-- Supabase production DB configured
-- Cloudinary for media CDN
-- Sentry production project active
-- Uptime Kuma monitoring configured
+- [x] E2E test suite passes
+- [x] Deploy backend → Render
+- [x] Deploy frontend → Vercel
+- [x] Supabase production DB configured
+- [x] Cloudinary for media CDN
+- [x] Sentry production project active
+- [x] Uptime Kuma monitoring configured
 
 ### Tools Activated This Phase
 
