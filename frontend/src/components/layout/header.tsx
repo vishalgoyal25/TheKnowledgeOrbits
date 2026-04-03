@@ -33,8 +33,10 @@ import { useAuth } from "@/lib/auth/useAuth";
 import UserMenu from "@/components/auth/UserMenu";
 import { useSearch } from "@/lib/hooks/use-search";
 import { SearchResult } from "@/lib/api/search";
-import { subjectsAPI } from "@/lib/api/subjects";
+import { getBookSubjects, getBookTree } from "@/lib/api/book-content";
 import { HierarchySubject, HierarchyModule, HierarchyTopic } from "@/lib/types";
+import type { TreeTopic } from "@/types/book-content";
+import OrbitIcon from "@/components/ui/orbit-icon";
 
 const NEWS_SUBJECT: HierarchySubject = {
   id: "news",
@@ -126,9 +128,9 @@ export default function Header({ initialHierarchy }: HeaderProps) {
   const [hoveredModuleTopics, setHoveredModuleTopics] = useState<
     HierarchyTopic[]
   >([]);
-  // Sub-topic flyout state
+  // Sub-topic flyout state (HierarchyTopic so we can render sub-sub-topics inline)
   const [hoveredTopicSubtopics, setHoveredTopicSubtopics] = useState<
-    { id: string; name: string }[]
+    HierarchyTopic[]
   >([]);
   const [subtopicPos, setSubtopicPos] = useState<{
     left: number;
@@ -186,29 +188,48 @@ export default function Header({ initialHierarchy }: HeaderProps) {
   const displaySubjectId = hoveredSubject || currentSubjectId;
 
   useEffect(() => {
-    // Only fetch if we don't have server-side data, or as a background refresh.
+    // Always refresh from the book content engine on mount.
+    // This ensures hamburger/navbar use the SAME topic UUIDs as the graph + outline
+    // (book content ingestion creates new knowledge_topic rows; old hierarchy rows are stale).
+
+    // Moved to useEffect root (not inside async arrow) to satisfy linter rule.
+    function treeTopicToHierarchy(t: TreeTopic): HierarchyTopic {
+      return {
+        id: t.id,
+        name: t.name,
+        sub_topics: t.subtopics.map(treeTopicToHierarchy),
+      };
+    }
+
     const fetchHierarchy = async () => {
       try {
-        const data = await subjectsAPI.getHierarchy();
-        if (data && data.length > 0) {
-          const backendSubjects = data[0].subjects || [];
-          setHierarchyData([NEWS_SUBJECT, ...backendSubjects]);
-        }
-      } catch (err) {
-        // Silent fail: If background fetch fails, we keep a the server-side data.
-        console.warn(
-          "Background hierarchy fetch failed, using cached version.",
-          err,
+        const bookSubjects = await getBookSubjects();
+        if (!bookSubjects || bookSubjects.length === 0) return;
+
+        // Pre-fetch every subject's tree in parallel (same data the outline view uses)
+        const trees = await Promise.all(
+          bookSubjects.map((s) => getBookTree(s.id).catch(() => null)),
         );
+
+        const hierarchySubjects: HierarchySubject[] = bookSubjects.map((s, i) => ({
+          id: s.id,
+          name: s.name,
+          modules: (trees[i]?.modules ?? []).map((mod) => ({
+            id: mod.id,
+            name: mod.name,
+            topics: mod.topics.map(treeTopicToHierarchy),
+          })),
+        }));
+
+        setHierarchyData([NEWS_SUBJECT, ...hierarchySubjects]);
+      } catch (err) {
+        console.warn("Hierarchy refresh failed, keeping cached version.", err);
       }
     };
 
-    // If we have no data at all (neither server nor client), we MUST fetch.
-    if (hierarchyData.length <= 1) {
-      // 1 because NEWS_SUBJECT is always there
-      fetchHierarchy();
-    }
-  }, [hierarchyData.length]);
+    fetchHierarchy();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [debouncedQuery, setDebouncedQuery] = useState("");
   useEffect(() => {
@@ -597,26 +618,17 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                             }[] = [];
                             const seenIds = new Set<string>();
 
-                            activeModule?.topics?.forEach(
-                              (t: HierarchyTopic) => {
+                            // Recursively flatten all levels: topic → subtopic → sub-subtopic
+                            function flattenTree(topics: HierarchyTopic[], isSub: boolean) {
+                              topics.forEach((t) => {
                                 if (!seenIds.has(t.id)) {
-                                  flatTopics.push({ id: t.id, name: t.name });
+                                  flatTopics.push({ id: t.id, name: t.name, isSubTopic: isSub || undefined });
                                   seenIds.add(t.id);
                                 }
-                                t.sub_topics?.forEach(
-                                  (st: { id: string; name: string }) => {
-                                    if (!seenIds.has(st.id)) {
-                                      flatTopics.push({
-                                        id: st.id,
-                                        name: st.name,
-                                        isSubTopic: true,
-                                      });
-                                      seenIds.add(st.id);
-                                    }
-                                  },
-                                );
-                              },
-                            );
+                                if (t.sub_topics?.length) flattenTree(t.sub_topics, true);
+                              });
+                            }
+                            flattenTree(activeModule?.topics ?? [], false);
 
                             return flatTopics.map((t, i) => {
                               const isActiveTopic = pathname.includes(
@@ -624,7 +636,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                               );
                               const href = isNewsModule
                                 ? "/current-affairs"
-                                : `/topics/${t.id}/articles`;
+                                : `/knowledge?topic=${t.id}&subject=${drawerActiveSubjectId}`;
                               return (
                                 <Link
                                   key={`drawer-topic-${t.id}`}
@@ -772,7 +784,12 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                 >
                   Contact Us
                 </Link>
+                {/* Orbital icon replaces plain text link on xl nav */}
+                <OrbitIcon />
               </nav>
+
+              {/* Orbit icon — visible on all sizes below xl, icon-only (no label) */}
+              <OrbitIcon className="xl:hidden px-1.5" label="" />
 
               {/* MOBILE SEARCH TRIGGER */}
               <Button
@@ -813,192 +830,219 @@ export default function Header({ initialHierarchy }: HeaderProps) {
         </div>
       </div>
 
-      {/* TIER 1: SUBJECTS (Horizontal Ribbon) */}
-      <div
-        className="bg-white border-b relative z-40 shadow-sm overflow-hidden"
-        onMouseLeave={() => setHoveredSubject(null)}
-      >
-        <div className="container mx-auto px-4">
-          <nav className="flex items-center h-12 overflow-x-auto no-scrollbar scroll-smooth">
-            {hierarchyData.map((subject) => {
-              const isActive = displaySubjectId === subject.id;
-              const isNews = subject.id === "news";
-              return (
-                <Link
-                  key={subject.id}
-                  href={isNews ? "/current-affairs" : `/subjects/${subject.id}`}
-                  className={cn(
-                    "flex items-center px-5 h-full text-sm font-bold transition-all whitespace-nowrap shrink-0 border-b-2 border-r border-slate-200 group",
-                    isActive
-                      ? isNews
-                        ? "text-red-600 border-b-red-600 bg-red-50/50"
-                        : "text-blue-700 border-b-blue-700 bg-blue-50/50"
-                      : "text-slate-600 border-b-transparent hover:text-slate-900 hover:bg-slate-50",
-                  )}
-                  onMouseEnter={() => setHoveredSubject(subject.id)}
-                >
-                  {subject.name}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+      {/* TIER 1 + 2: SUBJECTS + MODULES ribbons — hidden on /knowledge to maximise study space */}
+      {pathname !== "/knowledge" && (
+        <div
+          className="bg-white border-b relative z-40 shadow-sm overflow-hidden"
+          onMouseLeave={() => setHoveredSubject(null)}
+        >
+          <div className="container mx-auto px-4">
+            <nav className="flex items-center h-12 overflow-x-auto no-scrollbar scroll-smooth">
+              {hierarchyData.map((subject) => {
+                const isActive = displaySubjectId === subject.id;
+                const isNews = subject.id === "news";
+                return (
+                  <Link
+                    key={subject.id}
+                    href={
+                      isNews ? "/current-affairs" : `/subjects/${subject.id}`
+                    }
+                    className={cn(
+                      "flex items-center px-5 h-full text-sm font-bold transition-all whitespace-nowrap shrink-0 border-b-2 border-r border-slate-200 group",
+                      isActive
+                        ? isNews
+                          ? "text-red-600 border-b-red-600 bg-red-50/50"
+                          : "text-blue-700 border-b-blue-700 bg-blue-50/50"
+                        : "text-slate-600 border-b-transparent hover:text-slate-900 hover:bg-slate-50",
+                    )}
+                    onMouseEnter={() => setHoveredSubject(subject.id)}
+                  >
+                    {subject.name}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
 
-        {/* TIER 2: MODULES (Swipable Ribbon) */}
-        {displaySubjectId && (
-          <div
-            className="bg-slate-50 shadow-inner border-b relative z-30 block"
-            onMouseLeave={startCloseTimer}
-          >
-            <div className="container mx-auto px-4">
-              <nav className="flex items-center h-9 overflow-x-auto overflow-y-visible no-scrollbar scroll-smooth w-full relative z-[100]">
-                {hierarchyData
-                  .find((s) => s.id === displaySubjectId)
-                  ?.modules?.map((module: HierarchyModule) => {
-                    const isActiveModule = pathname.includes(
-                      `/modules/${module.id}`,
-                    );
-                    const isHovered = hoveredModuleId === module.id;
-                    const allTopics: { id: string; name: string }[] = [];
-                    module.topics?.forEach((t: HierarchyTopic) => {
-                      allTopics.push({ id: t.id, name: t.name });
-                      t.sub_topics?.forEach(
-                        (st: { id: string; name: string }) =>
-                          allTopics.push({ id: st.id, name: st.name }),
+          {/* TIER 2: MODULES (Swipable Ribbon) */}
+          {displaySubjectId && (
+            <div
+              className="bg-slate-50 shadow-inner border-b relative z-30 block"
+              onMouseLeave={startCloseTimer}
+            >
+              <div className="container mx-auto px-4">
+                <nav className="flex items-center h-9 overflow-x-auto overflow-y-visible no-scrollbar scroll-smooth w-full relative z-[100]">
+                  {hierarchyData
+                    .find((s) => s.id === displaySubjectId)
+                    ?.modules?.map((module: HierarchyModule) => {
+                      const isActiveModule = pathname.includes(
+                        `/modules/${module.id}`,
                       );
-                    });
-                    const hasTopics = allTopics.length > 0;
+                      const isHovered = hoveredModuleId === module.id;
+                      const allTopics: { id: string; name: string }[] = [];
+                      module.topics?.forEach((t: HierarchyTopic) => {
+                        allTopics.push({ id: t.id, name: t.name });
+                        t.sub_topics?.forEach(
+                          (st: { id: string; name: string }) =>
+                            allTopics.push({ id: st.id, name: st.name }),
+                        );
+                      });
+                      const hasTopics = allTopics.length > 0;
 
-                    return (
-                      <div
-                        key={module.id}
-                        className="h-full shrink-0 flex items-center border-r border-slate-300 relative group/module"
-                        onMouseEnter={(e) => {
+                      return (
+                        <div
+                          key={module.id}
+                          className="h-full shrink-0 flex items-center border-r border-slate-300 relative group/module"
+                          onMouseEnter={(e) => {
+                            const rect = (
+                              e.currentTarget as HTMLElement
+                            ).getBoundingClientRect();
+                            setDropdownPos({
+                              left: rect.left,
+                              top: rect.bottom,
+                            });
+                            const topics =
+                              module.topics?.map((t: HierarchyTopic) => ({
+                                id: t.id,
+                                name: t.name,
+                                sub_topics: t.sub_topics || [],
+                              })) || [];
+                            setHoveredModuleTopics(topics);
+                            setHoveredModuleId(module.id);
+                            // clear sub-topic flyout
+                            setHoveredTopicSubtopics([]);
+                            setSubtopicPos(null);
+                          }}
+                        >
+                          <Link
+                            href={`/modules/${module.id}`}
+                            className={cn(
+                              "flex items-center px-4 h-full text-[11px] font-extrabold uppercase tracking-widest transition-all whitespace-nowrap",
+                              isActiveModule || isHovered
+                                ? "text-blue-600 bg-white"
+                                : "text-slate-500 hover:text-slate-900",
+                            )}
+                          >
+                            {module.name}
+                            {hasTopics && (
+                              <ChevronDown
+                                className={cn(
+                                  "ml-1 h-3 w-3 opacity-50 transition-transform duration-300",
+                                  isHovered &&
+                                    "rotate-180 opacity-100 text-blue-600",
+                                )}
+                              />
+                            )}
+                          </Link>
+                        </div>
+                      );
+                    })}
+                </nav>
+              </div>
+            </div>
+          )}
+
+          {/* FIXED-POSITION TOPIC DROPDOWN — breaks out of overflow:auto nav, overlays entire page */}
+          {hoveredModuleId && dropdownPos && hoveredModuleTopics.length > 0 && (
+            <div
+              className="fixed z-[99999] w-[260px] bg-white border border-slate-200 shadow-2xl rounded-b-md"
+              style={{ left: dropdownPos.left, top: dropdownPos.top }}
+              onMouseEnter={cancelCloseTimer}
+              onMouseLeave={startCloseTimer}
+            >
+              <div className="max-h-[60vh] overflow-y-auto no-scrollbar py-1">
+                {hoveredModuleTopics.map((topic) => {
+                  const hasSubs = (topic.sub_topics?.length ?? 0) > 0;
+                  return (
+                    <div
+                      key={`fixed-topic-${topic.id}`}
+                      className="relative flex items-center justify-between group/topicrow"
+                      onMouseEnter={(e) => {
+                        if (hasSubs) {
                           const rect = (
                             e.currentTarget as HTMLElement
                           ).getBoundingClientRect();
-                          setDropdownPos({ left: rect.left, top: rect.bottom });
-                          const topics =
-                            module.topics?.map((t: HierarchyTopic) => ({
-                              id: t.id,
-                              name: t.name,
-                              sub_topics: t.sub_topics || [],
-                            })) || [];
-                          setHoveredModuleTopics(topics);
-                          setHoveredModuleId(module.id);
-                          // clear sub-topic flyout
+                          setSubtopicPos({ left: rect.right, top: rect.top });
+                          setHoveredTopicSubtopics(topic.sub_topics || []);
+                        } else {
+                          setHoveredTopicSubtopics([]);
+                          setSubtopicPos(null);
+                        }
+                      }}
+                    >
+                      <Link
+                        href={`/knowledge?topic=${topic.id}&subject=${displaySubjectId}`}
+                        onClick={() => {
+                          setHoveredModuleId(null);
+                          setDropdownPos(null);
                           setHoveredTopicSubtopics([]);
                           setSubtopicPos(null);
                         }}
+                        className="flex-1 block px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors"
                       >
+                        {topic.name}
+                      </Link>
+                      {hasSubs && (
+                        <span className="pr-3 text-slate-500 group-hover/topicrow:text-blue-600 text-[12px] font-bold">
+                          ›
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* FIXED-POSITION SUB-TOPIC PANEL — opens horizontally to the right of a hovered topic */}
+          {subtopicPos &&
+            hoveredTopicSubtopics.length > 0 &&
+            hoveredModuleId && (
+              <div
+                className="fixed z-[99999] w-[240px] bg-white border border-slate-200 shadow-2xl rounded-md"
+                style={{ left: subtopicPos.left, top: subtopicPos.top }}
+                onMouseEnter={cancelCloseTimer}
+                onMouseLeave={startCloseTimer}
+              >
+                <div className="max-h-[50vh] overflow-y-auto no-scrollbar py-1">
+                  {hoveredTopicSubtopics.map((st) => (
+                    <div key={`fixed-sub-${st.id}`}>
+                      {/* Sub-topic link */}
+                      <Link
+                        href={`/knowledge?topic=${st.id}&subject=${displaySubjectId}`}
+                        onClick={() => {
+                          setHoveredModuleId(null);
+                          setDropdownPos(null);
+                          setHoveredTopicSubtopics([]);
+                          setSubtopicPos(null);
+                        }}
+                        className="block px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors"
+                      >
+                        {st.name}
+                      </Link>
+                      {/* Sub-sub-topics indented below */}
+                      {st.sub_topics?.map((sst) => (
                         <Link
-                          href={`/modules/${module.id}`}
-                          className={cn(
-                            "flex items-center px-4 h-full text-[11px] font-extrabold uppercase tracking-widest transition-all whitespace-nowrap",
-                            isActiveModule || isHovered
-                              ? "text-blue-600 bg-white"
-                              : "text-slate-500 hover:text-slate-900",
-                          )}
+                          key={`fixed-subsub-${sst.id}`}
+                          href={`/knowledge?topic=${sst.id}&subject=${displaySubjectId}`}
+                          onClick={() => {
+                            setHoveredModuleId(null);
+                            setDropdownPos(null);
+                            setHoveredTopicSubtopics([]);
+                            setSubtopicPos(null);
+                          }}
+                          className="block pl-7 pr-4 py-1.5 text-[11px] text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors border-l-2 border-slate-100 ml-4"
                         >
-                          {module.name}
-                          {hasTopics && (
-                            <ChevronDown
-                              className={cn(
-                                "ml-1 h-3 w-3 opacity-50 transition-transform duration-300",
-                                isHovered &&
-                                  "rotate-180 opacity-100 text-blue-600",
-                              )}
-                            />
-                          )}
+                          {sst.name}
                         </Link>
-                      </div>
-                    );
-                  })}
-              </nav>
-            </div>
-          </div>
-        )}
-
-        {/* FIXED-POSITION TOPIC DROPDOWN — breaks out of overflow:auto nav, overlays entire page */}
-        {hoveredModuleId && dropdownPos && hoveredModuleTopics.length > 0 && (
-          <div
-            className="fixed z-[99999] w-[260px] bg-white border border-slate-200 shadow-2xl rounded-b-md"
-            style={{ left: dropdownPos.left, top: dropdownPos.top }}
-            onMouseEnter={cancelCloseTimer}
-            onMouseLeave={startCloseTimer}
-          >
-            <div className="max-h-[60vh] overflow-y-auto no-scrollbar py-1">
-              {hoveredModuleTopics.map((topic) => {
-                const hasSubs = (topic.sub_topics?.length ?? 0) > 0;
-                return (
-                  <div
-                    key={`fixed-topic-${topic.id}`}
-                    className="relative flex items-center justify-between group/topicrow"
-                    onMouseEnter={(e) => {
-                      if (hasSubs) {
-                        const rect = (
-                          e.currentTarget as HTMLElement
-                        ).getBoundingClientRect();
-                        setSubtopicPos({ left: rect.right, top: rect.top });
-                        setHoveredTopicSubtopics(topic.sub_topics || []);
-                      } else {
-                        setHoveredTopicSubtopics([]);
-                        setSubtopicPos(null);
-                      }
-                    }}
-                  >
-                    <Link
-                      href={`/topics/${topic.id}/articles`}
-                      onClick={() => {
-                        setHoveredModuleId(null);
-                        setDropdownPos(null);
-                        setHoveredTopicSubtopics([]);
-                        setSubtopicPos(null);
-                      }}
-                      className="flex-1 block px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition-colors"
-                    >
-                      {topic.name}
-                    </Link>
-                    {hasSubs && (
-                      <span className="pr-3 text-slate-500 group-hover/topicrow:text-blue-600 text-[12px] font-bold">
-                        ›
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* FIXED-POSITION SUB-TOPIC PANEL — opens horizontally to the right of a hovered topic */}
-        {subtopicPos && hoveredTopicSubtopics.length > 0 && hoveredModuleId && (
-          <div
-            className="fixed z-[99999] w-[240px] bg-white border border-slate-200 shadow-2xl rounded-md"
-            style={{ left: subtopicPos.left, top: subtopicPos.top }}
-            onMouseEnter={cancelCloseTimer}
-            onMouseLeave={startCloseTimer}
-          >
-            <div className="max-h-[50vh] overflow-y-auto no-scrollbar py-1">
-              {hoveredTopicSubtopics.map((st) => (
-                <Link
-                  key={`fixed-sub-${st.id}`}
-                  href={`/topics/${st.id}/articles`}
-                  onClick={() => {
-                    setHoveredModuleId(null);
-                    setDropdownPos(null);
-                    setHoveredTopicSubtopics([]);
-                    setSubtopicPos(null);
-                  }}
-                  className="block px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors"
-                >
-                  {st.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+        </div>
+      )}
     </header>
   );
 }

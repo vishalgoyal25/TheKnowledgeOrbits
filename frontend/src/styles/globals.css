@@ -40,9 +40,43 @@
   * {
     @apply border-border;
   }
+  html,
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
   }
+}
+
+/* ── Orbit Icon animations ─────────────────────────────────────────────── */
+/* Each ring rotates at a different speed around the SVG centre (14, 14).   */
+/* The dot tracks the ellipse by being placed at its right edge and rotated */
+/* together with the ring — same transform-origin, same keyframe.           */
+
+@keyframes orbit-spin-1 {
+  from { transform: rotate(-60deg); }
+  to   { transform: rotate(300deg); }
+}
+@keyframes orbit-dot-1 {
+  from { transform: rotate(-60deg); }
+  to   { transform: rotate(300deg); }
+}
+
+@keyframes orbit-spin-2 {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes orbit-dot-2 {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes orbit-spin-3 {
+  from { transform: rotate(60deg); }
+  to   { transform: rotate(420deg); }
+}
+@keyframes orbit-dot-3 {
+  from { transform: rotate(60deg); }
+  to   { transform: rotate(420deg); }
 }
 
 /* Typography improvements */

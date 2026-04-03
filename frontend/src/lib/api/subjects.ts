@@ -54,9 +54,17 @@ export const subjectsAPI = {
     return response.data;
   },
 
-  // Get complete master hierarchy for Navigation
+  // Get complete master hierarchy for Navigation.
+  // Backend returns program-wrapped: [{id, name, subjects: [...]}].
+  // We flatten to HierarchySubject[] to match the server-side ISR format.
   getHierarchy: async () => {
     const response = await apiClient.get("/knowledge/hierarchy/");
-    return response.data;
+    const data = response.data;
+    if (Array.isArray(data) && data.length > 0 && data[0]?.subjects) {
+      return data.flatMap(
+        (program: { subjects?: unknown[] }) => program.subjects || [],
+      );
+    }
+    return Array.isArray(data) ? data : [];
   },
 };

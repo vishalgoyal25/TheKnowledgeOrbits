@@ -145,6 +145,14 @@ class Topic(models.Model):
         ("custom", "Custom Topic"),
     ]
 
+    NODE_TYPE_CHOICES = [
+        ("subject_root", "Subject Root"),
+        ("module", "Module"),
+        ("topic", "Topic"),
+        ("subtopic", "Subtopic"),
+        ("sub_subtopic", "Sub-Subtopic"),
+    ]
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -182,6 +190,23 @@ class Topic(models.Model):
         default="syllabus",
         help_text="Topic classification",
     )
+    node_type = models.CharField(
+        max_length=30,
+        choices=NODE_TYPE_CHOICES,
+        default="topic",
+        help_text=(
+            "Hierarchy depth: subject_root → module → topic → subtopic → sub_subtopic. "
+            "Drives graph node visual type and hamburger navbar depth."
+        ),
+    )
+    content_status = models.CharField(
+        max_length=20,
+        default="empty",
+        help_text=(
+            "Generation status of this node's book content. "
+            "Values: empty | generating | book_quality | failed"
+        ),
+    )
     difficulty_level = models.CharField(
         max_length=20,
         choices=DIFFICULTY_CHOICES,
@@ -205,6 +230,8 @@ class Topic(models.Model):
             models.Index(fields=["parent_topic"]),
             models.Index(fields=["difficulty_level"]),
             models.Index(fields=["topic_type"]),
+            models.Index(fields=["node_type"]),
+            models.Index(fields=["content_status"]),
             models.Index(fields=["is_active"]),
             models.Index(fields=["module", "is_active"]),
             models.Index(fields=["subject", "is_active"]),

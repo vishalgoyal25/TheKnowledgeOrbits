@@ -97,3 +97,12 @@ specs/
 .agent
 .specify
 specs
+
+.claude/
+.postman/
+
+FEATURE1.md
+FEATURES.md
+
+postman/
+CLAUDE.md
