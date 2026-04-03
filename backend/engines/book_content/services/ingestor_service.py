@@ -1,0 +1,524 @@
+"""
+engines/book_content/services/ingestor_service.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The Master Orchestrator — runs the full 3-Layer pipeline for one topic.
+
+Pipeline:
+  Step 1-2 — Mode A only (wiki_only): no PDF extraction needed
+  Step 3   — Hierarchy Classification (LLM Call #1 or map lookup)
+  Step 4   — Subtopic Discovery (LLM Call #2)
+  Step 5   — Wikipedia Full-Page Fetch (per subtopic)
+  Step 6   — NCERT Section Extract (Mode B only — skipped for now)
+  Step 7   — Quality Article Generation (Layer 2 Quality Engine)
+  Step 8   — Sub-Subtopic Discovery + Articles (for [DEEP] subtopics)
+  Step 9   — Coherence Pass (Layer 3)
+
+Smart Skip: if BookContent already exists for a subtopic → skip LLM,
+            still update concept registry (crash-safe resumption).
+
+Ported from: upsc-agent-lab/src/ingestor.py
+Changes: logging (structlog), imports, ALL DB ops replaced with Django ORM,
+         pdf_path removed (wiki_only for now), topic_overview prompt PRESERVED,
+         _generate_subtopic_article() REPLACED by generate_quality_article().
+Preserved exactly: topic_overview prompt, smart skip logic, pipeline order,
+                   all step comments, coherence pass call, generation log.
+"""
+
+import time
+from typing import Optional
+
+import sentry_sdk
+import structlog
+from django.db import transaction
+
+from engines.book_content.models import BookContent, GenerationLog
+from engines.knowledge.models import Module, Subject, Topic
+
+from .book_planner_service import (
+    get_previously_covered_concepts,
+    update_concept_registry,
+)
+from .classifier_service import classify_hierarchy
+from .coherence_service import run_coherence_pass
+from .llm_service import llm_call
+from .quality_engine_service import generate_quality_article
+from .subtopic_service import find_sub_subtopics, find_subtopics
+from .wiki_service import extract_relevant_section, fetch_full_page
+
+logger = structlog.get_logger(__name__)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PUBLIC ENTRY POINT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def ingest_topic(
+    topic_name: Optional[str] = None, subject_name: Optional[str] = None
+) -> dict:
+    """
+    Master Agent Entry Point.
+
+    Call with:
+      ingest_topic(topic_name="Parliament of India")
+      ingest_topic(topic_name="Parliament of India", subject_name="Indian Constitution & Polity")
+
+    Returns:
+      {"nodes_created": int, "relations_created": int, "topic": str}
+    """
+    _separator()
+    logger.info("ingestor_start", topic_name=topic_name, subject_name=subject_name)
+    _separator()
+
+    # ── Steps 1 & 2: Mode A — wiki_only, no PDF ───────────────────────────────
+    clean_ncert_text = ""  # Future Mode B: NCERT PDF extraction goes here
+    logger.info("ingestor_mode", mode="A (Wikipedia only)")
+
+    nodes_created = 0
+    relations_created = 0
+    start_time = time.time()
+
+    try:
+        # ── Step 3: Hierarchy Classification ─────────────────────────────────
+        logger.info("ingestor_step3_classify", topic_name=topic_name)
+        hierarchy = classify_hierarchy(
+            topic_name=topic_name,
+            ncert_text=clean_ncert_text[:1500] if clean_ncert_text else None,
+        )
+        subject = hierarchy["subject"]
+        module = hierarchy["module"]
+        topic = hierarchy["confirmed_topic"]
+
+        # ── Step 4: Subtopic Discovery ────────────────────────────────────────
+        logger.info("ingestor_step4_subtopics", topic=topic)
+        subtopics = find_subtopics(topic, ncert_text=clean_ncert_text or None)
+
+        if not subtopics:
+            logger.warning("ingestor_no_subtopics_found", topic=topic)
+
+        # ── Resolve / create knowledge hierarchy nodes ────────────────────────
+        subject_obj = _get_or_create_subject(subject)
+        module_obj = _get_or_create_module(module, subject_obj)
+        topic_obj = _get_or_create_topic(
+            topic, module_obj, subject_obj, node_type="topic"
+        )
+
+        # Generate topic overview and save to BookContent
+        topic_wiki = fetch_full_page(topic)
+        topic_overview = _generate_topic_overview(
+            topic, clean_ncert_text, topic_wiki["summary"]
+        )
+
+        with transaction.atomic():
+            BookContent.objects.update_or_create(
+                topic=topic_obj,
+                defaults={
+                    "subject": subject_obj,
+                    "content_markdown": topic_overview,
+                    "word_count": len(topic_overview.split()),
+                    "quality_score": 75.0,  # Fixed high score for intro overviews
+                    "source_mode": "wiki_only",
+                    "is_published": False,
+                },
+            )
+            # Mark topic as generating
+            Topic.objects.filter(id=topic_obj.id).update(content_status="generating")
+
+        nodes_created += 1
+        logger.info("ingestor_topic_overview_saved", topic=topic)
+
+        # ── Steps 5-8: Process each subtopic ─────────────────────────────────
+        for i, sub in enumerate(subtopics, 1):
+            sub_name = sub["name"]
+            needs_deep = sub["needs_deep"]
+
+            logger.info(
+                "ingestor_subtopic_start",
+                index=i,
+                total=len(subtopics),
+                subtopic=sub_name,
+                needs_deep=needs_deep,
+            )
+
+            # ── Smart Skip: check if BookContent already exists ───────────────
+            existing = BookContent.objects.filter(topic__name=sub_name).first()
+            if existing:
+                logger.info(
+                    "ingestor_smart_skip", subtopic=sub_name, reason="already_exists"
+                )
+                # SYNCED SKIPPING: still register in concept registry
+                update_concept_registry(
+                    subject, sub_name, str(existing.topic.id), sub_name
+                )
+                sub_topic_obj = existing.topic
+            else:
+                # Step 5: Fetch Wikipedia for subtopic
+                logger.info("ingestor_step5_wiki", subtopic=sub_name)
+                wiki_data = fetch_full_page(sub_name)
+                wiki_section = extract_relevant_section(wiki_data["content"], sub_name)[
+                    :3000
+                ]
+
+                # Step 6: NCERT section (Mode B — skipped, no PDF for now)
+                ncert_section = ""
+
+                # Step 7: Generate quality article (Layer 2)
+                logger.info("ingestor_step7_generate", subtopic=sub_name)
+                previously_covered = get_previously_covered_concepts(subject, sub_name)
+                article_md, quality_score = generate_quality_article(
+                    subtopic=sub_name,
+                    parent_topic=topic,
+                    ncert_section=ncert_section,
+                    wiki_content=wiki_section,
+                    previously_covered=previously_covered,
+                    subject=subject,
+                )
+
+                # Save subtopic node + BookContent
+                sub_topic_obj = _get_or_create_topic(
+                    sub_name,
+                    module_obj,
+                    subject_obj,
+                    node_type="subtopic",
+                    parent_topic=topic_obj,
+                )
+
+                with transaction.atomic():
+                    BookContent.objects.update_or_create(
+                        topic=sub_topic_obj,
+                        defaults={
+                            "subject": subject_obj,
+                            "content_markdown": article_md,
+                            "word_count": len(article_md.split()),
+                            "quality_score": quality_score,
+                            "source_mode": "wiki_only",
+                            "is_published": False,
+                        },
+                    )
+                    Topic.objects.filter(id=sub_topic_obj.id).update(
+                        content_status="book_quality"
+                    )
+
+                # Register in concept registry
+                update_concept_registry(
+                    subject, sub_name, str(sub_topic_obj.id), sub_name
+                )
+
+                _log_generation(
+                    topic_name=sub_name,
+                    subject_name=subject,
+                    status="success",
+                    nodes_created=1,
+                    quality_score=quality_score,
+                    word_count=len(article_md.split()),
+                    start_time=start_time,
+                )
+
+                nodes_created += 1
+                relations_created += 1
+                logger.info(
+                    "ingestor_subtopic_saved",
+                    subtopic=sub_name,
+                    quality_score=quality_score,
+                    words=len(article_md.split()),
+                )
+
+            # ── Step 8: Recursive deep expansion ─────────────────────────────
+            if needs_deep:
+                logger.info("ingestor_step8_deep_expand", subtopic=sub_name)
+                sub_subtopics = find_sub_subtopics(sub_name, topic)
+
+                for ss_name in sub_subtopics:
+                    logger.info("ingestor_sub_subtopic_start", name=ss_name)
+
+                    # Smart Skip for sub-subtopics
+                    existing_ss = BookContent.objects.filter(
+                        topic__name=ss_name
+                    ).first()
+                    if existing_ss:
+                        logger.info(
+                            "ingestor_smart_skip",
+                            subtopic=ss_name,
+                            reason="already_exists",
+                        )
+                        update_concept_registry(
+                            subject, ss_name, str(existing_ss.topic.id), ss_name
+                        )
+                        continue
+
+                    ss_wiki = fetch_full_page(ss_name)
+                    ss_section = extract_relevant_section(ss_wiki["content"], ss_name)[
+                        :3000
+                    ]
+                    ss_ncert = ""  # Mode B: would extract from NCERT here
+
+                    logger.info("ingestor_step7_generate", subtopic=ss_name)
+                    previously_covered = get_previously_covered_concepts(
+                        subject, ss_name
+                    )
+                    ss_article, ss_quality = generate_quality_article(
+                        subtopic=ss_name,
+                        parent_topic=sub_name,
+                        ncert_section=ss_ncert,
+                        wiki_content=ss_section,
+                        previously_covered=previously_covered,
+                        subject=subject,
+                    )
+
+                    ss_topic_obj = _get_or_create_topic(
+                        ss_name,
+                        module_obj,
+                        subject_obj,
+                        node_type="sub_subtopic",
+                        parent_topic=sub_topic_obj,
+                    )
+
+                    with transaction.atomic():
+                        BookContent.objects.update_or_create(
+                            topic=ss_topic_obj,
+                            defaults={
+                                "subject": subject_obj,
+                                "content_markdown": ss_article,
+                                "word_count": len(ss_article.split()),
+                                "quality_score": ss_quality,
+                                "source_mode": "wiki_only",
+                                "is_published": False,
+                            },
+                        )
+                        Topic.objects.filter(id=ss_topic_obj.id).update(
+                            content_status="book_quality"
+                        )
+
+                    update_concept_registry(
+                        subject, ss_name, str(ss_topic_obj.id), ss_name
+                    )
+
+                    _log_generation(
+                        topic_name=ss_name,
+                        subject_name=subject,
+                        status="success",
+                        nodes_created=1,
+                        quality_score=ss_quality,
+                        word_count=len(ss_article.split()),
+                        start_time=start_time,
+                    )
+
+                    nodes_created += 1
+                    relations_created += 1
+                    logger.info(
+                        "ingestor_sub_subtopic_saved",
+                        name=ss_name,
+                        quality_score=ss_quality,
+                        words=len(ss_article.split()),
+                    )
+
+        # ── Step 9: Coherence Pass (Layer 3) ─────────────────────────────────
+        logger.info("ingestor_step9_coherence", topic=topic)
+        run_coherence_pass(str(topic_obj.id), topic, subject)
+
+        # Mark parent topic as book_quality
+        Topic.objects.filter(id=topic_obj.id).update(content_status="book_quality")
+
+        # Final generation log
+        elapsed = int(time.time() - start_time)
+        _log_generation(
+            topic_name=topic,
+            subject_name=subject,
+            status="success",
+            nodes_created=nodes_created,
+            relations_created=relations_created,
+            quality_score=0.0,
+            word_count=0,
+            start_time=start_time,
+        )
+
+    except Exception as e:
+        elapsed = int(time.time() - start_time)
+        logger.error("ingestor_failed", topic_name=topic_name, error=str(e))
+        sentry_sdk.capture_exception(e)
+        try:
+            GenerationLog.objects.create(
+                topic_name=topic_name or "",
+                subject_name=subject_name or "",
+                status="failed",
+                error_message=str(e),
+                generation_time_seconds=elapsed,
+            )
+        except Exception:
+            pass
+        raise
+
+    _separator()
+    logger.info(
+        "ingestor_complete",
+        topic=topic,
+        nodes_created=nodes_created,
+        relations_created=relations_created,
+    )
+    _separator()
+
+    return {
+        "nodes_created": nodes_created,
+        "relations_created": relations_created,
+        "topic": topic,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOPIC OVERVIEW GENERATION (prompt preserved exactly from POC)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _generate_topic_overview(topic: str, ncert_text: str, wiki_summary: str) -> str:
+    """
+    Generates a concise topic-level overview article (~400 words).
+    This is the intro node that readers see before drilling into subtopics.
+    """
+    if ncert_text:
+        prompt = f"""You are writing an overview introduction for a UPSC study book chapter.
+
+TOPIC: "{topic}"
+
+NCERT CHAPTER CONTEXT (first section):
+{ncert_text[:3000]}
+
+WIKIPEDIA SUMMARY:
+{wiki_summary[:500]}
+
+Write a concise, engaging OVERVIEW for "{topic}" (~400 words).
+  - What this topic is and why it matters for UPSC
+  - Key constitutional/legal foundation (1-2 sentences)
+  - What subtopics this chapter covers (as a list)
+  - Exam relevance (Prelims/Mains)
+
+Use Markdown. Start with: ## {topic}"""
+    else:
+        prompt = f"""You are writing an overview introduction for a UPSC study book chapter.
+
+TOPIC: "{topic}"
+
+WIKIPEDIA SUMMARY:
+{wiki_summary[:800]}
+
+Write a concise, engaging OVERVIEW for "{topic}" (~400 words).
+  - What this topic is and why it matters for UPSC
+  - Key constitutional/legal foundation (1-2 sentences)
+  - What subtopics this chapter covers (as a list)
+  - Exam relevance (Prelims/Mains)
+
+Use Markdown. Start with: ## {topic}"""
+
+    result = llm_call(prompt, mode="standard")
+    return result or f"## {topic}\n\nOverview coming soon."
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DJANGO ORM HELPERS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _get_or_create_subject(subject_name: str) -> Subject:
+    """
+    Gets or creates a Subject by name.
+    Safe to re-run — never creates duplicates.
+    """
+    from engines.knowledge.models import Program
+
+    program, _ = Program.objects.get_or_create(
+        name="UPSC CSE", defaults={"description": "UPSC Civil Services Examination"}
+    )
+    subject, created = Subject.objects.get_or_create(
+        name=subject_name,
+        program=program,
+        defaults={"description": f"UPSC subject: {subject_name}", "is_active": True},
+    )
+    if created:
+        logger.info("subject_created", name=subject_name)
+    else:
+        logger.info("subject_reused", name=subject_name)
+    return subject
+
+
+def _get_or_create_module(module_name: str, subject: Subject) -> Module:
+    """
+    Gets or creates a Module by name under a subject.
+    Safe to re-run — never creates duplicates.
+    """
+    module, created = Module.objects.get_or_create(
+        name=module_name,
+        subject=subject,
+        defaults={"description": f"Module: {module_name}", "is_active": True},
+    )
+    if created:
+        logger.info("module_created", name=module_name, subject=subject.name)
+    else:
+        logger.info("module_reused", name=module_name)
+    return module
+
+
+def _get_or_create_topic(
+    topic_name: str,
+    module: Module,
+    subject: Subject,
+    node_type: str = "topic",
+    parent_topic: Optional[Topic] = None,
+) -> Topic:
+    """
+    Gets or creates a Topic node in knowledge_topic.
+    node_type drives the hierarchy depth:
+      'topic'        → level 3 (main topic)
+      'subtopic'     → level 4 (subtopic under topic)
+      'sub_subtopic' → level 5 (sub-subtopic under subtopic)
+    Safe to re-run — never creates duplicates.
+    """
+    topic, created = Topic.objects.get_or_create(
+        name=topic_name,
+        module=module,
+        defaults={
+            "subject": subject,
+            "parent_topic": parent_topic,
+            "topic_type": "syllabus",
+            "is_active": True,
+        },
+    )
+    if created:
+        # Set node_type via update (column added via RunSQL migration)
+        Topic.objects.filter(id=topic.id).update(node_type=node_type)
+        logger.info("topic_created", name=topic_name, node_type=node_type)
+    else:
+        logger.info("topic_reused", name=topic_name)
+    return topic
+
+
+def _log_generation(
+    topic_name: str,
+    subject_name: str,
+    status: str,
+    nodes_created: int = 0,
+    relations_created: int = 0,
+    quality_score: float = 0.0,
+    word_count: int = 0,
+    error_message: str = "",
+    start_time: float = 0.0,
+) -> None:
+    """Creates a GenerationLog entry for crash recovery and admin monitoring."""
+    try:
+        elapsed = int(time.time() - start_time) if start_time else 0
+        GenerationLog.objects.create(
+            topic_name=topic_name,
+            subject_name=subject_name,
+            status=status,
+            nodes_created=nodes_created,
+            relations_created=relations_created,
+            quality_score=quality_score,
+            word_count=word_count,
+            error_message=error_message,
+            generation_time_seconds=elapsed,
+        )
+    except Exception as e:
+        logger.warning("generation_log_failed", error=str(e))
+        sentry_sdk.capture_exception(e)
+
+
+def _separator():
+    logger.info("ingestor_separator", line="━" * 55)

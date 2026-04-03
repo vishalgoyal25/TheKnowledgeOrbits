@@ -127,7 +127,7 @@ export interface Subject {
 export interface HierarchyTopic {
   id: string;
   name: string;
-  sub_topics?: { id: string; name: string }[];
+  sub_topics?: HierarchyTopic[];  // recursive: topic → subtopic → sub-subtopic
 }
 
 export interface HierarchyModule {

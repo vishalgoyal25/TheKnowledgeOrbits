@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "engines.authorization",
     "engines.analytics",
     "engines.support",
+    "engines.book_content",
 ]
 
 # Custom User Model
@@ -113,7 +114,7 @@ else:
             "USER": env("DB_USER", default=env("USER", default="postgres")),
             "PASSWORD": env("DB_PASSWORD", default=env("PASSWORD", default="")),
             "HOST": env("DB_HOST", default=env("HOST", default="localhost")),
-            "PORT": env("DB_PORT", default="5432"),
+            "PORT": env("DB_PORT", default="5433"),
             "OPTIONS": {
                 "options": "-c timezone=Asia/Kolkata",
             },

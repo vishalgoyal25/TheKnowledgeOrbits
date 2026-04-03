@@ -21,6 +21,9 @@ groq>=0.13.0
 # PDF Extraction
 pdfplumber>=0.11.4
 
+# Wikipedia (used by book_content engine wiki_service)
+wikipedia==1.4.0
+
 # Logging & Monitoring
 structlog>=24.4.0
 rich>=13.9.4

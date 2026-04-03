@@ -466,7 +466,7 @@ class HierarchyListView(views.APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, *args, **kwargs):
-        cache_key = "master_hierarchy_list_v3"  # bumped to bust stale cache
+        cache_key = "master_hierarchy_list_v4"  # bumped to bust stale cache
         cached = cache_service.get(cache_key)
         if cached:
             return Response(cached)

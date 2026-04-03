@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPSC Agent Lab — Knowledge Graph</title>
+
+    <!-- Vis.js for the Graph -->
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <!-- marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* ── Reset & Base ─────────────────────────────────── */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #0d1117;
+            color: #e6edf3;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+        }
+
+        /* ── Top Header ───────────────────────────────────── */
+        #header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 24px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            flex-shrink: 0;
+        }
+        #header .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #header .logo-icon { font-size: 24px; }
+        #header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #58a6ff;
+            letter-spacing: 0.3px;
+        }
+        #header .subtitle {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 2px;
+        }
+        #header .badge {
+            background: #1f6feb33;
+            border: 1px solid #1f6feb;
+            color: #58a6ff;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* ── Legend ───────────────────────────────────────── */
+        #legend {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 8px 24px;
+            background: #0d1117;
+            border-bottom: 1px solid #21262d;
+            font-size: 12px;
+            color: #8b949e;
+            flex-shrink: 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* ── Main Layout ──────────────────────────────────── */
+        #main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── Graph Panel ──────────────────────────────────── */
+        #graph-panel {
+            width: 55%;
+            position: relative;
+            border-right: 1px solid #21262d;
+        }
+        #mynetwork {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, #161b22 0%, #0d1117 100%);
+        }
+        #graph-label {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: #161b2280;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 11px;
+            color: #8b949e;
+            backdrop-filter: blur(4px);
+        }
+        #node-count {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            background: #161b2290;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 11px;
+            color: #58a6ff;
+            backdrop-filter: blur(4px);
+        }
+
+        /* ── Content Panel ────────────────────────────────── */
+        #content-panel {
+            width: 45%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #panel-header {
+            padding: 16px 20px 12px;
+            border-bottom: 1px solid #21262d;
+            flex-shrink: 0;
+        }
+        #node-type-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+        }
+        #panel-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #e6edf3;
+            line-height: 1.3;
+        }
+        #panel-meta {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 4px;
+        }
+        #panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        #panel-content::-webkit-scrollbar { width: 4px; }
+        #panel-content::-webkit-scrollbar-track { background: #0d1117; }
+        #panel-content::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+        /* ── Empty State ──────────────────────────────────── */
+        #empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #8b949e;
+            text-align: center;
+            gap: 12px;
+        }
+        #empty-state .empty-icon { font-size: 48px; opacity: 0.5; }
+        #empty-state p { font-size: 14px; line-height: 1.6; }
+
+        /* ── Markdown Styles ──────────────────────────────── */
+        .md-body h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #58a6ff;
+            margin: 0 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #21262d;
+        }
+        .md-body h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #79c0ff;
+            margin: 20px 0 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .md-body p {
+            font-size: 14px;
+            line-height: 1.7;
+            color: #c9d1d9;
+            margin-bottom: 12px;
+        }
+        .md-body ul {
+            padding-left: 20px;
+            margin-bottom: 12px;
+        }
+        .md-body li {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #c9d1d9;
+            margin-bottom: 4px;
+        }
+        .md-body li::marker { color: #58a6ff; }
+        .md-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 13px;
+        }
+        .md-body th {
+            background: #161b22;
+            color: #8b949e;
+            font-weight: 600;
+            padding: 8px 12px;
+            text-align: left;
+            border: 1px solid #21262d;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .md-body td {
+            padding: 8px 12px;
+            border: 1px solid #21262d;
+            color: #c9d1d9;
+            vertical-align: top;
+        }
+        .md-body tr:nth-child(even) td { background: #161b2250; }
+        .md-body strong { color: #e6edf3; font-weight: 600; }
+
+        /* ── Loading Spinner ──────────────────────────────── */
+        #loading {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 12px;
+            color: #8b949e;
+            font-size: 14px;
+        }
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #21262d;
+            border-top-color: #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<div id="header">
+    <div class="logo">
+        <span class="logo-icon">🧪</span>
+        <div>
+            <h1>UPSC Agent Lab</h1>
+            <div class="subtitle">Agentic Knowledge Graph • Local POC</div>
+        </div>
+    </div>
+    <span class="badge">⚡ Powered by Groq LLaMA-3.3-70b</span>
+</div>
+
+<!-- ── Legend ─────────────────────────────────────────────── -->
+<div id="legend">
+    <span>HIERARCHY LEVELS:</span>
+    <div class="legend-item">
+        <div class="legend-dot" style="background:#f97316"></div> Subject
+    </div>
+    <div class="legend-item">
+        <div class="legend-dot" style="background:#a855f7"></div> Module
+    </div>
+    <div class="legend-item">
+        <div class="legend-dot" style="background:#3b82f6"></div> Topic
+    </div>
+    <div class="legend-item">
+        <div class="legend-dot" style="background:#22c55e"></div> SubTopic
+    </div>
+    <span style="margin-left:auto;">← Click any node to load AI content</span>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────── -->
+<div id="main">
+
+    <!-- Graph -->
+    <div id="graph-panel">
+        <div id="mynetwork"></div>
+        <div id="graph-label">🕸️ Knowledge Graph</div>
+        <div id="node-count">Loading nodes...</div>
+    </div>
+
+    <!-- Content -->
+    <div id="content-panel">
+        <div id="panel-header">
+            <div id="node-type-badge" style="display:none"></div>
+            <div id="panel-title" style="color:#8b949e; font-size:15px; font-weight:400;">
+                Select a node from the graph
+            </div>
+            <div id="panel-meta"></div>
+        </div>
+        <div id="panel-content">
+            <div id="empty-state">
+                <div class="empty-icon">🗺️</div>
+                <p>Click any bubble in the graph<br>to load the AI-synthesized content here.</p>
+            </div>
+            <div id="loading"><div class="spinner"></div> Loading content...</div>
+            <div id="content-body" class="md-body" style="display:none"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ── Node color by level ──────────────────────────────────────
+    const TYPE_COLORS = {
+        subject:  { bg: '#f9731620', border: '#f97316', font: '#f97316' },
+        module:   { bg: '#a855f720', border: '#a855f7', font: '#a855f7' },
+        topic:    { bg: '#3b82f620', border: '#3b82f6', font: '#3b82f6' },
+        subtopic: { bg: '#22c55e20', border: '#22c55e', font: '#22c55e' },
+    };
+    const TYPE_SIZE = { subject: 36, module: 28, topic: 22, subtopic: 16 };
+    const TYPE_LABEL = {
+        subject: '📚 SUBJECT', module: '📂 MODULE',
+        topic: '📄 TOPIC', subtopic: '🔹 SUBTOPIC'
+    };
+    const BADGE_COLOR = {
+        subject: '#f97316', module: '#a855f7',
+        topic: '#3b82f6', subtopic: '#22c55e'
+    };
+
+    // ── Fetch graph data from API ────────────────────────────────
+    fetch('/api/graph')
+        .then(r => r.json())
+        .then(data => {
+            // Style each node by type
+            const styledNodes = data.nodes.map(n => {
+                const c = TYPE_COLORS[n.group] || TYPE_COLORS.subtopic;
+                return {
+                    id: n.id,
+                    label: n.label,
+                    group: n.group,
+                    color: { background: c.bg, border: c.border, highlight: { background: c.bg, border: c.border } },
+                    font:  { color: c.font, size: 13, face: 'Segoe UI' },
+                    size:  TYPE_SIZE[n.group] || 16,
+                    shape: 'dot',
+                    borderWidth: 2,
+                    borderWidthSelected: 3,
+                    shadow: { enabled: true, color: c.border + '40', size: 12, x: 0, y: 0 }
+                };
+            });
+
+            const styledEdges = data.edges.map(e => ({
+                from: e.from,
+                to: e.to,
+                color: { color: '#30363d', highlight: '#58a6ff' },
+                arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+                width: 1.5,
+                smooth: { type: 'curvedCW', roundness: 0.15 }
+            }));
+
+            document.getElementById('node-count').textContent =
+                `${styledNodes.length} nodes · ${styledEdges.length} edges`;
+
+            // ── Render graph ──────────────────────────────────────
+            const container = document.getElementById('mynetwork');
+            const network = new vis.Network(container,
+                { nodes: new vis.DataSet(styledNodes), edges: new vis.DataSet(styledEdges) },
+                {
+                    physics: {
+                        solver: 'forceAtlas2Based',
+                        forceAtlas2Based: { gravitationalConstant: -80, springLength: 120, springConstant: 0.08 },
+                        stabilization: { iterations: 150 }
+                    },
+                    interaction: { hover: true, tooltipDelay: 100 },
+                    layout: { improvedLayout: true }
+                }
+            );
+
+            // ── Handle node click ─────────────────────────────────
+            network.on('click', params => {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = data.nodes.find(n => n.id === nodeId);
+                    loadContent(nodeId, node);
+                }
+            });
+        });
+
+    // ── Load node content into right panel ───────────────────────
+    function loadContent(id, node) {
+        // Show loading
+        document.getElementById('empty-state').style.display = 'none';
+        document.getElementById('content-body').style.display = 'none';
+        document.getElementById('loading').style.display = 'flex';
+
+        // Set badge
+        const badge = document.getElementById('node-type-badge');
+        badge.style.display = 'inline-block';
+        badge.textContent = TYPE_LABEL[node.group] || node.group.toUpperCase();
+        badge.style.background = (BADGE_COLOR[node.group] || '#58a6ff') + '22';
+        badge.style.color = BADGE_COLOR[node.group] || '#58a6ff';
+        badge.style.border = '1px solid ' + (BADGE_COLOR[node.group] || '#58a6ff');
+
+        document.getElementById('panel-title').style.color = '#e6edf3';
+        document.getElementById('panel-title').style.fontSize = '20px';
+        document.getElementById('panel-title').style.fontWeight = '700';
+        document.getElementById('panel-title').textContent = node.label;
+        document.getElementById('panel-meta').textContent = `Node ID: ${id}`;
+
+        fetch(`/api/node/${id}`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                const body = document.getElementById('content-body');
+                body.style.display = 'block';
+                // Render Markdown → HTML
+                body.innerHTML = marked.parse(data.content || '_No content available._');
+                // Scroll to top
+                document.getElementById('panel-content').scrollTop = 0;
+            })
+            .catch(() => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content-body').style.display = 'block';
+                document.getElementById('content-body').innerHTML = '<p style="color:#f85149">Failed to load content.</p>';
+            });
+    }
+</script>
+</body>
+</html>

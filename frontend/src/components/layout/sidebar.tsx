@@ -171,7 +171,7 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "absolute right-0 top-0 flex flex-col bg-white transition-all duration-300 ease-in-out z-40 h-[calc(100vh-112px)]",
+        "absolute right-0 top-0 flex flex-col bg-white transition-all duration-300 ease-in-out z-40 h-[calc(100vh-112px)] overflow-hidden",
         isCollapsed ? "w-0 border-l-0" : "w-64 border-l",
       )}
     >
