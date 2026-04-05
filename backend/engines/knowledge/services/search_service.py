@@ -146,9 +146,7 @@ class SearchService:
     # ═══════════════════════════════════════════════════════════════════════════
 
     @classmethod
-    def _vector_search(
-        cls, query_vector: List[float], limit: int
-    ) -> List[Dict]:
+    def _vector_search(cls, query_vector: List[float], limit: int) -> List[Dict]:
         """
         HNSW-optimized vector search across all indexed content types.
 
@@ -176,12 +174,13 @@ class SearchService:
                     ]
                 )
                 .annotate(distance=CosineDistance("vector", query_vector))
-                .order_by("distance")
-                [:_VECTOR_CANDIDATES]
+                .order_by("distance")[:_VECTOR_CANDIDATES]
             )
 
             # Apply noise filter in Python — keeps HNSW index active
-            filtered = [e for e in raw_embeddings if float(e.distance) < _NOISE_THRESHOLD]
+            filtered = [
+                e for e in raw_embeddings if float(e.distance) < _NOISE_THRESHOLD
+            ]
 
             if not filtered:
                 return []
@@ -197,9 +196,7 @@ class SearchService:
             return []
 
     @classmethod
-    def _resolve_embeddings(
-        cls, embeddings: list, limit: int
-    ) -> List[Dict]:
+    def _resolve_embeddings(cls, embeddings: list, limit: int) -> List[Dict]:
         """
         Bulk-resolves embedding rows to their source objects.
         Groups by content_type, fetches all IDs of each type in one query.
@@ -223,9 +220,9 @@ class SearchService:
         if "chunk" in by_type:
             chunk_map = {
                 c.id: c
-                for c in Chunk.objects.filter(
-                    id__in=by_type["chunk"]
-                ).select_related("document")
+                for c in Chunk.objects.filter(id__in=by_type["chunk"]).select_related(
+                    "document"
+                )
             }
         if "article" in by_type:
             article_map = {
@@ -291,7 +288,11 @@ class SearchService:
                         "id": str(obj.id),
                         "type": "article",
                         "title": obj.title,
-                        "snippet": (obj.summary[:200] + "..." if obj.summary else "AI Generated Article"),
+                        "snippet": (
+                            obj.summary[:200] + "..."
+                            if obj.summary
+                            else "AI Generated Article"
+                        ),
                         "url": f"/articles/{obj.id}",
                         "metadata": {
                             "source": "AI Generated",
@@ -356,7 +357,9 @@ class SearchService:
                         "id": str(obj.id),
                         "type": "book_article",
                         "title": obj.topic.name if obj.topic else "Book Article",
-                        "snippet": (obj.content_markdown[:250] + "...") if obj.content_markdown else "",
+                        "snippet": (obj.content_markdown[:250] + "...")
+                        if obj.content_markdown
+                        else "",
                         "url": (
                             f"/knowledge?topic={obj.topic_id}"
                             if obj.topic_id
@@ -399,17 +402,19 @@ class SearchService:
 
             for chunk in keyword_chunks:
                 if str(chunk.id) not in existing_ids:
-                    results.append({
-                        "id": str(chunk.id),
-                        "type": "article",
-                        "title": chunk.document.title,
-                        "snippet": chunk.chunk_text[:250] + "...",
-                        "url": f"/articles/{chunk.document.id}?chunk={chunk.chunk_index}&type=document",
-                        "metadata": {
-                            "source": chunk.document.source_type,
-                            "chapter": chunk.chapter_name or "General",
-                        },
-                    })
+                    results.append(
+                        {
+                            "id": str(chunk.id),
+                            "type": "article",
+                            "title": chunk.document.title,
+                            "snippet": chunk.chunk_text[:250] + "...",
+                            "url": f"/articles/{chunk.document.id}?chunk={chunk.chunk_index}&type=document",
+                            "metadata": {
+                                "source": chunk.document.source_type,
+                                "chapter": chunk.chapter_name or "General",
+                            },
+                        }
+                    )
         except Exception as e:
             logger.warning("keyword_chunk_search_failed", error=str(e))
 
@@ -428,21 +433,25 @@ class SearchService:
 
             for topic in topics:
                 if str(topic.id) not in existing_ids:
-                    results.append({
-                        "id": str(topic.id),
-                        "type": "topic",
-                        "title": topic.name,
-                        "snippet": (
-                            topic.description[:150] + "..."
-                            if topic.description
-                            else "Explore this topic in depth."
-                        ),
-                        "url": f"/topics/{topic.id}",
-                        "metadata": {
-                            "subject": topic.subject.name if topic.subject else "General",
-                            "level": topic.difficulty_level,
-                        },
-                    })
+                    results.append(
+                        {
+                            "id": str(topic.id),
+                            "type": "topic",
+                            "title": topic.name,
+                            "snippet": (
+                                topic.description[:150] + "..."
+                                if topic.description
+                                else "Explore this topic in depth."
+                            ),
+                            "url": f"/topics/{topic.id}",
+                            "metadata": {
+                                "subject": topic.subject.name
+                                if topic.subject
+                                else "General",
+                                "level": topic.difficulty_level,
+                            },
+                        }
+                    )
         except Exception as e:
             logger.warning("topic_search_failed", error=str(e))
 
@@ -466,25 +475,27 @@ class SearchService:
 
             for ca in current_affairs:
                 if str(ca.id) not in existing_ids:
-                    results.append({
-                        "id": str(ca.id),
-                        "type": "current_affair",
-                        "title": ca.title,
-                        "snippet": (
-                            ca.summary[:200] + "..."
-                            if ca.summary
-                            else "Latest update on this topic."
-                        ),
-                        "url": f"/current-affairs/{ca.id}",
-                        "metadata": {
-                            "source": ca.source.name,
-                            "date": (
-                                ca.published_at.strftime("%Y-%m-%d")
-                                if ca.published_at
-                                else "Recent"
+                    results.append(
+                        {
+                            "id": str(ca.id),
+                            "type": "current_affair",
+                            "title": ca.title,
+                            "snippet": (
+                                ca.summary[:200] + "..."
+                                if ca.summary
+                                else "Latest update on this topic."
                             ),
-                        },
-                    })
+                            "url": f"/current-affairs/{ca.id}",
+                            "metadata": {
+                                "source": ca.source.name,
+                                "date": (
+                                    ca.published_at.strftime("%Y-%m-%d")
+                                    if ca.published_at
+                                    else "Recent"
+                                ),
+                            },
+                        }
+                    )
         except Exception as e:
             logger.warning("ca_article_search_failed", error=str(e))
 
@@ -511,22 +522,24 @@ class SearchService:
 
             for art in generated_articles:
                 if str(art.id) not in existing_ids:
-                    results.append({
-                        "id": str(art.id),
-                        "type": "article",
-                        "title": art.title,
-                        "snippet": (
-                            art.summary[:200] + "..."
-                            if art.summary
-                            else "AI Generated Article"
-                        ),
-                        "url": f"/articles/{art.id}",
-                        "metadata": {
-                            "source": "AI Generated",
-                            "topic": art.topic.name if art.topic else "",
-                            "date": art.created_at.strftime("%Y-%m-%d"),
-                        },
-                    })
+                    results.append(
+                        {
+                            "id": str(art.id),
+                            "type": "article",
+                            "title": art.title,
+                            "snippet": (
+                                art.summary[:200] + "..."
+                                if art.summary
+                                else "AI Generated Article"
+                            ),
+                            "url": f"/articles/{art.id}",
+                            "metadata": {
+                                "source": "AI Generated",
+                                "topic": art.topic.name if art.topic else "",
+                                "date": art.created_at.strftime("%Y-%m-%d"),
+                            },
+                        }
+                    )
         except Exception as e:
             logger.warning("generated_article_search_failed", error=str(e))
 
@@ -571,17 +584,19 @@ class SearchService:
                 if bc_id in existing_ca_ids or bc_id in seen_article_ids:
                     continue
                 seen_article_ids.add(bc_id)
-                results.append({
-                    "id": bc_id,
-                    "type": "book_article",
-                    "title": bc.topic.name,
-                    "snippet": chunk.chunk_text[:250] + "...",
-                    "url": f"/knowledge?topic={bc.topic_id}",
-                    "metadata": {
-                        "source": "Book Content",
-                        "subject": bc.subject.name if bc.subject else "",
-                    },
-                })
+                results.append(
+                    {
+                        "id": bc_id,
+                        "type": "book_article",
+                        "title": bc.topic.name,
+                        "snippet": chunk.chunk_text[:250] + "...",
+                        "url": f"/knowledge?topic={bc.topic_id}",
+                        "metadata": {
+                            "source": "Book Content",
+                            "subject": bc.subject.name if bc.subject else "",
+                        },
+                    }
+                )
 
         except Exception as e:
             logger.warning("bm25_book_chunk_search_failed", error=str(e))
@@ -602,9 +617,7 @@ class SearchService:
         """
         from engines.current_affairs.models import CAChunk
 
-        existing_ca_ids = {
-            r["id"] for r in existing if r["type"] == "current_affair"
-        }
+        existing_ca_ids = {r["id"] for r in existing if r["type"] == "current_affair"}
         results = []
 
         try:
@@ -614,8 +627,7 @@ class SearchService:
             sv = SearchVector("chunk_text", config="english")  # noqa: F821
 
             chunks = (
-                CAChunk.objects
-                .annotate(sv=sv, rank=SearchRank(sv, search_q))
+                CAChunk.objects.annotate(sv=sv, rank=SearchRank(sv, search_q))
                 .filter(sv=search_q)
                 .order_by("-rank")
                 .select_related("ca_article", "ca_article__source")[:10]
@@ -629,21 +641,23 @@ class SearchService:
                 if ca_id in existing_ca_ids or ca_id in seen_article_ids:
                     continue
                 seen_article_ids.add(ca_id)
-                results.append({
-                    "id": ca_id,
-                    "type": "current_affair",
-                    "title": chunk.ca_article.title,
-                    "snippet": chunk.chunk_text[:200] + "...",
-                    "url": f"/current-affairs/{ca_id}",
-                    "metadata": {
-                        "source": chunk.ca_article.source.name,
-                        "date": (
-                            chunk.published_at.strftime("%Y-%m-%d")
-                            if chunk.published_at
-                            else "Recent"
-                        ),
-                    },
-                })
+                results.append(
+                    {
+                        "id": ca_id,
+                        "type": "current_affair",
+                        "title": chunk.ca_article.title,
+                        "snippet": chunk.chunk_text[:200] + "...",
+                        "url": f"/current-affairs/{ca_id}",
+                        "metadata": {
+                            "source": chunk.ca_article.source.name,
+                            "date": (
+                                chunk.published_at.strftime("%Y-%m-%d")
+                                if chunk.published_at
+                                else "Recent"
+                            ),
+                        },
+                    }
+                )
 
         except Exception as e:
             logger.warning("bm25_ca_chunk_search_failed", error=str(e))

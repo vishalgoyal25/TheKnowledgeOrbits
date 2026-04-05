@@ -211,15 +211,17 @@ export default function Header({ initialHierarchy }: HeaderProps) {
           bookSubjects.map((s) => getBookTree(s.id).catch(() => null)),
         );
 
-        const hierarchySubjects: HierarchySubject[] = bookSubjects.map((s, i) => ({
-          id: s.id,
-          name: s.name,
-          modules: (trees[i]?.modules ?? []).map((mod) => ({
-            id: mod.id,
-            name: mod.name,
-            topics: mod.topics.map(treeTopicToHierarchy),
-          })),
-        }));
+        const hierarchySubjects: HierarchySubject[] = bookSubjects.map(
+          (s, i) => ({
+            id: s.id,
+            name: s.name,
+            modules: (trees[i]?.modules ?? []).map((mod) => ({
+              id: mod.id,
+              name: mod.name,
+              topics: mod.topics.map(treeTopicToHierarchy),
+            })),
+          }),
+        );
 
         setHierarchyData([NEWS_SUBJECT, ...hierarchySubjects]);
       } catch (err) {
@@ -228,7 +230,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
     };
 
     fetchHierarchy();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -619,13 +621,21 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                             const seenIds = new Set<string>();
 
                             // Recursively flatten all levels: topic → subtopic → sub-subtopic
-                            function flattenTree(topics: HierarchyTopic[], isSub: boolean) {
+                            function flattenTree(
+                              topics: HierarchyTopic[],
+                              isSub: boolean,
+                            ) {
                               topics.forEach((t) => {
                                 if (!seenIds.has(t.id)) {
-                                  flatTopics.push({ id: t.id, name: t.name, isSubTopic: isSub || undefined });
+                                  flatTopics.push({
+                                    id: t.id,
+                                    name: t.name,
+                                    isSubTopic: isSub || undefined,
+                                  });
                                   seenIds.add(t.id);
                                 }
-                                if (t.sub_topics?.length) flattenTree(t.sub_topics, true);
+                                if (t.sub_topics?.length)
+                                  flattenTree(t.sub_topics, true);
                               });
                             }
                             flattenTree(activeModule?.topics ?? [], false);

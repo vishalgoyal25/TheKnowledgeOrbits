@@ -19,7 +19,6 @@ import {
 } from "@/types/book-content";
 import apiClient from "./client";
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/subjects/
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,7 +31,6 @@ export async function getBookSubjects(): Promise<SubjectWithPlan[]> {
   const response = await apiClient.get("/book/subjects/");
   return response.data;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/tree/{subject_id}/
@@ -47,7 +45,6 @@ export async function getBookTree(subjectId: string): Promise<SubjectTree> {
   return response.data;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/graph/{subject_id}/
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,7 +57,6 @@ export async function getBookGraph(subjectId: string): Promise<GraphData> {
   const response = await apiClient.get(`/book/graph/${subjectId}/`);
   return response.data;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/graph/{subject_id}/node/{topic_id}/children/
@@ -81,7 +77,6 @@ export async function getGraphNodeChildren(
   return response.data;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/content/{topic_id}/
 // ─────────────────────────────────────────────────────────────────────────────
@@ -95,7 +90,6 @@ export async function getBookContent(topicId: string): Promise<BookContent> {
   const response = await apiClient.get(`/book/content/${topicId}/`);
   return response.data;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/content/{topic_id}/cross-references/
@@ -114,7 +108,6 @@ export async function getCrossReferences(
   );
   return response.data;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/generation-log/   (staff only)

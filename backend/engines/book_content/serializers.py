@@ -20,6 +20,7 @@ from rest_framework import serializers
 from engines.book_content.models import (
     BookContent,
     BookPlan,
+    ContentMedia,
     CrossReference,
     GenerationLog,
     TopicRelation,
@@ -171,6 +172,35 @@ class CrossReferenceSerializer(serializers.ModelSerializer):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CONTENT MEDIA  (Cloudinary image/infographic assets)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class ContentMediaSerializer(serializers.ModelSerializer):
+    """
+    Media asset linked to a BookContent article.
+    Populated by admin via Cloudinary dashboard → Django Admin inline.
+    Frontend uses `position_marker` to match infographic blockquote nodes,
+    then replaces the placeholder with a <Image> if `cloudinary_url` is present.
+    Used by:
+      GET /api/v1/book/content/{topic_id}/  (nested in BookContentSerializer)
+    """
+
+    class Meta:
+        model = ContentMedia
+        fields = [
+            "id",
+            "media_type",
+            "cloudinary_url",
+            "position_marker",
+            "alt_text",
+            "caption",
+            "display_order",
+        ]
+        read_only_fields = fields
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # BOOK CONTENT — FULL  (article reader)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -201,6 +231,12 @@ class BookContentSerializer(serializers.ModelSerializer):
         read_only=True,
         help_text="See Also links injected by Layer 3 Coherence Engine.",
     )
+    media_assets = ContentMediaSerializer(
+        source="media_assets",
+        many=True,
+        read_only=True,
+        help_text="Cloudinary media assets linked to this article (images, infographics).",
+    )
     # Render formatted_content if available, else fall back to content_markdown.
     # Frontend uses this single field — no conditional logic needed in React.
     render_content = serializers.SerializerMethodField(
@@ -225,6 +261,7 @@ class BookContentSerializer(serializers.ModelSerializer):
             "has_media",
             "is_published",
             "cross_references",
+            "media_assets",
             "created_at",
             "updated_at",
         ]

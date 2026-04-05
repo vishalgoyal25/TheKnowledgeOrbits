@@ -17,11 +17,7 @@ export type NodeType =
   | "subtopic"
   | "sub_subtopic";
 
-export type ContentStatus =
-  | "empty"
-  | "generating"
-  | "book_quality"
-  | "failed";
+export type ContentStatus = "empty" | "generating" | "book_quality" | "failed";
 
 export type DifficultyLevel = "easy" | "medium" | "hard";
 
@@ -44,7 +40,6 @@ export type GenerationStatus =
   | "not_started";
 
 export type LogStatus = "success" | "failed" | "skipped";
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOK PLAN  (BookPlanSerializer)
@@ -90,7 +85,6 @@ export interface BookPlanStub {
   completion_pct: 0.0;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SUBJECT  (subject_list view response)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,7 +96,6 @@ export interface SubjectWithPlan {
   order_index: number;
   book_plan: BookPlan | BookPlanStub;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOPIC NODE  (TopicNodeSerializer)
@@ -126,7 +119,6 @@ export interface TopicNode {
   difficulty_level: DifficultyLevel;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // TOPIC RELATION  (TopicRelationSerializer)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,14 +135,13 @@ export interface TopicRelation {
   created_at: string;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // GRAPH DATA  (subject_graph view response)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface HierarchicalEdge {
-  source: string;  // source topic UUID
-  target: string;  // target topic UUID
+  source: string; // source topic UUID
+  target: string; // target topic UUID
   type: "contains";
 }
 
@@ -166,7 +157,6 @@ export interface GraphData {
   edges: GraphEdges;
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SUBJECT TREE  (subject_tree view response)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -179,7 +169,7 @@ export interface TreeTopic {
   quality_score: number | null;
   order_index: number;
   difficulty_level: DifficultyLevel;
-  subtopics: TreeTopic[];  // recursive
+  subtopics: TreeTopic[]; // recursive
 }
 
 export interface TreeModule {
@@ -195,7 +185,6 @@ export interface SubjectTree {
   modules: TreeModule[];
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // CROSS REFERENCE  (CrossReferenceSerializer)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -210,6 +199,33 @@ export interface CrossReference {
   created_at: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTENT MEDIA  (ContentMediaSerializer)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type MediaType =
+  | "image"
+  | "diagram"
+  | "table_image"
+  | "infographic"
+  | "video"
+  | "placeholder";
+
+export interface ContentMedia {
+  id: string;
+  media_type: MediaType;
+  /** Cloudinary CDN URL — empty string when placeholder not yet fulfilled. */
+  cloudinary_url: string;
+  /**
+   * Exact marker string in content_markdown where this media is inserted.
+   * Example: '>[!infographic: Map of British India 1773]<'
+   * Frontend matches this against blockquote rawText to resolve the image.
+   */
+  position_marker: string;
+  alt_text: string;
+  caption: string;
+  display_order: number;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOK CONTENT — FULL  (BookContentSerializer)
@@ -232,10 +248,11 @@ export interface BookContent {
   has_media: boolean;
   is_published: boolean;
   cross_references: CrossReference[];
+  /** Cloudinary media assets (images, infographics). Empty array until admin uploads. */
+  media_assets: ContentMedia[];
   created_at: string;
   updated_at: string;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOK CONTENT — LIST  (BookContentListSerializer)
@@ -255,7 +272,6 @@ export interface BookContentListItem {
   created_at: string;
   updated_at: string;
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GENERATION LOG  (GenerationLogSerializer)

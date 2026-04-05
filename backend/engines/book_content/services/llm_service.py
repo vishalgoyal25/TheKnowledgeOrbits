@@ -10,9 +10,10 @@ Preserved exactly: pool config, rate limits, retry logic, key rotation algorithm
 
 import time
 
+from django.conf import settings
+
 import sentry_sdk
 import structlog
-from django.conf import settings
 from langchain_groq import ChatGroq
 
 logger = structlog.get_logger(__name__)
@@ -80,7 +81,10 @@ def llm_call(prompt: str, mode: str = "standard") -> str:
             pool = _pool_critique
         else:
             pool = _pool_standard
-        client = pool[_current_key_idx]
+        if not pool:
+            break
+        key_idx = _current_key_idx % len(pool)
+        client = pool[key_idx]
 
         try:
             response = client.invoke(prompt)
