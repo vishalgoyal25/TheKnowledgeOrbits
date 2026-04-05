@@ -27,11 +27,12 @@ Preserved exactly: topic_overview prompt, smart skip logic, pipeline order,
 import time
 from typing import Optional
 
+import requests
 import sentry_sdk
 import structlog
 from django.db import transaction
 
-from engines.book_content.models import BookContent, GenerationLog
+from engines.book_content.models import BookContent, ContentMedia, GenerationLog
 from engines.knowledge.models import Module, Subject, Topic
 
 from .book_planner_service import (
@@ -129,6 +130,8 @@ def ingest_topic(
         # Cross-link: Book↔CA and Book↔Book inter-subject (needs book_article embedding)
         _cross_link_to_ca(topic_bc_obj)
         _cross_link_inter_subject(topic_bc_obj)
+        # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
+        _fetch_and_store_hero_image(topic_bc_obj)
 
         nodes_created += 1
         logger.info("ingestor_topic_overview_saved", topic=topic)
@@ -209,6 +212,8 @@ def ingest_topic(
                 _create_chunks_and_embeddings(sub_bc_obj)
                 _cross_link_to_ca(sub_bc_obj)
                 _cross_link_inter_subject(sub_bc_obj)
+                # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
+                _fetch_and_store_hero_image(sub_bc_obj)
 
                 # Register in concept registry
                 update_concept_registry(
@@ -304,6 +309,8 @@ def ingest_topic(
                     _create_chunks_and_embeddings(ss_bc_obj)
                     _cross_link_to_ca(ss_bc_obj)
                     _cross_link_inter_subject(ss_bc_obj)
+                    # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
+                    _fetch_and_store_hero_image(ss_bc_obj)
 
                     update_concept_registry(
                         subject, ss_name, str(ss_topic_obj.id), ss_name
@@ -743,6 +750,231 @@ def _cross_link_inter_subject(book_content_obj: BookContent) -> None:
     except Exception as e:
         logger.warning("ingestor_inter_subject_link_failed", error=str(e))
         sentry_sdk.capture_exception(e)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# G4 — WIKIPEDIA HERO IMAGE → CLOUDINARY  (auto image pipeline)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{}"
+_WIKI_HEADERS = {
+    "User-Agent": "TheKnowledgeOrbits/1.0 (contact@theknowledgeorbits.com)"
+}
+
+
+def _cld_slug(name: str, max_len: int = 40) -> str:
+    """
+    Convert a human name into a Cloudinary-safe folder segment.
+    Rules: lowercase, spaces → underscores, drop all non-alphanumeric/underscore chars,
+    collapse multiple underscores, truncate to max_len.
+
+    Examples:
+      "Indian Constitution & Polity" → "indian_constitution_and_polity"
+      "Fundamental Rights (Part III)" → "fundamental_rights_part_iii"
+    """
+    import re
+
+    s = name.lower()
+    s = s.replace("&", "and")
+    s = re.sub(r"[^a-z0-9\s]", " ", s)  # non-alphanumeric → space
+    s = re.sub(r"\s+", "_", s.strip())  # spaces → underscores
+    s = re.sub(r"_+", "_", s)  # collapse repeated underscores
+    return s[:max_len].rstrip("_")
+
+
+def _fetch_and_store_hero_image(book_content_obj: BookContent) -> None:
+    """
+    Fetch the Wikipedia page summary hero image, re-host on Cloudinary in a
+    structured folder hierarchy, tag with all IDs, and save to ContentMedia.
+
+    Cloudinary folder layout:
+      tko/upsc/{subject_slug}/{module_slug}/
+
+    Cloudinary public_id (filename, within folder):
+      {topic_uuid}_hero
+
+    Full example path on Cloudinary:
+      tko/upsc/indian_constitution_and_polity/fundamental_rights/{uuid}_hero
+
+    This guarantees:
+      ✓ Zero collision   — topic UUID is mathematically unique
+      ✓ Idempotent       — overwrite=True replaces old image on re-generation
+      ✓ Neat hierarchy   — browsable per subject → module in Cloudinary dashboard
+      ✓ Searchable tags  — filter by subject_id / topic_id in Cloudinary Media Library
+      ✓ Rich metadata    — full context (IDs + names) visible on each asset
+
+    Filter rules (skip bad images):
+      - No `originalimage` key in the Wikipedia response
+      - width < 200px (icons, flags, tiny thumbnails)
+      - URL ends in .svg (vector diagrams — unsupported by <Image>)
+
+    Completely non-blocking: wrapped in try/except. Any failure is logged +
+    sent to Sentry but NEVER raises. Image failure must not abort article generation.
+    """
+    try:
+        import cloudinary
+        import cloudinary.uploader
+        from django.conf import settings
+
+        # ── Extract hierarchy metadata from book_content_obj ─────────────────
+        # All IDs and names are derived here — no extra arguments needed.
+        topic_obj = book_content_obj.topic  # FK — may query DB once
+        subject_obj = book_content_obj.subject  # FK — may query DB once
+        module_obj = topic_obj.module  # FK — may query DB once
+
+        topic_id: str = str(topic_obj.id)
+        topic_name: str = topic_obj.name
+        node_type: str = getattr(topic_obj, "node_type", "topic")
+
+        subject_id: str = str(subject_obj.id)
+        subject_name: str = subject_obj.name
+
+        module_id: str = str(module_obj.id)
+        module_name: str = module_obj.name
+
+        # ── Step 1: Fetch Wikipedia page summary ─────────────────────────────
+        encoded_topic = requests.utils.quote(topic_name, safe="")
+        api_url = _WIKI_SUMMARY_URL.format(encoded_topic)
+
+        resp = requests.get(api_url, headers=_WIKI_HEADERS, timeout=10)
+        if resp.status_code != 200:
+            logger.info(
+                "hero_image_wiki_skip",
+                topic=topic_name,
+                reason="non_200_response",
+                status=resp.status_code,
+            )
+            return
+
+        data = resp.json()
+
+        # ── Filter: must have originalimage ──────────────────────────────────
+        original = data.get("originalimage")
+        if not original:
+            logger.info(
+                "hero_image_wiki_skip",
+                topic=topic_name,
+                reason="no_originalimage_key",
+            )
+            return
+
+        image_url: str = original.get("source", "")
+        image_width: int = original.get("width", 0)
+
+        # ── Filter: skip icons and tiny thumbnails (< 200 px) ────────────────
+        if image_width < 200:
+            logger.info(
+                "hero_image_wiki_skip",
+                topic=topic_name,
+                reason="width_too_small",
+                width=image_width,
+            )
+            return
+
+        # ── Filter: skip SVG vector files ─────────────────────────────────────
+        if image_url.lower().endswith(".svg"):
+            logger.info(
+                "hero_image_wiki_skip",
+                topic=topic_name,
+                reason="svg_format",
+                url=image_url,
+            )
+            return
+
+        # ── Extract caption from Wikipedia description ────────────────────────
+        wiki_description: str = data.get("description", "") or ""
+        wiki_caption: str = wiki_description[:200] if wiki_description else topic_name
+
+        # ── Step 2: Configure Cloudinary (safety net over auto-config) ───────
+        cloudinary_settings = getattr(settings, "CLOUDINARY_STORAGE", {})
+        if cloudinary_settings.get("CLOUD_NAME"):
+            cloudinary.config(
+                cloud_name=cloudinary_settings["CLOUD_NAME"],
+                api_key=cloudinary_settings["API_KEY"],
+                api_secret=cloudinary_settings["API_SECRET"],
+            )
+
+        # ── Build deterministic folder + public_id ────────────────────────────
+        #
+        # Folder:    tko/upsc/{subject_slug}/{module_slug}
+        # Public ID: {topic_uuid}_hero
+        #
+        # With overwrite=True + explicit public_id, re-running the ingestor for
+        # the same topic replaces the old image cleanly — no duplicate uploads.
+        #
+        subject_slug = _cld_slug(subject_name)
+        module_slug = _cld_slug(module_name)
+        folder = f"tko/upsc/{subject_slug}/{module_slug}"
+        public_id = f"{topic_id}_hero"  # UUID → zero collision guaranteed
+
+        # ── Step 3: Upload to Cloudinary (re-hosting from Wikimedia) ─────────
+        upload_result = cloudinary.uploader.upload(
+            image_url,
+            folder=folder,
+            public_id=public_id,
+            resource_type="image",
+            overwrite=True,  # idempotent: same topic → same slot
+            use_filename=False,
+            unique_filename=False,  # we control the filename via public_id
+            # ── Searchable tags (filterable in Cloudinary Media Library) ───
+            tags=[
+                "tko",
+                "upsc",
+                f"subject_{subject_id}",
+                f"module_{module_id}",
+                f"topic_{topic_id}",
+                node_type,
+            ],
+            # ── Rich context metadata (visible on each asset in dashboard) ──
+            context=(
+                f"topic_id={topic_id}"
+                f"|topic_name={topic_name}"
+                f"|subject_id={subject_id}"
+                f"|subject_name={subject_name}"
+                f"|module_id={module_id}"
+                f"|module_name={module_name}"
+                f"|node_type={node_type}"
+            ),
+        )
+
+        cloudinary_url: str = upload_result.get("secure_url", "")
+        if not cloudinary_url:
+            logger.warning("hero_image_upload_no_url", topic=topic_name)
+            return
+
+        # ── Step 4: Save to ContentMedia (idempotent upsert) ─────────────────
+        # Keyed on (content, media_type="image") so re-runs update rather than duplicate.
+        ContentMedia.objects.update_or_create(
+            content=book_content_obj,
+            media_type="image",
+            defaults={
+                "cloudinary_url": cloudinary_url,
+                "position": "hero",
+                "position_marker": "",  # hero images have no inline marker
+                "alt_text": topic_name,
+                "caption": wiki_caption,
+                "display_order": 0,
+            },
+        )
+
+        logger.info(
+            "hero_image_saved",
+            topic=topic_name,
+            topic_id=topic_id,
+            subject=subject_name,
+            module=module_name,
+            folder=folder,
+            cloudinary_url=cloudinary_url,
+            original_width=image_width,
+        )
+
+    except Exception as e:
+        topic_label = getattr(
+            getattr(book_content_obj, "topic", None), "name", str(book_content_obj.pk)
+        )
+        logger.warning("hero_image_failed", topic=topic_label, error=str(e))
+        sentry_sdk.capture_exception(e)
+        # Never re-raise — image failure must not abort article generation
 
 
 def _separator():

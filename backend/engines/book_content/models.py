@@ -573,17 +573,17 @@ class BookChunk(models.Model):
     """
 
     SOURCE_TYPE_CHOICES = [
-        ("wiki",       "Wikipedia"),
-        ("govt",       "Government Source"),
-        ("news",       "News Source"),
-        ("ncert_blend","NCERT + Wiki Blend"),
-        ("mixed",      "Multiple Sources"),
+        ("wiki", "Wikipedia"),
+        ("govt", "Government Source"),
+        ("news", "News Source"),
+        ("ncert_blend", "NCERT + Wiki Blend"),
+        ("mixed", "Multiple Sources"),
     ]
 
     QUALITY_FLAG_CHOICES = [
-        ("high",         "High Quality"),
-        ("medium",       "Medium Quality"),
-        ("low",          "Low Quality"),
+        ("high", "High Quality"),
+        ("medium", "Medium Quality"),
+        ("low", "Low Quality"),
         ("needs_review", "Needs Review"),
     ]
 

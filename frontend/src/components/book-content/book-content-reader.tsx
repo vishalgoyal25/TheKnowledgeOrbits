@@ -20,13 +20,18 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { BookOpen, ExternalLink, AlertCircle, PenLine } from "lucide-react";
 
 import { getBookContent } from "@/lib/api/book-content";
 import { cn } from "@/lib/utils";
-import type { BookContent, CrossReference } from "@/types/book-content";
+import type {
+  BookContent,
+  ContentMedia,
+  CrossReference,
+} from "@/types/book-content";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -50,10 +55,16 @@ function extractNodeText(node: unknown): string {
 function detectBlockquoteType(
   rawText: string,
 ): "infographic" | "upsc-focus" | "standard" {
-  if (/^\s*>\s*\[!infographic:/i.test(rawText) || rawText.includes("[!infographic:")) {
+  if (
+    /^\s*>\s*\[!infographic:/i.test(rawText) ||
+    rawText.includes("[!infographic:")
+  ) {
     return "infographic";
   }
-  if (rawText.includes("💡 UPSC High-Yield Focus") || rawText.includes("UPSC High-Yield Focus")) {
+  if (
+    rawText.includes("💡 UPSC High-Yield Focus") ||
+    rawText.includes("UPSC High-Yield Focus")
+  ) {
     return "upsc-focus";
   }
   return "standard";
@@ -99,10 +110,10 @@ function SeeAlsoLink({
 }) {
   const label = xref.display_label || xref.target_topic_name;
   const badgeColors: Record<string, string> = {
-    see_also:     "bg-blue-100   text-blue-700",
+    see_also: "bg-blue-100   text-blue-700",
     prerequisite: "bg-purple-100 text-purple-700",
     continuation: "bg-green-100  text-green-700",
-    contrast:     "bg-orange-100 text-orange-700",
+    contrast: "bg-orange-100 text-orange-700",
   };
 
   return (
@@ -130,7 +141,39 @@ function SeeAlsoLink({
 // MARKDOWN RENDERER
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BookMarkdown({ content }: { content: string }) {
+/**
+ * Extract the infographic caption from raw blockquote text.
+ * Matches patterns like `[!infographic: Map of British India 1773]`.
+ * Returns null if no infographic marker is found.
+ */
+function extractInfographicCaption(rawText: string): string | null {
+  const match = rawText.match(/\[!infographic:\s*([^\]]+)\]/i);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Find a ContentMedia entry whose position_marker contains the given caption.
+ * Returns the media object if found AND cloudinary_url is populated.
+ */
+function resolveInfographicMedia(
+  caption: string,
+  mediaAssets: ContentMedia[],
+): ContentMedia | null {
+  const found = mediaAssets.find(
+    (m) =>
+      m.cloudinary_url.length > 0 &&
+      m.position_marker.toLowerCase().includes(caption.toLowerCase()),
+  );
+  return found ?? null;
+}
+
+function BookMarkdown({
+  content,
+  mediaAssets,
+}: {
+  content: string;
+  mediaAssets: ContentMedia[];
+}) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -138,19 +181,19 @@ function BookMarkdown({ content }: { content: string }) {
         // Headings
         h1: ({ ...props }) => (
           <h1
-            className="text-2xl font-bold mt-8 mb-4 text-foreground border-b border-border pb-2"
+            className="text-xl sm:text-2xl font-bold mt-8 mb-4 text-foreground border-b border-border pb-2 break-words"
             {...props}
           />
         ),
         h2: ({ ...props }) => (
           <h2
-            className="text-lg font-bold mt-6 mb-3 text-primary"
+            className="text-base sm:text-lg font-bold mt-6 mb-3 text-primary break-words"
             {...props}
           />
         ),
         h3: ({ ...props }) => (
           <h3
-            className="text-sm font-bold mt-6 mb-2 text-indigo-700 uppercase tracking-wider border-b border-indigo-100 pb-1.5"
+            className="text-sm font-bold mt-6 mb-2 text-indigo-700 uppercase tracking-wider border-b border-indigo-100 pb-1.5 break-words"
             {...props}
           />
         ),
@@ -158,17 +201,23 @@ function BookMarkdown({ content }: { content: string }) {
         // Paragraph
         p: ({ ...props }) => (
           <p
-            className="mb-3 leading-relaxed text-sm text-foreground/90"
+            className="mb-3 leading-relaxed text-sm text-foreground/90 break-words overflow-wrap-anywhere"
             {...props}
           />
         ),
 
         // Lists
         ul: ({ ...props }) => (
-          <ul className="list-disc pl-5 mb-3 space-y-1 text-sm text-foreground/90" {...props} />
+          <ul
+            className="list-disc pl-5 mb-3 space-y-1 text-sm text-foreground/90"
+            {...props}
+          />
         ),
         ol: ({ ...props }) => (
-          <ol className="list-decimal pl-5 mb-3 space-y-1 text-sm text-foreground/90" {...props} />
+          <ol
+            className="list-decimal pl-5 mb-3 space-y-1 text-sm text-foreground/90"
+            {...props}
+          />
         ),
         li: ({ ...props }) => (
           <li className="leading-relaxed marker:text-primary" {...props} />
@@ -180,23 +229,24 @@ function BookMarkdown({ content }: { content: string }) {
             <table className="w-full text-sm border-collapse" {...props} />
           </div>
         ),
-        thead: ({ ...props }) => (
-          <thead className="bg-blue-50" {...props} />
-        ),
+        thead: ({ ...props }) => <thead className="bg-blue-50" {...props} />,
         th: ({ ...props }) => (
           <th
-            className="px-3 py-2 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider border-b border-blue-200 bg-blue-50"
+            className="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-xs font-semibold text-blue-700 uppercase tracking-wider border-b border-blue-200 bg-blue-50"
             {...props}
           />
         ),
         td: ({ ...props }) => (
           <td
-            className="px-3 py-2 text-sm text-foreground/90 border-b border-blue-100 border-r border-r-blue-100/60 last:border-r-0 align-top"
+            className="px-2 py-1.5 sm:px-3 sm:py-2 text-sm text-foreground/90 border-b border-blue-100 border-r border-r-blue-100/60 last:border-r-0 align-top break-words"
             {...props}
           />
         ),
         tr: ({ ...props }) => (
-          <tr className="even:bg-blue-50/30 hover:bg-blue-50/60 transition-colors" {...props} />
+          <tr
+            className="even:bg-blue-50/30 hover:bg-blue-50/60 transition-colors"
+            {...props}
+          />
         ),
 
         // Strong / em
@@ -212,9 +262,7 @@ function BookMarkdown({ content }: { content: string }) {
           // Extract raw text for type detection
           let rawText = "";
           try {
-            rawText = node
-              ? JSON.stringify(node)
-              : String(children);
+            rawText = node ? JSON.stringify(node) : String(children);
           } catch {
             rawText = String(children);
           }
@@ -222,26 +270,105 @@ function BookMarkdown({ content }: { content: string }) {
           const type = detectBlockquoteType(rawText);
 
           if (type === "infographic") {
+            const caption = extractInfographicCaption(rawText);
+            if (caption) {
+              const media = resolveInfographicMedia(caption, mediaAssets);
+              if (media) {
+                return (
+                  <figure className="my-5">
+                    <Image
+                      src={media.cloudinary_url}
+                      alt={media.alt_text || caption}
+                      width={800}
+                      height={450}
+                      className="rounded-lg w-full h-auto"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 60vw, 800px"
+                    />
+                    {(media.caption || caption) && (
+                      <figcaption className="mt-2 text-center text-xs text-muted-foreground italic">
+                        {media.caption || caption}
+                      </figcaption>
+                    )}
+                  </figure>
+                );
+              }
+            }
+            // No Cloudinary URL for this infographic → render nothing
             return null;
           }
 
           if (type === "upsc-focus") {
             // Strip the leading emoji + label from plain text so the component
             // renders only the actual insight text (no duplicate 💡 or label).
-            const fullText = extractNodeText(node).replace(
-              /💡\s*UPSC High-Yield Focus:\s*/i,
-              "",
-            ).trim();
+            const fullText = extractNodeText(node)
+              .replace(/💡\s*UPSC High-Yield Focus:\s*/i, "")
+              .trim();
             return <UpscFocusCallout>{fullText}</UpscFocusCallout>;
           }
 
           return <StandardBlockquote {...props}>{children}</StandardBlockquote>;
         },
 
-        // Horizontal rule as section divider
-        hr: () => (
-          <hr className="my-6 border-border/50" />
+        // Inline code
+        code: ({ children, className, ...props }) => {
+          // Block code is rendered by pre; inline code has no language className
+          const isBlock = className?.startsWith("language-");
+          if (isBlock) {
+            return (
+              <code
+                className="block font-mono text-xs leading-relaxed"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          }
+          return (
+            <code
+              className="font-mono text-xs bg-muted px-1 py-0.5 rounded text-foreground/90"
+              {...props}
+            >
+              {children}
+            </code>
+          );
+        },
+
+        // Code block wrapper
+        pre: ({ ...props }) => (
+          <pre
+            className="my-4 overflow-x-auto rounded-lg bg-muted/60 border border-border px-4 py-3 text-xs font-mono leading-relaxed text-foreground/90"
+            {...props}
+          />
         ),
+
+        // Images — Cloudinary → Next.js <Image> (optimised CDN); everything else → lazy <img>
+        img: ({ src, alt }) => {
+          if (!src) return null;
+          const imgSrc = typeof src === "string" ? src : "";
+          if (imgSrc.includes("cloudinary.com")) {
+            return (
+              <Image
+                src={imgSrc}
+                alt={alt ?? ""}
+                width={800}
+                height={450}
+                className="rounded-lg my-4 w-full h-auto"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 60vw, 800px"
+              />
+            );
+          }
+          return (
+            <img
+              src={imgSrc}
+              alt={alt ?? ""}
+              loading="lazy"
+              className="rounded-lg my-4 w-full h-auto"
+            />
+          );
+        },
+
+        // Horizontal rule as section divider
+        hr: () => <hr className="my-6 border-border/50" />,
       }}
     >
       {content}
@@ -260,7 +387,8 @@ function EmptyState() {
       <div>
         <p className="font-medium text-foreground/60">No article selected</p>
         <p className="text-sm mt-1 leading-relaxed">
-          Click any node in the graph or outline to load its AI-generated UPSC content here.
+          Click any node in the graph or outline to load its AI-generated UPSC
+          content here.
         </p>
       </div>
     </div>
@@ -294,9 +422,9 @@ export default function BookContentReader({
   onSeeAlsoClick,
   className,
 }: BookContentReaderProps) {
-  const [content, setContent]   = useState<BookContent | null>(null);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [content, setContent] = useState<BookContent | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // ── Fetch article whenever topicId changes ────────────────────────────────
   useEffect(() => {
@@ -316,7 +444,9 @@ export default function BookContentReader({
         setLoading(false);
       })
       .catch(() => {
-        setError("Could not load article. The content may not be generated yet.");
+        setError(
+          "Could not load article. The content may not be generated yet.",
+        );
         setLoading(false);
       });
   }, [topicId]);
@@ -339,7 +469,7 @@ export default function BookContentReader({
       )}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-5 py-4 border-b border-border bg-muted/20">
+      <div className="flex-shrink-0 px-3 sm:px-5 py-3 sm:py-4 border-b border-border bg-muted/20">
         {/* Empty state header */}
         {!topicId && (
           <p className="text-sm text-muted-foreground">
@@ -361,7 +491,9 @@ export default function BookContentReader({
             {/* Node type badge */}
             <span className="inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary">
               {content.topic_name
-                ? (content.topic_name.length > 0 ? "📄 Article" : "")
+                ? content.topic_name.length > 0
+                  ? "📄 Article"
+                  : ""
                 : "📄 Article"}
             </span>
 
@@ -369,7 +501,6 @@ export default function BookContentReader({
             <h2 className="text-lg font-bold leading-snug text-foreground">
               {content.topic_name}
             </h2>
-
           </div>
         )}
 
@@ -382,8 +513,7 @@ export default function BookContentReader({
       </div>
 
       {/* ── Scrollable body ─────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto scroll-smooth px-5 py-5 space-y-4 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-border">
-
+      <div className="flex-1 overflow-y-auto scroll-smooth px-3 sm:px-5 py-4 sm:py-5 space-y-4 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-border">
         {/* Empty state */}
         {!topicId && <EmptyState />}
 
@@ -408,17 +538,20 @@ export default function BookContentReader({
             <AlertCircle className="h-10 w-10 text-destructive/50" />
             <p className="text-sm text-destructive/80">{error}</p>
             <p className="text-xs text-muted-foreground/70">
-              Content for this topic may not be generated yet. Run the generation
-              pipeline to create it.
+              Content for this topic may not be generated yet. Run the
+              generation pipeline to create it.
             </p>
           </div>
         )}
 
         {/* Article content */}
         {!loading && !error && content && (
-          <>
+          <div className="max-w-3xl mx-auto w-full">
             {/* Main markdown article */}
-            <BookMarkdown content={content.render_content} />
+            <BookMarkdown
+              content={content.render_content}
+              mediaAssets={content.media_assets ?? []}
+            />
 
             {/* ── See Also section ─────────────────────────────────────────── */}
             {content.cross_references.length > 0 && (
@@ -448,7 +581,7 @@ export default function BookContentReader({
                   : "First-pass quality"}
               </span>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

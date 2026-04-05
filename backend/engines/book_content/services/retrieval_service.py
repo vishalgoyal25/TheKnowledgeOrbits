@@ -104,9 +104,8 @@ def hybrid_search(
         # ── Fetch BookChunk objects for top IDs ───────────────────────────────
         from engines.book_content.models import BookChunk
 
-        chunks_qs = (
-            BookChunk.objects.filter(id__in=top_ids)
-            .select_related("book_content", "book_content__topic", "book_content__subject")
+        chunks_qs = BookChunk.objects.filter(id__in=top_ids).select_related(
+            "book_content", "book_content__topic", "book_content__subject"
         )
         chunks_map: Dict[uuid.UUID, Any] = {c.id: c for c in chunks_qs}
 
@@ -186,9 +185,7 @@ def keyword_search(
     try:
         search_query = SearchQuery(query, config="english", search_type="websearch")
 
-        qs: QuerySet = BookChunk.objects.filter(
-            search_vector=search_query
-        ).annotate(
+        qs: QuerySet = BookChunk.objects.filter(search_vector=search_query).annotate(
             rank=SearchRank("search_vector", search_query, weights=[0.2, 0.4, 0.6, 1.0])
         )
 
@@ -274,8 +271,7 @@ def semantic_search(
         emb_qs = emb_qs[:limit]
 
         results = [
-            (row.content_id, round(1.0 - float(row.distance), 6))
-            for row in emb_qs
+            (row.content_id, round(1.0 - float(row.distance), 6)) for row in emb_qs
         ]
         logger.debug(
             "semantic_search_done",
@@ -345,9 +341,9 @@ def find_similar_articles(
         distance_map = {e.content_id: float(e.distance) for e in similar_embs}
 
         # Fetch BookContent objects
-        articles = BookContent.objects.filter(id__in=similar_article_ids).select_related(
-            "topic", "subject"
-        )
+        articles = BookContent.objects.filter(
+            id__in=similar_article_ids
+        ).select_related("topic", "subject")
         article_map = {a.id: a for a in articles}
 
         results = []
@@ -513,9 +509,9 @@ def _reciprocal_rank_fusion(
 # Dynamic retrieval uses 0.50 threshold (wider net, filtered per caller's needs).
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_CA_BOOK_LINK_THRESHOLD: float = 0.70   # for persistent TopicRelation records
+_CA_BOOK_LINK_THRESHOLD: float = 0.70  # for persistent TopicRelation records
 _CA_BOOK_QUERY_THRESHOLD: float = 0.50  # for dynamic retrieval (wider)
-_CA_BOOK_LINK_LIMIT: int = 10           # max CA chunks to consider per book article
+_CA_BOOK_LINK_LIMIT: int = 10  # max CA chunks to consider per book article
 
 
 def find_book_articles_for_ca(
@@ -580,8 +576,7 @@ def find_book_articles_for_ca(
         book_embs = (
             Embedding.objects.filter(content_type="book_article")
             .annotate(distance=CosineDistance("vector", centroid))
-            .order_by("distance")
-            [: limit * 2]  # fetch extra, filter noise in Python
+            .order_by("distance")[: limit * 2]  # fetch extra, filter noise in Python
         )
 
         # ── Step 5: Build results above dynamic threshold ─────────────────────
@@ -601,9 +596,9 @@ def find_book_articles_for_ca(
             )
             return []
 
-        articles = BookContent.objects.filter(
-            id__in=book_ids_ordered
-        ).select_related("topic", "subject")
+        articles = BookContent.objects.filter(id__in=book_ids_ordered).select_related(
+            "topic", "subject"
+        )
         article_map = {a.id: a for a in articles}
 
         results = []
@@ -621,7 +616,9 @@ def find_book_articles_for_ca(
                     "quality_score": float(art.quality_score or 0),
                     "similarity_score": round(1.0 - distance_map[book_id], 6),
                     "knowledge_map_url": (
-                        f"/knowledge?topic={art.topic_id}" if art.topic_id else "/knowledge"
+                        f"/knowledge?topic={art.topic_id}"
+                        if art.topic_id
+                        else "/knowledge"
                     ),
                 }
             )
@@ -693,8 +690,7 @@ def find_ca_for_book_article(
         ca_embs = list(
             Embedding.objects.filter(content_type="ca_chunk")
             .annotate(distance=CosineDistance("vector", book_emb.vector))
-            .order_by("distance")
-            [: _CA_BOOK_LINK_LIMIT * 3]
+            .order_by("distance")[: _CA_BOOK_LINK_LIMIT * 3]
         )
 
         # ── Step 3: Filter by threshold and resolve to CAChunks ──────────────
@@ -708,9 +704,8 @@ def find_ca_for_book_article(
         if not ca_chunk_ids_above:
             return []
 
-        ca_chunks = (
-            CAChunk.objects.filter(id__in=ca_chunk_ids_above)
-            .select_related("ca_article", "ca_article__source")
+        ca_chunks = CAChunk.objects.filter(id__in=ca_chunk_ids_above).select_related(
+            "ca_article", "ca_article__source"
         )
 
         # ── Step 4: Deduplicate by parent CAArticle, pick best similarity ─────
@@ -727,9 +722,7 @@ def find_ca_for_book_article(
                     "title": ca.title,
                     "source": ca.source.name if ca.source else "",
                     "published_at": (
-                        ca.published_at.strftime("%Y-%m-%d")
-                        if ca.published_at
-                        else ""
+                        ca.published_at.strftime("%Y-%m-%d") if ca.published_at else ""
                     ),
                     "ca_url": f"/current-affairs/{ca.id}",
                     "similarity_score": sim,
@@ -744,7 +737,8 @@ def find_ca_for_book_article(
 
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days_recent)
             results = [
-                r for r in results
+                r
+                for r in results
                 if r["_published_at_dt"] and r["_published_at_dt"] >= cutoff
             ]
 
@@ -837,8 +831,7 @@ def create_cross_links_for_book_article(
         ca_embs = list(
             Embedding.objects.filter(content_type="ca_chunk")
             .annotate(distance=CosineDistance("vector", book_emb.vector))
-            .order_by("distance")
-            [:_CA_BOOK_LINK_LIMIT]
+            .order_by("distance")[:_CA_BOOK_LINK_LIMIT]
         )
 
         above_threshold = [
@@ -1109,8 +1102,7 @@ def create_book_inter_subject_links(
             Embedding.objects.filter(content_type="book_article")
             .exclude(content_id=book_content_obj.id)
             .annotate(distance=CosineDistance("vector", book_emb.vector))
-            .order_by("distance")
-            [:_INTER_SUBJECT_LIMIT]
+            .order_by("distance")[:_INTER_SUBJECT_LIMIT]
         )
 
         above_threshold = [
@@ -1196,9 +1188,13 @@ def create_book_inter_subject_links(
 
             logger.debug(
                 "inter_subject_link_created",
-                source_topic=book_content_obj.topic.name if book_content_obj.topic else "",
+                source_topic=book_content_obj.topic.name
+                if book_content_obj.topic
+                else "",
                 target_topic=article.topic.name if article.topic else "",
-                source_subject=book_content_obj.subject.name if book_content_obj.subject else "",
+                source_subject=book_content_obj.subject.name
+                if book_content_obj.subject
+                else "",
                 target_subject=article.subject.name if article.subject else "",
                 relation_type=rel_type,
                 score=score,

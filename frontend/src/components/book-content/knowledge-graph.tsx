@@ -40,17 +40,17 @@ import type { GraphData, TopicNode } from "@/types/book-content";
 
 const NODE_CONFIG: Record<string, { color: string; size: number }> = {
   subject_root: { color: "#f97316", size: 34 },
-  module:       { color: "#3b82f6", size: 26 },
-  topic:        { color: "#22c55e", size: 20 },
-  subtopic:     { color: "#6b7280", size: 14 },
+  module: { color: "#3b82f6", size: 26 },
+  topic: { color: "#22c55e", size: 20 },
+  subtopic: { color: "#6b7280", size: 14 },
   sub_subtopic: { color: "#9ca3af", size: 10 },
 };
 
 const LEGEND_ITEMS = [
-  { label: "Subject",   color: "#f97316" },
-  { label: "Module",    color: "#3b82f6" },
-  { label: "Topic",     color: "#22c55e" },
-  { label: "Subtopic",  color: "#6b7280" },
+  { label: "Subject", color: "#f97316" },
+  { label: "Module", color: "#3b82f6" },
+  { label: "Topic", color: "#22c55e" },
+  { label: "Subtopic", color: "#6b7280" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,19 +144,22 @@ export default function KnowledgeGraph({
   containerVisible = true,
   className,
 }: KnowledgeGraphProps) {
-  const svgRef              = useRef<SVGSVGElement>(null);
-  const wrapperRef          = useRef<HTMLDivElement>(null);
-  const simulationRef       = useRef<d3.Simulation<SimNode, SimEdge> | null>(null);
-  const graphDataRef        = useRef<GraphData | null>(null);
-  const expandedRef         = useRef<Set<string>>(new Set());
-  const selectedTopicIdRef  = useRef<string | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const simulationRef = useRef<d3.Simulation<SimNode, SimEdge> | null>(null);
+  const graphDataRef = useRef<GraphData | null>(null);
+  const expandedRef = useRef<Set<string>>(new Set());
+  const selectedTopicIdRef = useRef<string | null>(null);
   // Click-delay timer: holds single-click 250ms so dblclick can cancel it
-  const clickTimerRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Preserve zoom/pan across topology rebuilds (node expand/collapse)
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const lastZoomTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
 
-  const [loading, setLoading]               = useState(true);
-  const [error, setError]                   = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string>>(new Set());
-  const [stats, setStats]                   = useState({ nodes: 0, edges: 0 });
+  const [stats, setStats] = useState({ nodes: 0, edges: 0 });
 
   // ── Fetch full graph on subject change ────────────────────────────────────
   useEffect(() => {
@@ -248,7 +251,7 @@ export default function KnowledgeGraph({
     if (svg) {
       d3.select(svg)
         .selectAll<SVGCircleElement, SimNode>("circle.main-circle")
-        .attr("stroke-width", (d) => d.id === selectedTopicId ? 4 : 2)
+        .attr("stroke-width", (d) => (d.id === selectedTopicId ? 4 : 2))
         .attr("stroke", (d) =>
           d.id === selectedTopicId
             ? "#ffffff"
@@ -267,8 +270,8 @@ export default function KnowledgeGraph({
       if (!node) return;
 
       const childCountMap = buildChildCountMap(data);
-      const childCount    = childCountMap.get(nodeId) ?? 0;
-      const isLeaf        = childCount === 0;
+      const childCount = childCountMap.get(nodeId) ?? 0;
+      const isLeaf = childCount === 0;
 
       if (isLeaf) {
         // Leaf → open article reader
@@ -318,7 +321,7 @@ export default function KnowledgeGraph({
   // ── D3 render: runs whenever visible node set changes ────────────────────
   useEffect(() => {
     const data = graphDataRef.current;
-    const svg  = svgRef.current;
+    const svg = svgRef.current;
     if (!data || !svg || visibleNodeIds.size === 0 || loading) return;
 
     // Stop any running simulation
@@ -340,8 +343,8 @@ export default function KnowledgeGraph({
       ...data.edges.hierarchical
         .filter((e) => visibleSet.has(e.source) && visibleSet.has(e.target))
         .map((e) => ({
-          source:   e.source,
-          target:   e.target,
+          source: e.source,
+          target: e.target,
           edgeType: "contains" as const,
         })),
       ...data.edges.semantic
@@ -351,9 +354,9 @@ export default function KnowledgeGraph({
             visibleSet.has(e.target_topic_id),
         )
         .map((e) => ({
-          source:        e.source_topic_id,
-          target:        e.target_topic_id,
-          edgeType:      "semantic" as const,
+          source: e.source_topic_id,
+          target: e.target_topic_id,
+          edgeType: "semantic" as const,
           relation_type: e.relation_type,
         })),
     ];
@@ -363,8 +366,15 @@ export default function KnowledgeGraph({
     // Use wrapper div dimensions — more reliable than getBoundingClientRect()
     // on SVG which can return 0×0 before browser layout completes.
     const wrapper = wrapperRef.current;
-    const W = wrapper?.clientWidth  || svg.clientWidth  || 700;
+    const W = wrapper?.clientWidth || svg.clientWidth || 700;
     const H = wrapper?.clientHeight || svg.clientHeight || 500;
+
+    // ── Preserve zoom/pan before clearing SVG ────────────────────────────────
+    // Saves current transform so we can restore it after rebuild.
+    // Prevents zoom/pan resetting when user expands/collapses a node.
+    if (zoomRef.current) {
+      lastZoomTransformRef.current = d3.zoomTransform(svg);
+    }
 
     // ── Clear & rebuild SVG ─────────────────────────────────────────────────
     const root = d3.select(svg);
@@ -375,10 +385,20 @@ export default function KnowledgeGraph({
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.15, 4])
-      .on("zoom", (event) => g.attr("transform", event.transform));
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+        lastZoomTransformRef.current = event.transform;
+      });
     root.call(zoom);
+    zoomRef.current = zoom;
     // Disable D3 zoom's built-in dblclick-to-zoom — it intercepts node dblclick
     root.on("dblclick.zoom", null);
+
+    // Restore previous zoom/pan — preserves user's view across node expand/collapse
+    // Skip on first render (zoomIdentity = no transform applied yet)
+    if (lastZoomTransformRef.current !== d3.zoomIdentity) {
+      root.call(zoom.transform, lastZoomTransformRef.current);
+    }
 
     // Arrow markers for edge ends
     const defs = root.append("defs");
@@ -398,7 +418,7 @@ export default function KnowledgeGraph({
         .attr("fill", color);
 
     makeArrow("arrow-contains", "#4b5563");
-    makeArrow("arrow-semantic",  "#f97316");
+    makeArrow("arrow-semantic", "#f97316");
 
     // ── Edges ───────────────────────────────────────────────────────────────
     const edgeGroup = g.append("g").attr("class", "edges");
@@ -407,11 +427,17 @@ export default function KnowledgeGraph({
       .selectAll<SVGLineElement, SimEdge>("line")
       .data(simEdges)
       .join("line")
-      .attr("stroke", (d) => (d.edgeType === "semantic" ? "#f9731655" : "#4b556335"))
+      .attr("stroke", (d) =>
+        d.edgeType === "semantic" ? "#f9731655" : "#4b556335",
+      )
       .attr("stroke-width", (d) => (d.edgeType === "semantic" ? 1.5 : 1))
-      .attr("stroke-dasharray", (d) => (d.edgeType === "semantic" ? "5,4" : "none"))
+      .attr("stroke-dasharray", (d) =>
+        d.edgeType === "semantic" ? "5,4" : "none",
+      )
       .attr("marker-end", (d) =>
-        d.edgeType === "semantic" ? "url(#arrow-semantic)" : "url(#arrow-contains)",
+        d.edgeType === "semantic"
+          ? "url(#arrow-semantic)"
+          : "url(#arrow-contains)",
       );
 
     // ── Nodes ───────────────────────────────────────────────────────────────
@@ -428,9 +454,15 @@ export default function KnowledgeGraph({
     nodeSel
       .filter((d) => d.content_status === "book_quality")
       .append("circle")
-      .attr("r", (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).size + 5)
+      .attr(
+        "r",
+        (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).size + 5,
+      )
       .attr("fill", "none")
-      .attr("stroke", (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).color)
+      .attr(
+        "stroke",
+        (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).color,
+      )
       .attr("stroke-width", 1)
       .attr("opacity", 0.35);
 
@@ -439,30 +471,47 @@ export default function KnowledgeGraph({
       .append("circle")
       .attr("class", "main-circle")
       .attr("r", (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).size)
-      .attr("fill", (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).color + "28")
+      .attr(
+        "fill",
+        (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).color + "28",
+      )
       .attr("stroke", (d) =>
         d.id === selectedTopicIdRef.current
           ? "#ffffff"
           : (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).color,
       )
-      .attr("stroke-width", (d) => d.id === selectedTopicIdRef.current ? 4 : 2);
+      .attr("stroke-width", (d) =>
+        d.id === selectedTopicIdRef.current ? 4 : 2,
+      );
 
     // Label below node
     nodeSel
       .append("text")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).size + 15)
+      .attr(
+        "dy",
+        (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).size + 15,
+      )
       .attr("font-size", (d) => {
         const sizes: Record<string, number> = {
-          subject_root: 13, module: 12, topic: 11, subtopic: 10, sub_subtopic: 9,
+          subject_root: 13,
+          module: 12,
+          topic: 11,
+          subtopic: 10,
+          sub_subtopic: 9,
         };
         return sizes[d.node_type] ?? 10;
       })
       .attr("font-family", "system-ui, sans-serif")
       .attr("font-weight", (d) =>
-        d.node_type === "subject_root" || d.node_type === "module" ? "600" : "400",
+        d.node_type === "subject_root" || d.node_type === "module"
+          ? "600"
+          : "400",
       )
-      .attr("fill", (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).color)
+      .attr(
+        "fill",
+        (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).color,
+      )
       .text((d) => nodeLabel(d, expandedRef.current));
 
     // ── Hover effects ───────────────────────────────────────────────────────
@@ -498,9 +547,7 @@ export default function KnowledgeGraph({
         clickTimerRef.current = setTimeout(() => {
           clickTimerRef.current = null;
           handleNodeClick(d.id);
-          nodeSel
-            .select("text")
-            .text((n) => nodeLabel(n, expandedRef.current));
+          nodeSel.select("text").text((n) => nodeLabel(n, expandedRef.current));
         }, 250);
       })
       .on("dblclick", (event, d) => {
@@ -516,7 +563,7 @@ export default function KnowledgeGraph({
     let lastTapTime = 0;
 
     nodeSel
-      .on("touchstart", (event, d) => {
+      .on("touchstart", (event, _d) => {
         event.stopPropagation();
         const touch = event.changedTouches[0];
         touchState.set(touch.identifier, {
@@ -525,7 +572,7 @@ export default function KnowledgeGraph({
           t: Date.now(),
         });
       })
-      .on("touchend", (event, d) => {
+      .on("touchend", (event, _d) => {
         event.stopPropagation();
         // Prevent the ghost mouse click that browsers fire ~300ms after touchend
         event.preventDefault();
@@ -566,9 +613,7 @@ export default function KnowledgeGraph({
         clickTimerRef.current = setTimeout(() => {
           clickTimerRef.current = null;
           handleNodeClick(d.id);
-          nodeSel
-            .select("text")
-            .text((n) => nodeLabel(n, expandedRef.current));
+          nodeSel.select("text").text((n) => nodeLabel(n, expandedRef.current));
         }, 250);
       });
 
@@ -603,7 +648,11 @@ export default function KnowledgeGraph({
           .distance((d) => {
             const src = d.source as SimNode;
             const distances: Record<string, number> = {
-              subject_root: 200, module: 150, topic: 110, subtopic: 75, sub_subtopic: 55,
+              subject_root: 200,
+              module: 150,
+              topic: 110,
+              subtopic: 75,
+              sub_subtopic: 55,
             };
             return distances[src.node_type] ?? 80;
           })
@@ -613,7 +662,11 @@ export default function KnowledgeGraph({
         "charge",
         d3.forceManyBody<SimNode>().strength((d) => {
           const strengths: Record<string, number> = {
-            subject_root: -500, module: -300, topic: -180, subtopic: -90, sub_subtopic: -60,
+            subject_root: -500,
+            module: -300,
+            topic: -180,
+            subtopic: -90,
+            sub_subtopic: -60,
           };
           return strengths[d.node_type] ?? -90;
         }),
@@ -623,7 +676,9 @@ export default function KnowledgeGraph({
         "collide",
         d3
           .forceCollide<SimNode>()
-          .radius((d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).size + 22)
+          .radius(
+            (d) => (NODE_CONFIG[d.node_type] ?? NODE_CONFIG.subtopic).size + 22,
+          )
           .strength(0.8),
       )
       .alphaDecay(0.025);
@@ -645,21 +700,39 @@ export default function KnowledgeGraph({
     };
   }, [visibleNodeIds, loading, handleNodeClick, handleNodeDblClick]);
 
-  // ── Re-render when the container becomes visible (mobile panel toggle) ───
-  // When the left panel transitions from hidden → visible, clientWidth/Height
-  // go from 0 to real values. This effect fires 80 ms after visibility flips
-  // to true, giving the browser time to complete layout before D3 reads dims.
+  // ── Re-center when container becomes visible (mobile panel toggle) ─────────
+  // Panel transitions from hidden (w=0) → visible: wait 80ms for layout,
+  // then nudge simulation to new center. Full rebuild only if no sim yet.
   useEffect(() => {
     if (!containerVisible) return;
     const timer = setTimeout(() => {
-      setVisibleNodeIds((prev) => new Set(prev));
+      const wrapper = wrapperRef.current;
+      const sim = simulationRef.current;
+      if (!wrapper) return;
+
+      const W = wrapper.clientWidth || 700;
+      const H = wrapper.clientHeight || 500;
+
+      if (sim) {
+        // Lightweight: update center force + gentle alpha kick
+        const cf = sim.force("center") as d3.ForceCenter<SimNode> | null;
+        if (cf) {
+          cf.x(W / 2).y(H / 2);
+        }
+        sim.alpha(0.2).restart();
+      } else {
+        // No simulation yet (first open) — do a full render
+        setVisibleNodeIds((prev) => new Set(prev));
+      }
     }, 80);
     return () => clearTimeout(timer);
   }, [containerVisible]);
 
-  // ── ResizeObserver: re-trigger D3 render when wrapper dimensions change ───
-  // Covers: desktop panel drag, mobile orientation change, split-pct change.
-  // Debounced 150ms so rapid resize events don't spawn many simulations.
+  // ── ResizeObserver: lightweight resize on panel drag / window resize ──────
+  // Does NOT rebuild the SVG or restart simulation from scratch.
+  // Instead: updates center force → nodes smoothly drift to new center.
+  // Full rebuild is only triggered when visible node set actually changes
+  // (i.e., user clicks expand/collapse), not on every container resize.
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
@@ -669,8 +742,22 @@ export default function KnowledgeGraph({
     const observer = new ResizeObserver(() => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        // Trigger a D3 rebuild by bumping visibleNodeIds (same set, new reference)
-        setVisibleNodeIds((prev) => new Set(prev));
+        const sim = simulationRef.current;
+        const W = wrapper.clientWidth || 700;
+        const H = wrapper.clientHeight || 500;
+
+        if (sim) {
+          // Update center force to new container midpoint
+          const cf = sim.force("center") as d3.ForceCenter<SimNode> | null;
+          if (cf) {
+            cf.x(W / 2).y(H / 2);
+          }
+          // Small alpha so nodes drift gently, not a jarring jump
+          sim.alpha(0.15).restart();
+        } else {
+          // Sim not initialised yet — full rebuild as fallback
+          setVisibleNodeIds((prev) => new Set(prev));
+        }
       }, 150);
     });
 
@@ -709,15 +796,27 @@ export default function KnowledgeGraph({
         <div className="ml-auto flex items-center gap-4 text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <svg width="18" height="6" aria-hidden>
-              <line x1="0" y1="3" x2="18" y2="3" stroke="#4b5563" strokeWidth="1.5" />
+              <line
+                x1="0"
+                y1="3"
+                x2="18"
+                y2="3"
+                stroke="#4b5563"
+                strokeWidth="1.5"
+              />
             </svg>
             Contains
           </span>
           <span className="flex items-center gap-1.5">
             <svg width="18" height="6" aria-hidden>
               <line
-                x1="0" y1="3" x2="18" y2="3"
-                stroke="#f97316" strokeWidth="1.5" strokeDasharray="4,3"
+                x1="0"
+                y1="3"
+                x2="18"
+                y2="3"
+                stroke="#f97316"
+                strokeWidth="1.5"
+                strokeDasharray="4,3"
               />
             </svg>
             Related
@@ -728,7 +827,10 @@ export default function KnowledgeGraph({
       {/* ── Graph canvas ─────────────────────────────────────────────────── */}
       {/* touch-none: prevents browser from hijacking touch gestures for page scroll,
            letting D3 handle pan/pinch-zoom/drag natively on mobile */}
-      <div ref={wrapperRef} className="relative flex-1 overflow-hidden touch-none">
+      <div
+        ref={wrapperRef}
+        className="relative flex-1 overflow-hidden touch-none"
+      >
         {/* Loading overlay */}
         {loading && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-background/70 backdrop-blur-sm">
@@ -751,7 +853,9 @@ export default function KnowledgeGraph({
         {/* Empty state */}
         {!loading && !error && stats.nodes === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
-            <span className="text-5xl opacity-40" aria-hidden>🗺️</span>
+            <span className="text-5xl opacity-40" aria-hidden>
+              🗺️
+            </span>
             <p className="text-sm text-center">
               No graph data found for this subject.
             </p>
@@ -759,14 +863,22 @@ export default function KnowledgeGraph({
         )}
 
         {/* D3 SVG canvas */}
-        <svg ref={svgRef} className="w-full h-full" aria-label="Knowledge graph" />
+        <svg
+          ref={svgRef}
+          className="w-full h-full"
+          aria-label="Knowledge graph"
+        />
 
         {/* Stats badge */}
         {!loading && !error && stats.nodes > 0 && (
           <div className="absolute bottom-3 left-3 rounded-md border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs text-muted-foreground">
-            <span className="text-primary font-medium">{stats.nodes}</span> nodes ·{" "}
-            <span className="text-primary font-medium">{stats.edges}</span> edges ·{" "}
-            <span className="text-muted-foreground/70">click to expand · drag to move</span>
+            <span className="text-primary font-medium">{stats.nodes}</span>{" "}
+            nodes ·{" "}
+            <span className="text-primary font-medium">{stats.edges}</span>{" "}
+            edges ·{" "}
+            <span className="text-muted-foreground/70">
+              click to expand · drag to move
+            </span>
           </div>
         )}
 

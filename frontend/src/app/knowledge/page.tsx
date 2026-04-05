@@ -14,11 +14,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronRight, BookOpen, Loader2, PanelLeft, PanelLeftClose } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  BookOpen,
+  Loader2,
+  PanelLeft,
+  PanelLeftClose,
+} from "lucide-react";
 
 import { getBookSubjects, getBookTree } from "@/lib/api/book-content";
 import { cn } from "@/lib/utils";
-import type { SubjectWithPlan, SubjectTree, TreeTopic } from "@/types/book-content";
+import type {
+  SubjectWithPlan,
+  SubjectTree,
+  TreeTopic,
+} from "@/types/book-content";
 
 /**
  * D3.js is a heavy 500KB+ library.
@@ -54,7 +65,11 @@ import GraphToggleButton, {
  * Walk the recursive TreeTopic tree. If targetId is found, push every ancestor's
  * id into `acc` and return true. Used to auto-expand the path to a selected node.
  */
-function collectAncestorIds(topics: TreeTopic[], targetId: string, acc: Set<string>): boolean {
+function collectAncestorIds(
+  topics: TreeTopic[],
+  targetId: string,
+  acc: Set<string>,
+): boolean {
   for (const t of topics) {
     if (t.id === targetId) return true;
     if (collectAncestorIds(t.subtopics, targetId, acc)) {
@@ -74,8 +89,16 @@ interface OutlineNodeProps {
   expandedIds: Set<string>;
 }
 
-function OutlineNode({ topic, depth, onSelect, selectedId, expandedIds }: OutlineNodeProps) {
-  const [expanded, setExpanded] = useState(() => depth === 0 || expandedIds.has(topic.id));
+function OutlineNode({
+  topic,
+  depth,
+  onSelect,
+  selectedId,
+  expandedIds,
+}: OutlineNodeProps) {
+  const [expanded, setExpanded] = useState(
+    () => depth === 0 || expandedIds.has(topic.id),
+  );
 
   // When the selected topic changes (URL nav), auto-expand ancestor nodes
   useEffect(() => {
@@ -86,9 +109,9 @@ function OutlineNode({ topic, depth, onSelect, selectedId, expandedIds }: Outlin
 
   const statusDot: Record<string, string> = {
     book_quality: "bg-green-500",
-    generating:   "bg-yellow-400 animate-pulse",
-    failed:       "bg-red-400",
-    empty:        "bg-muted-foreground/30",
+    generating: "bg-yellow-400 animate-pulse",
+    failed: "bg-red-400",
+    empty: "bg-muted-foreground/30",
   };
 
   return (
@@ -162,24 +185,24 @@ function OutlineNode({ topic, depth, onSelect, selectedId, expandedIds }: Outlin
 
 export default function KnowledgePage() {
   // ── State ────────────────────────────────────────────────────────────────
-  const [viewMode, setViewMode]           = useState<ViewMode>("outline");
-  const [subjects, setSubjects]           = useState<SubjectWithPlan[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("outline");
+  const [subjects, setSubjects] = useState<SubjectWithPlan[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
-  const [tree, setTree]                   = useState<SubjectTree | null>(null);
-  const [selectedTopicId, setSelectedTopicId]     = useState<string | null>(null);
+  const [tree, setTree] = useState<SubjectTree | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [selectedTopicName, setSelectedTopicName] = useState<string>("");
 
   const [loadingSubjects, setLoadingSubjects] = useState(true);
-  const [loadingTree, setLoadingTree]         = useState(false);
+  const [loadingTree, setLoadingTree] = useState(false);
 
   // ── Resizable panel split (desktop only) ────────────────────────────────
-  const [splitPct, setSplitPct]   = useState(38);
-  const splitPctRef               = useRef(38);   // tracks latest value in drag closure
-  const isDragging                = useRef(false);
-  const containerRef              = useRef<HTMLDivElement>(null);
+  const [splitPct, setSplitPct] = useState(38);
+  const splitPctRef = useRef(38); // tracks latest value in drag closure
+  const isDragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // ── Mobile layout state ──────────────────────────────────────────────────
-  const [isMobile, setIsMobile]             = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [showMobilePanel, setShowMobilePanel] = useState(false);
 
   const searchParams = useSearchParams();
@@ -201,9 +224,9 @@ export default function KnowledgePage() {
   // ?subject=<uuid> → immediately switches the left panel to the correct subject
   //                   (encoded by hamburger/navbar so no extra API call is needed)
   useEffect(() => {
-    const topicParam   = searchParams.get("topic");
+    const topicParam = searchParams.get("topic");
     const subjectParam = searchParams.get("subject");
-    if (topicParam)   setSelectedTopicId(topicParam);
+    if (topicParam) setSelectedTopicId(topicParam);
     if (subjectParam) setSelectedSubjectId(subjectParam);
   }, [searchParams]);
 
@@ -245,8 +268,8 @@ export default function KnowledgePage() {
 
     const onMouseMove = (ev: MouseEvent) => {
       if (!isDragging.current || !containerRef.current) return;
-      const rect    = containerRef.current.getBoundingClientRect();
-      const raw     = ((ev.clientX - rect.left) / rect.width) * 100;
+      const rect = containerRef.current.getBoundingClientRect();
+      const raw = ((ev.clientX - rect.left) / rect.width) * 100;
       const clamped = Math.min(78, Math.max(20, raw));
       splitPctRef.current = clamped;
       setSplitPct(clamped);
@@ -259,7 +282,10 @@ export default function KnowledgePage() {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       try {
-        localStorage.setItem("tko_panel_split", String(Math.round(splitPctRef.current)));
+        localStorage.setItem(
+          "tko_panel_split",
+          String(Math.round(splitPctRef.current)),
+        );
       } catch {
         // ignore
       }
@@ -281,9 +307,11 @@ export default function KnowledgePage() {
           setSelectedSubjectId(data[0].id);
         }
       })
-      .catch(() => {/* silently handled below */})
+      .catch(() => {
+        /* silently handled below */
+      })
       .finally(() => setLoadingSubjects(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Fetch outline tree when subject changes (outline mode only) ───────────
@@ -308,17 +336,20 @@ export default function KnowledgePage() {
   }, []);
 
   // ── View mode change ──────────────────────────────────────────────────────
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    // Load tree on first switch to outline
-    if (mode === "outline" && selectedSubjectId && !tree) {
-      setLoadingTree(true);
-      getBookTree(selectedSubjectId)
-        .then(setTree)
-        .catch(() => setTree(null))
-        .finally(() => setLoadingTree(false));
-    }
-  }, [selectedSubjectId, tree]);
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode);
+      // Load tree on first switch to outline
+      if (mode === "outline" && selectedSubjectId && !tree) {
+        setLoadingTree(true);
+        getBookTree(selectedSubjectId)
+          .then(setTree)
+          .catch(() => setTree(null))
+          .finally(() => setLoadingTree(false));
+      }
+    },
+    [selectedSubjectId, tree],
+  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -340,10 +371,17 @@ export default function KnowledgePage() {
             onClick={() => setShowMobilePanel((v) => !v)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
           >
-            {showMobilePanel
-              ? <><PanelLeftClose className="h-3.5 w-3.5" />Hide Outline</>
-              : <><PanelLeft className="h-3.5 w-3.5" />Browse Topics</>
-            }
+            {showMobilePanel ? (
+              <>
+                <PanelLeftClose className="h-3.5 w-3.5" />
+                Hide Outline
+              </>
+            ) : (
+              <>
+                <PanelLeft className="h-3.5 w-3.5" />
+                Browse Topics
+              </>
+            )}
           </button>
           {selectedTopicName && (
             <span className="text-xs text-muted-foreground truncate flex-1 text-right">
@@ -358,16 +396,12 @@ export default function KnowledgePage() {
       <div
         className={cn(
           "flex flex-col overflow-hidden flex-shrink-0",
-          isMobile
-            ? cn("w-full", showMobilePanel ? "flex-1" : "hidden")
-            : "",
+          isMobile ? cn("w-full", showMobilePanel ? "flex-1" : "hidden") : "",
         )}
         style={!isMobile ? { width: `${splitPct}%` } : undefined}
       >
-
         {/* Header bar: subject selector + toggle */}
         <div className="flex-shrink-0 px-4 py-3 border-b border-border bg-muted/20 space-y-3">
-
           {/* Page title */}
           <div className="flex items-center gap-2">
             <BookOpen className="h-4 w-4 text-primary" />
@@ -410,15 +444,17 @@ export default function KnowledgePage() {
               onChange={handleViewModeChange}
             />
             {/* Progress hint */}
-            {selectedSubjectId && subjects.length > 0 && (() => {
-              const subj = subjects.find((s) => s.id === selectedSubjectId);
-              const pct = subj?.book_plan.completion_pct ?? 0;
-              return pct > 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  {typeof pct === "number" ? pct.toFixed(0) : pct}% generated
-                </span>
-              ) : null;
-            })()}
+            {selectedSubjectId &&
+              subjects.length > 0 &&
+              (() => {
+                const subj = subjects.find((s) => s.id === selectedSubjectId);
+                const pct = subj?.book_plan.completion_pct ?? 0;
+                return pct > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {typeof pct === "number" ? pct.toFixed(0) : pct}% generated
+                  </span>
+                ) : null;
+              })()}
           </div>
         </div>
 
@@ -438,25 +474,27 @@ export default function KnowledgePage() {
               </div>
             )}
 
-            {!loadingTree && tree && tree.modules.map((mod) => (
-              <div key={mod.id} className="mb-1">
-                {/* Module header */}
-                <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
-                  {mod.name}
+            {!loadingTree &&
+              tree &&
+              tree.modules.map((mod) => (
+                <div key={mod.id} className="mb-1">
+                  {/* Module header */}
+                  <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                    {mod.name}
+                  </div>
+                  {/* Topics */}
+                  {mod.topics.map((topic) => (
+                    <OutlineNode
+                      key={topic.id}
+                      topic={topic}
+                      depth={0}
+                      onSelect={handleNodeSelect}
+                      selectedId={selectedTopicId}
+                      expandedIds={expandedIds}
+                    />
+                  ))}
                 </div>
-                {/* Topics */}
-                {mod.topics.map((topic) => (
-                  <OutlineNode
-                    key={topic.id}
-                    topic={topic}
-                    depth={0}
-                    onSelect={handleNodeSelect}
-                    selectedId={selectedTopicId}
-                    expandedIds={expandedIds}
-                  />
-                ))}
-              </div>
-            ))}
+              ))}
 
             {!loadingTree && tree && tree.modules.length === 0 && (
               <div className="py-12 text-center text-sm text-muted-foreground">

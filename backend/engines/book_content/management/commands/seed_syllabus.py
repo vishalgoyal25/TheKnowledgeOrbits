@@ -103,6 +103,7 @@ SYLLABUS: dict = {
 # MANAGEMENT COMMAND
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class Command(BaseCommand):
     help = (
         "Seeds the complete UPSC CSE syllabus hierarchy into knowledge_* tables. "
@@ -158,9 +159,7 @@ class Command(BaseCommand):
         total_subtopics = total_sub_subtopics = 0
 
         for subject_name, modules in subjects_to_seed.items():
-            counts = self._seed_subject(
-                subject_name, modules, program, dry_run
-            )
+            counts = self._seed_subject(subject_name, modules, program, dry_run)
             total_subjects += 1
             total_modules += counts["modules"]
             total_topics += counts["topics"]
@@ -187,12 +186,13 @@ class Command(BaseCommand):
         if dry_run:
             return None
         from engines.knowledge.models import Program
+
         program, created = Program.objects.get_or_create(
             name="UPSC CSE",
             defaults={"description": "UPSC Civil Services Examination"},
         )
         if created:
-            self.stdout.write(f"  Created Program: UPSC CSE")
+            self.stdout.write("  Created Program: UPSC CSE")
         return program
 
     def _seed_subject(
@@ -256,9 +256,7 @@ class Command(BaseCommand):
                         },
                     )
                     if t_created:
-                        Topic.objects.filter(id=topic_obj.id).update(
-                            node_type="topic"
-                        )
+                        Topic.objects.filter(id=topic_obj.id).update(node_type="topic")
                     counts["topics"] += 1
 
                     for sub_idx, (subtopic_name, sub_subtopics) in enumerate(

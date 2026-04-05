@@ -21,7 +21,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     # CONCURRENTLY requires running outside a transaction block.
     atomic = False
 
@@ -60,11 +59,11 @@ class Migration(migrations.Migration):
                     "source_type",
                     models.CharField(
                         choices=[
-                            ("wiki",        "Wikipedia"),
-                            ("govt",        "Government Source"),
-                            ("news",        "News Source"),
+                            ("wiki", "Wikipedia"),
+                            ("govt", "Government Source"),
+                            ("news", "News Source"),
                             ("ncert_blend", "NCERT + Wiki Blend"),
-                            ("mixed",       "Multiple Sources"),
+                            ("mixed", "Multiple Sources"),
                         ],
                         default="wiki",
                         max_length=30,
@@ -78,9 +77,9 @@ class Migration(migrations.Migration):
                     "quality_flag",
                     models.CharField(
                         choices=[
-                            ("high",         "High Quality"),
-                            ("medium",       "Medium Quality"),
-                            ("low",          "Low Quality"),
+                            ("high", "High Quality"),
+                            ("medium", "Medium Quality"),
+                            ("low", "Low Quality"),
                             ("needs_review", "Needs Review"),
                         ],
                         default="high",
@@ -119,17 +118,15 @@ class Migration(migrations.Migration):
                 ),
             ],
             options={
-                "db_table":  "knowledge_book_chunk",
-                "ordering":  ["book_content", "chunk_index"],
+                "db_table": "knowledge_book_chunk",
+                "ordering": ["book_content", "chunk_index"],
             },
         ),
-
         # ── unique_together: (book_content, chunk_index) ──────────────────────
         migrations.AlterUniqueTogether(
             name="BookChunk",
             unique_together={("book_content", "chunk_index")},
         ),
-
         # ── GIN index on search_vector (BM25 keyword search) ──────────────────
         migrations.AddIndex(
             model_name="BookChunk",
@@ -138,7 +135,6 @@ class Migration(migrations.Migration):
                 name="book_chunk_fts_idx",
             ),
         ),
-
         # ── Regular indexes ───────────────────────────────────────────────────
         migrations.AddIndex(
             model_name="BookChunk",
@@ -154,7 +150,6 @@ class Migration(migrations.Migration):
                 name="book_chunk_content_order_idx",
             ),
         ),
-
         # ── HNSW index on content_embedding.vector ────────────────────────────
         # Replaces untuned IVFFlat. Scales to 10M+ rows. Sub-50ms at 500k entries.
         # CONCURRENTLY = no table lock, safe on live production DB.
