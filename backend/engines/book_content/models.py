@@ -10,6 +10,8 @@ DO NOT confuse with article_article (marketing tool) or assessment_* (quiz syste
 import uuid
 
 import structlog
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
 logger = structlog.get_logger(__name__)
@@ -547,4 +549,119 @@ class GenerationLog(models.Model):
     def __str__(self) -> str:
         return (
             f"GenLog: {self.topic_name} [{self.status}] score={self.quality_score:.0f}"
+        )
+
+
+class BookChunk(models.Model):
+    """
+    Phase E — Hybrid RAG Infrastructure.
+
+    One chunk (~1200 chars) of a generated BookContent article.
+    Separate from content_chunk (NCERT/PDFs) and ca_chunk (Current Affairs).
+    Each source type owns its chunk table — never mixed.
+
+    Two embedding namespaces in content_embedding (universal table):
+      content_type="book_chunk"   → this chunk's vector  (RAG precision)
+      content_type="book_article" → parent article vector (similarity speed)
+
+    Topic mapping is implicit via FK chain:
+      BookChunk → BookContent.topic → knowledge.Topic
+    No separate ChunkTopicMap needed for book content.
+
+    source_type is extensible — adding govt/news sources later requires
+    only a new string value, zero schema migration needed.
+    """
+
+    SOURCE_TYPE_CHOICES = [
+        ("wiki",       "Wikipedia"),
+        ("govt",       "Government Source"),
+        ("news",       "News Source"),
+        ("ncert_blend","NCERT + Wiki Blend"),
+        ("mixed",      "Multiple Sources"),
+    ]
+
+    QUALITY_FLAG_CHOICES = [
+        ("high",         "High Quality"),
+        ("medium",       "Medium Quality"),
+        ("low",          "Low Quality"),
+        ("needs_review", "Needs Review"),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text="Unique identifier for this book chunk.",
+    )
+    book_content = models.ForeignKey(
+        BookContent,
+        on_delete=models.CASCADE,
+        related_name="chunks",
+        help_text=(
+            "The BookContent article this chunk belongs to. "
+            "Topic link is implicit: BookChunk → BookContent → Topic."
+        ),
+    )
+    chunk_text = models.TextField(
+        help_text="~1200-character semantic chunk of the parent article.",
+    )
+    chunk_index = models.IntegerField(
+        help_text="Zero-based position of this chunk within the parent article.",
+    )
+    source_type = models.CharField(
+        max_length=30,
+        default="wiki",
+        choices=SOURCE_TYPE_CHOICES,
+        help_text=(
+            "Origin of the source material used to generate this chunk. "
+            "Adding new sources (govt, news) requires only a new string value — "
+            "no migration needed."
+        ),
+    )
+    quality_flag = models.CharField(
+        max_length=20,
+        default="high",
+        choices=QUALITY_FLAG_CHOICES,
+        help_text="Quality assessment from ChunkingService._assess_quality().",
+    )
+    search_vector = SearchVectorField(
+        null=True,
+        help_text=(
+            "PostgreSQL tsvector for BM25 full-text search (keyword matching). "
+            "Populated on save via SearchVector(chunk_text, config='english'). "
+            "Indexed with GIN for sub-millisecond keyword queries. "
+            "Part of the Hybrid RAG pipeline: BM25 + semantic vector."
+        ),
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this chunk was created.",
+    )
+
+    class Meta:
+        db_table = "knowledge_book_chunk"
+        unique_together = [("book_content", "chunk_index")]
+        ordering = ["book_content", "chunk_index"]
+        indexes = [
+            # BM25 keyword search — fast even at 500k rows
+            GinIndex(
+                fields=["search_vector"],
+                name="book_chunk_fts_idx",
+            ),
+            # Filter by source type (wiki / govt / news)
+            models.Index(
+                fields=["source_type"],
+                name="book_chunk_source_idx",
+            ),
+            # Retrieve all chunks for an article in order
+            models.Index(
+                fields=["book_content", "chunk_index"],
+                name="book_chunk_content_order_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"BookChunk[{self.chunk_index}]: "
+            f"{self.book_content.topic.name} ({self.source_type})"
         )
