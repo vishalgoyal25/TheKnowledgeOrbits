@@ -110,7 +110,7 @@ def ingest_topic(
         )
 
         with transaction.atomic():
-            BookContent.objects.update_or_create(
+            topic_bc_obj, _ = BookContent.objects.update_or_create(
                 topic=topic_obj,
                 defaults={
                     "subject": subject_obj,
@@ -123,6 +123,12 @@ def ingest_topic(
             )
             # Mark topic as generating
             Topic.objects.filter(id=topic_obj.id).update(content_status="generating")
+
+        # Chunk + embed outside transaction so failures don't roll back the save
+        _create_chunks_and_embeddings(topic_bc_obj)
+        # Cross-link: Book↔CA and Book↔Book inter-subject (needs book_article embedding)
+        _cross_link_to_ca(topic_bc_obj)
+        _cross_link_inter_subject(topic_bc_obj)
 
         nodes_created += 1
         logger.info("ingestor_topic_overview_saved", topic=topic)
@@ -184,7 +190,7 @@ def ingest_topic(
                 )
 
                 with transaction.atomic():
-                    BookContent.objects.update_or_create(
+                    sub_bc_obj, _ = BookContent.objects.update_or_create(
                         topic=sub_topic_obj,
                         defaults={
                             "subject": subject_obj,
@@ -198,6 +204,11 @@ def ingest_topic(
                     Topic.objects.filter(id=sub_topic_obj.id).update(
                         content_status="book_quality"
                     )
+
+                # Chunk + embed outside transaction so failures don't roll back the save
+                _create_chunks_and_embeddings(sub_bc_obj)
+                _cross_link_to_ca(sub_bc_obj)
+                _cross_link_inter_subject(sub_bc_obj)
 
                 # Register in concept registry
                 update_concept_registry(
@@ -274,7 +285,7 @@ def ingest_topic(
                     )
 
                     with transaction.atomic():
-                        BookContent.objects.update_or_create(
+                        ss_bc_obj, _ = BookContent.objects.update_or_create(
                             topic=ss_topic_obj,
                             defaults={
                                 "subject": subject_obj,
@@ -288,6 +299,11 @@ def ingest_topic(
                         Topic.objects.filter(id=ss_topic_obj.id).update(
                             content_status="book_quality"
                         )
+
+                    # Chunk + embed outside transaction so failures don't roll back the save
+                    _create_chunks_and_embeddings(ss_bc_obj)
+                    _cross_link_to_ca(ss_bc_obj)
+                    _cross_link_inter_subject(ss_bc_obj)
 
                     update_concept_registry(
                         subject, ss_name, str(ss_topic_obj.id), ss_name
@@ -517,6 +533,215 @@ def _log_generation(
         )
     except Exception as e:
         logger.warning("generation_log_failed", error=str(e))
+        sentry_sdk.capture_exception(e)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHUNK + EMBEDDING PIPELINE (Phase E)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _create_chunks_and_embeddings(book_content_obj: BookContent) -> None:
+    """
+    Full chunking + embedding pipeline for one BookContent article.
+
+    Called after every BookContent.update_or_create(). Idempotent — existing
+    chunks/embeddings for this article are deleted before re-creating.
+
+    Pipeline:
+      1. Split article markdown into ~1200-char semantic chunks (ChunkingService)
+      2. Bulk-create BookChunk rows
+      3. Populate search_vector (tsvector) for BM25 keyword search
+      4. Batch-generate 384-dim embeddings for all chunks (EmbeddingService)
+      5. Bulk-create content_embedding rows (content_type='book_chunk') for RAG
+      6. Generate article-level embedding (content_type='book_article') for similarity
+
+    Never raises — logs error + captures to Sentry so the ingestion pipeline
+    continues even if chunking/embedding fails for one article.
+    """
+    try:
+        # ── Lazy imports: avoid circular imports + heavy ML load at module level ──
+        from django.contrib.postgres.search import SearchVector
+
+        from engines.book_content.models import BookChunk
+        from engines.content.models import Embedding
+        from engines.content.services.chunking_service import ChunkingService
+        from engines.content.services.embedding_service import EmbeddingService
+
+        topic_name: str = (
+            book_content_obj.topic.name if book_content_obj.topic_id else "unknown"
+        )
+        article_text: str = book_content_obj.content_markdown or ""
+
+        if not article_text.strip():
+            logger.warning("chunk_pipeline_skip_empty", topic=topic_name)
+            return
+
+        logger.info(
+            "chunk_pipeline_start", topic=topic_name, text_len=len(article_text)
+        )
+
+        # ── Step 1: Chunk the article markdown ───────────────────────────────
+        chunk_dicts = ChunkingService.chunk_text(
+            text=article_text,
+            document_id=str(book_content_obj.id),
+            page_number=0,
+            chapter_name=topic_name,
+        )
+
+        if not chunk_dicts:
+            logger.warning("chunk_pipeline_no_chunks", topic=topic_name)
+            return
+
+        # ── Step 2: Delete stale chunks + their embeddings (idempotent) ──────
+        old_chunk_ids = list(
+            BookChunk.objects.filter(book_content=book_content_obj).values_list(
+                "id", flat=True
+            )
+        )
+        if old_chunk_ids:
+            Embedding.objects.filter(
+                content_type="book_chunk",
+                content_id__in=old_chunk_ids,
+            ).delete()
+            BookChunk.objects.filter(book_content=book_content_obj).delete()
+            logger.info(
+                "chunk_pipeline_stale_deleted",
+                count=len(old_chunk_ids),
+                topic=topic_name,
+            )
+
+        # ── Step 3: Bulk-create BookChunk rows ───────────────────────────────
+        book_chunks = BookChunk.objects.bulk_create(
+            [
+                BookChunk(
+                    book_content=book_content_obj,
+                    chunk_text=cd["chunk_text"],
+                    chunk_index=cd["chunk_index"],
+                    source_type="wiki",  # Mode A: all sources are Wikipedia
+                    quality_flag=cd.get("quality_flag", "high"),
+                )
+                for cd in chunk_dicts
+            ]
+        )
+        logger.info(
+            "chunk_pipeline_chunks_created", count=len(book_chunks), topic=topic_name
+        )
+
+        # ── Step 4: Populate search_vector (BM25 / tsvector) ─────────────────
+        # Single bulk UPDATE — generates tsvector for all chunks in one SQL call
+        BookChunk.objects.filter(book_content=book_content_obj).update(
+            search_vector=SearchVector("chunk_text", config="english")
+        )
+        logger.info("chunk_pipeline_search_vector_updated", topic=topic_name)
+
+        # ── Step 5: Batch-generate chunk embeddings ───────────────────────────
+        # One HTTP call to HF API for all chunk texts — efficient
+        chunk_texts = [cd["chunk_text"] for cd in chunk_dicts]
+        chunk_vectors = EmbeddingService.generate_embeddings_batch(chunk_texts)
+
+        # Fetch saved chunks ordered by chunk_index to align with chunk_vectors
+        saved_chunks = list(
+            BookChunk.objects.filter(book_content=book_content_obj).order_by(
+                "chunk_index"
+            )
+        )
+
+        # ── Step 6: Bulk-create chunk embeddings ─────────────────────────────
+        chunk_embeddings = Embedding.objects.bulk_create(
+            [
+                Embedding(
+                    content_type="book_chunk",
+                    content_id=chunk.id,
+                    vector=chunk_vectors[i],
+                    model_name=EmbeddingService.MODEL_NAME,
+                )
+                for i, chunk in enumerate(saved_chunks)
+                if i < len(chunk_vectors) and chunk_vectors[i]
+            ],
+            ignore_conflicts=True,
+        )
+        logger.info(
+            "chunk_pipeline_chunk_embeddings_created",
+            count=len(chunk_embeddings),
+            topic=topic_name,
+        )
+
+        # ── Step 7: Article-level embedding (fast similarity search) ─────────
+        # Use first 1200 chars as summary proxy — stays within model token limit
+        article_summary = article_text[:1200]
+        article_vector = EmbeddingService.generate_embedding(article_summary)
+
+        Embedding.objects.update_or_create(
+            content_type="book_article",
+            content_id=book_content_obj.id,
+            defaults={
+                "vector": article_vector,
+                "model_name": EmbeddingService.MODEL_NAME,
+            },
+        )
+        logger.info("chunk_pipeline_article_embedding_saved", topic=topic_name)
+
+        logger.info(
+            "chunk_pipeline_complete",
+            topic=topic_name,
+            chunks=len(book_chunks),
+            chunk_embeddings=len(chunk_embeddings),
+            article_embedding=1,
+        )
+
+    except Exception as e:
+        logger.error(
+            "chunk_pipeline_failed",
+            topic=getattr(book_content_obj.topic, "name", "unknown"),
+            error=str(e),
+        )
+        sentry_sdk.capture_exception(e)
+        # DO NOT re-raise — chunking failure must never abort the ingestion pipeline
+
+
+def _cross_link_to_ca(book_content_obj: BookContent) -> None:
+    """
+    Wrapper: create persistent CA↔Book TopicRelation(cross_subject) records.
+    Called after _create_chunks_and_embeddings (book_article embedding must exist).
+    Never raises — failure must not abort ingestion.
+    """
+    try:
+        from engines.book_content.services.retrieval_service import (
+            create_cross_links_for_book_article,
+        )
+
+        links = create_cross_links_for_book_article(book_content_obj)
+        logger.info(
+            "ingestor_ca_cross_links",
+            topic=getattr(book_content_obj.topic, "name", "unknown"),
+            links=links,
+        )
+    except Exception as e:
+        logger.warning("ingestor_ca_cross_link_failed", error=str(e))
+        sentry_sdk.capture_exception(e)
+
+
+def _cross_link_inter_subject(book_content_obj: BookContent) -> None:
+    """
+    Wrapper: create Book↔Book cross-subject TopicRelation edges.
+    e.g. "Budget" (Economy) ──cross_subject──▶ "Budget Process" (Polity).
+    Called after _cross_link_to_ca so book_article embedding already exists.
+    Never raises — failure must not abort ingestion.
+    """
+    try:
+        from engines.book_content.services.retrieval_service import (
+            create_book_inter_subject_links,
+        )
+
+        links = create_book_inter_subject_links(book_content_obj)
+        logger.info(
+            "ingestor_inter_subject_links",
+            topic=getattr(book_content_obj.topic, "name", "unknown"),
+            links=links,
+        )
+    except Exception as e:
+        logger.warning("ingestor_inter_subject_link_failed", error=str(e))
         sentry_sdk.capture_exception(e)
 
 
