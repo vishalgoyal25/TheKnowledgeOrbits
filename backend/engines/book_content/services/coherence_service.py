@@ -129,7 +129,7 @@ Return ONLY JSON array:"""
             summaries.append({"id": sub["id"], "label": sub["label"], "facts": []})
 
     # Now find overlapping facts
-    duplicate_map = {}
+    duplicate_map: dict[str, list[str]] = {}
     for i, sub_a in enumerate(summaries):
         for sub_b in summaries[i + 1 :]:
             overlap_prompt = f"""Compare these two fact lists. Which facts are essentially the SAME

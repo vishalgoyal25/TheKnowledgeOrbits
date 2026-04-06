@@ -126,7 +126,7 @@ TOPICS_TO_GENERATE = [
 
 # ── MODE B: NCERT PDFs (NCERT as spine + Wikipedia as enricher) ───────────
 # Drop PDFs into data/input_pdfs/ first, then uncomment the path below.
-PDF_FILES_TO_INGEST = [
+PDF_FILES_TO_INGEST: list[str] = [
     # "data/input_pdfs/ncert_polity_ch22_parliament.pdf",
     # "data/input_pdfs/ncert_polity_ch17_president.pdf",
     # "data/input_pdfs/ncert_polity_ch13_fundamental_rights.pdf",
@@ -348,6 +348,7 @@ class Command(BaseCommand):
         """
         from django.conf import settings
         from langchain_groq import ChatGroq
+        from pydantic.v1 import SecretStr
 
         raw_key = getattr(settings, "GROQ_API_KEY", "")
         api_key = raw_key.split(",")[0].strip() if raw_key else ""
@@ -359,13 +360,14 @@ class Command(BaseCommand):
 
         try:
             client = ChatGroq(
-                api_key=api_key,
-                model_name=model,
+                api_key=SecretStr(api_key),
+                model=model,
                 temperature=0,
                 max_tokens=3,
+                stop_sequences=[],
             )
             response = client.invoke("Reply with exactly: OK")
-            return bool(response.content.strip())
+            return bool(str(response.content).strip())
         except Exception as e:
             logger.warning("groq_health_check_failed", error=str(e)[:120])
             return False

@@ -26,6 +26,7 @@ Preserved exactly: topic_overview prompt, smart skip logic, pipeline order,
 
 import time
 from typing import Optional
+from urllib.parse import quote as url_quote
 
 import requests
 import sentry_sdk
@@ -833,7 +834,7 @@ def _fetch_and_store_hero_image(book_content_obj: BookContent) -> None:
         module_name: str = module_obj.name
 
         # ── Step 1: Fetch Wikipedia page summary ─────────────────────────────
-        encoded_topic = requests.utils.quote(topic_name, safe="")
+        encoded_topic = url_quote(topic_name, safe="")
         api_url = _WIKI_SUMMARY_URL.format(encoded_topic)
 
         resp = requests.get(api_url, headers=_WIKI_HEADERS, timeout=10)

@@ -11,6 +11,7 @@
  * "Knowledge Map" nav link is added in Task 6.5 (header.tsx).
  */
 
+import { Suspense } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
@@ -183,7 +184,7 @@ function OutlineNode({
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function KnowledgePage() {
+function KnowledgePageInner() {
   // ── State ────────────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("outline");
   const [subjects, setSubjects] = useState<SubjectWithPlan[]>([]);
@@ -554,5 +555,15 @@ export default function KnowledgePage() {
         />
       </div>
     </div>
+  );
+}
+
+// ── useSearchParams() requires a Suspense boundary in Next.js 14+ ──────────
+// Wrap KnowledgePageInner so static pre-rendering doesn't crash the build.
+export default function KnowledgePage() {
+  return (
+    <Suspense>
+      <KnowledgePageInner />
+    </Suspense>
   );
 }

@@ -11,6 +11,7 @@ Preserved exactly: all prompt builders, all parsers (_parse_subtopic_list,
 """
 
 import json
+from typing import Optional
 
 import structlog
 
@@ -19,7 +20,7 @@ from .llm_service import llm_call
 logger = structlog.get_logger(__name__)
 
 
-def find_subtopics(topic_name: str, ncert_text: str = None) -> list:
+def find_subtopics(topic_name: str, ncert_text: Optional[str] = None) -> list:
     """
     LLM Call #2: Discovers ALL subtopics under a main topic.
 
@@ -191,7 +192,7 @@ def _parse_subtopic_list(text: str) -> list:
     seen = set()
     deduped = []
     for s in result:
-        key = s["name"].lower()
+        key = str(s["name"]).lower()
         if key not in seen:
             seen.add(key)
             deduped.append(s)

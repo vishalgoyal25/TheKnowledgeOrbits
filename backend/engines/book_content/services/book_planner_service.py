@@ -240,7 +240,7 @@ If a topic has no prerequisites, set it to [].
 
 def _build_initial_concept_registry(toc: list) -> dict:
     """Builds initial empty registry from TOC — populated as articles generate."""
-    registry = {}
+    registry: dict[str, object] = {}
     for module in toc:
         for topic in module.get("topics", []):
             for subtopic in topic.get("subtopics", []):

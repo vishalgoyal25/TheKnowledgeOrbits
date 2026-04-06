@@ -572,7 +572,7 @@ export default function KnowledgeGraph({
           t: Date.now(),
         });
       })
-      .on("touchend", (event, _d) => {
+      .on("touchend", (event, d) => {
         event.stopPropagation();
         // Prevent the ghost mouse click that browsers fire ~300ms after touchend
         event.preventDefault();
