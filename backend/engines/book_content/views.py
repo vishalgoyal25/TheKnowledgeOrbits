@@ -16,6 +16,8 @@ Auth pattern:
   Staff   (IsAdminUser) — generation-log only
 """
 
+from typing import Any
+
 import structlog
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -60,7 +62,7 @@ def _build_topic_tree(topic: Topic) -> dict:
     except BookContent.DoesNotExist:
         pass
 
-    node = {
+    node: dict[str, Any] = {
         "id": str(topic.id),
         "name": topic.name,
         "node_type": topic.node_type,
@@ -148,14 +150,14 @@ def subject_tree(request: Request, subject_id: str) -> Response:
         .order_by("order_index", "name")
     )
 
-    tree = {
+    tree: dict[str, Any] = {
         "id": str(subject.id),
         "name": subject.name,
         "modules": [],
     }
 
     for module in modules:
-        module_node = {
+        module_node: dict[str, Any] = {
             "id": str(module.id),
             "name": module.name,
             "order_index": module.order_index,

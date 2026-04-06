@@ -232,7 +232,6 @@ class BookContentSerializer(serializers.ModelSerializer):
         help_text="See Also links injected by Layer 3 Coherence Engine.",
     )
     media_assets = ContentMediaSerializer(
-        source="media_assets",
         many=True,
         read_only=True,
         help_text="Cloudinary media assets linked to this article (images, infographics).",

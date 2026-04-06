@@ -15,6 +15,7 @@ from django.conf import settings
 import sentry_sdk
 import structlog
 from langchain_groq import ChatGroq
+from pydantic.v1 import SecretStr
 
 logger = structlog.get_logger(__name__)
 
@@ -30,17 +31,35 @@ if not _keys:
     _keys = ["DUMMY_KEY"]
 
 _pool_standard = [
-    ChatGroq(api_key=k, model_name=_model_name, temperature=0.1, max_tokens=2048)
+    ChatGroq(
+        api_key=SecretStr(k),
+        model=_model_name,
+        temperature=0.1,
+        max_tokens=2048,
+        stop_sequences=[],
+    )
     for k in _keys
 ]
 
 _pool_writer = [
-    ChatGroq(api_key=k, model_name=_model_name, temperature=0.25, max_tokens=16384)
+    ChatGroq(
+        api_key=SecretStr(k),
+        model=_model_name,
+        temperature=0.25,
+        max_tokens=16384,
+        stop_sequences=[],
+    )
     for k in _keys
 ]
 
 _pool_critique = [
-    ChatGroq(api_key=k, model_name=_model_name, temperature=0.1, max_tokens=2048)
+    ChatGroq(
+        api_key=SecretStr(k),
+        model=_model_name,
+        temperature=0.1,
+        max_tokens=2048,
+        stop_sequences=[],
+    )
     for k in _keys
 ]
 
@@ -88,7 +107,7 @@ def llm_call(prompt: str, mode: str = "standard") -> str:
 
         try:
             response = client.invoke(prompt)
-            content = response.content.strip()
+            content = str(response.content).strip()
             logger.info(
                 "llm_call_success",
                 chars=len(content),

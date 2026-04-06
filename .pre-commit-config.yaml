@@ -34,14 +34,14 @@ repos:
     hooks:
       - id: backend-mypy
         name: Backend Audit (Mypy)
-        entry: powershell -Command "docker exec TheKnowledgeOrbits_backend mypy . --no-error-summary"
+        entry: powershell -Command "cd backend; ..\myvenv\Scripts\mypy engines/ --pretty"
         language: system
         always_run: true
         pass_filenames: false
 
       - id: backend-pytest
         name: Backend Laboratory (Pytest)
-        entry: powershell -Command "docker exec TheKnowledgeOrbits_backend pytest engines/ --reuse-db -q"
+        entry: powershell -Command "cd backend; ..\myvenv\Scripts\pytest engines/ -q --tb=short"
         language: system
         always_run: true
         pass_filenames: false

@@ -44,7 +44,7 @@ jobs:
         run: mypy .
 
   # ============================================
-  # JOB 2: Backend Logic (342 Tests)
+  # JOB 2: Backend Logic (379 Tests)
   # ============================================
   backend-tests:
     name: Backend Laboratory (Pytest)
@@ -104,7 +104,7 @@ jobs:
         working-directory: ./backend
         run: python manage.py migrate --noinput
 
-      - name: Execute 342 Tests (Parallel)
+      - name: Execute 379 Tests (Parallel)
         working-directory: ./backend
         run: |
           pytest -n auto --cov=engines --cov-report=xml --maxfail=10

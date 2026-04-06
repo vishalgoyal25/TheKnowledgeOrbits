@@ -72,7 +72,7 @@ def classify_hierarchy(
     if ncert_text:
         prompt = _build_ncert_prompt(ncert_text[:1500])
     else:
-        prompt = _build_topic_prompt(topic_name)
+        prompt = _build_topic_prompt(topic_name or "")
 
     response = llm_call(prompt, mode="standard")
     result = _parse_json(response)

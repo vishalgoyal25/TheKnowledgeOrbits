@@ -40,6 +40,419 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// KNOWLEDGE ORBITS GRAPH TEASER
+// Pure CSS/SVG hierarchy preview — no D3, no deps.
+// Shows Polity ↔ Economy as two subject trees with dashed cross-subject arrows.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// viewBox: 0 0 100 82
+// Left tree = Polity (violet), Right tree = Economy (blue/cyan)
+// Cross-subject edges flagged with cross:true → dashed blue arrow
+
+const GRAPH_NODES = [
+  // ── Polity (left) ────────────────────────────────────────────────────────
+  {
+    id: "polity",
+    label: "Indian\nPolity",
+    x: 24,
+    y: 11,
+    r: 10,
+    color: "#7c3aed",
+    tc: "#fff",
+    w: "700",
+  },
+  {
+    id: "parliament",
+    label: "Parliament",
+    x: 12,
+    y: 31,
+    r: 8,
+    color: "#8b5cf6",
+    tc: "#fff",
+    w: "600",
+  },
+  {
+    id: "lok",
+    label: "Lok Sabha",
+    x: 5,
+    y: 52,
+    r: 6,
+    color: "#a78bfa",
+    tc: "#fff",
+    w: "500",
+  },
+  {
+    id: "rajya",
+    label: "Rajya\nSabha",
+    x: 16,
+    y: 63,
+    r: 6,
+    color: "#c4b5fd",
+    tc: "#4c1d95",
+    w: "500",
+  },
+  {
+    id: "fundrights",
+    label: "Fundamental\nRights",
+    x: 36,
+    y: 33,
+    r: 7.5,
+    color: "#a78bfa",
+    tc: "#fff",
+    w: "600",
+  },
+  {
+    id: "art19",
+    label: "Art. 19–22",
+    x: 29,
+    y: 53,
+    r: 5.5,
+    color: "#ddd6fe",
+    tc: "#4c1d95",
+    w: "500",
+  },
+  {
+    id: "dpsp",
+    label: "DPSP",
+    x: 43,
+    y: 53,
+    r: 5,
+    color: "#ede9fe",
+    tc: "#4c1d95",
+    w: "500",
+  },
+  // ── Economy (right) ──────────────────────────────────────────────────────
+  {
+    id: "economy",
+    label: "Indian\nEconomy",
+    x: 76,
+    y: 11,
+    r: 10,
+    color: "#0e7490",
+    tc: "#fff",
+    w: "700",
+  },
+  {
+    id: "budget",
+    label: "Union\nBudget",
+    x: 63,
+    y: 31,
+    r: 8,
+    color: "#0891b2",
+    tc: "#fff",
+    w: "600",
+  },
+  {
+    id: "fiscal",
+    label: "Fiscal\nPolicy",
+    x: 55,
+    y: 52,
+    r: 6,
+    color: "#67e8f9",
+    tc: "#164e63",
+    w: "500",
+  },
+  {
+    id: "taxreform",
+    label: "Tax\nReform",
+    x: 68,
+    y: 63,
+    r: 6,
+    color: "#a5f3fc",
+    tc: "#164e63",
+    w: "500",
+  },
+  {
+    id: "monetary",
+    label: "Monetary\nPolicy",
+    x: 88,
+    y: 33,
+    r: 7.5,
+    color: "#0284c7",
+    tc: "#fff",
+    w: "600",
+  },
+  {
+    id: "rbi",
+    label: "RBI",
+    x: 82,
+    y: 52,
+    r: 5.5,
+    color: "#7dd3fc",
+    tc: "#0c4a6e",
+    w: "500",
+  },
+  {
+    id: "inflation",
+    label: "Inflation",
+    x: 94,
+    y: 52,
+    r: 5,
+    color: "#bae6fd",
+    tc: "#0c4a6e",
+    w: "500",
+  },
+];
+
+// cross:true → dashed blue arrow   cross:false → solid gray line
+const GRAPH_EDGES = [
+  // Polity hierarchy
+  { from: "polity", to: "parliament", cross: false },
+  { from: "polity", to: "fundrights", cross: false },
+  { from: "parliament", to: "lok", cross: false },
+  { from: "parliament", to: "rajya", cross: false },
+  { from: "fundrights", to: "art19", cross: false },
+  { from: "fundrights", to: "dpsp", cross: false },
+  // Economy hierarchy
+  { from: "economy", to: "budget", cross: false },
+  { from: "economy", to: "monetary", cross: false },
+  { from: "budget", to: "fiscal", cross: false },
+  { from: "budget", to: "taxreform", cross: false },
+  { from: "monetary", to: "rbi", cross: false },
+  { from: "monetary", to: "inflation", cross: false },
+  // Cross-subject (dashed blue) — Parliament approves Union Budget
+  {
+    from: "parliament",
+    to: "budget",
+    cross: true,
+    label: "Appropriation\nBill",
+  },
+  // Cross-subject — Fiscal Policy impacts DPSP implementation
+  { from: "fiscal", to: "dpsp", cross: true, label: "Welfare\nFunding" },
+];
+
+function KnowledgeGraphTeaser() {
+  const nodeMap = Object.fromEntries(GRAPH_NODES.map((n) => [n.id, n]));
+
+  return (
+    <section className="relative overflow-hidden bg-white border-b border-slate-100 py-14 px-4">
+      {/* Subtle dot-grid background */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, #6366f1 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+        }}
+      />
+
+      <div className="container mx-auto max-w-7xl relative">
+        {/* Header */}
+        <div className="mb-10 text-center">
+          <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-violet-600">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-500" />
+            Knowledge Orbits
+          </span>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
+            Every topic is{" "}
+            <span className="bg-gradient-to-r from-violet-600 to-cyan-500 bg-clip-text text-transparent">
+              connected
+            </span>
+          </h2>
+          <p className="mt-3 text-base text-slate-500 max-w-xl mx-auto">
+            See how <strong className="text-slate-800">Parliament</strong> and{" "}
+            <strong className="text-slate-800">Union Budget</strong> are two
+            nodes in the same living knowledge graph.
+          </p>
+        </div>
+
+        {/* Graph + sidebar layout */}
+        <div className="flex flex-col lg:flex-row gap-8 items-stretch">
+          {/* SVG Graph panel */}
+          <div className="relative w-full lg:w-[58%] rounded-2xl border border-slate-200 bg-slate-50/60 overflow-hidden shadow-sm">
+            {/* Subject legend */}
+            <div className="absolute top-3 left-3 flex flex-col gap-1">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
+                <span className="h-2 w-2 rounded-full bg-violet-500" />
+                Indian Polity
+              </span>
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
+                <span className="h-2 w-2 rounded-full bg-cyan-500" />
+                Indian Economy
+              </span>
+            </div>
+            {/* Edge legend */}
+            <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+              <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                <svg width="18" height="6">
+                  <line
+                    x1="0"
+                    y1="3"
+                    x2="18"
+                    y2="3"
+                    stroke="#94a3b8"
+                    strokeWidth="1.2"
+                  />
+                </svg>
+                Hierarchy
+              </span>
+              <span className="flex items-center gap-1.5 text-[10px] text-blue-500">
+                <svg width="18" height="6">
+                  <line
+                    x1="0"
+                    y1="3"
+                    x2="15"
+                    y2="3"
+                    stroke="#3b82f6"
+                    strokeWidth="1.2"
+                    strokeDasharray="2.5 1.5"
+                  />
+                  <polygon points="15,0 18,3 15,6" fill="#3b82f6" />
+                </svg>
+                Cross-subject
+              </span>
+            </div>
+
+            <svg
+              viewBox="0 0 100 82"
+              className="w-full h-auto"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <defs>
+                <marker
+                  id="arr-cross"
+                  markerWidth="5"
+                  markerHeight="5"
+                  refX="4"
+                  refY="2.5"
+                  orient="auto"
+                >
+                  <polygon points="0,0 5,2.5 0,5" fill="#3b82f6" />
+                </marker>
+              </defs>
+
+              {/* Edges — hierarchy first, then cross-subject on top */}
+              {GRAPH_EDGES.map((e, i) => {
+                const a = nodeMap[e.from];
+                const b = nodeMap[e.to];
+                if (!a || !b) return null;
+                // Shorten line to node boundary so arrowhead touches circle edge
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const ux = dx / dist;
+                const uy = dy / dist;
+                const x1 = a.x + ux * a.r;
+                const y1 = a.y + uy * a.r;
+                const x2 = b.x - ux * (b.r + (e.cross ? 2.5 : 0));
+                const y2 = b.y - uy * (b.r + (e.cross ? 2.5 : 0));
+                const mx = (x1 + x2) / 2;
+                const my = (y1 + y2) / 2;
+                return (
+                  <g key={i}>
+                    <line
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={e.cross ? "#3b82f6" : "#94a3b8"}
+                      strokeWidth={e.cross ? "0.55" : "0.3"}
+                      strokeDasharray={e.cross ? "1.4 0.9" : undefined}
+                      opacity={e.cross ? 0.85 : 0.6}
+                      markerEnd={e.cross ? "url(#arr-cross)" : undefined}
+                    />
+                    {e.cross && e.label && (
+                      <text
+                        x={mx}
+                        y={my - 1}
+                        textAnchor="middle"
+                        fontSize="2"
+                        fill="#3b82f6"
+                        opacity="0.8"
+                      >
+                        {e.label.split("\n").map((ln: string, li: number) => (
+                          <tspan key={li} x={mx} dy={li === 0 ? 0 : 2.2}>
+                            {ln}
+                          </tspan>
+                        ))}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Nodes */}
+              {GRAPH_NODES.map((n) => (
+                <g key={n.id}>
+                  <circle cx={n.x} cy={n.y} r={n.r} fill={n.color} />
+                  {n.label
+                    .split("\n")
+                    .map((ln: string, li: number, arr: string[]) => (
+                      <text
+                        key={li}
+                        x={n.x}
+                        y={
+                          n.y +
+                          (li - (arr.length - 1) / 2) * (n.r > 7 ? 2.6 : 2.1)
+                        }
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize={n.r >= 10 ? 2.6 : n.r >= 7.5 ? 2.2 : 2}
+                        fontWeight={n.w}
+                        fill={n.tc}
+                      >
+                        {ln}
+                      </text>
+                    ))}
+                </g>
+              ))}
+            </svg>
+          </div>
+
+          {/* Right side — feature cards + CTA */}
+          <div className="w-full lg:w-[42%] flex flex-col gap-4">
+            {[
+              {
+                icon: "🔗",
+                title: "Cross-Subject Links",
+                desc: "Every concept auto-links to related topics across all UPSC subjects via semantic AI.",
+              },
+              {
+                icon: "🧭",
+                title: "Navigate by Meaning",
+                desc: "Click any node to instantly load a book-quality UPSC article. No searching — just explore.",
+              },
+              {
+                icon: "📡",
+                title: "Live Current Affairs",
+                desc: "Today's news is automatically wired to relevant syllabus nodes so nothing feels disconnected.",
+              },
+            ].map((card) => (
+              <div
+                key={card.title}
+                className="rounded-xl border border-slate-200 bg-white p-5 hover:shadow-md hover:border-blue-200 transition-all"
+              >
+                <div className="mb-2 text-xl">{card.icon}</div>
+                <h3 className="font-bold text-slate-800 text-sm mb-1">
+                  {card.title}
+                </h3>
+                <p className="text-slate-500 text-xs leading-relaxed">
+                  {card.desc}
+                </p>
+              </div>
+            ))}
+
+            {/* CTA */}
+            <Link href="/knowledge" className="mt-1">
+              <button className="w-full group relative overflow-hidden rounded-xl bg-blue-600 hover:bg-blue-700 transition-colors px-6 py-4 font-bold text-white text-base shadow-md flex items-center justify-center gap-3">
+                <span>Explore Knowledge Map</span>
+                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              </button>
+            </Link>
+
+            <p className="text-center text-xs text-slate-400">
+              {GRAPH_NODES.length} nodes · {GRAPH_EDGES.length} connections ·
+              fully interactive
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   const { data: articlesData, isLoading } = useArticles({ page_size: 9 });
   const articlesArray = articlesData?.results || [];
@@ -58,6 +471,9 @@ export default function HomePage() {
           isCollapsed ? "lg:pl-20" : "lg:pl-64",
         )}
       >
+        {/* KNOWLEDGE ORBITS GRAPH TEASER — top of page, just below navbars */}
+        <KnowledgeGraphTeaser />
+
         {/* 1. HERO SECTION: Light with subtle gradient */}
         <section className="relative overflow-hidden pt-24 pb-32 lg:pt-32 lg:pb-48 bg-gradient-to-b from-blue-50 to-white border-b">
           {/* ... existing hero content ... */}
