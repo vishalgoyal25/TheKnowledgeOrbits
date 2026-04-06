@@ -872,15 +872,7 @@ def _fetch_and_store_hero_image(book_content_obj: BookContent) -> None:
             )
             return
 
-        # ── Filter: skip SVG vector files ─────────────────────────────────────
-        if image_url.lower().endswith(".svg"):
-            logger.info(
-                "hero_image_wiki_skip",
-                topic=topic_name,
-                reason="svg_format",
-                url=image_url,
-            )
-            return
+        # All formats allowed: JPEG, PNG, SVG, WebP, GIF, diagrams, maps, etc.
 
         # ── Extract caption from Wikipedia description ────────────────────────
         wiki_description: str = data.get("description", "") or ""
@@ -913,7 +905,7 @@ def _fetch_and_store_hero_image(book_content_obj: BookContent) -> None:
             image_url,
             folder=folder,
             public_id=public_id,
-            resource_type="image",
+            resource_type="auto",  # handles JPEG, PNG, SVG, WebP, GIF, diagrams
             overwrite=True,  # idempotent: same topic → same slot
             use_filename=False,
             unique_filename=False,  # we control the filename via public_id
