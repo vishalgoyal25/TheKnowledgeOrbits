@@ -17,6 +17,8 @@ argon2-cffi>=23.1.0
 
 # API integration
 groq>=0.13.0
+langchain-groq==0.1.9
+langchain==0.2.16
 
 # PDF Extraction
 pdfplumber>=0.11.4
