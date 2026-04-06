@@ -285,6 +285,11 @@ class TestGenerationLog(TestCase):
 
     def test_default_ordering_newest_first(self) -> None:
         """GenerationLog Meta.ordering = ['-created_at'] — newest record appears first."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        now = timezone.now()
         log1 = GenerationLog.objects.create(
             topic_name="Alpha Topic",
             subject_name="Sub",
@@ -294,6 +299,11 @@ class TestGenerationLog(TestCase):
             topic_name="Beta Topic",
             subject_name="Sub",
             status="success",
+        )
+        # Force distinct timestamps so ordering is deterministic regardless of DB speed
+        GenerationLog.objects.filter(id=log1.id).update(created_at=now)
+        GenerationLog.objects.filter(id=log2.id).update(
+            created_at=now + timedelta(seconds=1)
         )
         logs = list(
             GenerationLog.objects.filter(topic_name__in=["Alpha Topic", "Beta Topic"])
