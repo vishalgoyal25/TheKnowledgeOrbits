@@ -147,6 +147,9 @@ export default function KnowledgeGraph({
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const simulationRef = useRef<d3.Simulation<SimNode, SimEdge> | null>(null);
+  const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(
+    new Map(),
+  );
   const graphDataRef = useRef<GraphData | null>(null);
   const expandedRef = useRef<Set<string>>(new Set());
   const selectedTopicIdRef = useRef<string | null>(null);
@@ -324,18 +327,55 @@ export default function KnowledgeGraph({
     const svg = svgRef.current;
     if (!data || !svg || visibleNodeIds.size === 0 || loading) return;
 
-    // Stop any running simulation
-    simulationRef.current?.stop();
+    // Stop any running simulation and save current node positions
+    if (simulationRef.current) {
+      simulationRef.current.stop();
+      simulationRef.current.nodes().forEach((n) => {
+        if (n.x != null && n.y != null) {
+          nodePositionsRef.current.set(n.id, { x: n.x, y: n.y });
+        }
+      });
+    }
 
     const childCountMap = buildChildCountMap(data);
 
-    // Filter nodes + edges to currently visible set
+    // Build parent lookup so new nodes can start near their parent
+    const parentPosMap = new Map<string, { x: number; y: number }>();
+    for (const edge of data.edges.hierarchical) {
+      const parentSaved = nodePositionsRef.current.get(edge.source);
+      if (parentSaved) parentPosMap.set(edge.target, parentSaved);
+    }
+
+    // Filter nodes + edges to currently visible set.
+    // Existing nodes: pinned at saved position (don't move on expand/collapse).
+    // New nodes: start near their parent so they're immediately visible.
     const simNodes: SimNode[] = data.nodes
       .filter((n) => visibleNodeIds.has(n.id))
-      .map((n: TopicNode) => ({
-        ...n,
-        childCount: childCountMap.get(n.id) ?? 0,
-      }));
+      .map((n: TopicNode) => {
+        const saved = nodePositionsRef.current.get(n.id);
+        if (saved) {
+          return {
+            ...n,
+            childCount: childCountMap.get(n.id) ?? 0,
+            x: saved.x,
+            y: saved.y,
+            fx: saved.x,
+            fy: saved.y,
+          };
+        }
+        // New node — spawn near parent with small random offset
+        const nearParent = parentPosMap.get(n.id);
+        const angle = Math.random() * 2 * Math.PI;
+        const r = 60 + Math.random() * 40;
+        return {
+          ...n,
+          childCount: childCountMap.get(n.id) ?? 0,
+          x: nearParent ? nearParent.x + Math.cos(angle) * r : undefined,
+          y: nearParent ? nearParent.y + Math.sin(angle) * r : undefined,
+          fx: undefined,
+          fy: undefined,
+        };
+      });
 
     const visibleSet = new Set(simNodes.map((n) => n.id));
 
@@ -631,8 +671,12 @@ export default function KnowledgeGraph({
       })
       .on("end", (event, d) => {
         if (!event.active) sim.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+        // Re-pin at dropped position — node stays exactly where user left it
+        d.fx = d.x;
+        d.fy = d.y;
+        if (d.x != null && d.y != null) {
+          nodePositionsRef.current.set(d.id, { x: d.x, y: d.y });
+        }
       });
 
     nodeSel.call(drag);
@@ -695,7 +739,18 @@ export default function KnowledgeGraph({
       nodeSel.attr("transform", (d) => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
 
+    // After new nodes settle, pin ALL nodes so graph stays frozen until
+    // user manually drags them — no spontaneous rearrangement ever again.
+    const pinTimer = setTimeout(() => {
+      sim.stop();
+      simNodes.forEach((n) => {
+        if (n.x != null) n.fx = n.x;
+        if (n.y != null) n.fy = n.y;
+      });
+    }, 800);
+
     return () => {
+      clearTimeout(pinTimer);
       sim.stop();
     };
   }, [visibleNodeIds, loading, handleNodeClick, handleNodeDblClick]);

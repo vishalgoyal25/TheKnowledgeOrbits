@@ -73,29 +73,20 @@ logger = structlog.get_logger(__name__)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 SYLLABUS: dict = {
-    # ── Subjects will be added here one by one ────────────────────────────────
-    # Example structure (remove before final use):
-    #
-    # "Indian Polity & Constitution": {
-    #     "Constitutional Framework": {
-    #         "Making of the Indian Constitution": {
-    #             "Constituent Assembly": [
-    #                 "Formation and Composition",
-    #                 "Objectives Resolution",
-    #                 "Key Debates",
-    #             ],
-    #             "Sources of Indian Constitution": [],
-    #             "Preamble": [
-    #                 "Meaning and Significance",
-    #                 "Amendments to Preamble",
-    #             ],
-    #         },
-    #         "Nature of Indian Constitution": {
-    #             "Federal vs Unitary Features": [],
-    #             "Quasi-Federal Character": [],
-    #         },
-    #     },
-    # },
+    "Indian Polity & Constitution": {
+        "Constitutional Framework": {
+            "Preamble to the Constitution of India": {
+                "Meaning and Significance of Preamble": [],
+                "Key Words in Preamble": [],
+                "Preamble and Basic Structure Doctrine": [],
+                "42nd Amendment and Preamble": [],
+            },
+            "Making of the Indian Constitution": {
+                "Constituent Assembly": [],
+                "Sources of Indian Constitution": [],
+            },
+        },
+    },
 }
 
 
