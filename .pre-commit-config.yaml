@@ -41,7 +41,7 @@ repos:
 
       - id: backend-pytest
         name: Backend Laboratory (Pytest)
-        entry: powershell -Command "cd backend; ..\myvenv\Scripts\pytest engines/ -q --tb=short"
+        entry: powershell -Command "cd backend; ..\myvenv\Scripts\pytest engines/ -q --tb=short -p no:cacheprovider"
         language: system
         always_run: true
         pass_filenames: false
