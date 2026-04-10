@@ -16,8 +16,10 @@ Auth pattern:
   Staff   (IsAdminUser) — generation-log only
 """
 
+import threading
 from typing import Any
 
+import sentry_sdk
 import structlog
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -440,3 +442,123 @@ def generation_log_list(request: Request) -> Response:
         status_filter=status_filter or None,
     )
     return Response(serialized, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /api/v1/book/internal/generate/{topic_id}/
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _run_ingest_in_background(topic_id: str, topic_name: str, subject_name: str) -> None:
+    """
+    Target function for background thread.
+    Calls ingest_topic() — the full 3-layer book content generation pipeline.
+    Any exception is captured to Sentry and logged — never propagated.
+    """
+    try:
+        from engines.book_content.services.ingestor_service import ingest_topic
+
+        logger.info(
+            "internal_generate_bg_start",
+            topic_id=topic_id,
+            topic_name=topic_name,
+        )
+        result = ingest_topic(topic_name=topic_name, subject_name=subject_name)
+        logger.info(
+            "internal_generate_bg_complete",
+            topic_id=topic_id,
+            topic_name=topic_name,
+            nodes_created=result.get("nodes_created", 0),
+        )
+    except Exception as exc:
+        sentry_sdk.capture_exception(exc)
+        logger.error(
+            "internal_generate_bg_failed",
+            topic_id=topic_id,
+            topic_name=topic_name,
+            error=str(exc),
+        )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def internal_generate(request: Request, topic_id: str) -> Response:
+    """
+    POST /api/v1/book/internal/generate/{topic_id}/
+
+    Triggers background generation of static BookContent for a topic.
+    Called by StaticBackgroundService.trigger_pending_static_generation()
+    after all daily CA generation cycles complete.
+
+    Non-blocking: returns 202 immediately.
+    Generation runs in a daemon background thread using the existing
+    ingest_topic() pipeline (MASTER_STYLE_ANCHOR, SECTION_PLAN, SUBJECT_TONE_MAP
+    all preserved — this is the same pipeline as the manual command).
+
+    Responses:
+      202 Accepted  — generation triggered in background
+      200 OK        — already published, nothing to do
+      404 Not Found — topic_id not found or inactive
+      500           — unexpected internal error
+    """
+    try:
+        topic = (
+            Topic.objects.select_related("subject")
+            .filter(id=topic_id, is_active=True)
+            .first()
+        )
+        if not topic:
+            logger.warning("internal_generate_topic_not_found", topic_id=topic_id)
+            return Response(
+                {"error": "Topic not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Already published — no need to regenerate
+        if BookContent.objects.filter(topic=topic, is_published=True).exists():
+            logger.info(
+                "internal_generate_already_exists",
+                topic_id=topic_id,
+                topic_name=topic.name,
+            )
+            return Response(
+                {"status": "already_exists", "topic_id": topic_id},
+                status=status.HTTP_200_OK,
+            )
+
+        # Fire background thread — daemon=True so it doesn't block server shutdown
+        thread = threading.Thread(
+            target=_run_ingest_in_background,
+            args=(topic_id, topic.name, topic.subject.name),
+            daemon=True,
+            name=f"static-gen-{str(topic_id)[:8]}",
+        )
+        thread.start()
+
+        logger.info(
+            "internal_generate_triggered",
+            topic_id=topic_id,
+            topic_name=topic.name,
+            subject_name=topic.subject.name,
+            thread_name=thread.name,
+        )
+        return Response(
+            {
+                "status": "triggered",
+                "topic_id": topic_id,
+                "topic_name": topic.name,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    except Exception as exc:
+        sentry_sdk.capture_exception(exc)
+        logger.error(
+            "internal_generate_error",
+            topic_id=topic_id,
+            error=str(exc),
+        )
+        return Response(
+            {"error": "Internal server error"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

@@ -101,8 +101,10 @@ specs
 .claude/
 .postman/
 
-FEATURE1.md
+
 FEATURES.md
+FEATURES1.md
+FEATURES2.md
 
 postman/
 CLAUDE.md
