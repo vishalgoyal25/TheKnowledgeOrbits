@@ -8,9 +8,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict
 
-from django.core.exceptions import ImproperlyConfigured
-
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -55,6 +54,9 @@ INSTALLED_APPS = [
     "engines.analytics",
     "engines.support",
     "engines.book_content",
+    # Feature 2 engines
+    "engines.daily_ca",
+    "engines.tags",
 ]
 
 # Custom User Model
@@ -108,6 +110,8 @@ if RENDER_BUILD_MODE:
     }
 else:
     DATABASES = {
+        # ── Local Postgres (default) ──────────────────────────────────────────
+        # Used by: python manage.py migrate
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": env("DB_NAME", default=env("NAME", default="TheKnowledgeOrbits")),
@@ -118,7 +122,22 @@ else:
             "OPTIONS": {
                 "options": "-c timezone=Asia/Kolkata",
             },
-        }
+        },
+        # ── Supabase Postgres ─────────────────────────────────────────────────
+        # Used by: python manage.py migrate --database=supabase
+        # Credentials live in .env as SB_DB_* keys — no commenting needed.
+        "supabase": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("SB_DB_NAME", default="postgres"),
+            "USER": env("SB_DB_USER", default="postgres"),
+            "PASSWORD": env("SB_DB_PASSWORD", default=""),
+            "HOST": env("SB_DB_HOST", default="localhost"),
+            "PORT": env("SB_DB_PORT", default="5432"),
+            "OPTIONS": {
+                "options": "-c timezone=Asia/Kolkata",
+                "sslmode": "require",
+            },
+        },
     }
 
 # Standard URL Configuration

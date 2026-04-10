@@ -10,6 +10,7 @@ Endpoints:
   GET  content/<uuid:topic_id>/                     → book_content_detail
   GET  content/<uuid:topic_id>/cross-references/    → book_content_cross_references
   GET  generation-log/                              → generation_log_list  (staff only)
+  POST internal/generate/<uuid:topic_id>/           → internal_generate   (internal only)
 """
 
 from django.urls import path
@@ -19,6 +20,7 @@ from engines.book_content.views import (
     book_content_detail,
     generation_log_list,
     graph_node_children,
+    internal_generate,
     subject_graph,
     subject_list,
     subject_tree,
@@ -68,5 +70,11 @@ urlpatterns = [
         "generation-log/",
         generation_log_list,
         name="generation-log-list",
+    ),
+    # Internal: trigger background static generation (called by daily_ca engine only)
+    path(
+        "internal/generate/<uuid:topic_id>/",
+        internal_generate,
+        name="internal-generate",
     ),
 ]

@@ -74,6 +74,10 @@ def api_index(request: Any) -> JsonResponse:
                 "authorization": "/api/v1/authorization/",
                 "support": "/api/v1/support/",
                 "book": "/api/v1/book/",
+                "daily_ca": "/api/v1/daily-ca/",
+                "daily_ca_admin": "/api/v1/admin/daily-ca/",
+                "tags": "/api/v1/tags/",
+                "concepts": "/api/v1/concepts/",
             },
         },
         status=200,
@@ -97,6 +101,11 @@ urlpatterns = [
     path("api/v1/authorization/", include("engines.authorization.urls")),
     path("api/v1/support/", include("engines.support.urls")),
     path("api/v1/book/", include("engines.book_content.urls")),
+    # Feature 2 engines
+    path("api/v1/daily-ca/", include("engines.daily_ca.urls")),
+    path("api/v1/admin/daily-ca/", include("engines.daily_ca.admin_urls")),
+    path("api/v1/tags/", include("engines.tags.urls")),
+    path("api/v1/concepts/", include("engines.tags.concepts_urls")),
 ]
 
 # Conditionally add the admin path (not disabled in production)
