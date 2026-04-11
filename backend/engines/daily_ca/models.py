@@ -106,13 +106,15 @@ class CaDailyProposal(models.Model):
         help_text="Timestamp when a human approved this proposal",
     )
 
-    # Phase F1 note: DailyCaArticle doesn't exist yet (Phase J).
-    # Storing as plain UUIDField — FK constraint added in Phase J migration.
-    generated_article_id = models.UUIDField(
+    # Phase J migration converted this from UUIDField to ForeignKey (SET_NULL).
+    generated_article = models.ForeignKey(
+        "DailyCaArticle",
         null=True,
         blank=True,
-        help_text="PK of the DailyCaArticle generated from this proposal "
-                  "(FK constraint to daily_ca.DailyCaArticle added in Phase J)",
+        on_delete=models.SET_NULL,
+        related_name="proposals",
+        db_column="generated_article_id",
+        help_text="DailyCaArticle generated from this proposal",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
