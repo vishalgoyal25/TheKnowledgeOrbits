@@ -48,6 +48,7 @@ ARTICLE_CONTENT_TYPE_CHOICES = [
 
 # ── MODEL 1: Tag ──────────────────────────────────────────────────────────────
 
+
 class Tag(models.Model):
     """
     Keyword tag — a permanent, reusable label for articles.
@@ -113,6 +114,7 @@ class Tag(models.Model):
 
 # ── MODEL 2: ArticleTag ───────────────────────────────────────────────────────
 
+
 class ArticleTag(models.Model):
     """
     M2M junction linking a Tag to any article.
@@ -162,6 +164,7 @@ class ArticleTag(models.Model):
 
 
 # ── MODEL 3: ConceptPage ──────────────────────────────────────────────────────
+
 
 class ConceptPage(models.Model):
     """
@@ -232,6 +235,7 @@ class ConceptPage(models.Model):
 
 # ── MODEL 4: ConceptArticleLink ───────────────────────────────────────────────
 
+
 class ConceptArticleLink(models.Model):
     """
     M2M junction linking a ConceptPage to a DailyCaArticle.
@@ -259,7 +263,7 @@ class ConceptArticleLink(models.Model):
     # Phase C: plain UUID — FK constraint added in Phase E migration
     daily_ca_article_id = models.UUIDField(
         help_text="PK of the DailyCaArticle this concept is linked from "
-                  "(FK constraint to daily_ca.DailyCaArticle added in Phase E)",
+        "(FK constraint to daily_ca.DailyCaArticle added in Phase E)",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

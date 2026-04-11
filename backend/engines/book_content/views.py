@@ -449,7 +449,9 @@ def generation_log_list(request: Request) -> Response:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _run_ingest_in_background(topic_id: str, topic_name: str, subject_name: str) -> None:
+def _run_ingest_in_background(
+    topic_id: str, topic_name: str, subject_name: str
+) -> None:
     """
     Target function for background thread.
     Calls ingest_topic() — the full 3-layer book content generation pipeline.

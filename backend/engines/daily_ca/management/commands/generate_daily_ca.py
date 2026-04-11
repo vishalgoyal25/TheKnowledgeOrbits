@@ -104,9 +104,11 @@ class Command(BaseCommand):
         )
 
         if not proposals:
-            already_generated = CaDailyProposal.objects.using(db_alias).filter(
-                date=target_date, status="generated"
-            ).count()
+            already_generated = (
+                CaDailyProposal.objects.using(db_alias)
+                .filter(date=target_date, status="generated")
+                .count()
+            )
             self.stdout.write(
                 self.style.WARNING(
                     f"\nNo approved or queued proposals found for {target_date}."
@@ -138,11 +140,11 @@ class Command(BaseCommand):
         def _instrumented_cycle(cls, proposal, db_alias="default"):
             cycle_counter[0] += 1
             n = cycle_counter[0]
-            self.stdout.write(
-                f"  Cycle {n}/{total} starting: {proposal.title[:70]}..."
-            )
+            self.stdout.write(f"  Cycle {n}/{total} starting: {proposal.title[:70]}...")
             try:
-                article, calls, needs_static = original_run_single.__func__(cls, proposal, db_alias=db_alias)
+                article, calls, needs_static = original_run_single.__func__(
+                    cls, proposal, db_alias=db_alias
+                )
                 static_flag = "NO (queued for bg)" if needs_static else "YES"
                 self.stdout.write(
                     self.style.SUCCESS(
@@ -212,9 +214,7 @@ class Command(BaseCommand):
         capped = results.get("capped", 0)
         groq_used = results.get("groq_calls_used", 0)
 
-        self.stdout.write(
-            self.style.MIGRATE_HEADING(f"\n{'━' * 60}")
-        )
+        self.stdout.write(self.style.MIGRATE_HEADING(f"\n{'━' * 60}"))
         self.stdout.write(
             self.style.SUCCESS(
                 f"  Generation complete: "
@@ -230,8 +230,8 @@ class Command(BaseCommand):
             )
         self.stdout.write(
             self.style.WARNING(
-                f"\n  Articles are NOT published yet.\n"
-                f"  Review in Django admin → Daily CA → Articles → set is_published=True."
+                "\n  Articles are NOT published yet.\n"
+                "  Review in Django admin → Daily CA → Articles → set is_published=True."
             )
         )
         self.stdout.write(self.style.MIGRATE_HEADING(f"{'━' * 60}\n"))

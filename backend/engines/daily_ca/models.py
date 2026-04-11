@@ -135,6 +135,7 @@ class CaDailyProposal(models.Model):
 
 # ── MODEL: DailyCaArticle ─────────────────────────────────────────────────────
 
+
 class DailyCaArticle(models.Model):
     """
     One fully-generated Daily CA article — the core output of the daily pipeline.

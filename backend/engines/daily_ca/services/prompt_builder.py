@@ -258,6 +258,7 @@ DO NOT INCLUDE in the article body:
 
 # ── Static facts formatter ────────────────────────────────────────────────────
 
+
 def _format_static_facts(static_facts: dict | None) -> str:
     """
     Converts StaticBackgroundService.get_background_facts() output into
@@ -295,6 +296,7 @@ def _format_static_facts(static_facts: dict | None) -> str:
 
 # ── Wiki enrichment formatter ─────────────────────────────────────────────────
 
+
 def _format_wiki_enrichment(wiki_data: dict | None) -> str:
     """
     Converts WikiEnrichmentService.get_enrichment() output into
@@ -325,6 +327,7 @@ def _format_wiki_enrichment(wiki_data: dict | None) -> str:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def build_ca_prompt(
     ca_chunks_text: str,

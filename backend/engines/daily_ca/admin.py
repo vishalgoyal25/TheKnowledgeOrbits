@@ -12,14 +12,23 @@ from engines.daily_ca.models import CaDailyProposal, DailyCaArticle, DailyCaStat
 @admin.register(CaDailyProposal)
 class CaDailyProposalAdmin(admin.ModelAdmin):
     list_display = [
-        "title", "date", "status", "subject_name", "gs_paper",
-        "relevance_score", "created_at",
+        "title",
+        "date",
+        "status",
+        "subject_name",
+        "gs_paper",
+        "relevance_score",
+        "created_at",
     ]
     list_filter = ["status", "date", "subject_name", "gs_paper"]
     search_fields = ["title", "description"]
     readonly_fields = [
-        "id", "ca_chunk_ids", "source_urls", "relevance_score",
-        "generated_article_id", "created_at",
+        "id",
+        "ca_chunk_ids",
+        "source_urls",
+        "relevance_score",
+        "generated_article_id",
+        "created_at",
     ]
     ordering = ["-date", "-relevance_score"]
     date_hierarchy = "date"
@@ -29,6 +38,7 @@ class CaDailyProposalAdmin(admin.ModelAdmin):
     @admin.action(description="Approve selected proposals")
     def approve_proposals(self, request, queryset):
         from django.utils import timezone
+
         count = queryset.filter(status__in=["pending", "failed"]).update(
             status="approved", approved_at=timezone.now()
         )
@@ -38,14 +48,28 @@ class CaDailyProposalAdmin(admin.ModelAdmin):
 @admin.register(DailyCaArticle)
 class DailyCaArticleAdmin(admin.ModelAdmin):
     list_display = [
-        "title", "published_date", "subject_name", "gs_paper",
-        "quality_score", "is_published", "order_on_date", "created_at",
+        "title",
+        "published_date",
+        "subject_name",
+        "gs_paper",
+        "quality_score",
+        "is_published",
+        "order_on_date",
+        "created_at",
     ]
     list_filter = ["is_published", "published_date", "subject_name", "gs_paper"]
     search_fields = ["title", "slug"]
     readonly_fields = [
-        "id", "slug", "body_md", "body_md_processed", "ca_chunk_ids",
-        "sources_used", "generation_metadata", "quality_score", "created_at", "updated_at",
+        "id",
+        "slug",
+        "body_md",
+        "body_md_processed",
+        "ca_chunk_ids",
+        "sources_used",
+        "generation_metadata",
+        "quality_score",
+        "created_at",
+        "updated_at",
     ]
     ordering = ["-published_date", "order_on_date"]
     date_hierarchy = "published_date"

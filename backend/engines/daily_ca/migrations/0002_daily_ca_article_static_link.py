@@ -11,7 +11,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("daily_ca", "0001_initial"),
         ("book_content", "0003_alter_bookchunk_search_vector_and_more"),
@@ -186,7 +185,6 @@ class Migration(migrations.Migration):
                 ],
             },
         ),
-
         # ── J2: DailyCaStaticLink ─────────────────────────────────────────────
         migrations.CreateModel(
             name="DailyCaStaticLink",
@@ -245,7 +243,6 @@ class Migration(migrations.Migration):
                 "unique_together": {("daily_article", "book_content")},
             },
         ),
-
         # ── CaDailyProposal.generated_article_id → proper FK ─────────────────
         # Convert from plain UUIDField (Phase F1) to ForeignKey now that
         # DailyCaArticle exists. SET_NULL so deleting an article doesn't

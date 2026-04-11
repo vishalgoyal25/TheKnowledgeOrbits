@@ -83,7 +83,9 @@ class ConceptPageResolver:
     # ── Public API ─────────────────────────────────────────────────────────────
 
     @classmethod
-    def process_and_replace(cls, body_md: str, article_id: UUID, db_alias: str = "default") -> str:
+    def process_and_replace(
+        cls, body_md: str, article_id: UUID, db_alias: str = "default"
+    ) -> str:
         """
         Scan body_md for [[term]] patterns, resolve each to a ConceptPage,
         replace with [term](/concepts/slug), and write ConceptArticleLink rows.
@@ -206,7 +208,9 @@ class ConceptPageResolver:
             return existing
 
         # 2. Fuzzy slug match — load all slugs and compare
-        all_slugs = list(ConceptPage.objects.using(db_alias).values_list("slug", flat=True))
+        all_slugs = list(
+            ConceptPage.objects.using(db_alias).values_list("slug", flat=True)
+        )
         matches = difflib.get_close_matches(
             slug, all_slugs, n=1, cutoff=SIMILARITY_THRESHOLD
         )
@@ -224,7 +228,9 @@ class ConceptPageResolver:
         return cls._create_stub(term, slug, db_alias=db_alias)
 
     @classmethod
-    def _create_stub(cls, term: str, slug: str, db_alias: str = "default") -> ConceptPage:
+    def _create_stub(
+        cls, term: str, slug: str, db_alias: str = "default"
+    ) -> ConceptPage:
         """
         Create a new ConceptPage stub.
 

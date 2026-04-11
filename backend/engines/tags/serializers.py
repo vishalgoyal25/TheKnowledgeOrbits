@@ -17,6 +17,7 @@ from engines.tags.models import ConceptPage, Tag
 
 # ── Tag ───────────────────────────────────────────────────────────────────────
 
+
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
@@ -29,18 +30,23 @@ class TagDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = [
-            "id", "name", "slug", "description", "tag_type",
-            "usage_count", "is_active", "created_at", "recent_articles",
+            "id",
+            "name",
+            "slug",
+            "description",
+            "tag_type",
+            "usage_count",
+            "is_active",
+            "created_at",
+            "recent_articles",
         ]
 
     def get_recent_articles(self, obj):
         from engines.daily_ca.models import DailyCaArticle
 
-        article_tags = (
-            obj.article_tags
-            .filter(content_type="daily_ca")
-            .order_by("-created_at")[:5]
-        )
+        article_tags = obj.article_tags.filter(content_type="daily_ca").order_by(
+            "-created_at"
+        )[:5]
         ids = [at.object_id for at in article_tags]
         articles = DailyCaArticle.objects.filter(id__in=ids, is_published=True)
         return [{"title": a.title, "slug": a.slug} for a in articles]
@@ -48,10 +54,18 @@ class TagDetailSerializer(serializers.ModelSerializer):
 
 # ── ConceptPage ───────────────────────────────────────────────────────────────
 
+
 class ConceptPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConceptPage
-        fields = ["id", "name", "slug", "brief_description", "is_content_ready", "usage_count"]
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "brief_description",
+            "is_content_ready",
+            "usage_count",
+        ]
 
 
 class ConceptPageDetailSerializer(serializers.ModelSerializer):
@@ -61,8 +75,15 @@ class ConceptPageDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConceptPage
         fields = [
-            "id", "name", "slug", "brief_description", "body",
-            "is_content_ready", "usage_count", "created_at", "linked_articles",
+            "id",
+            "name",
+            "slug",
+            "brief_description",
+            "body",
+            "is_content_ready",
+            "usage_count",
+            "created_at",
+            "linked_articles",
         ]
 
     def get_body(self, obj):

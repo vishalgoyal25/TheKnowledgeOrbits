@@ -31,11 +31,13 @@ from engines.tags.serializers import (
 
 # ── Tag Views ─────────────────────────────────────────────────────────────────
 
+
 class TagListView(generics.ListAPIView):
     """
     GET /api/v1/tags/
     List all active tags, paginated. Optional filter: ?type=scheme
     """
+
     serializer_class = TagSerializer
     permission_classes = [AllowAny]
 
@@ -52,6 +54,7 @@ class TagDetailView(generics.RetrieveAPIView):
     GET /api/v1/tags/<slug>/
     Tag detail + list of recent CA articles using this tag (last 5).
     """
+
     serializer_class = TagDetailSerializer
     permission_classes = [AllowAny]
     lookup_field = "slug"
@@ -64,6 +67,7 @@ class TagArticlesView(APIView):
     All published DailyCaArticles carrying this tag, newest first.
     Supports ?limit=20&offset=0 pagination.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
@@ -74,34 +78,36 @@ class TagArticlesView(APIView):
         limit = int(request.query_params.get("limit", 20))
         offset = int(request.query_params.get("offset", 0))
 
-        article_tags = (
-            ArticleTag.objects.filter(tag=tag, content_type="daily_ca")
-            .order_by("-created_at")
-        )
+        article_tags = ArticleTag.objects.filter(
+            tag=tag, content_type="daily_ca"
+        ).order_by("-created_at")
         ids = [at.object_id for at in article_tags]
         total = len(ids)
 
-        articles = (
-            DailyCaArticle.objects.filter(id__in=ids, is_published=True)
-            .order_by("-published_date")[offset: offset + limit]
-        )
+        articles = DailyCaArticle.objects.filter(
+            id__in=ids, is_published=True
+        ).order_by("-published_date")[offset : offset + limit]
         serializer = DailyCaArticleListSerializer(articles, many=True)
-        return Response({
-            "tag": tag.name,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "results": serializer.data,
-        })
+        return Response(
+            {
+                "tag": tag.name,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "results": serializer.data,
+            }
+        )
 
 
 # ── Concept Views ─────────────────────────────────────────────────────────────
+
 
 class ConceptListView(generics.ListAPIView):
     """
     GET /api/v1/concepts/
     List all concept pages, paginated. Optional filter: ?is_content_ready=true
     """
+
     serializer_class = ConceptPageSerializer
     permission_classes = [AllowAny]
 
@@ -119,6 +125,7 @@ class ConceptDetailView(generics.RetrieveAPIView):
     Concept detail. Returns brief_description always.
     Returns body (full markdown) only when is_content_ready=True.
     """
+
     serializer_class = ConceptPageDetailSerializer
     permission_classes = [AllowAny]
     lookup_field = "slug"

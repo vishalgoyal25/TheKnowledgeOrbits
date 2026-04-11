@@ -25,9 +25,27 @@ from engines.daily_ca.views import (
 )
 
 urlpatterns = [
-    path("proposals/approve/", AdminApproveView.as_view(), name="admin-proposals-approve"),
-    path("proposals/<str:date_str>/", AdminProposalListView.as_view(), name="admin-proposals-list"),
-    path("generate/status/", AdminGenerateStatusView.as_view(), name="admin-generate-status"),
-    path("publish/<str:date_str>/", AdminPublishDateView.as_view(), name="admin-publish-date"),
-    path("articles/<str:date_str>/", AdminArticlesDateView.as_view(), name="admin-articles-date"),
+    path(
+        "proposals/approve/", AdminApproveView.as_view(), name="admin-proposals-approve"
+    ),
+    path(
+        "proposals/<str:date_str>/",
+        AdminProposalListView.as_view(),
+        name="admin-proposals-list",
+    ),
+    path(
+        "generate/status/",
+        AdminGenerateStatusView.as_view(),
+        name="admin-generate-status",
+    ),
+    path(
+        "publish/<str:date_str>/",
+        AdminPublishDateView.as_view(),
+        name="admin-publish-date",
+    ),
+    path(
+        "articles/<str:date_str>/",
+        AdminArticlesDateView.as_view(),
+        name="admin-articles-date",
+    ),
 ]

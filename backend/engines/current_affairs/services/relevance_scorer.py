@@ -43,6 +43,7 @@ def _get_embedding_model():
     if _embedding_model is None:
         logger.info("relevance_scorer_loading_model")
         from sentence_transformers import SentenceTransformer
+
         _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
     return _embedding_model
 
@@ -52,90 +53,318 @@ def _get_embedding_model():
 
 UPSC_KEYWORDS = {
     # Indian Polity & Constitution
-    "constitution", "parliament", "lok sabha", "rajya sabha", "supreme court",
-    "high court", "fundamental rights", "directive principles", "preamble",
-    "amendment", "president", "governor", "cabinet", "council of ministers",
-    "election commission", "federalism", "judiciary", "ordinance", "bill",
-    "speaker", "writ", "habeas corpus", "article 370", "article 356",
-    "anti-defection", "delimitation", "panchayati raj", "municipal corporation",
-    "gram sabha", "decentralization", "rti", "right to information",
-    "lokpal", "lokayukta", "cag", "comptroller",
-
+    "constitution",
+    "parliament",
+    "lok sabha",
+    "rajya sabha",
+    "supreme court",
+    "high court",
+    "fundamental rights",
+    "directive principles",
+    "preamble",
+    "amendment",
+    "president",
+    "governor",
+    "cabinet",
+    "council of ministers",
+    "election commission",
+    "federalism",
+    "judiciary",
+    "ordinance",
+    "bill",
+    "speaker",
+    "writ",
+    "habeas corpus",
+    "article 370",
+    "article 356",
+    "anti-defection",
+    "delimitation",
+    "panchayati raj",
+    "municipal corporation",
+    "gram sabha",
+    "decentralization",
+    "rti",
+    "right to information",
+    "lokpal",
+    "lokayukta",
+    "cag",
+    "comptroller",
     # Governance & Social Justice
-    "governance", "e-governance", "transparency", "accountability",
-    "social justice", "reservation", "obc", "sc", "st", "dalit", "adivasi",
-    "women empowerment", "gender equality", "disability", "minority",
-    "scheme", "yojana", "mission", "programme", "policy", "welfare",
-    "mgnregs", "pm-kisan", "ayushman", "pmjay", "jan dhan", "dbt",
-    "aadhaar", "jam trinity", "direct benefit transfer",
-
+    "governance",
+    "e-governance",
+    "transparency",
+    "accountability",
+    "social justice",
+    "reservation",
+    "obc",
+    "sc",
+    "st",
+    "dalit",
+    "adivasi",
+    "women empowerment",
+    "gender equality",
+    "disability",
+    "minority",
+    "scheme",
+    "yojana",
+    "mission",
+    "programme",
+    "policy",
+    "welfare",
+    "mgnregs",
+    "pm-kisan",
+    "ayushman",
+    "pmjay",
+    "jan dhan",
+    "dbt",
+    "aadhaar",
+    "jam trinity",
+    "direct benefit transfer",
     # Indian Economy
-    "gdp", "inflation", "fiscal deficit", "monetary policy", "rbi",
-    "budget", "tax", "gst", "fdi", "fpi", "trade", "export", "import",
-    "current account", "forex", "rupee", "sebi", "npa", "bank",
-    "disinvestment", "privatization", "msme", "startup", "make in india",
-    "infrastructure", "investment", "capital", "economic growth",
-    "unemployment", "poverty", "inequality", "frbm", "economic survey",
-    "finance commission", "niti aayog", "five year plan",
-
+    "gdp",
+    "inflation",
+    "fiscal deficit",
+    "monetary policy",
+    "rbi",
+    "budget",
+    "tax",
+    "gst",
+    "fdi",
+    "fpi",
+    "trade",
+    "export",
+    "import",
+    "current account",
+    "forex",
+    "rupee",
+    "sebi",
+    "npa",
+    "bank",
+    "disinvestment",
+    "privatization",
+    "msme",
+    "startup",
+    "make in india",
+    "infrastructure",
+    "investment",
+    "capital",
+    "economic growth",
+    "unemployment",
+    "poverty",
+    "inequality",
+    "frbm",
+    "economic survey",
+    "finance commission",
+    "niti aayog",
+    "five year plan",
     # Indian & World Geography
-    "monsoon", "cyclone", "flood", "drought", "earthquake", "tsunami",
-    "himalaya", "western ghats", "eastern ghats", "river", "dam",
-    "glacier", "groundwater", "aquifer", "soil", "mineral",
-    "agriculture", "crop", "irrigation", "watershed", "delta",
-    "coastline", "island", "eez", "continental shelf",
-
+    "monsoon",
+    "cyclone",
+    "flood",
+    "drought",
+    "earthquake",
+    "tsunami",
+    "himalaya",
+    "western ghats",
+    "eastern ghats",
+    "river",
+    "dam",
+    "glacier",
+    "groundwater",
+    "aquifer",
+    "soil",
+    "mineral",
+    "agriculture",
+    "crop",
+    "irrigation",
+    "watershed",
+    "delta",
+    "coastline",
+    "island",
+    "eez",
+    "continental shelf",
     # Environment & Ecology
-    "climate change", "global warming", "carbon", "emission", "net zero",
-    "biodiversity", "wildlife", "tiger", "elephant", "wetland", "ramsar",
-    "forest", "deforestation", "afforestation", "pollution", "air quality",
-    "pm2.5", "ozone", "plastic", "waste", "solar", "renewable energy",
-    "paris agreement", "unfccc", "cop", "ndc", "biosphere reserve",
-    "national park", "wildlife sanctuary", "endangered species",
-    "coral reef", "mangrove", "eia", "environmental clearance",
-
+    "climate change",
+    "global warming",
+    "carbon",
+    "emission",
+    "net zero",
+    "biodiversity",
+    "wildlife",
+    "tiger",
+    "elephant",
+    "wetland",
+    "ramsar",
+    "forest",
+    "deforestation",
+    "afforestation",
+    "pollution",
+    "air quality",
+    "pm2.5",
+    "ozone",
+    "plastic",
+    "waste",
+    "solar",
+    "renewable energy",
+    "paris agreement",
+    "unfccc",
+    "cop",
+    "ndc",
+    "biosphere reserve",
+    "national park",
+    "wildlife sanctuary",
+    "endangered species",
+    "coral reef",
+    "mangrove",
+    "eia",
+    "environmental clearance",
     # Science & Technology
-    "isro", "drdo", "nasa", "space", "satellite", "rocket", "missile",
-    "nuclear", "ai", "artificial intelligence", "machine learning",
-    "5g", "semiconductor", "quantum", "biotechnology", "genome",
-    "vaccine", "drug", "pharma", "cyber", "cybersecurity", "data",
-    "internet", "digital india", "technology", "innovation", "patent",
-    "research", "chandrayaan", "gaganyaan", "aditya",
-
+    "isro",
+    "drdo",
+    "nasa",
+    "space",
+    "satellite",
+    "rocket",
+    "missile",
+    "nuclear",
+    "ai",
+    "artificial intelligence",
+    "machine learning",
+    "5g",
+    "semiconductor",
+    "quantum",
+    "biotechnology",
+    "genome",
+    "vaccine",
+    "drug",
+    "pharma",
+    "cyber",
+    "cybersecurity",
+    "data",
+    "internet",
+    "digital india",
+    "technology",
+    "innovation",
+    "patent",
+    "research",
+    "chandrayaan",
+    "gaganyaan",
+    "aditya",
     # Internal Security
-    "terrorism", "naxal", "lwe", "insurgency", "border", "infiltration",
-    "uapa", "afspa", "nia", "crpf", "bsf", "security forces",
-    "ceasefire", "militant", "radicalization", "cyber attack",
-    "fake currency", "ficn", "narcotics", "drug trafficking",
-
+    "terrorism",
+    "naxal",
+    "lwe",
+    "insurgency",
+    "border",
+    "infiltration",
+    "uapa",
+    "afspa",
+    "nia",
+    "crpf",
+    "bsf",
+    "security forces",
+    "ceasefire",
+    "militant",
+    "radicalization",
+    "cyber attack",
+    "fake currency",
+    "ficn",
+    "narcotics",
+    "drug trafficking",
     # Disaster Management
-    "disaster", "ndma", "ndrf", "sdrf", "relief", "rescue",
-    "landslide", "avalanche", "fire", "chemical disaster", "sendai",
-    "drr", "disaster risk reduction", "early warning",
-
+    "disaster",
+    "ndma",
+    "ndrf",
+    "sdrf",
+    "relief",
+    "rescue",
+    "landslide",
+    "avalanche",
+    "fire",
+    "chemical disaster",
+    "sendai",
+    "drr",
+    "disaster risk reduction",
+    "early warning",
     # International Relations
-    "bilateral", "multilateral", "summit", "treaty", "agreement",
-    "un", "united nations", "g20", "brics", "sco", "quad", "saarc",
-    "bimstec", "asean", "wto", "imf", "world bank", "nato",
-    "sanctions", "diplomacy", "foreign policy", "india-china",
-    "india-pakistan", "india-us", "india-russia", "neighbourhood",
-
+    "bilateral",
+    "multilateral",
+    "summit",
+    "treaty",
+    "agreement",
+    "un",
+    "united nations",
+    "g20",
+    "brics",
+    "sco",
+    "quad",
+    "saarc",
+    "bimstec",
+    "asean",
+    "wto",
+    "imf",
+    "world bank",
+    "nato",
+    "sanctions",
+    "diplomacy",
+    "foreign policy",
+    "india-china",
+    "india-pakistan",
+    "india-us",
+    "india-russia",
+    "neighbourhood",
     # Modern History & Culture
-    "independence", "partition", "gandhi", "nehru", "ambedkar",
-    "colonial", "british", "mughal", "revolt", "freedom struggle",
-    "heritage", "unesco", "monument", "archaeological", "excavation",
-    "festival", "art", "culture", "classical", "folk",
-
+    "independence",
+    "partition",
+    "gandhi",
+    "nehru",
+    "ambedkar",
+    "colonial",
+    "british",
+    "mughal",
+    "revolt",
+    "freedom struggle",
+    "heritage",
+    "unesco",
+    "monument",
+    "archaeological",
+    "excavation",
+    "festival",
+    "art",
+    "culture",
+    "classical",
+    "folk",
     # Ethics & Social
-    "corruption", "whistleblower", "probity", "integrity",
-    "human rights", "civil liberties", "mob lynching", "caste violence",
-    "communal", "secularism", "religious freedom",
-
+    "corruption",
+    "whistleblower",
+    "probity",
+    "integrity",
+    "human rights",
+    "civil liberties",
+    "mob lynching",
+    "caste violence",
+    "communal",
+    "secularism",
+    "religious freedom",
     # Indian Society
-    "population", "census", "literacy", "education", "health",
-    "nutrition", "malnutrition", "infant mortality", "maternal",
-    "migration", "urbanization", "slum", "housing", "sanitation",
-    "swachh bharat", "open defecation", "tribal", "schedule tribe",
+    "population",
+    "census",
+    "literacy",
+    "education",
+    "health",
+    "nutrition",
+    "malnutrition",
+    "infant mortality",
+    "maternal",
+    "migration",
+    "urbanization",
+    "slum",
+    "housing",
+    "sanitation",
+    "swachh bharat",
+    "open defecation",
+    "tribal",
+    "schedule tribe",
 }
 
 # ── Blocked noise patterns ────────────────────────────────────────────────────
@@ -146,11 +375,15 @@ BLOCKED_NOISE_PATTERNS = [
     # Cricket / sports scores
     re.compile(r"\b(ipl|cricket|match score|wicket|century|test match|odi|t20i)\b"),
     # Bollywood / celebrity
-    re.compile(r"\b(bollywood|box office|film release|actor|actress|celebrity|gossip"
-               r"|bigg boss|karan johar|salman|shahrukh|deepika)\b"),
+    re.compile(
+        r"\b(bollywood|box office|film release|actor|actress|celebrity|gossip"
+        r"|bigg boss|karan johar|salman|shahrukh|deepika)\b"
+    ),
     # Crime / accident (pure local, no policy angle)
-    re.compile(r"\b(robbery|burglary|murder case|rape case|kidnap|car accident"
-               r"|road accident|hit and run|drunk driving crash)\b"),
+    re.compile(
+        r"\b(robbery|burglary|murder case|rape case|kidnap|car accident"
+        r"|road accident|hit and run|drunk driving crash)\b"
+    ),
     # Purely personal/tabloid
     re.compile(r"\b(wedding|divorce|breakup|affair|dating|pregnancy|baby shower)\b"),
 ]
@@ -158,8 +391,19 @@ BLOCKED_NOISE_PATTERNS = [
 # Terms that CANCEL noise blocking — if present, article is never blocked
 # (e.g. "cricket diplomacy", "actor turned politician", "accident compensation policy")
 NOISE_CANCEL_TERMS = {
-    "policy", "law", "court", "government", "ministry", "bill", "act",
-    "parliament", "scheme", "rights", "compensation", "reform", "tribunal",
+    "policy",
+    "law",
+    "court",
+    "government",
+    "ministry",
+    "bill",
+    "act",
+    "parliament",
+    "scheme",
+    "rights",
+    "compensation",
+    "reform",
+    "tribunal",
 }
 
 
@@ -216,6 +460,7 @@ def _get_topic_embeddings() -> dict:
 
 
 # ── Scoring functions ─────────────────────────────────────────────────────────
+
 
 def _score_keyword(title: str) -> float:
     """
@@ -289,6 +534,7 @@ def _score_noise_penalty(title: str) -> float:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+
 class RelevanceScorerService:
     """
     Scores a CAArticle for UPSC relevance.
@@ -315,12 +561,13 @@ class RelevanceScorerService:
             # Fallback to embedding similarity only when no topic links exist yet.
             # Use article._state.db to respect --database=supabase routing.
             db = article._state.db or "default"
-            has_topic_links = CATopicLink.objects.using(db).filter(
-                ca_chunk__ca_article=article
-            ).exists()
+            has_topic_links = (
+                CATopicLink.objects.using(db)
+                .filter(ca_chunk__ca_article=article)
+                .exists()
+            )
             similarity_score = (
-                3.0 if has_topic_links
-                else _score_topic_similarity(title, content)
+                3.0 if has_topic_links else _score_topic_similarity(title, content)
             )
 
             recency_score = _score_recency(article.published_at)
@@ -355,7 +602,10 @@ class RelevanceScorerService:
     @staticmethod
     def is_relevant(article: CAArticle) -> bool:
         """Convenience wrapper — returns True if score >= THRESHOLD."""
-        return RelevanceScorerService.score_article(article) >= RelevanceScorerService.THRESHOLD
+        return (
+            RelevanceScorerService.score_article(article)
+            >= RelevanceScorerService.THRESHOLD
+        )
 
     @staticmethod
     def filter_relevant(articles) -> list:
@@ -372,7 +622,7 @@ class RelevanceScorerService:
         scored.sort(key=lambda x: x[1], reverse=True)
         logger.info(
             "relevance_filter_complete",
-            total=len(list(articles)) if hasattr(articles, '__len__') else "N/A",
+            total=len(list(articles)) if hasattr(articles, "__len__") else "N/A",
             passed=len(scored),
         )
         return scored

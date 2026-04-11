@@ -27,6 +27,7 @@ from engines.daily_ca.models import (
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def sample_article():
     return DailyCaArticle.objects.create(
@@ -42,9 +43,9 @@ def sample_article():
 
 # ── CaDailyProposal ───────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestCaDailyProposalModel:
-
     def test_default_status_is_pending(self):
         proposal = CaDailyProposal.objects.create(
             date=date(2026, 4, 10),
@@ -127,9 +128,9 @@ class TestCaDailyProposalModel:
 
 # ── DailyCaArticle ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestDailyCaArticleModel:
-
     def test_default_is_published_false(self, sample_article):
         assert sample_article.is_published is False
 
@@ -171,9 +172,9 @@ class TestDailyCaArticleModel:
 
 # ── DailyCaStaticLink ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestDailyCaStaticLinkModel:
-
     def test_static_link_unique_constraint(self, sample_article):
         """Same daily_article + book_content_id → IntegrityError on second create."""
         book_content_id = uuid.uuid4()
