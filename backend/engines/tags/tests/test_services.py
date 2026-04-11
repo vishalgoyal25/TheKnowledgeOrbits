@@ -31,6 +31,7 @@ from engines.tags.services.tag_service import TagService
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_article(title="Test Article", slug_suffix=None):
     """Create a real DailyCaArticle for FK-safe ConceptArticleLink tests."""
     from engines.daily_ca.models import DailyCaArticle
@@ -46,12 +47,14 @@ def _make_article(title="Test Article", slug_suffix=None):
 
 # ── TagService ────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestTagServiceExtract:
-
     def test_extract_with_overrides_no_groq(self):
         """Override list → no GROQ call, tags linked directly."""
-        Tag.objects.create(name="nuclear-energy", slug="nuclear-energy", tag_type="topic")
+        Tag.objects.create(
+            name="nuclear-energy", slug="nuclear-energy", tag_type="topic"
+        )
         article_id = uuid.uuid4()
 
         linked = TagService.extract_and_link_tags(
@@ -79,9 +82,12 @@ class TestTagServiceExtract:
             overrides=overrides,
         )
         assert len(linked) <= 8
-        assert ArticleTag.objects.filter(
-            content_type="daily_ca", object_id=article_id
-        ).count() <= 8
+        assert (
+            ArticleTag.objects.filter(
+                content_type="daily_ca", object_id=article_id
+            ).count()
+            <= 8
+        )
 
     def test_fuzzy_match_reuses_existing_tag(self):
         """Near-duplicate slug → fuzzy match reuses existing, doesn't create new."""
@@ -141,9 +147,9 @@ class TestTagServiceExtract:
 
 # ── ConceptPageResolver ───────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestConceptPageResolver:
-
     def test_process_and_replace_exact_match(self):
         """Existing ConceptPage slug → [[term]] replaced with markdown link."""
         ConceptPage.objects.create(name="Sendai Framework", slug="sendai-framework")
@@ -160,7 +166,9 @@ class TestConceptPageResolver:
         concept = ConceptPage.objects.create(name="CLNDA", slug="clnda")
         article = _make_article()
 
-        ConceptPageResolver.process_and_replace("The [[CLNDA]] is important.", article.id)
+        ConceptPageResolver.process_and_replace(
+            "The [[CLNDA]] is important.", article.id
+        )
 
         assert ConceptArticleLink.objects.filter(
             concept_page=concept,
@@ -171,7 +179,9 @@ class TestConceptPageResolver:
         concept = ConceptPage.objects.create(name="ABDM", slug="abdm", usage_count=3)
         article = _make_article()
 
-        ConceptPageResolver.process_and_replace("[[ABDM]] is a health mission.", article.id)
+        ConceptPageResolver.process_and_replace(
+            "[[ABDM]] is a health mission.", article.id
+        )
         concept.refresh_from_db()
         assert concept.usage_count == 4
 
@@ -222,12 +232,12 @@ class TestConceptPageResolver:
                 "The [[civil-liability-for-nuclear-damage-act]] is a law.",
                 article.id,
             )
-        count = ConceptPage.objects.filter(
-            slug__icontains="civil-liability"
-        ).count()
+        count = ConceptPage.objects.filter(slug__icontains="civil-liability").count()
         assert count == 1
 
     def test_empty_brackets_left_as_is(self):
         article = _make_article()
-        result = ConceptPageResolver.process_and_replace("Text [[]] more text.", article.id)
+        result = ConceptPageResolver.process_and_replace(
+            "Text [[]] more text.", article.id
+        )
         assert "[[]]" in result

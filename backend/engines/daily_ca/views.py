@@ -41,12 +41,14 @@ _TODAY_CACHE_TTL = 300  # 5 minutes
 
 # ── Public Views ──────────────────────────────────────────────────────────────
 
+
 class TodayView(APIView):
     """
     GET /api/v1/daily-ca/today/
     Returns today's published articles, ordered by order_on_date.
     Response is Redis-cached for 5 minutes.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -57,10 +59,9 @@ class TodayView(APIView):
         if cached is not None:
             return Response(cached)
 
-        articles = (
-            DailyCaArticle.objects.filter(published_date=today, is_published=True)
-            .order_by("order_on_date")
-        )
+        articles = DailyCaArticle.objects.filter(
+            published_date=today, is_published=True
+        ).order_by("order_on_date")
         data = DailyCaArticleListSerializer(articles, many=True).data
         payload = {"date": str(today), "count": len(data), "articles": data}
         cache.set(cache_key, payload, timeout=_TODAY_CACHE_TTL)
@@ -74,18 +75,20 @@ class DateView(APIView):
     GET /api/v1/daily-ca/<date>/
     Returns published articles for a specific date (format: YYYY-MM-DD).
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request, date_str):
         try:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
+            )
 
-        articles = (
-            DailyCaArticle.objects.filter(published_date=target_date, is_published=True)
-            .order_by("order_on_date")
-        )
+        articles = DailyCaArticle.objects.filter(
+            published_date=target_date, is_published=True
+        ).order_by("order_on_date")
         data = DailyCaArticleListSerializer(articles, many=True).data
         return Response({"date": date_str, "count": len(data), "articles": data})
 
@@ -95,6 +98,7 @@ class ArticleDetailView(APIView):
     GET /api/v1/daily-ca/article/<slug>/
     Full article detail with tags, concept_links, static_background, related_articles.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
@@ -114,16 +118,14 @@ class ArchiveView(APIView):
     GET /api/v1/daily-ca/archive/
     Last 30 days, date-grouped summary: {date, count, articles (list)}.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request):
         cutoff = timezone.now().date() - timedelta(days=30)
-        articles = (
-            DailyCaArticle.objects.filter(
-                published_date__gte=cutoff, is_published=True
-            )
-            .order_by("-published_date", "order_on_date")
-        )
+        articles = DailyCaArticle.objects.filter(
+            published_date__gte=cutoff, is_published=True
+        ).order_by("-published_date", "order_on_date")
 
         # Group by date
         grouped: dict = {}
@@ -142,18 +144,22 @@ class ArchiveView(APIView):
 
 # ── Admin Views (no auth — solo developer) ────────────────────────────────────
 
+
 class AdminProposalListView(APIView):
     """
     GET /api/v1/admin/daily-ca/proposals/<date>/
     List all proposals for a given date, ordered by relevance_score DESC.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request, date_str):
         try:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
+            )
 
         proposals = (
             CaDailyProposal.objects.filter(date=target_date)
@@ -170,6 +176,7 @@ class AdminApproveView(APIView):
     Approve selected proposal IDs (max 10). Sets status='approved', approved_at=now().
     Body: {"proposal_ids": ["uuid1", "uuid2", ...]}
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -178,18 +185,17 @@ class AdminApproveView(APIView):
             return Response({"error": "proposal_ids is required."}, status=400)
         if len(proposal_ids) > 10:
             return Response(
-                {"error": f"Max 10 proposals per approval batch. Got {len(proposal_ids)}."},
+                {
+                    "error": f"Max 10 proposals per approval batch. Got {len(proposal_ids)}."
+                },
                 status=400,
             )
 
         try:
             now = timezone.now()
-            updated = (
-                CaDailyProposal.objects.filter(
-                    id__in=proposal_ids, status__in=["pending", "failed"]
-                )
-                .update(status="approved", approved_at=now)
-            )
+            updated = CaDailyProposal.objects.filter(
+                id__in=proposal_ids, status__in=["pending", "failed"]
+            ).update(status="approved", approved_at=now)
             logger.info("admin_approve", count=updated, ids=proposal_ids)
             return Response({"approved": updated, "requested": len(proposal_ids)})
 
@@ -205,6 +211,7 @@ class AdminGenerateStatusView(APIView):
     Returns proposal status breakdown for a date (default: today).
     Useful for monitoring progress mid-generation.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -213,7 +220,9 @@ class AdminGenerateStatusView(APIView):
             try:
                 target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
-                return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
+                )
         else:
             target_date = timezone.now().date()
 
@@ -225,13 +234,15 @@ class AdminGenerateStatusView(APIView):
         total = proposals.count()
         generated = status_counts.get("generated", 0)
 
-        return Response({
-            "date": str(target_date),
-            "total": total,
-            "status_breakdown": status_counts,
-            "generation_complete": generated == total and total > 0,
-            "articles_generated": generated,
-        })
+        return Response(
+            {
+                "date": str(target_date),
+                "total": total,
+                "status_breakdown": status_counts,
+                "generation_complete": generated == total and total > 0,
+                "articles_generated": generated,
+            }
+        )
 
 
 class AdminPublishDateView(APIView):
@@ -240,13 +251,16 @@ class AdminPublishDateView(APIView):
     Publishes all generated (is_published=False) articles for a date.
     Sets is_published=True on all matching articles.
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request, date_str):
         try:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
+            )
 
         try:
             updated = DailyCaArticle.objects.filter(
@@ -272,13 +286,16 @@ class AdminArticlesDateView(APIView):
     List ALL articles for a date — including unpublished (for admin review).
     Returns full detail including quality_score and generation_metadata.
     """
+
     permission_classes = [AllowAny]
 
     def get(self, request, date_str):
         try:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
+            )
 
         articles = (
             DailyCaArticle.objects.filter(published_date=target_date)

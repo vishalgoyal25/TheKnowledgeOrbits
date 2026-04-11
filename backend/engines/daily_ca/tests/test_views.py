@@ -35,6 +35,7 @@ from engines.tags.models import ConceptArticleLink, ConceptPage
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def client():
     return Client()
@@ -84,11 +85,10 @@ def sample_proposal():
 
 # ── Public Views ──────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestTodayView:
-
     def test_returns_200(self, client, published_article):
-        from django.utils import timezone
         # Published article has published_date=2026-04-10
         # We need today's date to match — mock timezone.now
         with pytest.MonkeyPatch().context() as m:
@@ -124,7 +124,6 @@ class TestTodayView:
 
 @pytest.mark.django_db
 class TestDateView:
-
     def test_valid_date_returns_200(self, client, published_article):
         resp = client.get("/api/v1/daily-ca/2026-04-10/")
         assert resp.status_code == 200
@@ -133,7 +132,9 @@ class TestDateView:
         resp = client.get("/api/v1/daily-ca/not-a-date/")
         assert resp.status_code == 400
 
-    def test_returns_only_published(self, client, published_article, unpublished_article):
+    def test_returns_only_published(
+        self, client, published_article, unpublished_article
+    ):
         resp = client.get("/api/v1/daily-ca/2026-04-10/")
         slugs = [a["slug"] for a in resp.json()["articles"]]
         assert "2026-04-10-published-test-article" in slugs
@@ -147,7 +148,6 @@ class TestDateView:
 
 @pytest.mark.django_db
 class TestArticleDetailView:
-
     def test_published_article_returns_200(self, client, published_article):
         resp = client.get(f"/api/v1/daily-ca/article/{published_article.slug}/")
         assert resp.status_code == 200
@@ -161,9 +161,7 @@ class TestArticleDetailView:
         assert resp.status_code == 404
 
     def test_concept_links_in_response(self, client, published_article):
-        concept = ConceptPage.objects.create(
-            name="Article 370", slug="article-370"
-        )
+        concept = ConceptPage.objects.create(name="Article 370", slug="article-370")
         ConceptArticleLink.objects.create(
             concept_page=concept,
             daily_ca_article_id=published_article.id,
@@ -183,7 +181,6 @@ class TestArticleDetailView:
 
 @pytest.mark.django_db
 class TestArchiveView:
-
     def test_returns_200(self, client, published_article):
         resp = client.get("/api/v1/daily-ca/archive/")
         assert resp.status_code == 200
@@ -195,9 +192,9 @@ class TestArchiveView:
 
 # ── Admin Views ───────────────────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestAdminProposalListView:
-
     def test_returns_200(self, client, sample_proposal):
         resp = client.get("/api/v1/admin/daily-ca/proposals/2026-04-10/")
         assert resp.status_code == 200
@@ -215,7 +212,6 @@ class TestAdminProposalListView:
 
 @pytest.mark.django_db
 class TestAdminApproveView:
-
     def test_approve_pending_proposals(self, client, sample_proposal):
         resp = client.post(
             "/api/v1/admin/daily-ca/proposals/approve/",
@@ -248,7 +244,6 @@ class TestAdminApproveView:
 
 @pytest.mark.django_db
 class TestAdminGenerateStatusView:
-
     def test_returns_200(self, client, sample_proposal):
         resp = client.get("/api/v1/admin/daily-ca/generate/status/?date=2026-04-10")
         assert resp.status_code == 200
@@ -263,7 +258,6 @@ class TestAdminGenerateStatusView:
 
 @pytest.mark.django_db
 class TestAdminPublishDateView:
-
     def test_publishes_all_generated_articles(self, client, unpublished_article):
         resp = client.post("/api/v1/admin/daily-ca/publish/2026-04-10/")
         assert resp.status_code == 200
@@ -278,8 +272,9 @@ class TestAdminPublishDateView:
 
 @pytest.mark.django_db
 class TestAdminArticlesDateView:
-
-    def test_returns_all_including_unpublished(self, client, published_article, unpublished_article):
+    def test_returns_all_including_unpublished(
+        self, client, published_article, unpublished_article
+    ):
         resp = client.get("/api/v1/admin/daily-ca/articles/2026-04-10/")
         assert resp.status_code == 200
         slugs = [a["slug"] for a in resp.json()["articles"]]

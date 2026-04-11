@@ -17,8 +17,10 @@ from engines.daily_ca.models import CaDailyProposal, DailyCaArticle
 
 # ── Nested: Static Background (BookContent summary) ──────────────────────────
 
+
 class StaticBackgroundSerializer(serializers.Serializer):
     """Minimal read-only serializer for BookContent — nested in article detail."""
+
     id = serializers.UUIDField()
     topic_name = serializers.SerializerMethodField()
     subject_name = serializers.SerializerMethodField()
@@ -41,20 +43,31 @@ class StaticBackgroundSerializer(serializers.Serializer):
 
 # ── DailyCaArticle: List ──────────────────────────────────────────────────────
 
+
 class DailyCaArticleListSerializer(serializers.ModelSerializer):
     """
     Lightweight serializer for article cards/lists.
     Does NOT include body_md — keeps response small.
     """
+
     tags = serializers.SerializerMethodField()
     topic_name = serializers.SerializerMethodField()
 
     class Meta:
         model = DailyCaArticle
         fields = [
-            "id", "slug", "title", "subject_name", "gs_paper",
-            "published_date", "news_context", "hero_image_url",
-            "quality_score", "order_on_date", "topic_name", "tags",
+            "id",
+            "slug",
+            "title",
+            "subject_name",
+            "gs_paper",
+            "published_date",
+            "news_context",
+            "hero_image_url",
+            "quality_score",
+            "order_on_date",
+            "topic_name",
+            "tags",
         ]
 
     def get_tags(self, obj):
@@ -77,11 +90,13 @@ class DailyCaArticleListSerializer(serializers.ModelSerializer):
 
 # ── DailyCaArticle: Detail ────────────────────────────────────────────────────
 
+
 class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
     """
     Full detail serializer — used at /api/v1/daily-ca/article/<slug>/.
     Includes body_md_processed, static_background, concept_links, related_articles.
     """
+
     tags = serializers.SerializerMethodField()
     topic_name = serializers.SerializerMethodField()
     concept_links = serializers.SerializerMethodField()
@@ -91,13 +106,26 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyCaArticle
         fields = [
-            "id", "slug", "title", "subject_name", "gs_paper",
-            "published_date", "news_context", "hero_image_url",
-            "body_md_processed", "sources_used",
-            "quality_score", "order_on_date", "is_published",
-            "generation_metadata", "created_at",
-            "topic_name", "tags", "concept_links",
-            "static_background", "related_articles",
+            "id",
+            "slug",
+            "title",
+            "subject_name",
+            "gs_paper",
+            "published_date",
+            "news_context",
+            "hero_image_url",
+            "body_md_processed",
+            "sources_used",
+            "quality_score",
+            "order_on_date",
+            "is_published",
+            "generation_metadata",
+            "created_at",
+            "topic_name",
+            "tags",
+            "concept_links",
+            "static_background",
+            "related_articles",
         ]
 
     def get_tags(self, obj):
@@ -136,8 +164,9 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
     def get_related_articles(self, obj):
         """5 recent published articles from the same subject (excluding self)."""
         qs = (
-            DailyCaArticle.objects
-            .filter(subject_name=obj.subject_name, is_published=True)
+            DailyCaArticle.objects.filter(
+                subject_name=obj.subject_name, is_published=True
+            )
             .exclude(id=obj.id)
             .order_by("-published_date")[:5]
         )
@@ -146,6 +175,7 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
 
 # ── CaDailyProposal ───────────────────────────────────────────────────────────
 
+
 class DailyCaProposalSerializer(serializers.ModelSerializer):
     topic_name = serializers.SerializerMethodField()
     source_count = serializers.SerializerMethodField()
@@ -153,9 +183,17 @@ class DailyCaProposalSerializer(serializers.ModelSerializer):
     class Meta:
         model = CaDailyProposal
         fields = [
-            "id", "title", "description", "topic_name", "subject_name",
-            "gs_paper", "relevance_score", "source_count", "status",
-            "approved_at", "date",
+            "id",
+            "title",
+            "description",
+            "topic_name",
+            "subject_name",
+            "gs_paper",
+            "relevance_score",
+            "source_count",
+            "status",
+            "approved_at",
+            "date",
         ]
 
     def get_topic_name(self, obj):

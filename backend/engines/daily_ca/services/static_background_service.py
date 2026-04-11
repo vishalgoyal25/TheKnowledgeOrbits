@@ -56,17 +56,35 @@ _FACT_PATTERNS = [
     (re.compile(r"\bArticle\s+\d+[\w()]*\b"), "article"),
     (re.compile(r"\bSection\s+\d+[\w()]*\b"), "section"),
     # Amendment numbers: "42nd Amendment", "101st Constitutional Amendment"
-    (re.compile(r"\b\d{1,3}(?:st|nd|rd|th)\s+(?:Constitutional\s+)?Amendment\b"), "amendment"),
+    (
+        re.compile(r"\b\d{1,3}(?:st|nd|rd|th)\s+(?:Constitutional\s+)?Amendment\b"),
+        "amendment",
+    ),
     # Percentages: "35%", "35 percent"
     (re.compile(r"\b\d+(?:\.\d+)?\s*(?:%|percent)\b"), "statistic"),
     # Monetary figures: "₹500 crore", "Rs 1000 crore", "$10 billion"
-    (re.compile(r"(?:₹|Rs\.?\s*|USD?\s*|INR\s*)\d[\d,]*(?:\.\d+)?\s*(?:crore|lakh|billion|million|thousand)?\b", re.IGNORECASE), "figure"),
+    (
+        re.compile(
+            r"(?:₹|Rs\.?\s*|USD?\s*|INR\s*)\d[\d,]*(?:\.\d+)?\s*(?:crore|lakh|billion|million|thousand)?\b",
+            re.IGNORECASE,
+        ),
+        "figure",
+    ),
     # Key years: standalone 4-digit years 1947–2030
     (re.compile(r"\b(19[4-9]\d|20[0-3]\d)\b"), "year"),
     # "Established in YYYY", "Founded in YYYY", "Enacted in YYYY"
-    (re.compile(r"\b(?:established|founded|enacted|passed|notified|constituted)\s+in\s+\d{4}\b", re.IGNORECASE), "date_fact"),
+    (
+        re.compile(
+            r"\b(?:established|founded|enacted|passed|notified|constituted)\s+in\s+\d{4}\b",
+            re.IGNORECASE,
+        ),
+        "date_fact",
+    ),
     # Target numbers: "target of 500 GW", "capacity of 40,000 MW"
-    (re.compile(r"\b(?:target|capacity|goal)\s+of\s+[\d,]+\s*\w+\b", re.IGNORECASE), "target"),
+    (
+        re.compile(r"\b(?:target|capacity|goal)\s+of\s+[\d,]+\s*\w+\b", re.IGNORECASE),
+        "target",
+    ),
 ]
 
 # Bullet / numbered list lines — capture content after "- " or "N. "

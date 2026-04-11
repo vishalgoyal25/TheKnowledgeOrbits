@@ -129,7 +129,6 @@ Good heading examples (pick style, adapt content):
 FORBIDDEN headings (never use these):
   ✗ "Introduction"  ✗ "Overview"  ✗ "Definition"  ✗ "Background"
   ✗ "What is [topic]"  ✗ "Understanding [topic]"  ✗ Any single-word heading""",
-
         "instruction": """Write the precise definition and conceptual foundation of {subtopic}.
 Begin with the exact NCERT or most authoritative definition (verbatim if available).
 Then establish the formal basis — choose the correct type for this subject:
@@ -145,7 +144,6 @@ Then establish the formal basis — choose the correct type for this subject:
 Also address: what {subtopic} IS NOT — dispel the most common misconception upfront.
 Length: 150–250 words. No padding. Every sentence = one unit of information.""",
     },
-
     {
         "id": "framework",
         "heading_directive": """SECTION 2 OF 5 — GOVERNING STRUCTURE
@@ -169,7 +167,6 @@ Good heading examples (adapt content, not just copy):
 FORBIDDEN headings:
   ✗ "Framework" alone  ✗ "Legal Basis"  ✗ "Structure"  ✗ "Overview"
   ✗ Any heading already used in this article (see forbidden list above)""",
-
         "instruction": """Write the complete formal framework governing {subtopic}.
 For EACH element of the framework: name it precisely, state what it mandates or establishes,
 and explain its practical significance. Do not list names without substance.
@@ -188,7 +185,6 @@ Include all amendments, revisions, or updates with exact years and effect.
 Format: structured prose with precise citations — NOT a bare bullet dump.
 Length: 200–400 words.""",
     },
-
     {
         "id": "core_content",
         "heading_directive": """SECTION 3 OF 5 — THE CORE (most detailed section)
@@ -216,7 +212,6 @@ FORBIDDEN headings:
   ✗ "Core Content"  ✗ "Main Section"  ✗ "Key Aspects"  ✗ "Important Points"
   ✗ "Key Features"  ✗ "Overview"  ✗ "Details"  ✗ "Analysis"
   ✗ Any heading already used in this article""",
-
         "instruction": """Write the core substantive section on {subtopic}.
 This is the MOST DETAILED section — a serious aspirant must find everything they need here.
 
@@ -238,7 +233,6 @@ Use tables only for true comparison (≥2 entities, identical attributes).
 Use prose for analysis, cause-effect, and complexity.
 Length: 350–650 words.""",
     },
-
     {
         "id": "evolution",
         "heading_directive": """SECTION 4 OF 5 — CHANGE OVER TIME
@@ -264,7 +258,6 @@ FORBIDDEN headings:
   ✗ "History" alone  ✗ "Evolution" alone  ✗ "Development" alone
   ✗ "Background"  ✗ "Timeline"  ✗ "Historical Overview"
   ✗ Any heading already used in this article""",
-
         "instruction": """Write a precise, chronologically ordered account of how {subtopic} evolved.
 Include only what is GENUINELY relevant — do not pad with unrelated history.
 
@@ -281,7 +274,6 @@ Format: flowing prose with years clearly embedded in sentences.
 NOT a bare date-list. Years should appear as: "The 44th Amendment (1978) reversed..."
 Length: 200–350 words.""",
     },
-
     {
         "id": "significance",
         "heading_directive": """SECTION 5 OF 5 — CRITICAL ANALYSIS
@@ -308,7 +300,6 @@ FORBIDDEN headings:
   ✗ "Conclusion"  ✗ "Summary"  ✗ "Significance"  ✗ "Importance"
   ✗ "Critical Analysis"  ✗ "Contemporary Relevance"  ✗ "Challenges and Way Forward"
   ✗ "Way Forward"  ✗ Any heading already used in this article""",
-
         "instruction": """Analyze {subtopic} critically. This section must go beyond description.
 
 Cover ALL that apply to this topic:
@@ -344,9 +335,7 @@ Length: 200–300 words.""",
 #   section_renames — how to rename default section headings for this subject
 
 SUBJECT_PROFILES = {
-
     # ── GS PAPER I ────────────────────────────────────────────────────────────
-
     "Indian Heritage & Culture": {
         "tone": (
             "art-historical, civilizational, analytically reverent — treat each art form "
@@ -397,7 +386,6 @@ SUBJECT_PROFILES = {
             "significance": "Legacy, Preservation Challenges & Contemporary Relevance",
         },
     },
-
     "Modern Indian History": {
         "tone": (
             "narrative-historical, chronologically precise, cause-effect driven — "
@@ -448,7 +436,6 @@ SUBJECT_PROFILES = {
             "significance": "Historical Significance, Contested Interpretations & Legacy",
         },
     },
-
     "World History": {
         "tone": (
             "global-comparative, analytically precise, India-anchored — "
@@ -500,7 +487,6 @@ SUBJECT_PROFILES = {
             "significance": "Global Legacy, India's Position & Contemporary Relevance",
         },
     },
-
     "Indian Society": {
         "tone": (
             "sociological, ground-level, empathetic but analytically rigorous — "
@@ -553,7 +539,6 @@ SUBJECT_PROFILES = {
             "significance": "Structural Challenges, Policy Gaps & Path Forward",
         },
     },
-
     "Indian & World Geography": {
         "tone": (
             "spatial, process-focused, resource-oriented — geography explains WHY "
@@ -612,7 +597,6 @@ SUBJECT_PROFILES = {
             "significance": "Human-Economic Significance & Environmental Implications",
         },
     },
-
     "Indian Polity & Constitution": {
         "tone": (
             "authoritative, legislatively precise, analytically critical — "
@@ -671,7 +655,6 @@ SUBJECT_PROFILES = {
             "significance": "Structural Debates, Judicial Interpretation & Reform Proposals",
         },
     },
-
     "Governance & Social Justice": {
         "tone": (
             "policy-implementation focused, reform-critical, evidence-driven — "
@@ -728,7 +711,6 @@ SUBJECT_PROFILES = {
             "significance": "Implementation Gaps, CAG Findings & Reform Agenda",
         },
     },
-
     "International Relations": {
         "tone": (
             "diplomatic-strategic, analytically balanced, India-centric — "
@@ -785,7 +767,6 @@ SUBJECT_PROFILES = {
             "significance": "Strategic Significance, Current Tensions & Future Trajectory",
         },
     },
-
     "Indian Economy": {
         "tone": (
             "analytical, data-aware, policy-critical — treat economic concepts as "
@@ -842,9 +823,7 @@ SUBJECT_PROFILES = {
             "significance": "Structural Challenges, Reform Gaps & Future Outlook",
         },
     },
-
     # ── GS PAPER III ──────────────────────────────────────────────────────────
-
     "Science & Technology": {
         "tone": (
             "explanatory, current-affairs-anchored, application-focused — explain the "
@@ -902,7 +881,6 @@ SUBJECT_PROFILES = {
             "significance": "Strategic Implications, Regulatory Challenges & Future Directions",
         },
     },
-
     "Environment & Ecology": {
         "tone": (
             "scientifically precise, conservation-focused, development-critical — "
@@ -964,7 +942,6 @@ SUBJECT_PROFILES = {
             "significance": "Development vs Conservation Tension & India's Climate Commitments",
         },
     },
-
     "Internal Security": {
         "tone": (
             "factual, neutral, legally precise, threat-analytical — "
@@ -1024,7 +1001,6 @@ SUBJECT_PROFILES = {
             "significance": "Structural Challenges, Coordination Gaps & Reform Imperatives",
         },
     },
-
     "Disaster Management": {
         "tone": (
             "procedural, preparedness-focused, institutionally precise — "
@@ -1086,9 +1062,7 @@ SUBJECT_PROFILES = {
             "significance": "Vulnerability Profile, Climate Risk Nexus & Systemic Gaps",
         },
     },
-
     # ── GS PAPER IV ───────────────────────────────────────────────────────────
-
     "Ethics, Integrity & Aptitude": {
         "tone": (
             "reflective, philosophical, normatively engaged, case-study grounded — "
@@ -1266,7 +1240,9 @@ def _generate_sections(
                 used_headings.append(heading_match.group(1).strip())
             else:
                 # LLM skipped the ### — prepend a safe fallback and track it
-                fallback_heading = f"{subtopic} — {section_id.replace('_', ' ').title()}"
+                fallback_heading = (
+                    f"{subtopic} — {section_id.replace('_', ' ').title()}"
+                )
                 content = f"### {fallback_heading}\n\n{content}"
                 used_headings.append(fallback_heading)
                 logger.warning(
@@ -1359,11 +1335,17 @@ HEADINGS ALREADY USED — your new heading MUST NOT repeat or closely echo any o
         if profile.get("key_sources"):
             lines.append(f"  Authoritative sources to cite: {profile['key_sources']}")
         if profile.get("critical_vocab"):
-            lines.append(f"  Domain vocabulary to use:      {profile['critical_vocab']}")
+            lines.append(
+                f"  Domain vocabulary to use:      {profile['critical_vocab']}"
+            )
         if profile.get("comparison_pairs"):
-            lines.append(f"  Comparison pairs (use where relevant): {profile['comparison_pairs']}")
+            lines.append(
+                f"  Comparison pairs (use where relevant): {profile['comparison_pairs']}"
+            )
         if profile.get("data_types"):
-            lines.append(f"  Data to weave in when available:       {profile['data_types']}")
+            lines.append(
+                f"  Data to weave in when available:       {profile['data_types']}"
+            )
         subject_persona_block = "\n".join(lines) + "\n"
 
     return f"""You are a senior author writing "{subtopic}" — one chapter in a

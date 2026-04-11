@@ -107,18 +107,20 @@ class Command(BaseCommand):
         )
 
         # ── Count rows to be deleted ──────────────────────────────────────────
-        old_articles = CAArticle.objects.using(db_alias).filter(
-            published_at__lt=cutoff
-        )
+        old_articles = CAArticle.objects.using(db_alias).filter(published_at__lt=cutoff)
         old_article_ids = list(old_articles.values_list("id", flat=True))
 
-        count_topic_links = CATopicLink.objects.using(db_alias).filter(
-            ca_chunk__ca_article_id__in=old_article_ids
-        ).count()
+        count_topic_links = (
+            CATopicLink.objects.using(db_alias)
+            .filter(ca_chunk__ca_article_id__in=old_article_ids)
+            .count()
+        )
 
-        count_chunks = CAChunk.objects.using(db_alias).filter(
-            ca_article_id__in=old_article_ids
-        ).count()
+        count_chunks = (
+            CAChunk.objects.using(db_alias)
+            .filter(ca_article_id__in=old_article_ids)
+            .count()
+        )
 
         count_articles = len(old_article_ids)
 
@@ -131,17 +133,17 @@ class Command(BaseCommand):
         est_mb = est_bytes / (1024 * 1024)
 
         # ── Print counts ──────────────────────────────────────────────────────
-        self.stdout.write(f"\n  Rows to be deleted:\n")
+        self.stdout.write("\n  Rows to be deleted:\n")
         self.stdout.write(f"    ca_topic_link  : {count_topic_links:,}")
         self.stdout.write(f"    ca_chunk       : {count_chunks:,}")
         self.stdout.write(f"    ca_article     : {count_articles:,}")
-        self.stdout.write(
-            f"\n  Estimated space to reclaim: ~{est_mb:.1f} MB\n"
-        )
+        self.stdout.write(f"\n  Estimated space to reclaim: ~{est_mb:.1f} MB\n")
 
         # ── Permanent assets — never touched ──────────────────────────────────
         self.stdout.write("  Permanent assets (NEVER deleted):")
-        self.stdout.write("    daily_ca_article, daily_ca_proposal, daily_ca_static_link")
+        self.stdout.write(
+            "    daily_ca_article, daily_ca_proposal, daily_ca_static_link"
+        )
         self.stdout.write("    tag, article_tag, concept_page, concept_article_link\n")
 
         if count_articles == 0:
@@ -167,7 +169,9 @@ class Command(BaseCommand):
 
         # ── Live deletion (FK-safe order) ─────────────────────────────────────
         self.stdout.write(
-            self.style.WARNING(f"  Deleting {count_articles:,} articles and related rows...")
+            self.style.WARNING(
+                f"  Deleting {count_articles:,} articles and related rows..."
+            )
         )
 
         try:
@@ -216,9 +220,7 @@ class Command(BaseCommand):
         except Exception as exc:
             sentry_sdk.capture_exception(exc)
             logger.error("cleanup_raw_ca_failed", error=str(exc))
-            self.stderr.write(
-                self.style.ERROR(f"\n  Deletion failed: {exc}")
-            )
+            self.stderr.write(self.style.ERROR(f"\n  Deletion failed: {exc}"))
             return
 
         self.stdout.write(self.style.MIGRATE_HEADING(f"\n{'━' * 60}\n"))

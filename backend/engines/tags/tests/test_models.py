@@ -29,11 +29,18 @@ from engines.tags.models import (
 
 @pytest.mark.django_db
 class TestTagModel:
-
     def test_create_tag_all_types(self):
         types = [
-            "topic", "subtopic", "scheme", "person", "place",
-            "organisation", "concept", "law", "event", "other",
+            "topic",
+            "subtopic",
+            "scheme",
+            "person",
+            "place",
+            "organisation",
+            "concept",
+            "law",
+            "event",
+            "other",
         ]
         for i, tag_type in enumerate(types):
             tag = Tag.objects.create(
@@ -69,7 +76,6 @@ class TestTagModel:
 
 @pytest.mark.django_db
 class TestConceptPageModel:
-
     def test_concept_page_default_not_ready(self):
         concept = ConceptPage.objects.create(
             name="Viksit Bharat 2047",
@@ -86,7 +92,9 @@ class TestConceptPageModel:
         assert concept.usage_count == 0
 
     def test_concept_page_str(self):
-        concept = ConceptPage.objects.create(name="Sendai Framework", slug="sendai-framework")
+        concept = ConceptPage.objects.create(
+            name="Sendai Framework", slug="sendai-framework"
+        )
         assert "Sendai Framework" in str(concept)
         assert "stub" in str(concept)
 
@@ -99,7 +107,6 @@ class TestConceptPageModel:
 
 @pytest.mark.django_db
 class TestConceptArticleLinkModel:
-
     def test_concept_article_link_unique_constraint(self):
         concept = ConceptPage.objects.create(name="Test Concept", slug="test-concept")
         article_id = uuid.uuid4()
@@ -116,7 +123,6 @@ class TestConceptArticleLinkModel:
 
 @pytest.mark.django_db
 class TestArticleTagModel:
-
     def test_article_tag_unique_constraint(self):
         tag = Tag.objects.create(name="pm-kisan", slug="pm-kisan")
         obj_id = uuid.uuid4()

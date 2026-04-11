@@ -35,8 +35,6 @@ from engines.book_content.services.llm_service import INTER_CALL_SLEEP, llm_call
 from engines.daily_ca.models import CaDailyProposal, DailyCaArticle, DailyCaStaticLink
 from engines.daily_ca.services.prompt_builder import (
     build_ca_prompt,
-    _format_static_facts,
-    _format_wiki_enrichment,
 )
 from engines.daily_ca.services.static_background_service import StaticBackgroundService
 from engines.daily_ca.services.wiki_enrichment_service import WikiEnrichmentService
@@ -49,9 +47,18 @@ logger = structlog.get_logger(__name__)
 _QUALITY_MIN_WORDS = 450
 _QUALITY_MAX_WORDS = 800
 _FORBIDDEN_PHRASES = [
-    "upsc", "gs1", "gs2", "gs3", "gs4", "mains value", "prelims",
-    "important for exam", "this is important for", "why in news",
-    "it goes without saying", "it is pertinent to note",
+    "upsc",
+    "gs1",
+    "gs2",
+    "gs3",
+    "gs4",
+    "mains value",
+    "prelims",
+    "important for exam",
+    "this is important for",
+    "why in news",
+    "it goes without saying",
+    "it is pertinent to note",
 ]
 
 # ── Response parsing patterns ─────────────────────────────────────────────────
@@ -62,6 +69,7 @@ _TITLE_LINE = re.compile(r"^#+\s+(.+)$", re.MULTILINE)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _fetch_ca_chunks_text(ca_chunk_ids: list, db_alias: str = "default") -> str:
     """
@@ -111,14 +119,14 @@ def _parse_response(raw: str) -> tuple[str, str, list[str], str]:
     if tags_match:
         raw_tags = tags_match.group(1)
         tags_raw = [t.strip().lower() for t in raw_tags.split(",") if t.strip()]
-        text = text[: tags_match.start()].rstrip() + text[tags_match.end():]
+        text = text[: tags_match.start()].rstrip() + text[tags_match.end() :]
 
     # Extract and remove SOURCE: line
     source_attr = ""
     source_match = _SOURCE_LINE.search(text)
     if source_match:
         source_attr = source_match.group(1).strip()
-        text = text[: source_match.start()].rstrip() + text[source_match.end():]
+        text = text[: source_match.start()].rstrip() + text[source_match.end() :]
 
     text = text.strip()
 
@@ -128,7 +136,7 @@ def _parse_response(raw: str) -> tuple[str, str, list[str], str]:
     if title_match:
         title = title_match.group(1).strip()
         # Remove the title heading line from body to avoid duplication
-        text = text[: title_match.start()].rstrip() + "\n" + text[title_match.end():]
+        text = text[: title_match.start()].rstrip() + "\n" + text[title_match.end() :]
         text = text.strip()
     else:
         lines = [l for l in text.splitlines() if l.strip()]
@@ -202,6 +210,7 @@ def _score_quality(body_md: str) -> float:
 
 # ── Main Service ──────────────────────────────────────────────────────────────
 
+
 class DailyCaGeneratorService:
     """
     Orchestrates the full Daily CA article generation pipeline.
@@ -260,7 +269,7 @@ class DailyCaGeneratorService:
                     at_cycle=i,
                     remaining=len(proposals) - i + 1,
                 )
-                for p in proposals[i - 1:]:
+                for p in proposals[i - 1 :]:
                     p.status = "queued_next_run"
                     p.save(using=db_alias, update_fields=["status"])
                 results["capped"] = len(proposals) - i + 1
@@ -329,7 +338,9 @@ class DailyCaGeneratorService:
         return results
 
     @classmethod
-    def _run_single_cycle(cls, proposal: CaDailyProposal, db_alias: str = "default") -> tuple:
+    def _run_single_cycle(
+        cls, proposal: CaDailyProposal, db_alias: str = "default"
+    ) -> tuple:
         """
         One complete, atomic CA article generation cycle for a single proposal.
         Generates ONLY the CA article — does NOT block on or trigger static generation.
@@ -463,7 +474,9 @@ class DailyCaGeneratorService:
             # ── STEP 10: Update proposal ───────────────────────────────────────
             proposal.status = "generated"
             proposal.generated_article = article  # FK — assign model instance directly
-            proposal.save(using=db_alias, update_fields=["status", "generated_article_id"])
+            proposal.save(
+                using=db_alias, update_fields=["status", "generated_article_id"]
+            )
 
             logger.info(
                 "single_cycle_done",

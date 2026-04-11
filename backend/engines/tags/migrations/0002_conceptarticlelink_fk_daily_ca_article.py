@@ -13,7 +13,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("tags", "0001_initial"),
         ("daily_ca", "0002_daily_ca_article_static_link"),

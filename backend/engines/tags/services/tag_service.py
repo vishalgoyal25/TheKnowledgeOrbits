@@ -31,7 +31,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils.text import slugify
 
-from engines.book_content.services.llm_service import INTER_CALL_SLEEP, llm_call
+from engines.book_content.services.llm_service import llm_call
 from engines.tags.models import (
     ARTICLE_CONTENT_TYPE_CHOICES,
     TAG_TYPE_CHOICES,
@@ -156,7 +156,9 @@ class TagService:
             final = unique_resolved[:MAX_TAGS_PER_ARTICLE]
 
             # Step 5: Write ArticleTag rows + increment usage_count
-            linked = cls._create_article_tags(final, content_type, object_id, db_alias=db_alias)
+            linked = cls._create_article_tags(
+                final, content_type, object_id, db_alias=db_alias
+            )
 
             logger.info(
                 "tag_service_linked",
@@ -206,8 +208,7 @@ class TagService:
                 qs = qs.filter(content_type=content_type)
 
             return list(
-                qs.order_by("-created_at")
-                .values_list("object_id", flat=True)[:limit]
+                qs.order_by("-created_at").values_list("object_id", flat=True)[:limit]
             )
 
         except Exception as exc:
@@ -238,17 +239,17 @@ class TagService:
             for i, raw in enumerate(overrides[:MAX_TAGS_PER_ARTICLE]):
                 name = cls._normalize_tag_name(raw)
                 if name:
-                    candidates.append({
-                        "name": name,
-                        "type": "topic",  # safe default; will be overridden if matched
-                        "relevance": round(1.0 - (i * 0.05), 2),
-                    })
+                    candidates.append(
+                        {
+                            "name": name,
+                            "type": "topic",  # safe default; will be overridden if matched
+                            "relevance": round(1.0 - (i * 0.05), 2),
+                        }
+                    )
             return candidates
 
         # GROQ extraction call
-        prompt = _EXTRACT_TAGS_PROMPT.format(
-            article_text=article_text[:3000]
-        )
+        prompt = _EXTRACT_TAGS_PROMPT.format(article_text=article_text[:3000])
         raw_response = llm_call(prompt, mode="standard")
 
         if not raw_response:
@@ -282,11 +283,13 @@ class TagService:
                     tag_type = "topic"
                 relevance = float(item.get("relevance", 1.0))
                 relevance = max(0.0, min(1.0, relevance))
-                candidates.append({
-                    "name": name,
-                    "type": tag_type,
-                    "relevance": relevance,
-                })
+                candidates.append(
+                    {
+                        "name": name,
+                        "type": tag_type,
+                        "relevance": relevance,
+                    }
+                )
             return candidates
 
         except (json.JSONDecodeError, ValueError) as exc:
@@ -298,7 +301,9 @@ class TagService:
             return []
 
     @classmethod
-    def _resolve_or_create_tag(cls, candidate: dict, db_alias: str = "default") -> Optional[Tag]:
+    def _resolve_or_create_tag(
+        cls, candidate: dict, db_alias: str = "default"
+    ) -> Optional[Tag]:
         """
         Find an existing Tag via exact slug or fuzzy match.
         If no match found: create a new Tag with a GROQ-generated description.
@@ -316,7 +321,9 @@ class TagService:
 
             # 2. Fuzzy slug match (difflib against all active slugs)
             all_slugs = list(
-                Tag.objects.using(db_alias).filter(is_active=True).values_list("slug", flat=True)
+                Tag.objects.using(db_alias)
+                .filter(is_active=True)
+                .values_list("slug", flat=True)
             )
             matches = difflib.get_close_matches(
                 slug, all_slugs, n=1, cutoff=FUZZY_THRESHOLD
@@ -344,7 +351,9 @@ class TagService:
             return None
 
     @classmethod
-    def _create_new_tag(cls, name: str, slug: str, tag_type: str, db_alias: str = "default") -> Optional[Tag]:
+    def _create_new_tag(
+        cls, name: str, slug: str, tag_type: str, db_alias: str = "default"
+    ) -> Optional[Tag]:
         """
         Create a brand-new Tag row with a GROQ-generated description.
         Rate-limited by INTER_CALL_SLEEP from llm_service.

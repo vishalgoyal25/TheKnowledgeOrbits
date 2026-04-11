@@ -44,8 +44,8 @@ from engines.daily_ca.services.static_background_service import StaticBackground
 
 # ── StaticBackgroundService ───────────────────────────────────────────────────
 
-class TestStaticBackgroundServiceCases:
 
+class TestStaticBackgroundServiceCases:
     def test_case_a_published_static_returns_dict(self):
         """Case A: published BookContent exists → dict with key_facts."""
         mock_response = MagicMock()
@@ -113,7 +113,9 @@ class TestStaticBackgroundServiceCases:
             "engines.daily_ca.services.static_background_service.requests.post",
             return_value=mock_response,
         ) as mock_post:
-            with patch("engines.daily_ca.services.static_background_service.time.sleep"):
+            with patch(
+                "engines.daily_ca.services.static_background_service.time.sleep"
+            ):
                 StaticBackgroundService.trigger_pending_static_generation(topic_ids)
 
         assert mock_post.call_count == 3
@@ -128,7 +130,9 @@ class TestStaticBackgroundServiceCases:
             "engines.daily_ca.services.static_background_service.requests.post",
             return_value=mock_response,
         ) as mock_post:
-            with patch("engines.daily_ca.services.static_background_service.time.sleep"):
+            with patch(
+                "engines.daily_ca.services.static_background_service.time.sleep"
+            ):
                 StaticBackgroundService.trigger_pending_static_generation(topic_ids)
 
         assert mock_post.call_count == 1
@@ -136,10 +140,12 @@ class TestStaticBackgroundServiceCases:
 
 # ── WikiEnrichmentService ─────────────────────────────────────────────────────
 
-class TestWikiEnrichmentService:
 
+class TestWikiEnrichmentService:
     def test_returns_empty_dict_on_failure(self):
-        from engines.daily_ca.services.wiki_enrichment_service import WikiEnrichmentService
+        from engines.daily_ca.services.wiki_enrichment_service import (
+            WikiEnrichmentService,
+        )
 
         with patch(
             "engines.daily_ca.services.wiki_enrichment_service.fetch_full_page",
@@ -150,7 +156,9 @@ class TestWikiEnrichmentService:
         assert result == {}
 
     def test_never_raises(self):
-        from engines.daily_ca.services.wiki_enrichment_service import WikiEnrichmentService
+        from engines.daily_ca.services.wiki_enrichment_service import (
+            WikiEnrichmentService,
+        )
 
         with patch(
             "engines.daily_ca.services.wiki_enrichment_service.fetch_full_page",
@@ -163,8 +171,8 @@ class TestWikiEnrichmentService:
 
 # ── build_ca_prompt ───────────────────────────────────────────────────────────
 
-class TestBuildCaPrompt:
 
+class TestBuildCaPrompt:
     def test_contains_ca_text(self):
         prompt = build_ca_prompt(
             ca_chunks_text="The RBI raised rates by 25 bps.",
@@ -190,7 +198,10 @@ class TestBuildCaPrompt:
         """key_facts must be a list — _format_static_facts iterates over it."""
         prompt = build_ca_prompt(
             ca_chunks_text="CA text.",
-            static_key_facts={"key_facts": ["Fact 1.", "Fact 2."], "title": "Climate Change"},
+            static_key_facts={
+                "key_facts": ["Fact 1.", "Fact 2."],
+                "title": "Climate Change",
+            },
             wiki_enrichment=None,
             subject_name="Environment",
             topic_name="Climate Change",
@@ -222,9 +233,9 @@ class TestBuildCaPrompt:
 
 # ── DailyCaGeneratorService ───────────────────────────────────────────────────
 
+
 @pytest.mark.django_db
 class TestDailyCaGeneratorService:
-
     def _make_proposal(self, title="Test Article Title"):
         return CaDailyProposal.objects.create(
             date=date(2026, 4, 10),
@@ -235,7 +246,9 @@ class TestDailyCaGeneratorService:
             status="approved",
         )
 
-    def _mock_llm(self, mock_target="engines.daily_ca.services.generator_service.llm_call"):
+    def _mock_llm(
+        self, mock_target="engines.daily_ca.services.generator_service.llm_call"
+    ):
         return patch(
             mock_target,
             return_value=(
@@ -261,9 +274,14 @@ class TestDailyCaGeneratorService:
                 return_value=None,
             ):
                 with patch("engines.daily_ca.services.generator_service.time.sleep"):
-                    with patch("engines.tags.services.concept_resolver.llm_call", return_value="Brief desc."):
+                    with patch(
+                        "engines.tags.services.concept_resolver.llm_call",
+                        return_value="Brief desc.",
+                    ):
                         with patch("engines.tags.services.concept_resolver.time.sleep"):
-                            article, calls, needs_static = DailyCaGeneratorService._run_single_cycle(proposal)
+                            article, calls, needs_static = (
+                                DailyCaGeneratorService._run_single_cycle(proposal)
+                            )
 
         assert needs_static is True
 
@@ -278,12 +296,20 @@ class TestDailyCaGeneratorService:
         with self._mock_llm():
             with patch(
                 "engines.daily_ca.services.generator_service.StaticBackgroundService.get_background_facts",
-                return_value={"key_facts": ["Some facts."], "title": "Test Topic"},  # no book_content_id
+                return_value={
+                    "key_facts": ["Some facts."],
+                    "title": "Test Topic",
+                },  # no book_content_id
             ):
                 with patch("engines.daily_ca.services.generator_service.time.sleep"):
-                    with patch("engines.tags.services.concept_resolver.llm_call", return_value="Brief."):
+                    with patch(
+                        "engines.tags.services.concept_resolver.llm_call",
+                        return_value="Brief.",
+                    ):
                         with patch("engines.tags.services.concept_resolver.time.sleep"):
-                            article, calls, needs_static = DailyCaGeneratorService._run_single_cycle(proposal)
+                            article, calls, needs_static = (
+                                DailyCaGeneratorService._run_single_cycle(proposal)
+                            )
 
         assert needs_static is False
 
@@ -303,9 +329,14 @@ class TestDailyCaGeneratorService:
                 return_value=None,
             ):
                 with patch("engines.daily_ca.services.generator_service.time.sleep"):
-                    with patch("engines.tags.services.concept_resolver.llm_call", return_value="Brief."):
+                    with patch(
+                        "engines.tags.services.concept_resolver.llm_call",
+                        return_value="Brief.",
+                    ):
                         with patch("engines.tags.services.concept_resolver.time.sleep"):
-                            article, calls, needs_static = DailyCaGeneratorService._run_single_cycle(proposal)
+                            article, calls, needs_static = (
+                                DailyCaGeneratorService._run_single_cycle(proposal)
+                            )
 
         assert len(article.body_md.split()) <= DailyCaGeneratorService.MAX_WORDS
 
@@ -321,7 +352,10 @@ class TestDailyCaGeneratorService:
                 return_value=None,
             ):
                 with patch("engines.daily_ca.services.generator_service.time.sleep"):
-                    with patch("engines.tags.services.concept_resolver.llm_call", return_value="Brief."):
+                    with patch(
+                        "engines.tags.services.concept_resolver.llm_call",
+                        return_value="Brief.",
+                    ):
                         with patch("engines.tags.services.concept_resolver.time.sleep"):
                             DailyCaGeneratorService._run_single_cycle(proposal)
 
@@ -343,7 +377,9 @@ class TestDailyCaGeneratorService:
             ):
                 with patch("engines.daily_ca.services.generator_service.time.sleep"):
                     with patch("engines.tags.services.concept_resolver.time.sleep"):
-                        article, _, _ = DailyCaGeneratorService._run_single_cycle(proposal)
+                        article, _, _ = DailyCaGeneratorService._run_single_cycle(
+                            proposal
+                        )
 
         assert "[[Article 370]]" in article.body_md
         assert "[Article 370](/concepts/article-370)" in article.body_md_processed
@@ -370,7 +406,9 @@ class TestDailyCaGeneratorService:
             )
             return article, 1, False
 
-        with patch.object(DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle):
+        with patch.object(
+            DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle
+        ):
             results = DailyCaGeneratorService.run_generation_cycle(
                 proposals=[p1, p2], groq_calls_used=0
             )
@@ -395,7 +433,9 @@ class TestDailyCaGeneratorService:
             )
             return article, 15, False  # 15 calls per cycle → cap after first
 
-        with patch.object(DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle):
+        with patch.object(
+            DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle
+        ):
             results = DailyCaGeneratorService.run_generation_cycle(
                 proposals=proposals,
                 groq_calls_used=0,
@@ -426,7 +466,9 @@ class TestDailyCaGeneratorService:
             )
             return article, 1, True  # needs_static=True
 
-        with patch.object(DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle):
+        with patch.object(
+            DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle
+        ):
             with patch(
                 "engines.daily_ca.services.generator_service.StaticBackgroundService.trigger_pending_static_generation",
                 return_value=1,

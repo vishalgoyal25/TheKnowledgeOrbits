@@ -20,6 +20,10 @@ from engines.daily_ca.views import ArchiveView, ArticleDetailView, DateView, Tod
 urlpatterns = [
     path("today/", TodayView.as_view(), name="daily-ca-today"),
     path("archive/", ArchiveView.as_view(), name="daily-ca-archive"),
-    path("article/<slug:slug>/", ArticleDetailView.as_view(), name="daily-ca-article-detail"),
+    path(
+        "article/<slug:slug>/",
+        ArticleDetailView.as_view(),
+        name="daily-ca-article-detail",
+    ),
     path("<str:date_str>/", DateView.as_view(), name="daily-ca-date"),
 ]

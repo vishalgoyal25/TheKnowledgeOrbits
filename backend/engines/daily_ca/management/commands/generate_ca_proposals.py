@@ -30,7 +30,6 @@ Session cap: if 30 GROQ calls consumed before all topics are processed,
 
 import json
 import re
-import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
@@ -39,20 +38,19 @@ import structlog
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
-from django.utils.text import slugify
 
-from engines.book_content.services.llm_service import INTER_CALL_SLEEP, llm_call
-from engines.current_affairs.models import CAArticle, CAChunk, CATopicLink
+from engines.book_content.services.llm_service import llm_call
+from engines.current_affairs.models import CAArticle, CAChunk
 from engines.current_affairs.services.relevance_scorer import RelevanceScorerService
 from engines.daily_ca.models import CaDailyProposal
 
 logger = structlog.get_logger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-MAX_TOPICS_PER_RUN = 30        # Hard cap on proposals generated per run
-MAX_GROQ_CALLS = 30            # Session safety cap
-TOP_CHUNKS_PER_TOPIC = 3       # How many source chunks to collect per proposal
-RELEVANCE_THRESHOLD = 5.0      # Minimum score from RelevanceScorerService
+MAX_TOPICS_PER_RUN = 30  # Hard cap on proposals generated per run
+MAX_GROQ_CALLS = 30  # Session safety cap
+TOP_CHUNKS_PER_TOPIC = 3  # How many source chunks to collect per proposal
+RELEVANCE_THRESHOLD = 5.0  # Minimum score from RelevanceScorerService
 
 # ── GS Paper mapping by UPSC subject name ────────────────────────────────────
 # Used as fallback when LLM doesn't return a valid gs_paper value.
@@ -158,7 +156,9 @@ class Command(BaseCommand):
         )
 
         if not relevant:
-            self.stdout.write(self.style.WARNING("No relevant articles found. Exiting."))
+            self.stdout.write(
+                self.style.WARNING("No relevant articles found. Exiting.")
+            )
             return
 
         # Step 3: Group by knowledge topic
@@ -216,9 +216,7 @@ class Command(BaseCommand):
                 if result == "created":
                     created += 1
                     self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  ✓ [{created}] {topic_obj.name[:60]}"
-                        )
+                        self.style.SUCCESS(f"  ✓ [{created}] {topic_obj.name[:60]}")
                     )
                 elif result == "skipped":
                     skipped += 1
@@ -227,9 +225,7 @@ class Command(BaseCommand):
                     )
                 elif result == "dry_run":
                     created += 1
-                    self.stdout.write(
-                        f"  [dry] {topic_obj.name[:60]}"
-                    )
+                    self.stdout.write(f"  [dry] {topic_obj.name[:60]}")
 
             except Exception as exc:
                 failed += 1
@@ -267,10 +263,12 @@ class Command(BaseCommand):
         """Fetch CAArticles published in the last 24 hours with processing_status='completed'."""
         cutoff = timezone.now() - timedelta(hours=24)
         return list(
-            CAArticle.objects.using(db_alias).filter(
+            CAArticle.objects.using(db_alias)
+            .filter(
                 published_at__gte=cutoff,
                 processing_status="completed",
-            ).select_related("source")
+            )
+            .select_related("source")
         )
 
     def _score_and_filter(
@@ -305,14 +303,16 @@ class Command(BaseCommand):
         }
         Deduplication: 3 news articles on same topic = 1 group, not 3 proposals.
         """
-        topic_groups: dict = defaultdict(lambda: {
-            "combined_score": 0.0,
-            "chunks": [],
-            "chunk_relevances": [],
-            "article_scores": {},
-            "source_urls": [],
-            "seen_urls": set(),
-        })
+        topic_groups: dict = defaultdict(
+            lambda: {
+                "combined_score": 0.0,
+                "chunks": [],
+                "chunk_relevances": [],
+                "article_scores": {},
+                "source_urls": [],
+                "seen_urls": set(),
+            }
+        )
 
         article_ids = [a.id for a, _ in relevant]
         article_score_map = {a.id: s for a, s in relevant}
@@ -347,11 +347,15 @@ class Command(BaseCommand):
                 url = article.url
                 if url not in g["seen_urls"]:
                     g["seen_urls"].add(url)
-                    g["source_urls"].append({
-                        "source_name": article.source.name if article.source else "Unknown",
-                        "url": url,
-                        "title": article.title,
-                    })
+                    g["source_urls"].append(
+                        {
+                            "source_name": article.source.name
+                            if article.source
+                            else "Unknown",
+                            "url": url,
+                            "title": article.title,
+                        }
+                    )
 
         # Post-process: sort chunks by relevance, keep top 3
         result = {}
@@ -392,8 +396,7 @@ class Command(BaseCommand):
         """
         # Idempotency check
         exists = (
-            CaDailyProposal.objects
-            .using(db_alias)
+            CaDailyProposal.objects.using(db_alias)
             .filter(date=target_date, topic=topic)
             .exists()
         )
@@ -403,8 +406,7 @@ class Command(BaseCommand):
         # Build news text from top chunks
         chunks: list[CAChunk] = group_data["chunks"]
         news_text = "\n\n---\n\n".join(
-            f"[{i+1}] {chunk.chunk_text[:600]}"
-            for i, chunk in enumerate(chunks)
+            f"[{i+1}] {chunk.chunk_text[:600]}" for i, chunk in enumerate(chunks)
         )
 
         # Derive subject name from topic → module → subject
