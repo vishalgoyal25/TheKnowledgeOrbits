@@ -519,7 +519,7 @@ class TestQualityEngineService(unittest.TestCase):
             parent_topic="Indian Constitution",
             ncert_section="",
             wiki_content="",
-            subject="Indian Constitution & Polity",
+            subject="Indian Polity & Constitution",
         )
 
         # At least one prompt should contain the subject persona text

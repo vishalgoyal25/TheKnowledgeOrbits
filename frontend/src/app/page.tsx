@@ -8,6 +8,7 @@
 "use client";
 
 import ArticleCard from "@/components/articles/article-card";
+import { DailyCaTeaserWidget } from "@/components/daily-ca/daily-ca-teaser";
 import { useSidebar } from "@/components/providers/sidebar-provider";
 import {
   Accordion,
@@ -39,6 +40,12 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useState, useEffect } from "react";
+import {
+  getTodayArticles,
+  getAllArticleDetails,
+  DailyCaArticleDetail,
+} from "@/lib/api/daily-ca";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KNOWLEDGE ORBITS GRAPH TEASER
@@ -221,6 +228,143 @@ const GRAPH_EDGES = [
   // Cross-subject — Fiscal Policy impacts DPSP implementation
   { from: "fiscal", to: "dpsp", cross: true, label: "Welfare\nFunding" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HERO LIVE CA PANEL — fetches today's articles for the hero right column
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GS_BADGE_COLORS: Record<string, string> = {
+  GS1: "bg-purple-100 text-purple-700",
+  GS2: "bg-blue-100 text-blue-700",
+  GS3: "bg-green-100 text-green-700",
+  GS4: "bg-orange-100 text-orange-700",
+  CSAT: "bg-gray-100 text-gray-600",
+};
+
+function HeroLiveCA() {
+  const [articles, setArticles] = useState<DailyCaArticleDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const list = await getTodayArticles();
+        if (list.articles.length > 0) {
+          const slugs = list.articles.slice(0, 5).map((a) => a.slug);
+          const details = await getAllArticleDetails(slugs);
+          details.sort((a, b) => a.order_on_date - b.order_on_date);
+          setArticles(details.slice(0, 5));
+        }
+      } catch {
+        // silent — hero panel is non-critical
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const today = new Date().toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+      {/* Header bar */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-500 px-5 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Newspaper className="h-4 w-4 text-white" />
+          <span className="text-white text-sm font-bold">
+            Today&apos;s Current Affairs
+          </span>
+          <span className="text-emerald-100 text-xs hidden sm:inline">
+            {today}
+          </span>
+        </div>
+        <Link
+          href="/daily-ca"
+          className="text-emerald-100 text-xs hover:text-white font-medium flex items-center gap-1 transition-colors"
+        >
+          View All <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+
+      {/* Article list */}
+      <div className="divide-y divide-slate-100">
+        {loading ? (
+          [1, 2, 3, 4].map((i) => (
+            <div key={i} className="px-5 py-3 flex gap-3 animate-pulse">
+              <div className="h-5 w-5 bg-slate-200 rounded-full flex-shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 bg-slate-200 rounded w-1/4" />
+                <div className="h-4 bg-slate-200 rounded" />
+                <div className="h-3 bg-slate-100 rounded w-3/4" />
+              </div>
+            </div>
+          ))
+        ) : articles.length === 0 ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm text-slate-500 font-medium">
+              No articles yet today.
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              Check back soon — we publish daily!
+            </p>
+          </div>
+        ) : (
+          articles.map((a, i) => {
+            const gsColor =
+              GS_BADGE_COLORS[a.gs_paper] ?? GS_BADGE_COLORS["CSAT"];
+            return (
+              <Link
+                key={a.id}
+                href={`/daily-ca/article/${a.slug}`}
+                className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition-colors group"
+              >
+                <span className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-600">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${gsColor}`}
+                    >
+                      {a.gs_paper}
+                    </span>
+                    <span className="text-[10px] text-slate-400 truncate">
+                      {a.subject_name}
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-800 line-clamp-2 group-hover:text-blue-700 transition-colors leading-snug">
+                    {a.title}
+                  </p>
+                </div>
+                <ArrowRight className="h-3 w-3 text-slate-300 group-hover:text-blue-400 flex-shrink-0 mt-1 transition-colors" />
+              </Link>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="bg-slate-50 border-t border-slate-100 px-5 py-2.5 flex items-center justify-between">
+        <span className="text-[11px] text-slate-400">
+          {articles.length > 0
+            ? `Showing ${articles.length} of today's articles`
+            : "Updated daily"}
+        </span>
+        <Link
+          href="/daily-ca"
+          className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors"
+        >
+          Full feed <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function KnowledgeGraphTeaser() {
   const nodeMap = Object.fromEntries(GRAPH_NODES.map((n) => [n.id, n]));
@@ -471,82 +615,116 @@ export default function HomePage() {
           isCollapsed ? "lg:pl-20" : "lg:pl-64",
         )}
       >
-        {/* KNOWLEDGE ORBITS GRAPH TEASER — top of page, just below navbars */}
-        <KnowledgeGraphTeaser />
+        {/* 1. HERO — 2-column: pitch (left) + live CA preview (right) */}
+        <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-slate-50 border-b border-slate-100">
+          {/* Soft dot grid */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, #3b82f6 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          />
 
-        {/* 1. HERO SECTION: Light with subtle gradient */}
-        <section className="relative overflow-hidden pt-24 pb-32 lg:pt-32 lg:pb-48 bg-gradient-to-b from-blue-50 to-white border-b">
-          {/* ... existing hero content ... */}
-          <div className="container relative mx-auto px-4 text-center">
-            <Badge className="mb-6 px-4 py-1.5 bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-200 transition-all cursor-default shadow-sm border">
-              <Sparkles className="h-3.5 w-3.5 mr-2" />
-              Empowering UPSC Aspirants with AI-RAG Technology
-            </Badge>
+          <div className="container relative mx-auto px-4 max-w-7xl">
+            <div className="flex flex-col lg:flex-row items-center gap-10 py-14 lg:py-20">
+              {/* ── LEFT: Value Prop ── */}
+              <div className="lg:w-[54%] text-center lg:text-left">
+                <Badge className="mb-5 px-4 py-1.5 bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-default shadow-sm border inline-flex">
+                  <Sparkles className="h-3.5 w-3.5 mr-2" />
+                  Empowering UPSC Aspirants with AI-RAG
+                </Badge>
 
-            <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight mb-8">
-              Your Personal AI <br />
-              <span className="text-blue-600">Syllabus Maestro</span>
-            </h1>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight mb-5 leading-[1.1]">
+                  Your Personal AI <br />
+                  <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                    Syllabus Maestro
+                  </span>
+                </h1>
 
-            <p className="text-xl text-slate-600 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Move beyond generic study material. Harness the power of
-              <span className="text-slate-900 font-semibold">
-                {" "}
-                Retrieval Augmented Generation
-              </span>{" "}
-              to create syllabus-mapped articles from verified NCERT & Current
-              Affairs sources instantly.
-            </p>
+                <p className="text-base md:text-lg text-slate-600 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                  Move beyond generic study material. Harness{" "}
+                  <span className="text-slate-900 font-semibold">
+                    Retrieval Augmented Generation
+                  </span>{" "}
+                  to create syllabus-mapped articles from verified NCERT &amp;
+                  Daily CA sources instantly.
+                </p>
 
-            <div className="flex flex-wrap gap-4 justify-center items-center">
-              <Link href="/generate">
-                <Button
-                  size="lg"
-                  className="h-14 px-8 text-lg bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-950/10 gap-3 group"
-                >
-                  <Sparkles className="h-5 w-5 group-hover:rotate-12 transition-transform" />
-                  Generate AI Article
-                </Button>
-              </Link>
+                <div className="flex flex-wrap gap-3 justify-center lg:justify-start items-center mb-10">
+                  <Link href="/generate">
+                    <Button
+                      size="lg"
+                      className="h-11 px-6 text-sm bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-950/10 gap-2 group"
+                    >
+                      <Sparkles className="h-4 w-4 group-hover:rotate-12 transition-transform" />
+                      Generate AI Article
+                    </Button>
+                  </Link>
+                  <Link href="/daily-ca">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="h-11 px-6 text-sm text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 gap-2"
+                    >
+                      <Newspaper className="h-4 w-4" />
+                      Today&apos;s Current Affairs
+                    </Button>
+                  </Link>
+                  <Link href="/assessment">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="h-11 px-6 text-sm text-slate-700 border-slate-200 bg-white hover:bg-slate-50 gap-2"
+                    >
+                      <FileQuestion className="h-4 w-4" />
+                      Try a Quiz
+                    </Button>
+                  </Link>
+                </div>
 
-              <Link href="/assessment">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="h-14 px-8 text-lg text-slate-700 border-slate-200 bg-white hover:bg-slate-50 gap-3"
-                >
-                  <FileQuestion className="h-5 w-5" />
-                  Try Interactive Quiz
-                </Button>
-              </Link>
-            </div>
-
-            <div className="mt-16 flex items-center justify-center gap-8 opacity-70">
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl font-bold text-slate-900">100%</span>
-                <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-                  Syllabus Coverage
-                </span>
+                {/* Trust stats */}
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 sm:gap-8 opacity-70">
+                  {[
+                    { val: "100%", label: "Syllabus Coverage" },
+                    { val: "Verified", label: "NCERT Sources" },
+                    { val: "Daily", label: "CA Integration" },
+                    { val: "AI RAG", label: "Powered" },
+                  ].map((s, i, arr) => (
+                    <div
+                      key={s.label}
+                      className="flex items-center gap-6 sm:gap-8"
+                    >
+                      <div className="flex flex-col items-center lg:items-start gap-0.5">
+                        <span className="text-xl font-extrabold text-slate-900">
+                          {s.val}
+                        </span>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                          {s.label}
+                        </span>
+                      </div>
+                      {i < arr.length - 1 && (
+                        <div className="w-px h-7 bg-slate-200 hidden sm:block" />
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="w-px h-8 bg-slate-200" />
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl font-bold text-slate-900">
-                  Verified
-                </span>
-                <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-                  NCERT Sources
-                </span>
-              </div>
-              <div className="w-px h-8 bg-slate-200" />
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl font-bold text-slate-900">Daily</span>
-                <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-                  CA Integration
-                </span>
+
+              {/* ── RIGHT: Live CA Preview ── */}
+              <div className="lg:w-[46%] w-full max-w-md mx-auto lg:mx-0">
+                <HeroLiveCA />
               </div>
             </div>
           </div>
         </section>
+
+        {/* 2. DAILY CA TEASER — full date-navigable feed strip */}
+        <DailyCaTeaserWidget />
+
+        {/* 3. KNOWLEDGE GRAPH TEASER — visual wow */}
+        <KnowledgeGraphTeaser />
       </div>
 
       {/* 2. RECENT CONTRIBUTIONS: Actual functional data */}

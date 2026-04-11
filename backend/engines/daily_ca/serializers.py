@@ -154,7 +154,9 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
             .select_related("concept_page")
             .order_by("-created_at")
         )
-        return ConceptPageSerializer([l.concept_page for l in links], many=True).data
+        return ConceptPageSerializer(
+            [link.concept_page for link in links], many=True
+        ).data
 
     def get_static_background(self, obj):
         if obj.static_background:
