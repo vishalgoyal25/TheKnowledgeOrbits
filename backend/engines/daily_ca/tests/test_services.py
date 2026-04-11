@@ -407,11 +407,15 @@ class TestDailyCaGeneratorService:
         assert queued > 0
 
     def test_trigger_static_called_after_all_cycles(self):
-        """trigger_pending_static_generation fires ONCE after all cycles complete."""
+        """trigger_pending_static_generation fires ONCE after all cycles complete.
+        Sets topic_id only in-memory (no DB write) to avoid FK constraint at teardown."""
         from engines.daily_ca.services.generator_service import DailyCaGeneratorService
 
         proposal = self._make_proposal("Static Trigger Test")
-        # Do NOT set topic_id — knowledge_topic FK doesn't exist in test DB
+        fake_topic_id = uuid.uuid4()
+
+        # Set topic_id only on the in-memory object — DB row stays NULL (no FK violation)
+        proposal.__dict__["topic_id"] = fake_topic_id
 
         def mock_single_cycle(p, db_alias="default"):
             article = DailyCaArticle.objects.create(
@@ -431,6 +435,5 @@ class TestDailyCaGeneratorService:
                     proposals=[proposal], groq_calls_used=0
                 )
 
-        # Called exactly once after the cycle loop — not inside the loop
         mock_trigger.assert_called_once()
         assert results["static_triggered"] == 1
