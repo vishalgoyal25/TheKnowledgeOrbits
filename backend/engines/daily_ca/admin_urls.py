@@ -10,6 +10,7 @@ Routes:
   GET  /api/v1/admin/daily-ca/proposals/<date>/     → list proposals for review
   POST /api/v1/admin/daily-ca/proposals/approve/    → approve selected IDs (max 10)
   GET  /api/v1/admin/daily-ca/generate/status/      → status breakdown for a date
+  POST /api/v1/admin/daily-ca/generate/run/         → trigger generation in background thread
   POST /api/v1/admin/daily-ca/publish/<date>/       → publish all generated articles
   GET  /api/v1/admin/daily-ca/articles/<date>/      → all articles for date (incl. unpublished)
 """
@@ -19,6 +20,7 @@ from django.urls import path
 from engines.daily_ca.views import (
     AdminApproveView,
     AdminArticlesDateView,
+    AdminGenerateRunView,
     AdminGenerateStatusView,
     AdminProposalListView,
     AdminPublishDateView,
@@ -37,6 +39,11 @@ urlpatterns = [
         "generate/status/",
         AdminGenerateStatusView.as_view(),
         name="admin-generate-status",
+    ),
+    path(
+        "generate/run/",
+        AdminGenerateRunView.as_view(),
+        name="admin-generate-run",
     ),
     path(
         "publish/<str:date_str>/",

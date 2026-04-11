@@ -109,7 +109,7 @@ def _extract_related_terms(wiki_content: str) -> list[str]:
         for line in see_also_text.splitlines()
         if line.strip() and not line.strip().startswith("=")
     ]
-    return [l[:100] for l in lines[:_MAX_RELATED_TERMS]]
+    return [ln[:100] for ln in lines[:_MAX_RELATED_TERMS]]
 
 
 class WikiEnrichmentService:

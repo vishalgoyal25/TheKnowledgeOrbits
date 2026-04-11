@@ -221,7 +221,7 @@ class TestConceptPageResolver:
 
     def test_fuzzy_match_prevents_near_duplicate(self):
         """Exact slug match → reuses existing, no new ConceptPage created."""
-        existing = ConceptPage.objects.create(
+        ConceptPage.objects.create(
             name="civil-liability-for-nuclear-damage-act",
             slug="civil-liability-for-nuclear-damage-act",
         )

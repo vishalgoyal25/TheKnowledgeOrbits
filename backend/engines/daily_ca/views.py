@@ -17,11 +17,13 @@ Admin endpoints — no auth (L3 — solo developer):
   GET  /api/v1/admin/daily-ca/articles/<date>/      → list all articles for date (incl. unpublished)
 """
 
+import threading
 from datetime import datetime, timedelta
 
 import sentry_sdk
 import structlog
 from django.core.cache import cache
+from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -278,6 +280,42 @@ class AdminPublishDateView(APIView):
             sentry_sdk.capture_exception(exc)
             logger.error("admin_publish_failed", error=str(exc))
             return Response({"error": str(exc)}, status=500)
+
+
+class AdminGenerateRunView(APIView):
+    """
+    POST /api/v1/admin/daily-ca/generate/run/
+    Triggers generate_daily_ca management command in a background daemon thread.
+    Returns 202 immediately — generation runs asynchronously.
+    Body: {"date": "YYYY-MM-DD"}  (optional; defaults to today)
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        date_str = request.data.get("date") or str(timezone.now().date())
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
+            )
+
+        def _run():
+            try:
+                call_command("generate_daily_ca", f"--date={date_str}")
+            except Exception as exc:
+                sentry_sdk.capture_exception(exc)
+                logger.error("admin_generate_run_failed", date=date_str, error=str(exc))
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+
+        logger.info("admin_generate_run_triggered", date=date_str)
+        return Response(
+            {"status": "triggered", "date": date_str},
+            status=202,
+        )
 
 
 class AdminArticlesDateView(APIView):

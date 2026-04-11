@@ -139,7 +139,7 @@ def _parse_response(raw: str) -> tuple[str, str, list[str], str]:
         text = text[: title_match.start()].rstrip() + "\n" + text[title_match.end() :]
         text = text.strip()
     else:
-        lines = [l for l in text.splitlines() if l.strip()]
+        lines = [ln for ln in text.splitlines() if ln.strip()]
         if lines:
             first_line = lines[0].strip("# *_").strip()
             if 5 < len(first_line) < 250:
