@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import {
   Search,
@@ -66,10 +66,25 @@ interface HeaderProps {
   initialHierarchy?: HierarchySubject[];
 }
 
+// ── Suspense-safe search params reader ────────────────────────────────────────
+// useSearchParams() must be in a Suspense boundary for static pages (e.g. /404).
+// This tiny component reads it and lifts the value up via callback.
+function SearchParamsReader({
+  onCategory,
+}: {
+  onCategory: (cat: string | null) => void;
+}) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    onCategory(searchParams.get("category"));
+  }, [searchParams, onCategory]);
+  return null;
+}
+
 export default function Header({ initialHierarchy }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const { isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -260,6 +275,10 @@ export default function Header({ initialHierarchy }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+      {/* Reads ?category= from URL safely — Suspense required by Next.js for useSearchParams */}
+      <Suspense fallback={null}>
+        <SearchParamsReader onCategory={setActiveCategory} />
+      </Suspense>
       {/* MOBILE SEARCH OVERLAY (Only visible when toggled on mobile) */}
       {isMobileSearchOpen && (
         <div className="md:hidden absolute inset-0 bg-white z-[60] flex items-center px-4 animate-in slide-in-from-top duration-300">
@@ -524,9 +543,8 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                                 drawerActiveSubjectId === "news";
                               const isCurrentModule = isNewsSubjectDrawer
                                 ? m.id === "all"
-                                  ? pathname === "/news" &&
-                                    !searchParams.get("category")
-                                  : searchParams.get("category") === m.id
+                                  ? pathname === "/news" && !activeCategory
+                                  : activeCategory === m.id
                                 : drawerActiveModuleId === m.id;
                               const moduleHrefDrawer = isNewsSubjectDrawer
                                 ? m.id === "all"
@@ -879,9 +897,8 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                       const isNewsSubject = displaySubjectId === "news";
                       const isActiveModule = isNewsSubject
                         ? module.id === "all"
-                          ? pathname === "/news" &&
-                            !searchParams.get("category")
-                          : searchParams.get("category") === module.id
+                          ? pathname === "/news" && !activeCategory
+                          : activeCategory === module.id
                         : pathname.includes(`/modules/${module.id}`);
                       const isHovered = hoveredModuleId === module.id;
                       const moduleHref = isNewsSubject

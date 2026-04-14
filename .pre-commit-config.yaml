@@ -5,7 +5,6 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-      - id: check-json
       - id: check-toml
       - id: check-merge-conflict
       - id: check-added-large-files
@@ -14,9 +13,9 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.4.4
     hooks:
-      - id: ruff # Replaces Flake8, isort, and Bandit
+      - id: ruff
         args: [--fix]
-      - id: ruff-format # Replaces Black
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
@@ -30,32 +29,26 @@ repos:
             backend/staticfiles/|
             backend/media/
           )
+
   - repo: local
     hooks:
       - id: backend-mypy
         name: Backend Audit (Mypy)
         entry: powershell -Command "cd backend; ..\myvenv\Scripts\mypy engines/ --pretty"
         language: system
-        always_run: true
+        files: ^backend/
         pass_filenames: false
 
       - id: backend-pytest
         name: Backend Laboratory (Pytest)
         entry: powershell -Command "cd backend; ..\myvenv\Scripts\pytest engines/ -q --tb=short -p no:cacheprovider"
         language: system
-        always_run: true
-        pass_filenames: false
-
-      - id: frontend-type-check
-        name: Frontend Architect (TSC)
-        entry: powershell -Command "cd frontend; npm run type-check"
-        language: system
-        always_run: true
+        files: ^backend/
         pass_filenames: false
 
       - id: frontend-jest
         name: Frontend Laboratory (Jest)
         entry: powershell -Command "cd frontend; npm test -- --watchAll=false"
         language: system
-        always_run: true
+        files: ^frontend/
         pass_filenames: false

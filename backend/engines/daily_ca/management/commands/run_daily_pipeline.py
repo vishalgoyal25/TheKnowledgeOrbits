@@ -182,9 +182,7 @@ class Command(BaseCommand):
         except Exception as exc:
             sentry_sdk.capture_exception(exc)
             logger.error("pipeline_step3_failed", error=str(exc))
-            self.stderr.write(
-                self.style.ERROR(f"\n✗ Step 3/4 failed: {exc}")
-            )
+            self.stderr.write(self.style.ERROR(f"\n✗ Step 3/4 failed: {exc}"))
             return
 
         # ── Final summary ─────────────────────────────────────────────────────
@@ -251,8 +249,6 @@ class Command(BaseCommand):
 
         # Print the approved titles for transparency in Render logs
         for p in top_proposals:
-            self.stdout.write(
-                f"    ✓ [{round(p.relevance_score, 1)}] {p.title[:70]}"
-            )
+            self.stdout.write(f"    ✓ [{round(p.relevance_score, 1)}] {p.title[:70]}")
 
         return updated

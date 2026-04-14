@@ -146,17 +146,16 @@ class ConceptContentService:
         # Django cannot traverse it with __ — must do a two-step query.
         try:
             article_ids = list(
-                ConceptArticleLink.objects
-                .using(db_alias)
+                ConceptArticleLink.objects.using(db_alias)
                 .filter(concept_page=concept)
                 .values_list("daily_ca_article_id", flat=True)[:5]
             )
             linked_titles: list[str] = []
             if article_ids:
                 from engines.daily_ca.models import DailyCaArticle
+
                 linked_titles = list(
-                    DailyCaArticle.objects
-                    .using(db_alias)
+                    DailyCaArticle.objects.using(db_alias)
                     .filter(id__in=article_ids)
                     .values_list("title", flat=True)
                 )
@@ -171,8 +170,7 @@ class ConceptContentService:
             linked_titles = []
 
         linked_context = (
-            "\n".join(f"- {t}" for t in linked_titles if t)
-            or "No linked articles yet."
+            "\n".join(f"- {t}" for t in linked_titles if t) or "No linked articles yet."
         )
 
         # ── Build and fire prompt ─────────────────────────────────────────────
@@ -221,13 +219,10 @@ class ConceptContentService:
         # LLMs occasionally return headings with a single \n before them instead
         # of the blank line (\n\n) that markdown requires for block rendering.
         # Normalise here so the stored body_md always renders correctly.
-        raw = (
-            raw
-            .replace("\r\n", "\n")
-            .replace("\r", "\n")
-        )
+        raw = raw.replace("\r\n", "\n").replace("\r", "\n")
         # Blank line before ## / ### headings
         import re as _re
+
         raw = _re.sub(r"([^\n])\n(#{1,3} )", r"\1\n\n\2", raw)
         # Blank line after ## / ### headings before body text
         raw = _re.sub(r"(#{1,3} [^\n]+)\n([^#\n])", r"\1\n\n\2", raw)

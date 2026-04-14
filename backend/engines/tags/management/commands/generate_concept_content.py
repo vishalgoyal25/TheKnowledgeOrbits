@@ -97,13 +97,19 @@ class Command(BaseCommand):
         limit: int = options["limit"]
         target_slug: str | None = options["slug"]
 
-        self.stdout.write(self.style.MIGRATE_HEADING(
-            f"\n{'━' * 60}\n"
-            f"  Concept Page Content Generator\n"
-            f"  DB: {db_alias}"
-            + (f"  |  Target slug: {target_slug}" if target_slug else f"  |  Limit: {limit}")
-            + f"\n{'━' * 60}"
-        ))
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(
+                f"\n{'━' * 60}\n"
+                f"  Concept Page Content Generator\n"
+                f"  DB: {db_alias}"
+                + (
+                    f"  |  Target slug: {target_slug}"
+                    if target_slug
+                    else f"  |  Limit: {limit}"
+                )
+                + f"\n{'━' * 60}"
+            )
+        )
 
         # ── Fetch target concepts ─────────────────────────────────────────────
 
@@ -113,9 +119,11 @@ class Command(BaseCommand):
             concepts = self._fetch_batch(limit, db_alias)
 
         if not concepts:
-            self.stdout.write(self.style.WARNING(
-                "  No concepts found matching the criteria. Nothing to generate."
-            ))
+            self.stdout.write(
+                self.style.WARNING(
+                    "  No concepts found matching the criteria. Nothing to generate."
+                )
+            )
             return
 
         total = len(concepts)
@@ -158,27 +166,25 @@ class Command(BaseCommand):
                 except Exception:
                     word_count = 0
 
-                self.stdout.write(
-                    self.style.SUCCESS(f"✓  ({word_count} words)")
-                )
+                self.stdout.write(self.style.SUCCESS(f"✓  ({word_count} words)"))
                 generated += 1
             else:
                 # Skipped = already is_content_ready=True and force=False
-                self.stdout.write(
-                    self.style.WARNING("skipped (already ready)")
-                )
+                self.stdout.write(self.style.WARNING("skipped (already ready)"))
                 skipped += 1
 
         # ── Summary ───────────────────────────────────────────────────────────
 
-        self.stdout.write(self.style.MIGRATE_HEADING(
-            f"\n{'─' * 60}\n"
-            f"  Generated : {generated}\n"
-            f"  Skipped   : {skipped}\n"
-            f"  Failed    : {failed}\n"
-            f"  GROQ calls: {generated}  (1 per generated concept)\n"
-            f"{'─' * 60}\n"
-        ))
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(
+                f"\n{'─' * 60}\n"
+                f"  Generated : {generated}\n"
+                f"  Skipped   : {skipped}\n"
+                f"  Failed    : {failed}\n"
+                f"  GROQ calls: {generated}  (1 per generated concept)\n"
+                f"{'─' * 60}\n"
+            )
+        )
 
         logger.info(
             "generate_concept_content_complete",
@@ -191,20 +197,16 @@ class Command(BaseCommand):
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _fetch_batch(
-        self, limit: int, db_alias: str
-    ) -> list[ConceptPage]:
+    def _fetch_batch(self, limit: int, db_alias: str) -> list[ConceptPage]:
         """
         Fetch up to `limit` ConceptPage stubs not yet content-ready,
         ordered by usage_count DESC (most-referenced first).
         """
         try:
             return list(
-                ConceptPage.objects
-                .using(db_alias)
+                ConceptPage.objects.using(db_alias)
                 .filter(is_content_ready=False)
-                .order_by("-usage_count", "name")
-                [:limit]
+                .order_by("-usage_count", "name")[:limit]
             )
         except Exception as exc:
             sentry_sdk.capture_exception(exc)
@@ -217,9 +219,7 @@ class Command(BaseCommand):
                 f"Failed to fetch ConceptPage stubs from DB '{db_alias}': {exc}"
             ) from exc
 
-    def _fetch_by_slug(
-        self, slug: str, db_alias: str
-    ) -> list[ConceptPage]:
+    def _fetch_by_slug(self, slug: str, db_alias: str) -> list[ConceptPage]:
         """
         Fetch a single ConceptPage by slug for admin override.
         Raises CommandError if not found.

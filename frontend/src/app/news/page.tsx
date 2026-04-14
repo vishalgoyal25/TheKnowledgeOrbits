@@ -9,17 +9,17 @@ import { getArchive, DailyCaArticleList } from "@/lib/api/daily-ca";
 // Keep in sync with NEWS_CATEGORY_CHOICES in backend/engines/daily_ca/models.py
 
 const CATEGORY_LABELS: Record<string, string> = {
-  national:        "National",
-  international:   "International",
-  "geo-politics":  "Geo-Politics",
+  national: "National",
+  international: "International",
+  "geo-politics": "Geo-Politics",
   "geo-economics": "Geo-Economics",
-  economy:         "Economy & Business",
-  "science-tech":  "Science & Technology",
-  environment:     "Environment & Climate",
-  society:         "Society & Culture",
-  "law-justice":   "Law & Justice",
-  defence:         "Defence & Security",
-  health:          "Health",
+  economy: "Economy & Business",
+  "science-tech": "Science & Technology",
+  environment: "Environment & Climate",
+  society: "Society & Culture",
+  "law-justice": "Law & Justice",
+  defence: "Defence & Security",
+  health: "Health",
   "sports-awards": "Sports & Awards",
 };
 
@@ -120,7 +120,7 @@ function NewsPageInner() {
   const activeCategoryLabel =
     activeCategory === "all"
       ? "All News"
-      : (CATEGORY_LABELS[activeCategory] ?? activeCategory);
+      : CATEGORY_LABELS[activeCategory] ?? activeCategory;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -133,7 +133,8 @@ function NewsPageInner() {
             </h1>
             {!loading && (
               <p className="text-xs text-gray-400 mt-0.5">
-                {filtered.length} article{filtered.length !== 1 ? "s" : ""} — last 30 days
+                {filtered.length} article{filtered.length !== 1 ? "s" : ""} —
+                last 30 days
               </p>
             )}
           </div>

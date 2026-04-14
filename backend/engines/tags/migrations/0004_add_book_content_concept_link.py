@@ -16,7 +16,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("book_content", "0003_alter_bookchunk_search_vector_and_more"),
         ("daily_ca", "0004_add_news_category"),
@@ -29,13 +28,11 @@ class Migration(migrations.Migration):
             model_name="conceptarticlelink",
             name="concept_art_daily_c_71e14b_idx",
         ),
-
         # 2. Drop old unique_together
         migrations.AlterUniqueTogether(
             name="conceptarticlelink",
             unique_together=set(),
         ),
-
         # 3. Add brand-new book_content_article column (safe — does not exist yet)
         migrations.AddField(
             model_name="conceptarticlelink",
@@ -49,7 +46,6 @@ class Migration(migrations.Migration):
                 to="book_content.bookcontent",
             ),
         ),
-
         # 4. Convert daily_ca_article_id UUIDField → FK without touching the column.
         #    The column already exists — we only add the FK constraint at DB level.
         #    At state level we swap out the UUIDField for the proper FK field.
@@ -91,7 +87,6 @@ class Migration(migrations.Migration):
                 ),
             ],
         ),
-
         # 5. Add index on daily_ca_article (same DB column as before)
         migrations.AddIndex(
             model_name="conceptarticlelink",
@@ -100,7 +95,6 @@ class Migration(migrations.Migration):
                 name="concept_art_daily_c_71e14b_idx",
             ),
         ),
-
         # 6. Add index on book_content_article (new column)
         migrations.AddIndex(
             model_name="conceptarticlelink",
@@ -109,7 +103,6 @@ class Migration(migrations.Migration):
                 name="concept_art_book_co_5fbd30_idx",
             ),
         ),
-
         # 7. Unique constraint: one concept per daily_ca_article
         migrations.AddConstraint(
             model_name="conceptarticlelink",
@@ -119,7 +112,6 @@ class Migration(migrations.Migration):
                 name="unique_concept_ca_article",
             ),
         ),
-
         # 8. Unique constraint: one concept per book_content_article
         migrations.AddConstraint(
             model_name="conceptarticlelink",
