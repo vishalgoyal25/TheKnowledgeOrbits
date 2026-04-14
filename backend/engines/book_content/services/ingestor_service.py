@@ -51,6 +51,57 @@ logger = structlog.get_logger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# K3 — CONCEPT LINK RESOLVER (defined before ingest_topic so linter is happy)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _resolve_concept_links(book_content_obj: BookContent) -> None:
+    """
+    Phase K3 — Resolve [[concept]] inline links in BookContent.content_markdown.
+
+    Scans content_markdown for [[term]] patterns, resolves/creates ConceptPage
+    stubs, writes ConceptArticleLink rows (book_content_article FK), and
+    replaces [[term]] with [term](/concepts/slug) in the stored markdown.
+
+    No-op if content_markdown contains no [[...]] patterns.
+    All exceptions are swallowed — never propagated to the ingestor caller.
+    """
+    try:
+        original = book_content_obj.content_markdown or ""
+        if "[[" not in original:
+            return  # fast path — no brackets, skip entirely
+
+        from engines.tags.services.concept_resolver import (
+            ConceptPageResolver,
+        )  # local import avoids circular refs
+
+        processed = ConceptPageResolver.process_and_replace(
+            body_md=original,
+            book_content_id=book_content_obj.id,
+        )
+
+        if processed != original:
+            BookContent.objects.filter(pk=book_content_obj.pk).update(
+                content_markdown=processed
+            )
+            book_content_obj.content_markdown = processed
+            logger.info(
+                "ingestor_concept_links_resolved",
+                book_content_id=str(book_content_obj.id),
+                links_added=ConceptPageResolver.last_new_concept_calls,
+            )
+    except Exception as exc:
+        import sentry_sdk as _sentry
+
+        _sentry.capture_exception(exc)
+        logger.warning(
+            "ingestor_concept_links_failed",
+            book_content_id=str(book_content_obj.id),
+            error=str(exc)[:200],
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # PUBLIC ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -133,6 +184,8 @@ def ingest_topic(
         _cross_link_inter_subject(topic_bc_obj)
         # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
         _fetch_and_store_hero_image(topic_bc_obj)
+        # K3: resolve [[concept]] links in content_markdown
+        _resolve_concept_links(topic_bc_obj)
 
         nodes_created += 1
         logger.info("ingestor_topic_overview_saved", topic=topic)
@@ -215,6 +268,8 @@ def ingest_topic(
                 _cross_link_inter_subject(sub_bc_obj)
                 # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
                 _fetch_and_store_hero_image(sub_bc_obj)
+                # K3: resolve [[concept]] links in content_markdown
+                _resolve_concept_links(sub_bc_obj)
 
                 # Register in concept registry
                 update_concept_registry(
@@ -312,6 +367,8 @@ def ingest_topic(
                     _cross_link_inter_subject(ss_bc_obj)
                     # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
                     _fetch_and_store_hero_image(ss_bc_obj)
+                    # K3: resolve [[concept]] links in content_markdown
+                    _resolve_concept_links(ss_bc_obj)
 
                     update_concept_registry(
                         subject, ss_name, str(ss_topic_obj.id), ss_name

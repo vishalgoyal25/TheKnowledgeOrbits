@@ -55,20 +55,34 @@ class TodayView(APIView):
 
     def get(self, request):
         today = timezone.now().date()
-        cache_key = f"daily_ca_today_{today}"
+        category = request.query_params.get("category", "").strip().lower()
 
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return Response(cached)
+        # Cache is skipped when category filter is applied (filtered result not cached)
+        if not category:
+            cache_key = f"daily_ca_today_{today}"
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
 
         articles = DailyCaArticle.objects.filter(
             published_date=today, is_published=True
         ).order_by("order_on_date")
+
+        if category:
+            articles = articles.filter(news_category=category)
+
         data = DailyCaArticleListSerializer(articles, many=True).data
         payload = {"date": str(today), "count": len(data), "articles": data}
-        cache.set(cache_key, payload, timeout=_TODAY_CACHE_TTL)
 
-        logger.info("today_view_cache_miss", date=str(today), count=len(data))
+        if not category:
+            cache.set(cache_key, payload, timeout=_TODAY_CACHE_TTL)
+
+        logger.info(
+            "today_view_cache_miss",
+            date=str(today),
+            count=len(data),
+            category=category or None,
+        )
         return Response(payload)
 
 
@@ -88,9 +102,15 @@ class DateView(APIView):
                 {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
             )
 
+        category = request.query_params.get("category", "").strip().lower()
+
         articles = DailyCaArticle.objects.filter(
             published_date=target_date, is_published=True
         ).order_by("order_on_date")
+
+        if category:
+            articles = articles.filter(news_category=category)
+
         data = DailyCaArticleListSerializer(articles, many=True).data
         return Response({"date": date_str, "count": len(data), "articles": data})
 
@@ -287,7 +307,16 @@ class AdminGenerateRunView(APIView):
     POST /api/v1/admin/daily-ca/generate/run/
     Triggers generate_daily_ca management command in a background daemon thread.
     Returns 202 immediately — generation runs asynchronously.
-    Body: {"date": "YYYY-MM-DD"}  (optional; defaults to today)
+
+    Body:
+        {
+            "date": "YYYY-MM-DD",   (optional; defaults to today)
+            "auto_publish": true    (optional; default true — H2)
+        }
+
+    Phase H2: auto_publish param forwarded to --auto-publish flag.
+    Default is True so "Approve & Generate" from the frontend publishes
+    articles automatically after generation completes.
     """
 
     permission_classes = [AllowAny]
@@ -301,19 +330,35 @@ class AdminGenerateRunView(APIView):
                 {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
             )
 
+        # H2: read auto_publish from request body — default True so the
+        # frontend "Approve & Generate" flow publishes without extra steps.
+        auto_publish: bool = bool(request.data.get("auto_publish", True))
+
         def _run():
             try:
-                call_command("generate_daily_ca", f"--date={date_str}")
+                args = [f"--date={date_str}"]
+                if auto_publish:
+                    args.append("--auto-publish")
+                call_command("generate_daily_ca", *args)
             except Exception as exc:
                 sentry_sdk.capture_exception(exc)
-                logger.error("admin_generate_run_failed", date=date_str, error=str(exc))
+                logger.error(
+                    "admin_generate_run_failed",
+                    date=date_str,
+                    auto_publish=auto_publish,
+                    error=str(exc),
+                )
 
         t = threading.Thread(target=_run, daemon=True)
         t.start()
 
-        logger.info("admin_generate_run_triggered", date=date_str)
+        logger.info(
+            "admin_generate_run_triggered",
+            date=date_str,
+            auto_publish=auto_publish,
+        )
         return Response(
-            {"status": "triggered", "date": date_str},
+            {"status": "triggered", "date": date_str, "auto_publish": auto_publish},
             status=202,
         )
 

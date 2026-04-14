@@ -2,10 +2,11 @@
 engines/tags/services/tag_service.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Phase E1 — TagService: Keyword Tag extraction and linking.
+Phase B1 (FEATURES3) — Enhanced deduplication: dual-field matching + normalization.
 
 Responsibilities:
   1. extract_and_link_tags() — given article text + article identity,
-     extract 5–8 UPSC keyword tags (via LLM or overrides), fuzzy-match
+     extract 5–8 keyword tags (via LLM or overrides), three-pass fuzzy-match
      against the pre-seeded tag table, create any new tags, and write
      ArticleTag junction rows.
   2. get_articles_by_tag() — return article IDs for a given tag slug.
@@ -13,8 +14,11 @@ Responsibilities:
 Design rules enforced here:
   - Max 8 ArticleTag rows per article (lowest-relevance discarded if overflow)
   - Tag names are always lowercase-hyphenated ("nuclear-energy", "article-370")
-  - Existing tags are REUSED via fuzzy slug match (difflib, threshold 0.85)
-  - New tags are created only when no match exists — 1 extra GROQ call for description
+  - Existing tags are REUSED via three-pass matching (difflib, threshold 0.75):
+      Pass 1: exact slug  →  Pass 2: exact name  →  Pass 3: fuzzy slug + normalized slug
+  - Normalization strips filler words ("of", "india", "act", etc.) before fuzzy compare,
+    so "constitution-of-india" correctly matches "indian-constitution"
+  - New tags are created only when all 3 passes fail — 1 extra GROQ call for description
   - usage_count on Tag incremented atomically via F() on every new ArticleTag
   - All exceptions captured to Sentry + structlog; never propagated to caller
 """
@@ -43,22 +47,183 @@ logger = structlog.get_logger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MAX_TAGS_PER_ARTICLE = 8
-FUZZY_THRESHOLD = 0.85
+FUZZY_THRESHOLD = 0.75  # Phase B1: lowered from 0.85 for better semantic dedup
 
 VALID_CONTENT_TYPES = {c[0] for c in ARTICLE_CONTENT_TYPE_CHOICES}
 VALID_TAG_TYPES = {t[0] for t in TAG_TYPE_CHOICES}
 
+# ── Normalisation helpers ─────────────────────────────────────────────────────
+# Words that do NOT carry semantic meaning for slug-matching purposes.
+# Stripped before fuzzy comparison to collapse near-duplicate tags across
+# all four GS subject areas:
+#
+#   GS1 (History/Geography/Culture/Society):
+#     "world-history" → "history"
+#     "ancient-indian-culture" → "ancient-culture"
+#     "physical-geography-of-india" → "physical-geography"
+#
+#   GS2 (Polity/Governance/IR):
+#     "election-commission-of-india" → "election-commission"
+#     "standing-committee-on-finance" → "standing-finance"
+#     "ministry-of-external-affairs" → "external-affairs"
+#     "bilateral-relations-india-us" → "bilateral-us"
+#
+#   GS3 (Economy/S&T/Environment/Security/Disaster):
+#     "pm-kisan-scheme" → "pm-kisan"
+#     "jal-jeevan-mission" → "jal-jeevan"
+#     "national-disaster-management-authority" → "disaster"
+#     "department-of-space" → "space"
+#
+#   GS4 (Ethics/Integrity/Aptitude):
+#     "national-human-rights-commission" → "human-rights"
+#     "central-vigilance-commission" → "vigilance"
+_FILLER_WORDS = frozenset(
+    {
+        # ── Articles, prepositions, connectors ───────────────────────────────────
+        "a",
+        "an",
+        "the",
+        "of",
+        "for",
+        "in",
+        "at",
+        "by",
+        "to",
+        "on",
+        "with",
+        "from",
+        "into",
+        "about",
+        "under",
+        "over",
+        "between",
+        "among",
+        "via",
+        "and",
+        "or",
+        # ── Geographic / nationality qualifiers (GS1, GS2, GS3) ─────────────────
+        "india",
+        "indian",
+        "bharat",
+        "national",
+        "central",
+        "state",
+        "union",
+        "global",
+        "world",
+        "international",
+        # ── Organisational suffixes — GS2 (Polity/Governance/IR) ─────────────────
+        "authority",
+        "board",
+        "committee",
+        "commission",
+        "council",
+        "tribunal",
+        "bureau",
+        "agency",
+        "body",
+        "wing",
+        "cell",
+        "ministry",
+        "department",
+        "office",
+        "secretariat",
+        "parliament",
+        "assembly",
+        "house",
+        "court",
+        "bench",
+        # ── Document/instrument type suffixes (GS2, GS3) ─────────────────────────
+        "act",
+        "bill",
+        "amendment",
+        "ordinance",
+        "notification",
+        "treaty",
+        "agreement",
+        "accord",
+        "protocol",
+        "convention",
+        "framework",
+        "resolution",
+        "declaration",
+        "directive",
+        # ── Programme/initiative suffixes — GS3 (Economy/Schemes/Environment) ────
+        "policy",
+        "scheme",
+        "programme",
+        "program",
+        "mission",
+        "yojana",
+        "abhiyan",
+        "project",
+        "plan",
+        "initiative",
+        "drive",
+        "campaign",
+        "fund",
+        "trust",
+        "foundation",
+        # ── Generic descriptor modifiers (all subjects) ───────────────────────────
+        "new",
+        "old",
+        "revised",
+        "amended",
+        "special",
+        "general",
+        "key",
+        "major",
+        "main",
+        "core",
+        "primary",
+        "public",
+        "private",
+        "civil",
+        "development",
+        "affairs",
+        "relations",
+        "regulation",
+        "reform",
+        "review",
+        "management",
+        "administration",
+        "governance",
+    }
+)
+
+
+def _normalize_for_match(text: str) -> str:
+    """
+    Strips filler words and normalises to lowercase hyphenated form.
+    Used for fuzzy matching only — NOT for slug generation.
+    Falls back to the original text if all words are stripped (prevents empty keys).
+
+    Examples (covering all GS subject domains):
+      GS1: "physical-geography-of-india"      → "physical-geography"
+      GS1: "ancient-indian-culture"           → "ancient-culture"
+      GS2: "election-commission-of-india"     → "election"
+      GS2: "ministry-of-external-affairs"     → "external-affairs"
+      GS3: "pm-kisan-scheme"                  → "pm-kisan"
+      GS3: "jal-jeevan-mission"               → "jal-jeevan"
+      GS3: "national-disaster-management-authority" → "disaster"
+      GS4: "central-vigilance-commission"     → "vigilance"
+    """
+    words = re.split(r"[-\s]+", text.lower().strip())
+    filtered = [w for w in words if w and w not in _FILLER_WORDS]
+    return "-".join(filtered) if filtered else text.lower()
+
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
-_EXTRACT_TAGS_PROMPT = """You are a UPSC keyword tagger. Extract 5–8 important keyword tags from the article below.
+_EXTRACT_TAGS_PROMPT = """You are a knowledge platform keyword tagger. Extract EXACTLY 5 to 8 important keyword tags from the article below.
 
 Return ONLY a valid JSON array — no extra text, no markdown fences.
 Format: [{{"name": "keyword-name", "type": "topic", "relevance": 1.0}}, ...]
 
 Rules for "name":
 - Lowercase-hyphenated (e.g. "nuclear-energy", "article-370", "pm-kisan")
-- Specific, not generic — avoid "india", "government", "policy", "issue"
-- Must be findable in a UPSC study index
+- Specific and discoverable — avoid bare words like "india", "government", "policy", "issue"
+- Each tag must be a distinct, meaningful discovery label for the article
+- MINIMUM 5 tags required — if fewer are obvious, add relevant subject-area tags
 
 Allowed "type" values (pick the best fit):
 topic | subtopic | scheme | person | place | organisation | concept | law | event | other
@@ -70,8 +235,9 @@ Article (first 3000 chars):
 
 Return JSON array only:"""
 
-_NEW_TAG_DESCRIPTION_PROMPT = """You are a UPSC content expert.
-Write a single concise sentence (max 20 words) describing what "{tag_name}" means in the UPSC context.
+_NEW_TAG_DESCRIPTION_PROMPT = """You are a concise encyclopaedic reference writer.
+Write a single sentence (max 20 words) defining what "{tag_name}" is.
+Do NOT mention UPSC, exam, aspirants, or GS paper.
 Return ONLY the sentence — no quotes, no extra text."""
 
 
@@ -305,8 +471,15 @@ class TagService:
         cls, candidate: dict, db_alias: str = "default"
     ) -> Optional[Tag]:
         """
-        Find an existing Tag via exact slug or fuzzy match.
-        If no match found: create a new Tag with a GROQ-generated description.
+        Phase B1 — Three-pass tag resolution with normalized fuzzy matching.
+
+        Find an existing Tag or create a new one. Resolution order:
+          Pass 1: Exact slug match (fastest, zero false positives)
+          Pass 2: Exact name match (case-insensitive, catches spacing/case variants)
+          Pass 3a: Fuzzy match on raw slug (threshold 0.75)
+          Pass 3b: Fuzzy match on normalized slug — strips filler words so
+                   "constitution-of-india" correctly matches "indian-constitution"
+        Creates a new tag with GROQ-generated description only when all passes fail.
         Returns None on failure.
         """
         name: str = candidate["name"]
@@ -314,17 +487,35 @@ class TagService:
         slug = slugify(name)
 
         try:
-            # 1. Exact slug match
+            # Pass 1: exact slug
             tag = Tag.objects.using(db_alias).filter(slug=slug, is_active=True).first()
             if tag:
                 return tag
 
-            # 2. Fuzzy slug match (difflib against all active slugs)
-            all_slugs = list(
+            # Pass 2: exact name match (case-insensitive)
+            tag = (
                 Tag.objects.using(db_alias)
-                .filter(is_active=True)
-                .values_list("slug", flat=True)
+                .filter(name__iexact=slug.replace("-", " "), is_active=True)
+                .first()
             )
+            if tag:
+                logger.info(
+                    "tag_service_name_match",
+                    input_slug=slug,
+                    matched_name=tag.name,
+                )
+                return tag
+
+            # Pass 3: load all active slugs once, then try fuzzy variants
+            all_tags_qs = list(
+                Tag.objects.using(db_alias).filter(is_active=True).values("slug")
+            )
+            if not all_tags_qs:
+                return cls._create_new_tag(name, slug, tag_type, db_alias=db_alias)
+
+            all_slugs = [t["slug"] for t in all_tags_qs]
+
+            # Pass 3a: fuzzy on raw slug
             matches = difflib.get_close_matches(
                 slug, all_slugs, n=1, cutoff=FUZZY_THRESHOLD
             )
@@ -337,9 +528,25 @@ class TagService:
                 )
                 return tag
 
-            # 3. No match — create new tag with LLM-generated description
-            tag = cls._create_new_tag(name, slug, tag_type, db_alias=db_alias)
-            return tag
+            # Pass 3b: fuzzy on normalized slug (strips filler words)
+            norm_slug = _normalize_for_match(slug)
+            norm_map = {_normalize_for_match(s): s for s in all_slugs}
+            norm_matches = difflib.get_close_matches(
+                norm_slug, list(norm_map.keys()), n=1, cutoff=FUZZY_THRESHOLD
+            )
+            if norm_matches:
+                original_slug = norm_map[norm_matches[0]]
+                tag = Tag.objects.using(db_alias).get(slug=original_slug)
+                logger.info(
+                    "tag_service_normalized_fuzzy_match",
+                    input_slug=slug,
+                    normalized_input=norm_slug,
+                    matched_slug=original_slug,
+                )
+                return tag
+
+            # All passes failed — create new tag with LLM-generated description
+            return cls._create_new_tag(name, slug, tag_type, db_alias=db_alias)
 
         except Exception as exc:
             sentry_sdk.capture_exception(exc)

@@ -13,6 +13,8 @@ Usage:
     python manage.py generate_daily_ca --date 2026-04-10
     python manage.py generate_daily_ca --date today
     python manage.py generate_daily_ca --date 2026-04-10 --database=supabase
+    python manage.py generate_daily_ca --date today --auto-publish
+    python manage.py generate_daily_ca --date today --auto-publish --database=supabase
 
 Process:
   1. Fetch CaDailyProposal WHERE date=X AND status IN ('approved', 'queued_next_run')
@@ -28,7 +30,8 @@ Process:
 Notes:
   - Re-running with the same date automatically picks up 'queued_next_run' proposals
   - Already 'generated' proposals are never re-processed
-  - Does NOT auto-publish — human admin reviews before publishing
+  - Does NOT auto-publish by default — human admin reviews before publishing
+  - With --auto-publish: publishes all generated articles immediately after generation
   - Static generation runs in background while admin reviews articles
 """
 
@@ -65,6 +68,15 @@ class Command(BaseCommand):
             "--database",
             default="default",
             help="Database alias to use (default: 'default'). Use 'supabase' for production.",
+        )
+        parser.add_argument(
+            "--auto-publish",
+            action="store_true",
+            default=False,
+            help=(
+                "Automatically publish all generated articles after generation completes. "
+                "Without this flag, articles remain unpublished for manual review (default behaviour)."
+            ),
         )
 
     def handle(self, *args, **options):
@@ -208,6 +220,34 @@ class Command(BaseCommand):
                 )
             )
 
+        # ── Auto-publish (H1) ─────────────────────────────────────────────────
+        auto_publish: bool = options["auto_publish"]
+        published_count = 0
+
+        if auto_publish and results.get("generated", 0) > 0:
+            from engines.daily_ca.models import DailyCaArticle
+
+            published_count = (
+                DailyCaArticle.objects.using(db_alias)
+                .filter(
+                    published_date=target_date,
+                    is_published=False,
+                    proposal__status="generated",
+                )
+                .update(is_published=True)
+            )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"\n  → Auto-published {published_count} article(s)."
+                )
+            )
+            logger.info(
+                "auto_publish_done",
+                date=str(target_date),
+                db_alias=db_alias,
+                count=published_count,
+            )
+
         # ── Final summary ─────────────────────────────────────────────────────
         generated = results.get("generated", 0)
         failed = results.get("failed", 0)
@@ -228,17 +268,26 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"  Background static triggered for: {static_triggered} topic(s)"
             )
-        self.stdout.write(
-            self.style.WARNING(
-                "\n  Articles are NOT published yet.\n"
-                "  Review in Django admin → Daily CA → Articles → set is_published=True."
+        if auto_publish:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"  Auto-publish: {published_count} article(s) published."
+                )
             )
-        )
+        else:
+            self.stdout.write(
+                self.style.WARNING(
+                    "\n  Articles are NOT published yet.\n"
+                    "  Review in Django admin → Daily CA → Articles → set is_published=True."
+                )
+            )
         self.stdout.write(self.style.MIGRATE_HEADING(f"{'━' * 60}\n"))
 
         logger.info(
             "generate_daily_ca_complete",
             date=str(target_date),
             db_alias=db_alias,
+            auto_publish=auto_publish,
+            published=published_count,
             **{k: v for k, v in results.items()},
         )

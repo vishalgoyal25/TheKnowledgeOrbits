@@ -104,8 +104,8 @@ const navItems: NavItem[] = [
     category: "tools",
   },
   {
-    title: "Current Affairs",
-    href: "/current-affairs",
+    title: "News",
+    href: "/news",
     icon: Newspaper,
     variant: "ghost",
     category: "tools",

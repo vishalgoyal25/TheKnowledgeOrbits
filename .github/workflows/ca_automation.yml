@@ -2,8 +2,8 @@ name: 🤖 Current Affairs Ghost Worker
 
 on:
   schedule:
-    # Runs once every 24 hours at 00:00 UTC
-    - cron: "0 0 * * *"
+    # Runs every 12 hours at 00:00 and 12:00 UTC
+    - cron: "0 */12 * * *"
   workflow_dispatch:
     # Manual trigger for ad-hoc syncing
 

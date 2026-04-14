@@ -2,6 +2,7 @@
 engines/daily_ca/services/generator_service.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Phase J3 — DailyCaGeneratorService
+Phase D1 (FEATURES3) — Enriched CA context: combines chunk text + parent article content.
 
 Main entry point: run_generation_cycle(proposals, groq_calls_used=0) → dict
 
@@ -20,6 +21,14 @@ GROQ call budget per cycle:
 
 Failed cycles do NOT stop the run — marked 'failed', loop continues.
 Session cap hit → remaining proposals marked 'queued_next_run' → stop gracefully.
+
+Phase D1 context enrichment:
+  _fetch_enriched_ca_context() replaces _fetch_ca_chunks_text().
+  Returns (enriched_text, chunk_word_count):
+    enriched_text      — chunks + parent CAArticle.content combined (cap: 4000 chars)
+    chunk_word_count   — words in chunks only (used for wiki enrichment threshold)
+  This gives the LLM both: specific news relevance (chunks) + full factual depth
+  of the original source article (names, dates, figures, quotes).
 """
 
 import re
@@ -46,24 +55,64 @@ logger = structlog.get_logger(__name__)
 # ── Quality scoring constants ─────────────────────────────────────────────────
 _QUALITY_MIN_WORDS = 450
 _QUALITY_MAX_WORDS = 800
+
+# Phrases that indicate exam-note regression or filler writing — used in quality scorer
+# and as a post-generation filter. Covers all four GS subject areas.
 _FORBIDDEN_PHRASES = [
+    # Exam-language (all subjects)
     "upsc",
     "gs1",
     "gs2",
     "gs3",
     "gs4",
     "mains value",
+    "mains preparation",
     "prelims",
+    "prelims focus",
     "important for exam",
     "this is important for",
+    "civil services perspective",
+    "from an exam standpoint",
+    "aspirants should note",
+    "important for competitive",
+    # Filler openers (all subjects)
     "why in news",
     "it goes without saying",
     "it is pertinent to note",
+    "in recent times",
+    "in recent years",
+    "against this backdrop",
+    "in the wake of",
+    "amid growing concerns",
+    # Hedging filler (all subjects)
+    "experts believe",
+    "some analysts say",
+    "it is widely acknowledged",
+    "many feel that",
+    "it is believed that",
 ]
 
 # ── Response parsing patterns ─────────────────────────────────────────────────
 _TAGS_LINE = re.compile(r"^TAGS:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
 _SOURCE_LINE = re.compile(r"^SOURCE:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
+_CATEGORY_LINE = re.compile(r"^CATEGORY:\s*(.+)$", re.MULTILINE | re.IGNORECASE)
+
+_VALID_CATEGORIES = frozenset(
+    {
+        "national",
+        "international",
+        "geo-politics",
+        "geo-economics",
+        "economy",
+        "science-tech",
+        "environment",
+        "society",
+        "law-justice",
+        "defence",
+        "health",
+        "sports-awards",
+    }
+)
 # Title on its own line — either "# Title" or bold "**Title**" or plain first line
 _TITLE_LINE = re.compile(r"^#+\s+(.+)$", re.MULTILINE)
 
@@ -71,47 +120,148 @@ _TITLE_LINE = re.compile(r"^#+\s+(.+)$", re.MULTILINE)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _fetch_ca_chunks_text(ca_chunk_ids: list, db_alias: str = "default") -> str:
+def _fetch_enriched_ca_context(
+    ca_chunk_ids: list, db_alias: str = "default"
+) -> tuple[str, int]:
     """
-    Fetches raw text from CAChunk records by their UUIDs.
-    Returns concatenated text of all available chunks.
-    Falls back to empty string if none found.
+    Phase D1 — Fetches enriched CA context by combining two complementary sources:
+
+      Layer 1 — CAChunk.chunk_text (pre-scored, most UPSC-relevant segments)
+        These are short embedded segments (~100–300 words). They are the highest-
+        signal material — already scored by RelevanceScorerService, topically focused.
+
+      Layer 2 — Parent CAArticle.content (full scraped article text)
+        The original newspaper article (The Hindu, Indian Express, PIB etc.).
+        Contains named officials, specific dates, exact figures, direct quotes,
+        and detailed context that chunks often omit.
+
+    Why both layers matter:
+      Chunks alone → LLM gets the UPSC angle but lacks factual specificity.
+      Parent content → adds names, dates, rupee figures, official statements —
+      exactly what makes articles feel authoritative rather than generic.
+
+    Returns:
+        (enriched_text, chunk_word_count) tuple where:
+          enriched_text     — combined text capped at 4000 chars, structured with
+                              clear section labels so LLM knows what each part is.
+          chunk_word_count  — word count of chunks ONLY (not parent content).
+                              Used by caller for wiki enrichment threshold check —
+                              wiki is triggered only when chunks are thin (< 300 words),
+                              independent of how much parent content is available.
+
+    Failure modes:
+      - Parent content fetch fails for a chunk → logged, skipped (best-effort)
+      - All DB access fails → returns ("", 0), Sentry capture, never raises
     """
     if not ca_chunk_ids:
-        return ""
+        return "", 0
 
     try:
         from engines.current_affairs.models import CAChunk
 
-        chunks = (
+        chunks = list(
             CAChunk.objects.using(db_alias)
             .filter(id__in=ca_chunk_ids)
+            .select_related("ca_article", "ca_article__source")
             .order_by("chunk_index")
         )
-        texts = [c.chunk_text for c in chunks if c.chunk_text]
-        return "\n\n".join(texts)
+
+        chunk_texts: list[str] = []
+        parent_content_parts: list[str] = []
+        seen_article_ids: set = set()
+
+        for chunk in chunks:
+            # Layer 1: chunk text
+            if chunk.chunk_text and chunk.chunk_text.strip():
+                chunk_texts.append(chunk.chunk_text.strip())
+
+            # Layer 2: parent article content — once per unique parent article
+            try:
+                ca_article = chunk.ca_article
+                if ca_article and ca_article.id not in seen_article_ids:
+                    seen_article_ids.add(ca_article.id)
+                    content = (ca_article.content or "").strip()
+                    if len(content) > 100:
+                        source_name = (
+                            ca_article.source.name
+                            if ca_article.source
+                            else "News Source"
+                        )
+                        # First 1000 chars captures headline + lead paragraphs
+                        # where named details (officials, figures, dates) concentrate
+                        parent_content_parts.append(
+                            f"[Source: {source_name}]\n{content[:1000]}"
+                        )
+            except Exception:
+                pass  # Parent fetch is best-effort — never block article generation
+
+        # Compute chunk word count BEFORE building combined text
+        # (used by caller for wiki enrichment threshold — must be chunk-only)
+        chunk_word_count = sum(len(t.split()) for t in chunk_texts)
+
+        # Build combined text with clear structural labels
+        parts: list[str] = []
+        if chunk_texts:
+            parts.append(
+                "KEY EXCERPTS (topically focused, highest-relevance segments):\n"
+                + "\n\n".join(chunk_texts)
+            )
+        if parent_content_parts:
+            parts.append(
+                "FULL SOURCE ARTICLES (original news — specific names, dates, figures, quotes):\n"
+                + "\n\n---\n\n".join(parent_content_parts)
+            )
+
+        if not parts:
+            return "", 0
+
+        combined = "\n\n".join(parts)
+
+        logger.info(
+            "generator_enriched_context_built",
+            chunk_count=len(chunk_texts),
+            parent_articles=len(parent_content_parts),
+            chunk_words=chunk_word_count,
+            total_chars=len(combined),
+        )
+
+        # Cap at 4000 chars — richer context window (up from 2000)
+        return combined[:4000], chunk_word_count
 
     except Exception as exc:
         sentry_sdk.capture_exception(exc)
-        logger.error("generator_fetch_chunks_failed", error=str(exc))
-        return ""
+        logger.error(
+            "generator_fetch_enriched_context_failed",
+            error=str(exc)[:200],
+        )
+        return "", 0
 
 
-def _parse_response(raw: str) -> tuple[str, str, list[str], str]:
+def _parse_response(raw: str) -> tuple[str, str, list[str], str, str]:
     """
-    Parses the LLM response into its four components.
+    Parses the LLM response into its five components.
 
     Returns:
-        (title, body_md, tags_raw, source_attr)
-        - title:       extracted title string
-        - body_md:     article body without TAGS:/SOURCE: footer lines
-        - tags_raw:    list of tag strings from TAGS: line
-        - source_attr: raw SOURCE: line value
+        (title, body_md, tags_raw, source_attr, news_category)
+        - title:         extracted title string
+        - body_md:       article body without CATEGORY:/TAGS:/SOURCE: footer lines
+        - tags_raw:      list of tag strings from TAGS: line
+        - source_attr:   raw SOURCE: line value
+        - news_category: validated category slug (default: "national")
     """
     if not raw:
-        return ("Untitled", "", [], "")
+        return ("Untitled", "", [], "", "national")
 
     text = raw.strip()
+
+    # Extract and remove CATEGORY: line
+    news_category = "national"
+    cat_match = _CATEGORY_LINE.search(text)
+    if cat_match:
+        raw_cat = cat_match.group(1).strip().lower().replace(" ", "-")
+        if raw_cat in _VALID_CATEGORIES:
+            news_category = raw_cat
+        text = text[: cat_match.start()].rstrip() + text[cat_match.end() :]
 
     # Extract and remove TAGS: line
     tags_raw: list[str] = []
@@ -146,7 +296,7 @@ def _parse_response(raw: str) -> tuple[str, str, list[str], str]:
                 title = first_line
                 text = "\n".join(text.splitlines()[1:]).strip()
 
-    return title, text, tags_raw, source_attr
+    return title, text, tags_raw, source_attr, news_category
 
 
 def _generate_slug(title: str, pub_date, db_alias: str = "default") -> str:
@@ -373,13 +523,21 @@ class DailyCaGeneratorService:
             if static_facts is None:
                 needs_static = True
 
-            # ── STEP 2: Wiki enrichment (conditional, 0 GROQ calls) ───────────
-            ca_text = _fetch_ca_chunks_text(proposal.ca_chunk_ids, db_alias=db_alias)
+            # ── STEP 2: Enriched CA context + Wiki enrichment (0 GROQ calls) ────
+            # Phase D1: fetch chunks + parent article content for richer input.
+            # chunk_word_count is the word count of chunks ONLY — used for wiki
+            # enrichment threshold independent of how much parent content was found.
+            ca_text, chunk_word_count = _fetch_enriched_ca_context(
+                proposal.ca_chunk_ids, db_alias=db_alias
+            )
             wiki_data: dict = {}
             topic_name_for_wiki = (
                 proposal.topic.name if proposal.topic else proposal.title
             )
-            if len(ca_text.split()) < 300:
+            # Wiki enrichment: trigger when chunk text is thin (< 300 words).
+            # Uses chunk_word_count, not total enriched text length, so adding
+            # parent content doesn't suppress wiki enrichment for genuinely thin sources.
+            if chunk_word_count < 300:
                 wiki_data = WikiEnrichmentService.get_enrichment(topic_name_for_wiki)
 
             # ── STEP 3: Build prompt + LLM call (1 GROQ call — writer mode) ───
@@ -396,7 +554,9 @@ class DailyCaGeneratorService:
             time.sleep(INTER_CALL_SLEEP)
 
             # ── STEP 4: Parse LLM response ─────────────────────────────────────
-            title, body_md, tags_raw, source_attr = _parse_response(raw_response)
+            title, body_md, tags_raw, source_attr, news_category = _parse_response(
+                raw_response
+            )
 
             # Fallback: use proposal title if LLM didn't produce one
             if not title or title == "Untitled":
@@ -419,6 +579,7 @@ class DailyCaGeneratorService:
                 topic=proposal.topic,
                 subject_name=proposal.subject_name or "",
                 gs_paper=proposal.gs_paper or "",
+                news_category=news_category,
                 published_date=proposal.date,
                 body_md=body_md,
                 body_md_processed="",  # filled in STEP 7
@@ -435,6 +596,9 @@ class DailyCaGeneratorService:
                     "subject": proposal.subject_name or "",
                     "had_static_anchor": static_facts is not None,
                     "had_wiki_enrichment": bool(wiki_data),
+                    "had_enriched_ca_context": bool(ca_text),
+                    "ca_context_chars": len(ca_text),
+                    "chunk_word_count": chunk_word_count,
                     "source_attr": source_attr,
                 },
             )
@@ -449,17 +613,19 @@ class DailyCaGeneratorService:
             article.save(using=db_alias, update_fields=["body_md_processed"])
 
             # ── STEP 8: Keyword tag linking ────────────────────────────────────
-            # Pass LLM-generated tags_raw as overrides → skips GROQ call when available
-            # TagService still calls GROQ for brand-new tags not in the seed table
+            # Only use LLM-generated tags_raw as overrides when it has ≥ 5 tags.
+            # Fewer than 5 means the LLM under-delivered — fall through to a fresh
+            # GROQ extraction call from TagService to guarantee the 5–8 minimum.
+            _use_tag_overrides = len(tags_raw) >= 5
             TagService.extract_and_link_tags(
                 article_text=body_md,
                 content_type="daily_ca",
                 object_id=article.id,
-                overrides=tags_raw if tags_raw else None,
+                overrides=tags_raw if _use_tag_overrides else None,
                 db_alias=db_alias,
             )
-            # Count 1 GROQ call if overrides were empty (service called LLM itself)
-            if not tags_raw:
+            # Count 1 GROQ call if overrides were insufficient (service called LLM itself)
+            if not _use_tag_overrides:
                 calls_used += 1
                 time.sleep(INTER_CALL_SLEEP)
 

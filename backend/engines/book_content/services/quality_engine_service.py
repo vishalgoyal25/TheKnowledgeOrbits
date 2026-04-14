@@ -60,8 +60,8 @@ SPECIFICITY IS MANDATORY — name exact references, ALWAYS:
   ❌ "Several landmark judgments have shaped this area"
   ❌ "Recent data shows improvement"
 
-WRITING FOR PREPARED ASPIRANTS — not beginners:
-  - Reader has read NCERT once and knows basic concepts
+WRITING FOR INFORMED, ANALYTICALLY PREPARED READERS — not beginners:
+  - Reader is well-read, has studied foundational texts, and knows basic concepts
   - Do NOT define what democracy, constitution, GDP, or photosynthesis mean
   - DO explain nuances, exceptions, internal contradictions, and inter-topic links
   - Challenge the reader's existing understanding — add the 20% they don't know
@@ -84,11 +84,47 @@ HEADING DISCIPLINE:
   - Section headings must be adapted to the subject: rename the default heading
     if a more accurate label exists for the topic being written
 
-TABLES: Use only when comparison genuinely adds value.
-  Good: Rajya Sabha vs Lok Sabha (same attributes, side-by-side)
-  Good: Types of disasters (classification with distinct categories)
-  Bad: Single-column list disguised as a 2-column table
-  Bad: Table where all cells say "varies by context"
+TABLE DISCIPLINE — STRICT (applies to all subjects, all articles):
+  Tables are NOT default formatting. An article with zero tables is completely fine.
+  Use a table ONLY when ALL THREE conditions are simultaneously true:
+    1. You are comparing 3 or more distinct items across 3 or more distinct attributes
+    2. A table communicates the comparison more clearly than prose or structured bullets
+    3. The table has a minimum of 4 data rows (not counting the header row)
+
+  MAXIMUM: 2 tables per complete article.
+  If you have already used 1 table, the second must cover an entirely different
+  category of comparison — do NOT double-table the same theme or subject.
+  If a second table is not clearly necessary: write 0 tables or 1 table only.
+
+  WHEN a table earns its place (right use — all subjects):
+    ✅ GS1/Polity:      5+ Constitutional bodies compared across composition, tenure,
+                        powers, appointment, and removal procedure
+    ✅ GS1/Geography:   Classification of 5+ soil/rock/climate types with formation
+                        process, characteristics, distribution, and associated crops
+    ✅ GS2/IR:          India's obligations under 4+ international treaties — framework,
+                        year of ratification, specific target, and India's current status
+    ✅ GS3/Environment: GHG emissions of 5+ sectors with base year figure, current
+                        figure, reduction target, and responsible agency
+    ✅ GS3/Economy:     Comparison of 4+ fiscal consolidation targets (FRBM path) —
+                        year, deficit target, actual, and deviation
+    ✅ GS3/Disaster:    Classification of 4+ disaster types — origin, scale indicator,
+                        primary affected zone, and governing framework
+    ✅ GS4/Ethics:      Contrast of 4+ ethical theories across core principle,
+                        key thinker, strength, and limitation
+
+  WHEN a table must NOT be used (use prose or bullets instead):
+    ❌ 2-item comparisons (Centre vs State, Lok Sabha vs Rajya Sabha, GS1 vs GS2):
+       use parallel bullet points — two-column tables for 2 items are visual padding
+    ❌ Fewer than 4 data rows: integrate into prose — the table adds no density benefit
+    ❌ Single-column list formatted as a 2-column table: use a bulleted list
+    ❌ Table cells that mostly say "varies", "context-dependent", or repeat the same value
+    ❌ Table generated to visually break up long text — this is padding, not value
+    ❌ Table that simply restates facts already written in the paragraph directly above it
+
+  Decision test before creating any table:
+    "Would removing this table require more than 4 sentences of prose to replace?"
+    If NO → do not create the table. Write the prose instead.
+    If YES, and rows ≥ 4, and items ≥ 3, and attributes ≥ 3 → the table is justified.
 """
 
 
@@ -213,7 +249,7 @@ FORBIDDEN headings:
   ✗ "Key Features"  ✗ "Overview"  ✗ "Details"  ✗ "Analysis"
   ✗ Any heading already used in this article""",
         "instruction": """Write the core substantive section on {subtopic}.
-This is the MOST DETAILED section — a serious aspirant must find everything they need here.
+This is the MOST DETAILED section — a serious reader must find everything they need here.
 
 Cover the type of content most relevant to {subtopic}:
   For institutions      → full composition, appointment, tenure, powers, functions
@@ -310,10 +346,10 @@ Cover ALL that apply to this topic:
   - Comparison with international models ONLY where it genuinely illuminates — not decorative
   - Pending reforms: Law Commission recommendations, ARC reports, SC directives,
     Parliamentary Standing Committee observations, NITI Aayog strategy notes
-  - How {subtopic} connects to 2–3 other areas of the UPSC syllabus (inter-topic links)
+  - How {subtopic} connects to 2–3 other subject areas (inter-topic links)
 
 Do NOT be neutral to the point of vagueness.
-Do NOT include "exam tips", "UPSC high-yield facts", or revision bullets.
+Do NOT include "exam tips", "high-yield facts", or revision bullets.
 Do NOT repeat content already covered in earlier sections.
 Length: 200–300 words.""",
     },
@@ -1194,6 +1230,148 @@ def generate_quality_article(
 # ── SECTION-BY-SECTION GENERATOR ─────────────────────────────────────────────
 
 
+# ── Fact extraction patterns ──────────────────────────────────────────────────
+# Used by _extract_facts_from_section() to harvest cited references from each
+# generated section so subsequent sections can avoid repeating them.
+# Covers all four GS subject areas — ordered by specificity (most precise first).
+_FACT_PATTERNS: list[re.Pattern] = [
+    # ── GS2 / Polity & Constitution ───────────────────────────────────────────
+    re.compile(r"Article\s+\d+[A-Z]?(?:\(\d+\))?"),  # Article 370, Article 21A(1)
+    re.compile(r"Section\s+\d+[A-Z]?"),  # Section 144
+    re.compile(
+        r"(?:\d+(?:th|st|nd|rd)|[IVX]+)\s+Schedule"
+    ),  # 6th Schedule, Schedule VI
+    re.compile(
+        r"(?:\d+(?:th|st|nd|rd)|[IVX]+)\s+Amendment"
+    ),  # 42nd Amendment, 101st Amendment
+    # ── GS2 / Governance & IR — named instruments with year ───────────────────
+    re.compile(r"[A-Z][a-zA-Z\s]{3,40}Act,?\s+\d{4}"),  # Forest Rights Act 2006
+    re.compile(r"[A-Z][a-zA-Z\s]{3,40}Amendment,?\s+\d{4}"),  # 42nd Amendment 1976
+    re.compile(
+        r"[A-Z][a-zA-Z\s]{3,30}Committee,?\s+\d{4}"
+    ),  # Swaran Singh Committee 1976
+    re.compile(r"[A-Z][a-zA-Z\s]{3,30}Commission,?\s+\d{4}"),  # Punchhi Commission 2010
+    re.compile(
+        r"[A-Z][a-zA-Z\s]{3,30}Treaty,?\s+(?:of\s+)?\d{4}"
+    ),  # Treaty of Westphalia 1648
+    re.compile(r"[A-Z][a-zA-Z\s]{3,30}Convention,?\s+\d{4}"),  # Vienna Convention 1969
+    # ── GS1 / Modern Indian History — significant standalone years ────────────
+    # Matches years 1757–1947 anchored by word boundary (Battle of Plassey → Independence)
+    re.compile(r"\b(175[7-9]|17[6-9]\d|1[89]\d{2}|194[0-7])\b"),
+    # ── GS1 / History — named events anchored to a year ──────────────────────
+    # Non-Cooperation Movement 1920, Battle of Plassey 1757, Jallianwala Bagh Massacre 1919
+    re.compile(
+        r"[A-Z][a-zA-Z\s]{3,30}"
+        r"(?:War|Battle|Revolt|Movement|Massacre|Pact|Session|Congress|Conference)"
+        r",?\s+(?:of\s+)?\d{4}",
+        re.IGNORECASE,
+    ),
+    # ── GS1 / Geography — quantitative physical geography facts ──────────────
+    re.compile(
+        r"\d{1,5}\s*(?:km|km²|sq\.?\s*km)\b", re.IGNORECASE
+    ),  # 3,214 km, 1.27M km²
+    re.compile(r"\d{1,5}\s*m\b(?!\w)"),  # 8,849 m (altitude)
+    re.compile(
+        r"\d{1,4}\s*mm\b(?:\s*(?:rainfall|precipitation))?", re.IGNORECASE
+    ),  # 1,187 mm rainfall
+    re.compile(r"\d{1,2}(?:\.\d{1,2})?\s*°[CNS]\b"),  # 28.6°N, 15°C
+    # ── GS1 / Heritage & Culture — UNESCO and national designations ───────────
+    re.compile(
+        r"UNESCO\s+(?:World Heritage|Intangible Cultural Heritage|"
+        r"Biosphere Reserve|Creative City)[^.]{0,60}",
+        re.IGNORECASE,
+    ),
+    # Named dynasties when followed by a century/period reference
+    re.compile(
+        r"(?:Maurya|Gupta|Chola|Mughal|Maratha|Vijayanagara|Pallava|Rashtrakuta)"
+        r"(?:\s+(?:dynasty|Empire|period|era))?",
+        re.IGNORECASE,
+    ),
+    # ── GS3 / Economy — fiscal and monetary figures ───────────────────────────
+    re.compile(
+        r"₹\s*[\d,]+(?:\.\d+)?\s*(?:crore|lakh|trillion|billion)?", re.IGNORECASE
+    ),
+    re.compile(r"\$\s*[\d,]+(?:\.\d+)?\s*(?:billion|trillion|million)?", re.IGNORECASE),
+    re.compile(r"\d{1,3}(?:\.\d{1,2})?\s*%"),  # 7.2%, 21.71%, 4.5%
+    # ── GS3 / Science & Technology — named missions and programmes ────────────
+    re.compile(
+        r"(?:Chandrayaan|Mangalyaan|Gaganyaan|Aditya|RISAT|GSAT|INSAT|NavIC|PSLV|GSLV)"
+        r"[-\s]?\w{0,10}",
+        re.IGNORECASE,
+    ),
+    re.compile(r"(?:PFBR|AHWR|KAPP|RAPP|NPCIL|ITER|TOKAMAK)\b", re.IGNORECASE),
+    # ── GS3 / Environment — frameworks and coverage figures ───────────────────
+    re.compile(
+        r"[A-Z][a-zA-Z\s]{3,30}"
+        r"(?:Framework|Protocol|Convention|Agreement|Accord),?\s+\d{4}",
+        re.IGNORECASE,
+    ),  # Sendai Framework 2015, Paris Agreement 2015, Ramsar Convention 1971
+    # ── GS4 / Ethics — named thinkers ────────────────────────────────────────
+    re.compile(
+        r"(?:Kant|Aristotle|Rawls|Bentham|Mill|Nozick|Sen|Gandhi|Thoreau|"
+        r"Hegel|Plato|Socrates|Confucius|Kautilya|Ambedkar|Vivekananda)\b"
+    ),
+    # Named ethical principles / doctrines
+    re.compile(
+        r"(?:Categorical Imperative|Veil of Ignorance|Greatest Happiness Principle|"
+        r"Doctrine of Double Effect|Golden Mean|Sarvodaya|Nishkama Karma|"
+        r"Panchsheel|Satyagraha|Ahimsa)\b",
+        re.IGNORECASE,
+    ),
+    # ── All subjects — year ranges (fiscal / academic / treaty periods) ───────
+    re.compile(r"\b(?:19|20)\d{2}[–\-](?:19|20)?\d{2}\b"),  # 2023-24, 1947-50
+]
+
+_MAX_TRACKED_FACTS = 15  # cap to avoid prompt bloat
+
+
+def _extract_facts_from_section(text: str) -> list[str]:
+    """
+    Phase E2 — Extracts citable facts from a generated section for cross-section
+    anti-repetition tracking. Covers all four GS subject areas:
+
+      GS1 / Modern Indian History:
+        Significant standalone years (1757–1947), named battles/movements with year
+      GS1 / Geography:
+        Distance/area figures (km, km², m), rainfall (mm), coordinates (°N/°C)
+      GS1 / Heritage & Culture:
+        UNESCO designations, named dynasties (Maurya, Gupta, Chola, Mughal, etc.)
+      GS2 / Polity & Constitution:
+        Article numbers, Schedule references, Amendment numbers, Section numbers
+      GS2 / Governance & IR:
+        Act names with year, Committee/Commission names with year,
+        Treaty/Convention names with year
+      GS3 / Economy:
+        Rupee figures (₹ crore/lakh), dollar figures ($bn), percentage figures
+      GS3 / Science & Technology:
+        Named ISRO missions (Chandrayaan, Gaganyaan), reactor/programme names
+      GS3 / Environment:
+        Named frameworks/protocols with year (Paris Agreement, Sendai Framework),
+        percentage coverage figures
+      GS4 / Ethics:
+        Named thinkers (Kant, Rawls, Gandhi, Ambedkar, Kautilya),
+        named ethical principles (Categorical Imperative, Sarvodaya, Ahimsa)
+      All subjects:
+        Year ranges (2023-24, 1947-50)
+
+    Returns a deduplicated list of matched fact strings, capped at _MAX_TRACKED_FACTS.
+    Short matches (< 6 chars) are filtered to avoid noise.
+    """
+    found: list[str] = []
+    seen: set[str] = set()
+
+    for pattern in _FACT_PATTERNS:
+        for match in pattern.finditer(text):
+            fact = match.group().strip()
+            if len(fact) >= 6 and fact not in seen:
+                seen.add(fact)
+                found.append(fact)
+                if len(found) >= _MAX_TRACKED_FACTS:
+                    return found
+
+    return found
+
+
 def _generate_sections(
     subtopic: str,
     parent_topic: str,
@@ -1205,11 +1383,14 @@ def _generate_sections(
     """
     Generates each section independently for deeper content.
     The LLM chooses its own ### heading per section (dynamic headings).
-    used_headings is passed to every subsequent section to prevent duplication.
+    used_headings is passed to every subsequent section to prevent heading duplication.
+    used_facts is accumulated after each section and passed to the next to prevent
+    fact/provision repetition across sections (Phase E2).
     """
     sections = {}
     article_so_far = ""
     used_headings: list[str] = []
+    used_facts: list[str] = []  # Phase E2: tracks cited facts across sections
 
     for section_def in SECTION_PLAN:
         section_id = section_def["id"]
@@ -1226,6 +1407,7 @@ def _generate_sections(
             section_instruction=instruction,
             article_so_far=article_so_far,
             used_headings=used_headings,
+            used_facts=used_facts,  # Phase E2: pass accumulated facts
             subject=subject,
         )
 
@@ -1254,6 +1436,14 @@ def _generate_sections(
 
             sections[section_id] = content
             article_so_far += f"\n\n{content}"
+
+            # Phase E2: extract facts from this section and accumulate for next section
+            new_facts = _extract_facts_from_section(content)
+            for fact in new_facts:
+                if fact not in used_facts:
+                    used_facts.append(fact)
+            # Keep cap tight to avoid prompt bloat
+            used_facts = used_facts[:_MAX_TRACKED_FACTS]
         else:
             fallback_heading = f"{subtopic} — {section_id.replace('_', ' ').title()}"
             logger.warning(
@@ -1277,12 +1467,17 @@ def _build_section_prompt(
     section_instruction: str,
     article_so_far: str,
     used_headings: list[str],
+    used_facts: list[str]
+    | None = None,  # Phase E2: facts already cited in prior sections
     subject: str = "",
 ) -> str:
     """
     Builds the full prompt for one section.
     The LLM picks its own ### heading guided by heading_directive.
-    used_headings enforces no duplication across sections.
+    used_headings enforces no heading duplication across sections.
+    used_facts (Phase E2) enforces no fact/provision repetition across sections —
+    cited Article numbers, Act names, percentages, rupee figures, and year ranges
+    from previously generated sections are injected as a fact fence.
     """
 
     # ── Source material ───────────────────────────────────────────────────────
@@ -1310,7 +1505,7 @@ ARTICLE SO FAR (maintain continuity — do NOT repeat any of this):
 ...{article_so_far[-600:]}
 """
 
-    # ── Anti-duplication fence ────────────────────────────────────────────────
+    # ── Anti-duplication fence (headings) ────────────────────────────────────
     if used_headings:
         forbidden_list = "\n".join(f"  ✗ {h}" for h in used_headings)
         duplicate_fence = f"""
@@ -1319,6 +1514,22 @@ HEADINGS ALREADY USED — your new heading MUST NOT repeat or closely echo any o
 """
     else:
         duplicate_fence = ""
+
+    # ── Anti-repetition fence (facts) — Phase E2 ─────────────────────────────
+    # Injects Article numbers, Act names, percentages, figures, and year ranges
+    # already cited in previous sections so the LLM doesn't re-explain them.
+    if used_facts:
+        facts_list = "\n".join(f"  ✗ {f}" for f in used_facts[:_MAX_TRACKED_FACTS])
+        fact_fence = f"""
+FACTS / PROVISIONS ALREADY CITED IN EARLIER SECTIONS — do NOT repeat or re-explain:
+{facts_list}
+If a listed fact is genuinely required as passing context in this section,
+reference it in at most one clause then move on — do not re-explain or re-analyse it.
+Covers all subjects: Article numbers (GS2/Polity), Act names (GS2/GS3),
+percentages and ₹ figures (GS3/Economy/Environment), year ranges (all subjects).
+"""
+    else:
+        fact_fence = ""
 
     # ── Subject persona ───────────────────────────────────────────────────────
     subject_persona_block = ""
@@ -1349,7 +1560,7 @@ HEADINGS ALREADY USED — your new heading MUST NOT repeat or closely echo any o
         subject_persona_block = "\n".join(lines) + "\n"
 
     return f"""You are a senior author writing "{subtopic}" — one chapter in a
-comprehensive UPSC study book on "{parent_topic}".
+comprehensive knowledge reference on "{parent_topic}".
 
 {MASTER_STYLE_ANCHOR}
 {subject_persona_block}
@@ -1363,6 +1574,7 @@ YOUR TASK — Write ONE section now. Follow ALL rules below exactly.
 STEP 1 — CHOOSE YOUR HEADING
 {heading_directive}
 {duplicate_fence}
+{fact_fence}
 OUTPUT FORMAT FOR HEADING: Start your response with exactly:
 ### [Your chosen heading here]
 (one blank line, then the section content)
@@ -1393,7 +1605,7 @@ def _run_critique(subtopic: str, article: str) -> dict:
     Runs a self-critique on the generated article.
     Returns critique dict with score and weak sections.
     """
-    prompt = f"""You are a strict UPSC content quality reviewer.
+    prompt = f"""You are a strict knowledge content quality reviewer.
 Review this article on "{subtopic}" and score it.
 
 ARTICLE TO REVIEW:
@@ -1401,17 +1613,17 @@ ARTICLE TO REVIEW:
 
 Rate on these criteria (0-20 each, total 100):
 1. SPECIFICITY: Are Articles, Acts, case names, years all cited precisely?
-2. DEPTH: Does it go beyond surface-level explanation?
-3. UPSC RELEVANCE: Is exam angle clearly addressed?
+2. DEPTH: Does it go beyond surface-level explanation into genuine analytical depth?
+3. SUBJECT RELEVANCE: Does it address the core dimensions of this subject with precision?
 4. NO VAGUENESS: Zero hedging phrases, zero filler sentences?
-5. ACCURACY: Is constitutional information factually correct?
+5. ACCURACY: Is the factual information (constitutional, scientific, historical) correct?
 
 Return ONLY valid JSON:
 {{
   "scores": {{
     "specificity": 0-20,
     "depth": 0-20,
-    "upsc_relevance": 0-20,
+    "subject_relevance": 0-20,
     "no_vagueness": 0-20,
     "accuracy": 0-20
   }},
@@ -1438,8 +1650,8 @@ def _refine_weak_sections(
         return article
 
     for section_heading in weak_sections[:2]:  # Max 2 refinements to save API calls
-        prompt = f"""This section of a UPSC article on "{subtopic}" is weak.
-Rewrite it to be more specific, precise, and exam-relevant.
+        prompt = f"""This section of an article on "{subtopic}" is weak.
+Rewrite it to be more specific, precise, and analytically deeper.
 
 {MASTER_STYLE_ANCHOR}
 
@@ -1535,7 +1747,7 @@ def _format_single_section(subtopic: str, section_text: str) -> str:
     same bounding philosophy as ncert[:3000] / wiki[:3000] in _build_section_prompt().
     Returns the enhanced section, or original if no criteria met.
     """
-    prompt = f"""You are a UPSC study material formatter.
+    prompt = f"""You are a study material formatter for a premier knowledge platform.
 Analyze the single section below from an article on "{subtopic}" and enhance it WHERE JUSTIFIED.
 
 SECTION:
@@ -1546,7 +1758,7 @@ EVALUATE THESE 2 CRITERIA FOR THIS SECTION ONLY:
 CRITERION 2 — Comparison Potential:
   Does this section discuss ≥2 distinct entities on the same attributes
   (e.g., Lok Sabha vs Rajya Sabha, Fundamental Rights vs DPSP)?
-  → If YES: Add a comparison table INLINE after both entities are discussed.
+  → If YES AND the comparison has ≥4 rows of genuine data: Add a comparison table INLINE.
   Format:
   ### ⚖️ Comparative Analysis: [Entity A] vs [Entity B]
   | Feature | [Entity A] | [Entity B] |
@@ -1556,7 +1768,7 @@ CRITERION 2 — Comparison Potential:
 CRITERION 3 — Logical Grouping:
   Can this section's content be better presented as a classification table
   (e.g., types of emergencies, categories of bills, types of amendments)?
-  → If YES: Add a categorization table INLINE within this section.
+  → If YES AND the classification has ≥4 rows of genuine data: Add a categorization table INLINE.
   Format:
   ### 📋 Classification: [Category Name]
   | Category | Description |
@@ -1567,12 +1779,12 @@ ALSO — detect Visual Moments in this section and inject infographic placeholde
   Use this syntax inline where a diagram/map/timeline would genuinely help:
   >[!infographic: "Description of what the image should show"]<
 
-ALSO — inject UPSC callout boxes for critical exam-facing facts:
-  > **💡 UPSC High-Yield Focus:** [Critical exam takeaway in 1-2 sentences]
+ALSO — inject insight callout boxes for significant facts worth highlighting:
+  > **💡 Key Insight:** [One genuinely surprising or significant fact in 1-2 sentences]
 
 RULES:
   - If NEITHER criterion is met → return the section UNCHANGED.
-  - Do NOT add tables for the sake of adding them.
+  - Do NOT add tables for the sake of adding them — fewer than 4 data rows = no table.
   - Every table cell must trace to a sentence in the section above.
   - Do NOT add any new facts, names, or data not present in the section.
 
@@ -1592,23 +1804,24 @@ def _add_summary_table(subtopic: str, article_md: str) -> str:
     The table is appended to the full article by this function, not by the LLM,
     so the LLM never needs to echo back a large payload.
     """
-    prompt = f"""You are a UPSC study material formatter.
+    prompt = f"""You are a study material formatter for a premier knowledge platform.
 Analyze the article excerpt below on "{subtopic}".
 
 ARTICLE EXCERPT:
 {article_md[:4000]}
 
-TASK — Criterion 1: Does this article contain ≥5 dates, names, or specific powers/provisions?
+TASK — Criterion 1: Does this article contain ≥5 distinct dates, names, or specific
+powers/provisions that would benefit from a consolidated reference table?
 
-→ If YES: Generate ONLY the summary revision table (nothing else, no preamble):
-### 📊 Quick Revision: {subtopic}
+→ If YES: Generate ONLY the summary reference table (nothing else, no preamble):
+### 📊 Quick Reference: {subtopic}
 | Aspect | Detail |
 |--------|--------|
 (8–12 rows of key facts ONLY from the excerpt above — no hallucination, no new data)
 
 → If NO: Reply with exactly the word: NO_TABLE
 
-Rules: Every row must trace to a fact in the excerpt. Zero hallucination."""
+Rules: Every row must trace to a fact in the excerpt. Zero hallucination. Zero invention."""
 
     result = llm_call(prompt, mode="standard")
 

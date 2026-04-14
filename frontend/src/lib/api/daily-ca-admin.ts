@@ -127,7 +127,11 @@ export async function getAdminArticles(
 
 export async function triggerGeneration(
   date: string,
-): Promise<{ status: string; date: string }> {
-  const res = await apiClient.post("/admin/daily-ca/generate/run/", { date });
+  autoPublish: boolean = true,
+): Promise<{ status: string; date: string; auto_publish: boolean }> {
+  const res = await apiClient.post("/admin/daily-ca/generate/run/", {
+    date,
+    auto_publish: autoPublish,
+  });
   return res.data;
 }
