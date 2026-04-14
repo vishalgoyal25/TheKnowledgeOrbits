@@ -4,14 +4,56 @@ import { useState } from "react";
 
 /**
  * InSummaryBox — collapsible "In Summary" card.
- * Extracts 3 key points from the article markdown body automatically.
+ *
+ * Primary source: `newsContext` — the article's news_context field, which is a
+ * concise editorial summary of why the topic is in the news. Sentence-split into
+ * bullet points (up to 3) so the box never duplicates body content.
+ *
+ * Fallback: `bodyMd` — used only when newsContext is absent or too short.
+ * Extracts up to 3 meaningful sentences/bullets from the article body.
  */
 
 interface Props {
-  bodyMd: string;
+  newsContext?: string;
+  bodyMd?: string;
 }
 
-function extractSummaryPoints(md: string): string[] {
+// ── Extraction helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Split newsContext into up to 3 clean bullet points.
+ * Handles both sentence-break (". ") and semicolon ("; ") delimiters.
+ */
+function extractFromNewsContext(text: string): string[] {
+  if (!text || text.trim().length < 20) return [];
+
+  // Try semicolon split first (structured news context)
+  const bySemicolon = text
+    .split(/;\s*/)
+    .map((s) => s.trim().replace(/\.$/, ""))
+    .filter((s) => s.length >= 20);
+
+  if (bySemicolon.length >= 2) return bySemicolon.slice(0, 3);
+
+  // Fall back to sentence split
+  const bySentence = text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 20 && s.length <= 250);
+
+  if (bySentence.length >= 1) return bySentence.slice(0, 3);
+
+  // Single block — return as one point
+  return [text.trim().slice(0, 250)];
+}
+
+/**
+ * Fallback: extract 3 key points from article body markdown.
+ * Used only when newsContext is absent/too short.
+ */
+function extractFromBodyMd(md: string): string[] {
+  if (!md) return [];
+
   // Strategy 1: find bullet/numbered list items (min 30 chars, max 150)
   const bulletMatches = md.match(/^[-*•]\s+(.{30,150})$/gm) ?? [];
   const bullets = bulletMatches
@@ -42,14 +84,26 @@ function extractSummaryPoints(md: string): string[] {
     .map((s) => s.trim())
     .filter((s) => s.length > 40 && s.length < 200);
 
-  return sentences.slice(0, 3).length > 0
-    ? sentences.slice(0, 3)
-    : ["This article covers key UPSC-relevant current affairs developments."];
+  return sentences.slice(0, 3);
 }
 
-export function InSummaryBox({ bodyMd }: Props) {
+function getSummaryPoints(newsContext?: string, bodyMd?: string): string[] {
+  // Primary: use news_context
+  const fromContext = extractFromNewsContext(newsContext ?? "");
+  if (fromContext.length >= 1) return fromContext;
+
+  // Fallback: extract from body
+  const fromBody = extractFromBodyMd(bodyMd ?? "");
+  if (fromBody.length >= 1) return fromBody;
+
+  return ["Key developments covered in this article."];
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
+export function InSummaryBox({ newsContext, bodyMd }: Props) {
   const [open, setOpen] = useState(true);
-  const points = extractSummaryPoints(bodyMd);
+  const points = getSummaryPoints(newsContext, bodyMd);
 
   return (
     <div className="my-4 rounded-xl border border-blue-200 bg-blue-50 overflow-hidden">

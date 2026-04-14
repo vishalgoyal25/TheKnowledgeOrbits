@@ -30,6 +30,7 @@ export interface DailyCaArticleList {
   title: string;
   subject_name: string;
   gs_paper: string;
+  news_category: string;
   published_date: string;
   news_context: string;
   hero_image_url: string | null;

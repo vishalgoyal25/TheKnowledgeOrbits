@@ -238,13 +238,16 @@ class ConceptPage(models.Model):
 
 class ConceptArticleLink(models.Model):
     """
-    M2M junction linking a ConceptPage to a DailyCaArticle.
+    M2M junction linking a ConceptPage to either a DailyCaArticle or a
+    BookContent article. Exactly ONE of the two FKs must be set — never both,
+    never neither. Enforced at the service layer (ConceptPageResolver).
 
-    Phase C note:
-      daily_ca_article_id is a plain UUIDField here because DailyCaArticle
-      (engines.daily_ca) does not exist yet. The actual FK constraint and
-      CASCADE behaviour will be added via migration in Phase E once
-      DailyCaArticle is created.
+    Phase K1: converted daily_ca_article_id (plain UUIDField) to a real FK
+    and added book_content_article FK so concept links work for both article types.
+
+    unique_together replaced by two conditional UniqueConstraints so
+    (concept, daily_ca_article) and (concept, book_content_article) are each
+    unique independently without conflicting with null values.
 
     Max 8 concept links per article enforced at service layer (ConceptPageResolver).
     """
@@ -260,20 +263,49 @@ class ConceptArticleLink(models.Model):
         related_name="article_links",
         help_text="The concept page being linked",
     )
-    # Phase C: plain UUID — FK constraint added in Phase E migration
-    daily_ca_article_id = models.UUIDField(
-        help_text="PK of the DailyCaArticle this concept is linked from "
-        "(FK constraint to daily_ca.DailyCaArticle added in Phase E)",
+    # EITHER daily_ca_article OR book_content_article is set — never both, never neither
+    daily_ca_article = models.ForeignKey(
+        "daily_ca.DailyCaArticle",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="concept_links",
+        help_text="DailyCaArticle this concept is linked from (null if book_content link)",
+    )
+    book_content_article = models.ForeignKey(
+        "book_content.BookContent",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="concept_links",
+        help_text="BookContent article this concept is linked from (null if daily_ca link)",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "concept_article_link"
-        unique_together = [["concept_page", "daily_ca_article_id"]]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["concept_page", "daily_ca_article"],
+                condition=models.Q(daily_ca_article__isnull=False),
+                name="unique_concept_ca_article",
+            ),
+            models.UniqueConstraint(
+                fields=["concept_page", "book_content_article"],
+                condition=models.Q(book_content_article__isnull=False),
+                name="unique_concept_book_article",
+            ),
+        ]
         indexes = [
             models.Index(fields=["concept_page"]),
-            models.Index(fields=["daily_ca_article_id"]),
+            models.Index(fields=["daily_ca_article"]),
+            models.Index(fields=["book_content_article"]),
         ]
 
     def __str__(self) -> str:
-        return f"{self.concept_page.name} → article:{self.daily_ca_article_id}"
+        article_ref = (
+            f"ca:{self.daily_ca_article_id}"
+            if self.daily_ca_article_id
+            else f"book:{self.book_content_article_id}"
+        )
+        return f"{self.concept_page.name} → {article_ref}"

@@ -5,7 +5,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -38,68 +38,28 @@ import { HierarchySubject, HierarchyModule, HierarchyTopic } from "@/lib/types";
 import type { TreeTopic } from "@/types/book-content";
 import OrbitIcon from "@/components/ui/orbit-icon";
 
+// Keep in sync with NEWS_CATEGORY_CHOICES in backend/engines/daily_ca/models.py
+const NEWS_CATEGORY_MODULES: HierarchyModule[] = [
+  { id: "all", name: "All", topics: [] },
+  { id: "national", name: "National", topics: [] },
+  { id: "international", name: "International", topics: [] },
+  { id: "geo-politics", name: "Geo-Politics", topics: [] },
+  { id: "geo-economics", name: "Geo-Economics", topics: [] },
+  { id: "economy", name: "Economy & Business", topics: [] },
+  { id: "science-tech", name: "Science & Technology", topics: [] },
+  { id: "environment", name: "Environment & Climate", topics: [] },
+  { id: "society", name: "Society & Culture", topics: [] },
+  { id: "law-justice", name: "Law & Justice", topics: [] },
+  { id: "defence", name: "Defence & Security", topics: [] },
+  { id: "health", name: "Health", topics: [] },
+  { id: "sports-awards", name: "Sports & Awards", topics: [] },
+];
+
 const NEWS_SUBJECT: HierarchySubject = {
   id: "news",
   name: "News",
-  description: "Global news updates and current affairs categorized by theme.",
-  modules: [
-    {
-      id: "news-world",
-      name: "World",
-      topics: [
-        { id: "news-un", name: "United Nations" },
-        { id: "news-global-economy", name: "Global Economy" },
-      ],
-    },
-    {
-      id: "news-politics",
-      name: "Politics",
-      topics: [
-        { id: "news-elections", name: "Elections" },
-        { id: "news-policy", name: "Policy Updates" },
-      ],
-    },
-    {
-      id: "news-climate",
-      name: "Climate Crisis",
-      topics: [
-        { id: "news-cop28", name: "COP28" },
-        { id: "news-emissions", name: "Carbon Emissions" },
-      ],
-    },
-    {
-      id: "news-middle-east",
-      name: "Middle East",
-      topics: [
-        { id: "news-peace", name: "Peace Process" },
-        { id: "news-oil", name: "Energy Market" },
-      ],
-    },
-    {
-      id: "news-science",
-      name: "Science",
-      topics: [
-        { id: "news-space", name: "Space Exploration" },
-        { id: "news-bio", name: "Biotech" },
-      ],
-    },
-    {
-      id: "news-tech",
-      name: "Tech",
-      topics: [
-        { id: "news-ai", name: "Artificial Intelligence" },
-        { id: "news-chips", name: "Semiconductors" },
-      ],
-    },
-    {
-      id: "news-business",
-      name: "Business",
-      topics: [
-        { id: "news-markets", name: "Stock Markets" },
-        { id: "news-trade", name: "World Trade" },
-      ],
-    },
-  ],
+  description: "Daily current affairs categorized by theme.",
+  modules: NEWS_CATEGORY_MODULES,
 };
 
 interface HeaderProps {
@@ -109,6 +69,7 @@ interface HeaderProps {
 export default function Header({ initialHierarchy }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -270,7 +231,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
     for (const subject of hierarchyData) {
       if (
         pathname.includes(`/subjects/${subject.id}`) ||
-        (subject.id === "news" && pathname.includes("/current-affairs"))
+        (subject.id === "news" && pathname.includes("/news"))
       ) {
         activeSubject = subject.id;
         break;
@@ -559,8 +520,40 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                           {hierarchyData
                             .find((s) => s.id === drawerActiveSubjectId)
                             ?.modules?.map((m) => {
-                              const isCurrentModule =
-                                drawerActiveModuleId === m.id;
+                              const isNewsSubjectDrawer =
+                                drawerActiveSubjectId === "news";
+                              const isCurrentModule = isNewsSubjectDrawer
+                                ? m.id === "all"
+                                  ? pathname === "/news" &&
+                                    !searchParams.get("category")
+                                  : searchParams.get("category") === m.id
+                                : drawerActiveModuleId === m.id;
+                              const moduleHrefDrawer = isNewsSubjectDrawer
+                                ? m.id === "all"
+                                  ? "/news"
+                                  : `/news?category=${m.id}`
+                                : undefined;
+
+                              if (isNewsSubjectDrawer) {
+                                return (
+                                  <Link
+                                    key={m.id}
+                                    href={moduleHrefDrawer!}
+                                    onClick={() => setIsDrawerOpen(false)}
+                                    className={cn(
+                                      "w-full flex items-center justify-between px-3 py-2.5 text-sm font-bold rounded-lg transition-all",
+                                      isCurrentModule
+                                        ? "bg-red-600 text-white shadow-sm"
+                                        : "text-slate-600 hover:bg-slate-50",
+                                    )}
+                                  >
+                                    <span className="leading-snug">
+                                      {m.name}
+                                    </span>
+                                  </Link>
+                                );
+                              }
+
                               return (
                                 <button
                                   key={m.id}
@@ -645,7 +638,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                                 `/topics/${t.id}`,
                               );
                               const href = isNewsModule
-                                ? "/current-affairs"
+                                ? "/news"
                                 : `/knowledge?topic=${t.id}&subject=${drawerActiveSubjectId}`;
                               return (
                                 <Link
@@ -854,9 +847,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                 return (
                   <Link
                     key={subject.id}
-                    href={
-                      isNews ? "/current-affairs" : `/subjects/${subject.id}`
-                    }
+                    href={isNews ? "/news" : `/subjects/${subject.id}`}
                     className={cn(
                       "flex items-center px-5 h-full text-sm font-bold transition-all whitespace-nowrap shrink-0 border-b-2 border-r border-slate-200 group",
                       isActive
@@ -885,10 +876,19 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                   {hierarchyData
                     .find((s) => s.id === displaySubjectId)
                     ?.modules?.map((module: HierarchyModule) => {
-                      const isActiveModule = pathname.includes(
-                        `/modules/${module.id}`,
-                      );
+                      const isNewsSubject = displaySubjectId === "news";
+                      const isActiveModule = isNewsSubject
+                        ? module.id === "all"
+                          ? pathname === "/news" &&
+                            !searchParams.get("category")
+                          : searchParams.get("category") === module.id
+                        : pathname.includes(`/modules/${module.id}`);
                       const isHovered = hoveredModuleId === module.id;
+                      const moduleHref = isNewsSubject
+                        ? module.id === "all"
+                          ? "/news"
+                          : `/news?category=${module.id}`
+                        : `/modules/${module.id}`;
                       const allTopics: { id: string; name: string }[] = [];
                       module.topics?.forEach((t: HierarchyTopic) => {
                         allTopics.push({ id: t.id, name: t.name });
@@ -904,6 +904,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                           key={module.id}
                           className="h-full shrink-0 flex items-center border-r border-slate-300 relative group/module"
                           onMouseEnter={(e) => {
+                            if (!hasTopics) return;
                             const rect = (
                               e.currentTarget as HTMLElement
                             ).getBoundingClientRect();
@@ -925,11 +926,13 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                           }}
                         >
                           <Link
-                            href={`/modules/${module.id}`}
+                            href={moduleHref}
                             className={cn(
                               "flex items-center px-4 h-full text-[11px] font-extrabold uppercase tracking-widest transition-all whitespace-nowrap",
                               isActiveModule || isHovered
-                                ? "text-blue-600 bg-white"
+                                ? isNewsSubject
+                                  ? "text-red-600 bg-white"
+                                  : "text-blue-600 bg-white"
                                 : "text-slate-500 hover:text-slate-900",
                             )}
                           >

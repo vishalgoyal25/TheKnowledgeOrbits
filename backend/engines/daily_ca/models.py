@@ -14,6 +14,23 @@ import uuid
 from django.db import models
 
 
+# ── Choices ───────────────────────────────────────────────────────────────────
+
+NEWS_CATEGORY_CHOICES = [
+    ("national", "National"),
+    ("international", "International"),
+    ("geo-politics", "Geo-Politics"),
+    ("geo-economics", "Geo-Economics"),
+    ("economy", "Economy & Business"),
+    ("science-tech", "Science & Technology"),
+    ("environment", "Environment & Climate"),
+    ("society", "Society & Culture"),
+    ("law-justice", "Law & Justice"),
+    ("defence", "Defence & Security"),
+    ("health", "Health"),
+    ("sports-awards", "Sports & Awards"),
+]
+
 # ── MODEL: CaDailyProposal ────────────────────────────────────────────────────
 
 PROPOSAL_STATUS_CHOICES = [
@@ -219,6 +236,13 @@ class DailyCaArticle(models.Model):
         default=list,
         help_text="UUIDs of the top-3 CAChunks used as source for generation (audit trail)",
     )
+    news_category = models.CharField(
+        max_length=30,
+        choices=NEWS_CATEGORY_CHOICES,
+        default="national",
+        db_index=True,
+        help_text="Fixed news category — classified by LLM at generation time.",
+    )
     quality_score = models.FloatField(
         default=0.0,
         help_text="0.0–10.0 quality signal computed post-generation",
@@ -247,6 +271,7 @@ class DailyCaArticle(models.Model):
             models.Index(fields=["published_date", "is_published"]),
             models.Index(fields=["slug"]),
             models.Index(fields=["topic"]),
+            models.Index(fields=["news_category"]),
         ]
 
     def __str__(self) -> str:

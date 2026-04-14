@@ -75,64 +75,98 @@ function estimateReadTime(md: string): number {
 }
 
 // ── Custom markdown components ────────────────────────────────────────────────
+// F1 (FEATURES3): Full typographic upgrade — larger, more readable, better spaced.
+// Paragraph structure: each <p> gets generous line-height + bottom margin so
+// multi-paragraph sections feel distinct and breathable (not a wall of text).
 
 const markdownComponents = {
-  // Style headings
+  // ## Section headings — clearly larger than body, with a coloured underline accent
   h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="text-base font-bold text-gray-900 mt-5 mb-2 pb-1 border-b border-gray-100">
+    <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3 pb-2 border-b-2 border-blue-100 tracking-tight leading-snug">
       {children}
     </h2>
   ),
+
+  // ### Sub-headings — one step down, still prominent
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-sm font-semibold text-gray-800 mt-4 mb-1.5">
+    <h3 className="text-lg font-semibold text-gray-800 mt-6 mb-2 leading-snug">
       {children}
     </h3>
   ),
+
+  // Paragraphs — base text size, generous line-height for long reads,
+  // clear bottom margin separates each paragraph visually
   p: ({ children }: { children?: React.ReactNode }) => (
-    <p className="text-sm leading-relaxed text-gray-700 mb-3">{children}</p>
+    <p className="text-base leading-7 text-gray-700 mb-4">{children}</p>
   ),
+
+  // Unordered lists — slightly more spacing between items for readability
   ul: ({ children }: { children?: React.ReactNode }) => (
-    <ul className="my-3 space-y-1 pl-4">{children}</ul>
+    <ul className="my-4 space-y-2 pl-2">{children}</ul>
   ),
+
+  // Ordered lists
   ol: ({ children }: { children?: React.ReactNode }) => (
-    <ol className="my-3 space-y-1 pl-4 list-decimal">{children}</ol>
+    <ol className="my-4 space-y-2 pl-5 list-decimal">{children}</ol>
   ),
+
+  // List items — base size, bullet dot replaced with a styled accent
   li: ({ children }: { children?: React.ReactNode }) => (
-    <li className="text-sm text-gray-700 leading-relaxed flex gap-2">
-      <span className="flex-shrink-0 text-blue-400 mt-1.5">•</span>
+    <li className="text-base text-gray-700 leading-7 flex gap-2.5">
+      <span className="flex-shrink-0 text-blue-400 font-bold mt-0.5">•</span>
       <span>{children}</span>
     </li>
   ),
+
+  // Bold — slightly deeper colour for contrast against body text
   strong: ({ children }: { children?: React.ReactNode }) => (
     <strong className="font-semibold text-gray-900">{children}</strong>
   ),
+
+  // Inline code
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code className="text-sm bg-gray-100 text-gray-800 rounded px-1.5 py-0.5 font-mono">
+      {children}
+    </code>
+  ),
+
+  // Concept links and external links — base size, readable blue, underlined
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
     <a
       href={href}
-      className="text-blue-600 underline underline-offset-2 hover:text-blue-800 transition-colors"
+      className="text-base text-blue-600 underline underline-offset-2 hover:text-blue-800 transition-colors font-medium"
     >
       {children}
     </a>
   ),
+
+  // Blockquote — used for callout-style notes and pull quotes
   blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote className="my-3 border-l-4 border-blue-300 pl-4 text-sm text-gray-600 italic">
+    <blockquote className="my-5 border-l-4 border-blue-300 bg-blue-50/50 pl-4 pr-3 py-3 rounded-r-xl text-base text-gray-600 italic leading-7">
       {children}
     </blockquote>
   ),
+
+  // Horizontal rule — clean visual section break
+  hr: () => <hr className="my-6 border-t border-gray-200" />,
+
+  // Tables — rounded card with shadow, clearly readable at base size
   table: ({ children }: { children?: React.ReactNode }) => (
-    <div className="overflow-x-auto my-3">
-      <table className="min-w-full text-sm border-collapse border border-gray-200 rounded-lg">
-        {children}
-      </table>
+    <div className="overflow-x-auto my-6 rounded-xl shadow-sm border border-gray-200">
+      <table className="min-w-full text-sm border-collapse">{children}</table>
     </div>
   ),
+
+  // Table header cells — slightly larger than before, bolder weight
   th: ({ children }: { children?: React.ReactNode }) => (
-    <th className="bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-600 border border-gray-200">
+    <th className="bg-gray-50 px-4 py-2.5 text-left text-sm font-semibold text-gray-700 border-b border-gray-200 whitespace-nowrap">
       {children}
     </th>
   ),
+
+  // Table data cells — base small size but comfortable padding
   td: ({ children }: { children?: React.ReactNode }) => (
-    <td className="px-3 py-2 text-xs text-gray-700 border border-gray-100">
+    <td className="px-4 py-2.5 text-sm text-gray-700 border-b border-gray-100 align-top">
       {children}
     </td>
   ),
@@ -184,7 +218,7 @@ export function DailyCaArticle({
         </div>
 
         {/* Title */}
-        <h1 className="text-lg font-bold leading-snug mb-2">
+        <h1 className="text-xl font-bold leading-snug tracking-tight mb-2">
           <Link
             href={`/daily-ca/article/${article.slug}`}
             className="text-blue-900 hover:text-blue-700 transition-colors"
@@ -195,19 +229,22 @@ export function DailyCaArticle({
 
         {/* News context */}
         {article.news_context && (
-          <p className="text-sm text-gray-500 italic leading-relaxed mb-3 border-l-2 border-gray-200 pl-3">
+          <p className="text-sm text-gray-500 italic leading-relaxed mb-3 border-l-2 border-blue-200 pl-3">
             {article.news_context}
           </p>
         )}
 
-        {/* In Summary */}
-        {article.body_md_processed && (
-          <InSummaryBox bodyMd={article.body_md_processed} />
+        {/* In Summary — primary: news_context; fallback: body markdown */}
+        {(article.news_context || article.body_md_processed) && (
+          <InSummaryBox
+            newsContext={article.news_context ?? undefined}
+            bodyMd={article.body_md_processed ?? undefined}
+          />
         )}
       </div>
 
       {/* Article Body */}
-      <div className="px-6 pb-4">
+      <div className="px-6 pb-6 antialiased">
         {parts.map((part, i) =>
           part.type === "callout" ? (
             <CalloutBlock key={i} content={part.content} />
