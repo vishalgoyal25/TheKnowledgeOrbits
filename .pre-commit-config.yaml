@@ -48,7 +48,7 @@ repos:
 
       - id: frontend-jest
         name: Frontend Laboratory (Jest)
-        entry: powershell -Command "cd frontend; npm test -- --watchAll=false"
+        entry: powershell -Command "cd frontend; npm test -- --watchAll=false --no-cache"
         language: system
         files: ^frontend/
         pass_filenames: false

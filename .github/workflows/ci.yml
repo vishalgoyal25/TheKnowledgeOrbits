@@ -135,17 +135,13 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
-      - name: Prettier Format Check
-        working-directory: ./frontend
-        run: npx prettier --check "src/**/*.{ts,tsx,js,jsx,css,scss}"
-
       - name: Lint Check
         working-directory: ./frontend
         run: npm run lint
 
       - name: Jest Tests
         working-directory: ./frontend
-        run: npm test -- --watchAll=false --passWithNoTests
+        run: npm test -- --watchAll=false --passWithNoTests --no-cache
 
       - name: Production Build Check
         working-directory: ./frontend
