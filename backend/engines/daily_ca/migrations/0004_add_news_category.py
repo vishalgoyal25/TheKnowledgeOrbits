@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("book_content", "0003_alter_bookchunk_search_vector_and_more"),
         (
