@@ -16,31 +16,54 @@ import { ConceptStubCard } from "./concept-stub-card";
  * Sidebar: usage_count, related concept pages (from linked articles), back link.
  */
 
+// ── Markdown normaliser ───────────────────────────────────────────────────────
+// LLMs sometimes return headings with only a single \n before them.
+// ReactMarkdown requires a blank line (\n\n) to treat ## as a block heading.
+// Without this, headings render as inline text inside the preceding paragraph.
+
+function normalizeConceptBody(md: string): string {
+  if (!md) return "";
+  return (
+    md
+      // Normalise Windows line endings first
+      .replace(/\r\n/g, "\n")
+      // Ensure blank line BEFORE any ## or ### heading
+      // e.g. "...sentence.\n## Heading" → "...sentence.\n\n## Heading"
+      .replace(/([^\n])\n(#{1,3} )/g, "$1\n\n$2")
+      // Ensure blank line AFTER any heading before body text begins
+      // e.g. "## Heading\nFirst sentence" → "## Heading\n\nFirst sentence"
+      .replace(/(#{1,3} [^\n]+)\n([^#\n])/g, "$1\n\n$2")
+      // Collapse 3+ blank lines to 2
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
+}
+
 // ── Markdown components (concept body) ───────────────────────────────────────
 
 const mdComponents = {
   h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="text-base font-bold text-gray-900 mt-6 mb-2 pb-1.5 border-b border-gray-100">
+    <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3 pb-2 border-b-2 border-purple-100 tracking-tight leading-snug">
       {children}
     </h2>
   ),
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-sm font-semibold text-gray-800 mt-4 mb-1.5">
+    <h3 className="text-lg font-semibold text-gray-800 mt-6 mb-2 leading-snug">
       {children}
     </h3>
   ),
   p: ({ children }: { children?: React.ReactNode }) => (
-    <p className="text-sm leading-relaxed text-gray-700 mb-3">{children}</p>
+    <p className="text-base leading-7 text-gray-700 mb-4">{children}</p>
   ),
   ul: ({ children }: { children?: React.ReactNode }) => (
-    <ul className="my-3 space-y-1 pl-4">{children}</ul>
+    <ul className="my-4 space-y-2 pl-2">{children}</ul>
   ),
   ol: ({ children }: { children?: React.ReactNode }) => (
-    <ol className="my-3 space-y-1 pl-4 list-decimal">{children}</ol>
+    <ol className="my-4 space-y-2 pl-5 list-decimal">{children}</ol>
   ),
   li: ({ children }: { children?: React.ReactNode }) => (
-    <li className="text-sm text-gray-700 leading-relaxed flex gap-2">
-      <span className="flex-shrink-0 text-purple-400 mt-1.5">•</span>
+    <li className="text-base text-gray-700 leading-7 flex gap-2.5">
+      <span className="flex-shrink-0 text-purple-400 font-bold mt-0.5">•</span>
       <span>{children}</span>
     </li>
   ),
@@ -50,15 +73,21 @@ const mdComponents = {
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
     <a
       href={href}
-      className="text-blue-600 underline underline-offset-2 hover:text-blue-800 transition-colors"
+      className="text-base text-blue-600 font-medium underline underline-offset-2 hover:text-blue-800 transition-colors"
     >
       {children}
     </a>
   ),
   blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote className="my-3 border-l-4 border-purple-300 pl-4 text-sm text-gray-600 italic">
+    <blockquote className="my-5 border-l-4 border-purple-300 bg-purple-50/50 pl-4 pr-3 py-3 rounded-r-xl text-base italic leading-7 text-gray-600">
       {children}
     </blockquote>
+  ),
+  hr: () => <hr className="my-6 border-t border-gray-200" />,
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code className="text-sm bg-gray-100 rounded px-1.5 py-0.5 font-mono text-gray-800">
+      {children}
+    </code>
   ),
 };
 
@@ -230,7 +259,7 @@ export function ConceptDetailComponent({ concept }: Props) {
                   remarkPlugins={[remarkGfm]}
                   components={mdComponents}
                 >
-                  {concept.body}
+                  {normalizeConceptBody(concept.body)}
                 </ReactMarkdown>
               </div>
             )}
