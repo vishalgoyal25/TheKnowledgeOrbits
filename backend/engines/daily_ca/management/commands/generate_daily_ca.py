@@ -183,6 +183,7 @@ class Command(BaseCommand):
                 proposals=proposals,
                 groq_calls_used=0,
                 db_alias=db_alias,
+                auto_publish=options["auto_publish"],
             )
         except Exception as exc:
             sentry_sdk.capture_exception(exc)
@@ -216,39 +217,12 @@ class Command(BaseCommand):
                 self.style.WARNING(
                     f"\n  Session cap reached. "
                     f"{results['capped']} proposal(s) marked as 'queued_next_run'.\n"
-                    f"  Re-run this command tomorrow to complete generation."
+                    f"  They will be picked up automatically on the next scheduled run."
                 )
-            )
-
-        # ── Auto-publish (H1) ─────────────────────────────────────────────────
-        auto_publish: bool = options["auto_publish"]
-        published_count = 0
-
-        if auto_publish and results.get("generated", 0) > 0:
-            from engines.daily_ca.models import DailyCaArticle
-
-            published_count = (
-                DailyCaArticle.objects.using(db_alias)
-                .filter(
-                    published_date=target_date,
-                    is_published=False,
-                    proposal__status="generated",
-                )
-                .update(is_published=True)
-            )
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"\n  → Auto-published {published_count} article(s)."
-                )
-            )
-            logger.info(
-                "auto_publish_done",
-                date=str(target_date),
-                db_alias=db_alias,
-                count=published_count,
             )
 
         # ── Final summary ─────────────────────────────────────────────────────
+        auto_publish: bool = options["auto_publish"]
         generated = results.get("generated", 0)
         failed = results.get("failed", 0)
         capped = results.get("capped", 0)
@@ -261,7 +235,7 @@ class Command(BaseCommand):
                 f"{generated} generated | "
                 f"{failed} failed | "
                 f"{capped} queued | "
-                f"GROQ calls: {groq_used}/25"
+                f"GROQ calls: {groq_used}/{DailyCaGeneratorService.MAX_GROQ_CALLS}"
             )
         )
         if static_triggered:
@@ -271,7 +245,7 @@ class Command(BaseCommand):
         if auto_publish:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"  Auto-publish: {published_count} article(s) published."
+                    f"  Auto-publish: {generated} article(s) published (each published immediately after generation)."
                 )
             )
         else:
@@ -288,6 +262,5 @@ class Command(BaseCommand):
             date=str(target_date),
             db_alias=db_alias,
             auto_publish=auto_publish,
-            published=published_count,
             **{k: v for k, v in results.items()},
         )

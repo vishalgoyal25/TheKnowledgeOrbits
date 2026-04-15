@@ -431,7 +431,11 @@ class TestDailyCaGeneratorService:
                 published_date=date(2026, 4, 10),
                 body_md="Content.",
             )
-            return article, 15, False  # 15 calls per cycle → cap after first
+            return (
+                article,
+                60,
+                False,
+            )  # 60 calls per cycle → cap before cycle 3 (120 >= 100)
 
         with patch.object(
             DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle

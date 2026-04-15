@@ -17,7 +17,7 @@ GROQ call budget per cycle:
   0-8     — new concept page stubs (1 per unknown [[term]], max 8)
   1 call  — keyword tag extraction (standard mode, only if overrides insufficient)
   ────
-  ~2-10 calls per cycle typical. Session cap = 25 across all cycles.
+  ~2-10 calls per cycle typical. Session cap = 100 across all cycles.
 
 Failed cycles do NOT stop the run — marked 'failed', loop continues.
 Session cap hit → remaining proposals marked 'queued_next_run' → stop gracefully.
@@ -373,7 +373,7 @@ class DailyCaGeneratorService:
     """
 
     MAX_WORDS = 800
-    MAX_GROQ_CALLS = 25  # session safety cap across all cycles
+    MAX_GROQ_CALLS = 100  # session safety cap across all cycles
 
     @classmethod
     def run_generation_cycle(
@@ -381,6 +381,7 @@ class DailyCaGeneratorService:
         proposals: list,
         groq_calls_used: int = 0,
         db_alias: str = "default",
+        auto_publish: bool = False,
     ) -> dict:
         """
         Main entry point. Processes each approved proposal as one complete atomic cycle.
@@ -432,6 +433,16 @@ class DailyCaGeneratorService:
                 )
                 groq_calls_used += calls_this_cycle
                 results["generated"] += 1
+
+                # ── Publish immediately if auto_publish ───────────────────────
+                if auto_publish:
+                    article.is_published = True
+                    article.save(using=db_alias, update_fields=["is_published"])
+                    logger.info(
+                        "article_auto_published",
+                        article_id=str(article.id),
+                        title=article.title[:60],
+                    )
 
                 if needs_static and proposal.topic_id:
                     pending_static_topic_ids.append(proposal.topic_id)
