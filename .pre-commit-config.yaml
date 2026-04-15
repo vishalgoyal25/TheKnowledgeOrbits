@@ -34,7 +34,7 @@ repos:
     hooks:
       - id: backend-mypy
         name: Backend Audit (Mypy)
-        entry: powershell -Command "cd backend; ..\myvenv\Scripts\mypy engines/ --pretty --no-incremental"
+        entry: powershell -Command "cd backend; ..\myvenv\Scripts\mypy engines/ --pretty --no-incremental --cache-dir=nul"
         language: system
         files: ^backend/
         pass_filenames: false
