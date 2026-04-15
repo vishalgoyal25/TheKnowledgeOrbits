@@ -46,7 +46,7 @@ _pool_writer = [
         api_key=SecretStr(k),
         model=_model_name,
         temperature=0.25,
-        max_tokens=16384,
+        max_tokens=2048,  # articles capped at 800 words (~1100 tokens); 16384 was burning 15× quota
         stop_sequences=[],
     )
     for k in _keys
@@ -67,7 +67,7 @@ _current_key_idx = 0
 
 # ── Rate Limit Config ─────────────────────────────────────────────────────────
 INTER_CALL_SLEEP = 12.0  # Soft throttle for 6,000 tokens/min Groq free tier limit
-RETRY_WAIT_TIMES = [15, 30, 45]  # Loop delays when entire key pool is exhausted
+RETRY_WAIT_TIMES = [15, 30, 60, 120]  # Loop delays when entire key pool is exhausted
 
 
 # ── Core Call Wrapper ─────────────────────────────────────────────────────────

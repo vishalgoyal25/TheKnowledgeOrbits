@@ -564,6 +564,12 @@ class DailyCaGeneratorService:
             calls_used += 1
             time.sleep(INTER_CALL_SLEEP)
 
+            if not raw_response:
+                raise RuntimeError(
+                    f"LLM permanently failed for '{proposal.title[:60]}' — "
+                    "empty response after all retries. Cycle aborted, no article saved."
+                )
+
             # ── STEP 4: Parse LLM response ─────────────────────────────────────
             title, body_md, tags_raw, source_attr, news_category = _parse_response(
                 raw_response
