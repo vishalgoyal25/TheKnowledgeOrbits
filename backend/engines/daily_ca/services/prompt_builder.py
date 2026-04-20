@@ -28,7 +28,7 @@ Key design decisions:
   - Concept links [[double brackets]] and TAGS are clearly distinguished in the prompt
   - Callout box position is mid-article (not end) for better reading UX
   - Factual anchor is "use for conceptual depth, do NOT copy prose" — prevents plagiarism
-  - Hard caps: 4000 chars for CA input (up from 2000), 680 words output target
+  - Hard caps: 6000 chars for CA input (up from 4000), 750 words output target
 """
 
 # ── Subject Tone Map ──────────────────────────────────────────────────────────
@@ -303,11 +303,140 @@ DATA INTEGRITY (non-negotiable — enforced strictly):
 
 ─────────────────────────────────────────
 
-1. TITLE
-   - Sharp, specific, newsworthy — 10 to 15 words maximum
-   - Must reflect today's specific development, not a generic topic label
-   - Good: "India's Fast Breeder Reactor Hits Full Power — What It Means for Energy Security"
-   - Bad: "Nuclear Energy in India"
+DEPTH AND CLARITY STANDARD (applies to every sentence you write):
+
+  The test for every sentence: does it teach the reader something they did NOT
+  already know, or does it only sound knowledgeable without adding real substance?
+
+  MINIMUM SPECIFICITY PER SECTION:
+    Every ## section must contain AT LEAST 2 of the following types of named facts
+    drawn directly from your source material:
+      - A specific number, percentage, or rupee/dollar figure
+      - A named law, Act, Article number, or constitutional provision
+      - A named person (minister, judge, scientist, official) with their role
+      - A specific date, year, or timeline reference
+      - A named scheme, programme, mission, or institution with its mandate
+      - A country, city, or geographic reference tied to the current development
+
+  SENTENCE-LEVEL CLARITY TEST — before writing any sentence, ask:
+    "If I remove this sentence, does the reader lose something real and specific?"
+    If YES → keep it.
+    If NO  → either replace it with a concrete fact, or delete it entirely.
+
+  SENTENCES THAT MUST BE DELETED OR REPLACED:
+    These are content-free fillers that consume word count without teaching anything.
+    They are not banned because they sound "bad" — they are banned because they convey
+    ZERO information that the reader could recall or use after reading the article.
+
+    Delete any sentence that ONLY does one of the following without adding a fact:
+      × Announces that something is important: "This is a significant development."
+        → Replace with: WHAT makes it significant, WHO it affects, by HOW MUCH.
+      × States the obvious topic: "Water scarcity is a major concern in India."
+        → Replace with: which specific river basins, what NITI Aayog data says, which states.
+      × Describes a process in a circle: "The policy aims to improve the situation."
+        → Replace with: the specific mechanism, the named target, the implementing agency.
+      × Adds no new information after a bullet: "Thus, this issue requires attention."
+        → Delete entirely — the bullets already communicated the facts.
+      × Uses dramatic framing without substance: "This marks a watershed moment..."
+        → Either cite what specifically changes from today vs. yesterday, or delete.
+
+  WHAT IS EXPLICITLY ALLOWED (do NOT over-sanitise):
+    ✓ "This marks a significant shift in India's nuclear posture" — IF the next
+      sentence explains WHAT the shift is (e.g., moving from 'no first use' to...)
+    ✓ "The ruling raises a major concern about judicial independence" — IF backed
+      by the specific provision or precedent being overridden
+    ✓ "Various measures have been taken" — ONLY IF followed immediately by a list
+      of those specific measures (not as a standalone sentence)
+    ✓ "A holistic approach is needed" — ONLY in a closing sentence if the preceding
+      paragraph already laid out the specific dimensions requiring that approach
+    ✓ Conceptual explanations that don't cite figures (e.g., explaining how a
+      monetary transmission mechanism works) — these teach frameworks, not facts,
+      and are genuinely valuable even without numbers
+
+  GOAL: After reading this article, the reader must be able to say:
+    "I now know [specific fact], [specific mechanism], and [specific implication]."
+    Not just: "I know this topic is important."
+
+─────────────────────────────────────────
+
+LANGUAGE AND READABILITY STANDARD:
+
+  TARGET READER: An educated Indian — a college student, working professional,
+  or civil services aspirant with standard English reading ability. Think of the
+  person who reads The Hindu, Indian Express, Hindustan Times, or watches NDTV
+  and DD News. Write for them — not for a western academic journal.
+
+  VOCABULARY STANDARD — match Indian quality-newspaper register:
+    ✓ USE freely: words that appear in Indian newspaper editorials and news reports
+      — including formal and legal English naturally used in Indian discourse:
+        prima facie, inter alia, vis-à-vis, notwithstanding, aforementioned,
+        hitherto, heretofore, wherein — these are standard in Indian journalism
+        and legal/policy writing. Do NOT avoid them.
+    ✓ USE freely: domain-specific technical terms (fiscal deficit, quantum entanglement,
+      genome sequencing, tectonic plates) — these are the educational content of the
+      article. Always explain a technical term in plain words right after first use.
+    ✓ USE freely: formal but common English (substantial, significant, mechanism,
+      implementation, provisions, implications) — Indian readers know these.
+
+    ✗ AVOID: Obscure Latinate or literary vocabulary that rarely appears in Indian
+      newspapers and would make a typical Indian reader pause to look up the word.
+      Examples of what to avoid:
+        "ameliorate" → write "improve"
+        "eschew" → write "avoid"
+        "obfuscate" → write "complicate" or "confuse"
+        "propitious" → write "favourable"
+        "recondite" → write "obscure"
+        "inchoate" → write "undeveloped" or "incomplete"
+        "tendentious" → write "one-sided"
+        "perspicacious" → write "perceptive"
+        "apotheosis" → write "pinnacle" or "peak"
+        "quotidian" → write "everyday"
+        "epistemological" → write "knowledge-based"
+        "vitiate" → write "undermine"
+        "pusillanimous" → write "cowardly"
+
+  SENTENCE STRUCTURE: Direct, active voice preferred.
+    ✓ "The Supreme Court struck down the law on Tuesday." (active, clear)
+    ✗ "The law was struck down by the Supreme Court on Tuesday." (passive — acceptable but less preferred)
+    ✗ "It was observed by the bench that the law was in violation of..." (stacked passive — never use)
+
+  EXPLAIN BEFORE YOU NAME:
+    The first time you use any technical term, institution name, or scheme acronym,
+    write the full form first, then abbreviate.
+    ✓ "The National Mission for Clean Ganga (NMCG) has..."
+    ✗ "NMCG has..." (reader may not know the acronym)
+
+─────────────────────────────────────────
+
+1. TITLE — MANDATORY RULES (read every rule before writing the title)
+   - A news headline, not a textbook chapter name
+   - 8 to 14 words maximum — sharp, direct, no filler words
+   - Must contain at least one specific noun: a named person, place, law, number, or event
+   - Format that works: [Specific subject]: [What happened / What it means]
+
+   GOOD title examples (study these):
+     ✓ "Women's Reservation Act: What 33% Seat Quota Means for India's Parliament"
+     ✓ "Centre's Fiscal Deficit Hits 5.1% — Why RBI is Watching Closely"
+     ✓ "Delimitation Row in Coimbatore: How Boundary Changes Spark Political Battles"
+     ✓ "India's Fast Breeder Reactor Hits Full Power — What It Means for Energy Security"
+     ✓ "Supreme Court Strikes Down Electoral Bonds: Five Things That Change Now"
+     ✓ "Western Disturbance Brings December Rains to Punjab — What the IMD Data Shows"
+
+   BAD title examples (forbidden patterns):
+     ✗ "Nuclear Energy in India" — generic topic label, not a news headline
+     ✗ "Introduction to the Women's Reservation Bill" — textbook opener
+     ✗ "Overview of India's Fiscal Policy Challenges" — textbook opener
+     ✗ "Understanding Delimitation Controversy" — textbook opener
+     ✗ "A Look at India-China Relations" — vague filler opener
+     ✗ "The Importance of Climate Policy" — textbook opener
+     ✗ "All You Need to Know About GST" — clickbait formula
+     ✗ "What is UAPA?" — single question, not a headline
+
+   FORBIDDEN title openers (if your title starts with any of these, rewrite it):
+     "Introduction to", "Overview of", "Understanding", "A Look at",
+     "Examining", "An Analysis of", "The Role of", "Importance of",
+     "All You Need to Know", "Everything About", "What is", "What are",
+     "A Brief", "A Study of", "Exploring"
 
 2. OPENING (first 2-3 sentences)
    - Lead with what happened TODAY and why it matters in the larger picture
@@ -340,22 +469,54 @@ DATA INTEGRITY (non-negotiable — enforced strictly):
        "UPSC Angle", "Exam Relevance", "Prelims Focus", "Mains Value",
        "Practice Questions", "Important for UPSC", "Why in News"
    - Use ## headings only. No ### sub-headings.
-   - PARAGRAPH STRUCTURE (critical — enforced across all subjects):
-       Under each ## heading, write 2 to 3 separate paragraphs.
-       Each paragraph: 2 to 4 sentences. Leave a blank line between paragraphs.
-       Do NOT write one long, dense paragraph that fills the entire section.
-       Each paragraph should answer one distinct sub-question:
-         Para 1: What/Who/Where — the core fact, provision, or claim
-         Para 2: Why/How — the mechanism, process, cause, or legal basis
-         Para 3: So What — the implication, consequence, or broader significance
-       Not every section requires all three — apply editorial judgment.
-       Subjects-specific guidance:
-         GS1 (History/Geography/Culture): Para structure helps separate event → context → legacy
-         GS2 (Polity/IR): Separate the legal provision → institutional interpretation → real-world impact
-         GS3 (Economy/S&T/Environment/Security): Separate the data → the policy response → the gap
-         GS4 (Ethics): Separate the dilemma → competing values → resolution framework
-   - Bullets ONLY for genuinely enumerable items (treaty provisions, constitutional articles,
-     scheme components, statistical comparisons). Never use bullets to substitute for analysis.
+   - SECTION STRUCTURE (critical — enforced across all subjects):
+       Under each ## heading, use this layered structure — paragraphs for analysis,
+       bullets for facts. Both are mandatory in every section:
+
+         PARAGRAPH LAYER (analytical depth — write 2 to 3 paragraphs):
+           Each paragraph: 2 to 4 sentences. Leave a blank line between paragraphs.
+           Do NOT write one long, dense paragraph that fills the entire section.
+           Each paragraph answers one distinct sub-question:
+             Para 1: What/Who/Where — the core fact, provision, or claim
+             Para 2: Why/How — the mechanism, process, cause, or legal basis
+             Para 3: So What — the implication, consequence, or broader significance
+           Not every section requires all three — apply editorial judgment.
+           Subject-specific paragraph guidance:
+             GS1 (History/Geography/Culture): Separate event → context → legacy
+             GS2 (Polity/IR): Separate legal provision → institutional interpretation → real-world impact
+             GS3 (Economy/S&T/Environment/Security): Separate data → policy response → gap
+             GS4 (Ethics): Separate dilemma → competing values → resolution framework
+
+         BULLET LAYER (factual anchors — immediately after the paragraph that introduces them):
+           After Para 1 or Para 2, insert a bullet list of 3–5 key factual points
+           that are too specific/dense to flow naturally in prose.
+           Rules for bullets:
+             - One clear, verifiable fact per bullet — no vague statements
+             - Each bullet: 1 sentence, under 25 words
+             - Must contain REAL specifics: article numbers, figures, named schemes,
+               dates, legal provisions, institutional names, statistical data
+             - Bad: "India has made significant progress in this area"
+             - Good: "India's installed solar capacity crossed 85 GW in 2024,
+               against a 2030 target of 500 GW under the [[National Solar Mission]]"
+           Subject-specific bullet guidance:
+             GS1 (History/Geography/Culture): Bullets → key dates, named actors, turning points, data
+             GS2 (Polity/IR): Bullets → specific Articles, judgement citations, treaty clauses, mandates
+             GS3 (Economy/S&T/Environment/Security): Bullets → figures, targets, scheme components, gaps
+             GS4 (Ethics): Bullets → competing values, principle names, case precedents, resolution steps
+
+       SECTION PATTERN EXAMPLE:
+         ## Key Provisions / Legal Framework
+
+         [Para 1 — 2–3 sentences: what the law/provision is and what it does]
+
+         - Article 21 guarantees right to life and personal liberty against state action
+         - [[Maneka Gandhi Judgment]] (1978) expanded Article 21 to include due process
+         - The [[Protection of Human Rights Act 1993]] established NHRC as the oversight body
+         - Section 3 of UAPA allows designation of organisations as terrorist entities by Centre
+
+         [Para 2 — 2–3 sentences: how it has been interpreted/applied in this context]
+
+         [Para 3 — optional, 1–2 sentences: consequence or forward-looking implication]
 
 3b. ANTI-REPETITION (strict — applies across all subject areas)
     Every fact, figure, provision, or named reference must appear EXACTLY ONCE
@@ -410,13 +571,16 @@ DATA INTEGRITY (non-negotiable — enforced strictly):
    Do NOT place it at the end. Do NOT make it a summary of the article.
 
 6. LENGTH AND QUALITY
-   - Target: 500 to 680 words of body text (not counting TAGS/SOURCE lines)
-   - Hard maximum: 800 words. Never exceed this.
+   - Target: 550 to 750 words of body text (not counting TAGS/SOURCE lines)
+   - Hard maximum: 1000 words. Never exceed this.
    - Quality over quantity. Every sentence must earn its place.
-   - No filler phrases: "It is pertinent to note that...", "In this context...",
-     "It goes without saying...", "India has a long history of..."
-   - No hedging padding: "This may have implications for...", "Some experts believe..."
-     unless you have a specific expert or specific study to cite.
+   - Apply the DEPTH AND CLARITY STANDARD above to every sentence before submitting.
+   - No standalone filler openers (add no information, only consume words):
+       "It is pertinent to note that...", "In this context...",
+       "It goes without saying...", "India has a long history of..."
+   - No unanchored hedging (only cite when you have a specific name/study attached):
+       "This may have implications...", "Experts believe...", "Some analysts say...",
+       "It is widely acknowledged...", "It is believed that...", "Many feel that..."
 
 7. CLOSING THREE LINES (mandatory, exactly this format):
    CATEGORY: [exactly one from: national | international | geo-politics | geo-economics | economy | science-tech | environment | society | law-justice | defence | health | sports-awards]
@@ -565,9 +729,9 @@ def build_ca_prompt(
     formatted_static = _format_static_facts(static_key_facts)
     formatted_wiki = _format_wiki_enrichment(wiki_enrichment)
 
-    # Phase D2: raised cap 2000 → 4000 chars — enriched context includes
-    # both chunk text (focused relevance) + parent article content (factual depth)
-    ca_text_capped = ca_chunks_text[:4000] if ca_chunks_text else "Not available."
+    # Phase F: raised cap 4000 → 6000 chars — richer context = more named
+    # facts, dates, figures available to the LLM for authoritative writing
+    ca_text_capped = ca_chunks_text[:6000] if ca_chunks_text else "Not available."
 
     return CA_DAILY_PROMPT_TEMPLATE.format(
         subject_name=subject_name or "General Studies",

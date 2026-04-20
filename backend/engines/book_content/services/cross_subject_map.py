@@ -29,7 +29,7 @@ logger = structlog.get_logger(__name__)
 
 # ── UPSC Subject Registry (canonical names — must match classifier.py) ─────────
 SUBJECTS = {
-    "POLITY": "Indian Constitution & Polity",
+    "POLITY": "Indian Polity & Constitution",
     "HISTORY": "Indian History & Culture",
     "GEOGRAPHY": "Geography of India & World",
     "ECONOMY": "Indian Economy & Agriculture",

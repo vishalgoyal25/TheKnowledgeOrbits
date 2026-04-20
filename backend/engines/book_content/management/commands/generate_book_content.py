@@ -50,7 +50,7 @@ logger = structlog.get_logger(__name__)
 # Add more subjects here as content generation expands.
 
 SUBJECT_MODULES = {
-    "Indian Constitution & Polity": [
+    "Indian Polity & Constitution": [
         "Union Legislature",
         "Union Executive",
         "Union Judiciary",
@@ -198,7 +198,7 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _run(self, options):
-        subject_name = options.get("subject") or "Indian Constitution & Polity"
+        subject_name = options.get("subject") or "Indian Polity & Constitution"
         single_topic = options.get("topic")
         dry_run = options.get("dry_run", False)
         max_articles = options.get("max_articles", 25)

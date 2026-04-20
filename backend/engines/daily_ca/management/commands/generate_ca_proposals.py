@@ -18,7 +18,7 @@ Process per run:
   1. Fetch CAArticles published in last 24hrs with processing_status='completed'
   2. Score each with RelevanceScorerService (threshold >= 5.0)
   3. Walk chunks → CATopicLink → group by Topic (deduplicate)
-  4. Top 30 topic groups max — sorted by combined relevance
+  4. Top 30 topic groups max — sorted by combined relevance, diversity-capped
   5. Per topic group: collect top 3 chunks, 1 GROQ call → title + description + gs_paper
   6. Save CaDailyProposal (skip if already exists for same date + topic)
   7. Session cap: 30 GROQ calls max (safety valve)
@@ -42,7 +42,7 @@ from django.utils import timezone
 from engines.book_content.services.llm_service import llm_call
 from engines.current_affairs.models import CAArticle, CAChunk
 from engines.current_affairs.services.relevance_scorer import RelevanceScorerService
-from engines.daily_ca.models import CaDailyProposal
+from engines.daily_ca.models import CaDailyProposal, DailyCaArticle
 
 logger = structlog.get_logger(__name__)
 
@@ -51,6 +51,13 @@ MAX_TOPICS_PER_RUN = 30  # Hard cap on proposals generated per run
 MAX_GROQ_CALLS = 30  # Session safety cap
 TOP_CHUNKS_PER_TOPIC = 3  # How many source chunks to collect per proposal
 RELEVANCE_THRESHOLD = 5.0  # Minimum score from RelevanceScorerService
+
+# Phase D — Subject diversity caps
+# Ensures all 4 GS papers are represented in the daily proposal set.
+# Without these caps, GS2 (Polity/IR) dominates because UPSC keywords are
+# heavily weighted toward political news and India has high Polity news volume.
+MAX_PER_GS_PAPER = 3  # No single GS paper can exceed 3 proposals (3×4 = 12 max)
+MAX_PER_SUBJECT = 2  # No single subject can exceed 2 proposals within a GS paper
 
 # ── GS Paper mapping — AUTHORITATIVE, deterministic, never overridden by LLM ─
 # Keys: exact Subject.name values as seeded by seed_syllabus.py, plus lowercase
@@ -338,6 +345,17 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("No topic groups found. Exiting."))
             return
 
+        # Step 3b: Deduplicate by chunk overlap — remove proposals that share
+        # >60% of their source chunks with a higher-scoring proposal.
+        pre_dedup_count = len(topic_groups)
+        topic_groups = self._deduplicate_by_chunk_overlap(topic_groups, threshold=0.6)
+        removed = pre_dedup_count - len(topic_groups)
+        if removed:
+            self.stdout.write(
+                f"  → {removed} topic group(s) removed by chunk deduplication "
+                f"(Jaccard > 0.6), {len(topic_groups)} remain"
+            )
+
         # Step 4: Sort by combined relevance score, cap at MAX_TOPICS_PER_RUN
         sorted_groups = sorted(
             topic_groups.items(),
@@ -345,9 +363,15 @@ class Command(BaseCommand):
             reverse=True,
         )[:MAX_TOPICS_PER_RUN]
 
+        # Step 4b: Apply subject diversity cap — prevent any GS paper or subject
+        # from dominating. Walk highest-scored first; admit greedily until cap hit.
+        pre_cap_count = len(sorted_groups)
+        sorted_groups = self._apply_diversity_cap(sorted_groups)
+
         self.stdout.write(
             f"  → Processing top {len(sorted_groups)} topic groups "
-            f"(cap: {MAX_TOPICS_PER_RUN})"
+            f"after diversity cap (was {pre_cap_count}, "
+            f"cap: GS paper ≤{MAX_PER_GS_PAPER}, subject ≤{MAX_PER_SUBJECT})"
         )
 
         # Step 5: Generate proposals
@@ -355,6 +379,28 @@ class Command(BaseCommand):
         skipped = 0
         failed = 0
         groq_calls = 0
+
+        # Phase I — Layer 2: fetch recent published titles ONCE before the loop.
+        # Single DB query, titles only (values_list flat=True).
+        # 3-day window: a news topic continuous for > 3 days warrants a new article.
+        # 3 days × max 10 articles/day = max 30 strings — negligible memory/time.
+        recent_published_titles: list[str] = list(
+            DailyCaArticle.objects.using(db_alias)
+            .filter(
+                published_date__gte=target_date - timedelta(days=3),
+                is_published=True,
+            )
+            .values_list("title", flat=True)
+        )
+        if recent_published_titles:
+            self.stdout.write(
+                f"  → {len(recent_published_titles)} published article(s) in last 3 days "
+                f"loaded for duplicate check"
+            )
+
+        # Phase I — Layer 1: track titles generated in THIS run (intra-day dedup).
+        # Mutated in-place by _process_topic_group() on each successful save.
+        generated_titles: list[str] = []
 
         for topic_obj, group_data in sorted_groups:
             # Session cap check
@@ -379,6 +425,8 @@ class Command(BaseCommand):
                     target_date=target_date,
                     dry_run=dry_run,
                     db_alias=db_alias,
+                    generated_titles=generated_titles,
+                    recent_published_titles=recent_published_titles,
                 )
                 groq_calls += 1
 
@@ -391,6 +439,13 @@ class Command(BaseCommand):
                     skipped += 1
                     self.stdout.write(
                         f"  ~ [skip] {topic_obj.name[:60]} (already exists)"
+                    )
+                elif result == "skipped_title_overlap":
+                    skipped += 1
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"  ~ [dedup] {topic_obj.name[:60]} (title too similar to recent article)"
+                        )
                     )
                 elif result == "dry_run":
                     created += 1
@@ -546,6 +601,194 @@ class Command(BaseCommand):
 
         return result
 
+    @staticmethod
+    def _title_token_overlap(title_a: str, title_b: str) -> float:
+        """
+        Phase I — Jaccard token overlap between two proposal/article titles.
+
+        Strips common stopwords and punctuation, then computes:
+            overlap = |tokens_a ∩ tokens_b| / |tokens_a ∪ tokens_b|
+
+        Returns 0.0–1.0. No external libraries — pure set operations.
+        Used for both Layer 1 (intra-day) and Layer 2 (3-day lookback).
+        """
+        _STOPWORDS = {
+            "the",
+            "a",
+            "an",
+            "of",
+            "in",
+            "to",
+            "and",
+            "for",
+            "on",
+            "at",
+            "is",
+            "are",
+            "was",
+            "were",
+            "india",
+            "its",
+            "by",
+            "with",
+            "as",
+            "from",
+            "that",
+            "this",
+            "be",
+            "has",
+            "have",
+            "it",
+            "will",
+            "about",
+            "how",
+            "why",
+            "what",
+            "who",
+            "when",
+            "where",
+            "which",
+            "new",
+            "now",
+            "over",
+            "after",
+            "amid",
+        }
+
+        def _tokens(title: str) -> set[str]:
+            return {
+                w.lower().strip(".,:-—\"'()")
+                for w in title.split()
+                if w.lower().strip(".,:-—\"'()") not in _STOPWORDS and len(w) > 1
+            }
+
+        tokens_a = _tokens(title_a)
+        tokens_b = _tokens(title_b)
+        if not tokens_a or not tokens_b:
+            return 0.0
+        return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+
+    @staticmethod
+    def _deduplicate_by_chunk_overlap(
+        topic_groups: dict,
+        threshold: float = 0.6,
+    ) -> dict:
+        """
+        Phase E — Cross-Proposal Chunk Deduplication.
+
+        A CAChunk with multiple CATopicLink entries gets added to several topic
+        groups. Two proposals can end up with heavily overlapping ca_chunk_ids,
+        causing the LLM to receive the same source material and generate two
+        articles on the same story.
+
+        Strategy: greedy Jaccard deduplication.
+          1. Sort topics by combined_score descending (highest quality first).
+          2. Walk each topic; compute Jaccard similarity of its chunk ID set
+             against every already-admitted topic.
+          3. If any admitted topic shares > threshold fraction of chunks,
+             skip (remove) this topic — the higher-scoring duplicate was kept.
+          4. Return dict of admitted topics only.
+
+        Jaccard(A, B) = |A ∩ B| / |A ∪ B|
+
+        threshold=0.6 means: if 60%+ of source chunks are shared, it's the same
+        story. Adjust down to 0.5 for stricter deduplication.
+        """
+        if not topic_groups:
+            return topic_groups
+
+        # Sort highest-score first so the better proposal is always kept
+        sorted_items = sorted(
+            topic_groups.items(),
+            key=lambda x: x[1]["combined_score"],
+            reverse=True,
+        )
+
+        admitted: list[tuple] = []
+        admitted_chunk_sets: list[set[str]] = []
+
+        for topic_obj, group_data in sorted_items:
+            chunk_ids: set[str] = {str(c.id) for c in group_data["chunks"]}
+
+            is_duplicate = False
+            for existing_set in admitted_chunk_sets:
+                intersection = len(chunk_ids & existing_set)
+                union = len(chunk_ids | existing_set)
+                if union == 0:
+                    continue
+                jaccard = intersection / union
+                if jaccard > threshold:
+                    is_duplicate = True
+                    logger.info(
+                        "generate_proposals_chunk_dedup_removed",
+                        topic=topic_obj.name,
+                        jaccard=round(jaccard, 3),
+                        threshold=threshold,
+                    )
+                    break
+
+            if not is_duplicate:
+                admitted.append((topic_obj, group_data))
+                admitted_chunk_sets.append(chunk_ids)
+
+        return dict(admitted)
+
+    @staticmethod
+    def _apply_diversity_cap(
+        sorted_groups: list[tuple],
+    ) -> list[tuple]:
+        """
+        Phase D — Subject Diversity Cap.
+
+        Walks topics highest-score-first and admits each topic only if
+        both caps are still open:
+          • gs_paper_counts[gs_paper] < MAX_PER_GS_PAPER
+          • subject_counts[subject_name] < MAX_PER_SUBJECT
+
+        Topics that exceed a cap are not dropped entirely — they are placed
+        in an overflow list and appended AFTER all primary slots are filled,
+        so rare GS papers that genuinely have no other news still get
+        representation up to the global MAX_TOPICS_PER_RUN limit.
+
+        This means:
+          - Under normal news days: balanced 3 GS1 / 3 GS2 / 3 GS3 / 3 GS4
+          - If one GS paper has zero news: other papers fill the slack
+          - High-score topics from a capped paper are never silently discarded;
+            they appear at the end as lower-priority overflow
+
+        Returns a new sorted list — does NOT mutate the input.
+        """
+        from collections import defaultdict
+
+        gs_paper_counts: dict[str, int] = defaultdict(int)
+        subject_counts: dict[str, int] = defaultdict(int)
+
+        primary: list[tuple] = []
+        overflow: list[tuple] = []
+
+        for topic_obj, group_data in sorted_groups:
+            subject_name = Command._get_subject_name(topic_obj)
+            gs_paper = Command._derive_gs_paper(subject_name)
+
+            gs_ok = gs_paper_counts[gs_paper] < MAX_PER_GS_PAPER
+            subj_ok = subject_counts[subject_name] < MAX_PER_SUBJECT
+
+            if gs_ok and subj_ok:
+                primary.append((topic_obj, group_data))
+                gs_paper_counts[gs_paper] += 1
+                subject_counts[subject_name] += 1
+            else:
+                overflow.append((topic_obj, group_data))
+
+        result = primary + overflow
+        logger.info(
+            "generate_proposals_diversity_cap_applied",
+            primary_slots=len(primary),
+            overflow_slots=len(overflow),
+            gs_paper_distribution=dict(gs_paper_counts),
+        )
+        return result
+
     def _process_topic_group(
         self,
         topic,
@@ -553,6 +796,8 @@ class Command(BaseCommand):
         target_date: date,
         dry_run: bool,
         db_alias: str,
+        generated_titles: list[str] | None = None,
+        recent_published_titles: list[str] | None = None,
     ) -> str:
         """
         For one topic group:
@@ -560,10 +805,23 @@ class Command(BaseCommand):
           - Derive subject_name from topic → module → subject (DB)
           - Derive gs_paper deterministically from subject_name (never from LLM)
           - Call GROQ for title + description only
+          - Phase I Layer 2: check title against last 3 days published articles
+          - Phase I Layer 1: check title against other proposals in THIS run
           - Save CaDailyProposal
 
-        Returns: "created" | "skipped" | "dry_run"
+        Returns: "created" | "skipped" | "skipped_title_overlap" | "dry_run"
+
+        generated_titles: mutable list — appended to on successful save so each
+                          subsequent call in the same loop sees already-saved titles.
+        recent_published_titles: read-only, pre-fetched once before the loop.
         """
+        if generated_titles is None:
+            generated_titles = []
+        if recent_published_titles is None:
+            recent_published_titles = []
+
+        _OVERLAP_THRESHOLD = 0.5
+
         # Idempotency check
         exists = (
             CaDailyProposal.objects.using(db_alias)
@@ -581,12 +839,11 @@ class Command(BaseCommand):
 
         # Derive subject name from topic → module → subject
         subject_name = self._get_subject_name(topic)
-        # Phase A3: if FK chain broken, fuzzy-match topic name against DB Subject names
         subject_name = self._canonicalize_subject_name(
             subject_name, topic.name, db_alias
         )
 
-        # GROQ call
+        # GROQ call — title + description only
         prompt = _PROPOSAL_PROMPT.format(
             topic_name=topic.name,
             news_text=news_text[:2500],
@@ -599,6 +856,34 @@ class Command(BaseCommand):
         title, description, gs_paper = self._parse_groq_response(
             raw, topic.name, subject_name
         )
+
+        # ── Phase I Layer 2: 3-day lookback against published articles ──────────
+        # recent_published_titles fetched once before loop — pure set ops, zero I/O
+        for recent_title in recent_published_titles:
+            overlap = self._title_token_overlap(title, recent_title)
+            if overlap >= _OVERLAP_THRESHOLD:
+                logger.info(
+                    "generate_proposals_skipped_recent_duplicate",
+                    topic=topic.name,
+                    proposal_title=title,
+                    matched_published_title=recent_title,
+                    overlap=round(overlap, 3),
+                    lookback_days=3,
+                )
+                return "skipped_title_overlap"
+
+        # ── Phase I Layer 1: intra-day dedup against this run's saved titles ────
+        for existing_title in generated_titles:
+            overlap = self._title_token_overlap(title, existing_title)
+            if overlap >= _OVERLAP_THRESHOLD:
+                logger.info(
+                    "generate_proposals_skipped_intraday_duplicate",
+                    topic=topic.name,
+                    proposal_title=title,
+                    matched_title=existing_title,
+                    overlap=round(overlap, 3),
+                )
+                return "skipped_title_overlap"
 
         if dry_run:
             logger.info(
@@ -624,6 +909,9 @@ class Command(BaseCommand):
                 relevance_score=round(group_data["combined_score"], 2),
                 status="pending",
             )
+
+        # Track for Layer 1 intra-day dedup on subsequent iterations
+        generated_titles.append(title)
 
         logger.info(
             "generate_proposals_created",

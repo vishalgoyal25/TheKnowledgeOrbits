@@ -40,9 +40,15 @@ export interface DailyCaArticleList {
   tags: Tag[];
 }
 
+export interface SourceItem {
+  source_name: string;
+  url: string;
+  title: string;
+}
+
 export interface DailyCaArticleDetail extends DailyCaArticleList {
   body_md_processed: string;
-  sources_used: string[];
+  sources_used: SourceItem[];
   is_published: boolean;
   generation_metadata: Record<string, unknown>;
   created_at: string;

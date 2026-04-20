@@ -12,6 +12,8 @@ Covers:
   - book_planner_service.generate_book_plan()
   - quality_engine_service.generate_quality_article()
   - ingestor_service smart skip: existing BookContent → skips LLM generation
+  - classifier_service: map-hit path, LLM fallback, JSON parsing, prompt content
+  - cross_subject_map: lookup_topic, fuzzy_lookup, get_secondary_subjects, SUBJECTS
 """
 
 from __future__ import annotations
@@ -589,9 +591,9 @@ class TestIngestorSmartSkip(TestCase):
     @patch("engines.book_content.services.ingestor_service._cross_link_to_ca")
     @patch("engines.book_content.services.ingestor_service._cross_link_inter_subject")
     @patch("engines.book_content.services.ingestor_service.run_coherence_pass")
-    @patch("engines.book_content.services.ingestor_service._get_or_create_subject")
-    @patch("engines.book_content.services.ingestor_service._get_or_create_module")
-    @patch("engines.book_content.services.ingestor_service._get_or_create_topic")
+    @patch("engines.book_content.services.ingestor_service._get_subject_strict")
+    @patch("engines.book_content.services.ingestor_service._get_module_strict")
+    @patch("engines.book_content.services.ingestor_service._get_or_match_topic_fuzzy")
     def test_smart_skip_does_not_call_generate_quality_article(
         self,
         mock_get_topic: MagicMock,
@@ -670,9 +672,9 @@ class TestIngestorSmartSkip(TestCase):
     @patch("engines.book_content.services.ingestor_service._cross_link_to_ca")
     @patch("engines.book_content.services.ingestor_service._cross_link_inter_subject")
     @patch("engines.book_content.services.ingestor_service.run_coherence_pass")
-    @patch("engines.book_content.services.ingestor_service._get_or_create_subject")
-    @patch("engines.book_content.services.ingestor_service._get_or_create_module")
-    @patch("engines.book_content.services.ingestor_service._get_or_create_topic")
+    @patch("engines.book_content.services.ingestor_service._get_subject_strict")
+    @patch("engines.book_content.services.ingestor_service._get_module_strict")
+    @patch("engines.book_content.services.ingestor_service._get_or_match_topic_fuzzy")
     def test_new_subtopic_does_call_generate_quality_article(
         self,
         mock_get_topic: MagicMock,
@@ -706,7 +708,7 @@ class TestIngestorSmartSkip(TestCase):
 
         mock_get_subject.return_value = self.subject
         mock_get_module.return_value = self.module
-        # get_topic called twice: once for main topic, once for new subtopic
+        # _get_or_match_topic_fuzzy called twice: main topic + new subtopic
         mock_get_topic.side_effect = [self.topic, new_subtopic]
 
         mock_classify.return_value = {
@@ -733,3 +735,576 @@ class TestIngestorSmartSkip(TestCase):
 
         # BookContent did NOT exist → quality article WAS generated
         mock_quality.assert_called_once()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HIERARCHY ENFORCEMENT — _word_overlap, strict matchers, SkipGenerationError
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestWordOverlap(unittest.TestCase):
+    """Tests for engines.book_content.services.ingestor_service._word_overlap"""
+
+    def _fn(self, a: str, b: str) -> float:
+        from engines.book_content.services.ingestor_service import _word_overlap
+
+        return _word_overlap(a, b)
+
+    def test_identical_strings_score_one(self) -> None:
+        assert self._fn("Union Legislature", "Union Legislature") == 1.0
+
+    def test_exact_word_match_scores_high(self) -> None:
+        assert self._fn("Fundamental Rights", "Fundamental Rights") == 1.0
+
+    def test_prefix_stem_match_judicial_judiciary(self) -> None:
+        """'Judicial' should match 'Judiciary' via 4-char prefix (judi)."""
+        score = self._fn("Judicial System", "Union Judiciary")
+        assert score >= 0.25, f"Expected ≥0.25, got {score}"
+
+    def test_prefix_stem_match_legislat(self) -> None:
+        """'Legislative' should match 'Legislature' via prefix (legi)."""
+        score = self._fn("Legislative Body", "Union Legislature")
+        assert score >= 0.25, f"Expected ≥0.25, got {score}"
+
+    def test_completely_unrelated_scores_zero(self) -> None:
+        score = self._fn("Cricket Stadium", "Monetary Policy")
+        assert score == 0.0
+
+    def test_empty_string_returns_zero(self) -> None:
+        assert self._fn("", "Fundamental Rights") == 0.0
+        assert self._fn("Fundamental Rights", "") == 0.0
+
+    def test_stopwords_excluded(self) -> None:
+        """Stopwords ('of', 'the', 'and') must not contribute to score."""
+        # Only stopwords — both stripped to empty → 0.0
+        score = self._fn("of the and", "in to a an")
+        assert score == 0.0
+
+
+class TestHierarchyStrictMatchers(TestCase):
+    """DB-backed tests for _get_subject_strict and _get_module_strict."""
+
+    def setUp(self) -> None:
+        from engines.knowledge.models import Module, Program, Subject
+
+        self.program = Program.objects.create(
+            name="Hierarchy Test Program", description="test"
+        )
+        self.subject = Subject.objects.create(
+            name="Indian Polity & Constitution",
+            program=self.program,
+            description="test",
+            is_active=True,
+        )
+        self.module = Module.objects.create(
+            name="Union Legislature",
+            subject=self.subject,
+            description="test",
+            is_active=True,
+            order_index=1,
+        )
+
+    def test_get_subject_strict_exact_match(self) -> None:
+        from engines.book_content.services.ingestor_service import _get_subject_strict
+
+        result = _get_subject_strict("Indian Polity & Constitution")
+        assert result is not None
+        assert result.name == "Indian Polity & Constitution"
+
+    def test_get_subject_strict_case_insensitive(self) -> None:
+        from engines.book_content.services.ingestor_service import _get_subject_strict
+
+        result = _get_subject_strict("indian polity & constitution")
+        assert result is not None
+
+    def test_get_subject_strict_no_match_returns_none(self) -> None:
+        from engines.book_content.services.ingestor_service import _get_subject_strict
+
+        result = _get_subject_strict("Completely Invented Subject XYZ999")
+        assert result is None
+
+    def test_get_module_strict_exact_match(self) -> None:
+        from engines.book_content.services.ingestor_service import _get_module_strict
+
+        result = _get_module_strict("Union Legislature", self.subject)
+        assert result is not None
+        assert result.name == "Union Legislature"
+
+    def test_get_module_strict_no_match_returns_none(self) -> None:
+        from engines.book_content.services.ingestor_service import _get_module_strict
+
+        result = _get_module_strict("Completely Invented Module XYZ999", self.subject)
+        assert result is None
+
+
+class TestSkipGenerationError(TestCase):
+    """ingest_topic() returns a skip dict — never raises — when hierarchy not found."""
+
+    def setUp(self) -> None:
+        from engines.knowledge.models import Program, Subject
+
+        self.program = Program.objects.create(
+            name="Skip Error Test Program", description="test"
+        )
+        Subject.objects.create(
+            name="Known Subject",
+            program=self.program,
+            description="test",
+            is_active=True,
+        )
+
+    @patch("engines.book_content.services.ingestor_service.classify_hierarchy")
+    def test_unknown_subject_returns_skip_dict(self, mock_classify: MagicMock) -> None:
+        """When LLM returns a subject not in DB, ingest_topic returns skip dict."""
+        mock_classify.return_value = {
+            "subject": "Completely Invented Subject That Does Not Exist",
+            "module": "Some Module",
+            "confirmed_topic": "Some Topic",
+        }
+
+        from engines.book_content.services.ingestor_service import ingest_topic
+
+        result = ingest_topic(topic_name="Some Topic")
+
+        assert result.get("skipped") is True
+        assert "reason" in result
+        assert result["nodes_created"] == 0
+
+    @patch("engines.book_content.services.ingestor_service.classify_hierarchy")
+    @patch("engines.book_content.services.ingestor_service._get_subject_strict")
+    def test_unknown_module_returns_skip_dict(
+        self,
+        mock_subject: MagicMock,
+        mock_classify: MagicMock,
+    ) -> None:
+        """When subject matches but module is invented, ingest_topic returns skip dict."""
+        from engines.knowledge.models import Subject
+
+        subj = Subject.objects.get(name="Known Subject")
+        # No modules seeded → _get_module_strict will return None
+        mock_subject.return_value = subj
+        mock_classify.return_value = {
+            "subject": "Known Subject",
+            "module": "Invented Module That Does Not Exist",
+            "confirmed_topic": "Some Topic",
+        }
+
+        from engines.book_content.services.ingestor_service import ingest_topic
+
+        result = ingest_topic(topic_name="Some Topic")
+
+        assert result.get("skipped") is True
+        assert result["nodes_created"] == 0
+
+
+class TestTopicLocking(TestCase):
+    """_find_complete_topic returns None unless content_status='complete'."""
+
+    def setUp(self) -> None:
+        from engines.knowledge.models import Module, Program, Subject, Topic
+
+        self.program = Program.objects.create(
+            name="Locking Test Program", description="test"
+        )
+        self.subject = Subject.objects.create(
+            name="Locking Subject",
+            program=self.program,
+            description="test",
+            is_active=True,
+        )
+        self.module = Module.objects.create(
+            name="Locking Module",
+            subject=self.subject,
+            description="test",
+            is_active=True,
+            order_index=1,
+        )
+        self.topic_incomplete = Topic.objects.create(
+            name="River Systems of India",
+            module=self.module,
+            subject=self.subject,
+            is_active=True,
+            topic_type="syllabus",
+            order_index=1,
+            content_status="book_quality",
+        )
+        self.topic_complete = Topic.objects.create(
+            name="Fully Complete Topic",
+            module=self.module,
+            subject=self.subject,
+            is_active=True,
+            topic_type="syllabus",
+            order_index=2,
+            content_status="complete",
+        )
+
+    def test_find_complete_topic_returns_none_for_incomplete(self) -> None:
+        from engines.book_content.services.ingestor_service import _find_complete_topic
+
+        result = _find_complete_topic("River Systems of India")
+        assert result is None
+
+    def test_find_complete_topic_returns_topic_when_complete(self) -> None:
+        from engines.book_content.services.ingestor_service import _find_complete_topic
+
+        result = _find_complete_topic("Fully Complete Topic")
+        assert result is not None
+        assert result.name == "Fully Complete Topic"
+
+    def test_find_complete_topic_returns_none_for_unknown(self) -> None:
+        from engines.book_content.services.ingestor_service import _find_complete_topic
+
+        result = _find_complete_topic("Topic That Does Not Exist XYZ")
+        assert result is None
+
+    @patch("engines.book_content.services.ingestor_service._extend_sub_subtopics_only")
+    def test_ingest_topic_routes_to_extend_when_locked(
+        self, mock_extend: MagicMock
+    ) -> None:
+        """Locked topic (content_status='complete') routes to _extend_sub_subtopics_only."""
+        mock_extend.return_value = {
+            "nodes_created": 0,
+            "relations_created": 0,
+            "topic": "Fully Complete Topic",
+            "locked_extension": True,
+        }
+
+        from engines.book_content.services.ingestor_service import ingest_topic
+
+        result = ingest_topic(topic_name="Fully Complete Topic")
+
+        mock_extend.assert_called_once()
+        assert result.get("locked_extension") is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASSIFIER SERVICE
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestClassifierService(unittest.TestCase):
+    """
+    Tests for engines.book_content.services.classifier_service.
+
+    No real LLM calls; no DB required for most tests.
+    _load_seeded_hierarchy() is patched where DB access would be needed.
+    """
+
+    # ── _parse_json ──────────────────────────────────────────────────────────
+
+    def test_parse_json_valid_string(self) -> None:
+        """Valid JSON string is parsed and returned as dict."""
+        from engines.book_content.services.classifier_service import _parse_json
+
+        raw = '{"subject":"Indian Polity & Constitution","module":"Union Legislature","confirmed_topic":"Parliament","secondary_subjects":[]}'
+        result = _parse_json(raw)
+        assert result["subject"] == "Indian Polity & Constitution"
+        assert result["module"] == "Union Legislature"
+        assert result["confirmed_topic"] == "Parliament"
+        assert result["secondary_subjects"] == []
+
+    def test_parse_json_wrapped_in_markdown_fences(self) -> None:
+        """JSON wrapped inside a larger text string is still extracted correctly."""
+        from engines.book_content.services.classifier_service import _parse_json
+
+        raw = 'Here is the result:\n{"subject":"Indian Economy & Agriculture","module":"Fiscal Policy","confirmed_topic":"Budget","secondary_subjects":["Governance & Social Justice"]}\nDone.'
+        result = _parse_json(raw)
+        assert result["subject"] == "Indian Economy & Agriculture"
+        assert result["module"] == "Fiscal Policy"
+
+    def test_parse_json_invalid_returns_safe_defaults(self) -> None:
+        """Completely broken JSON returns safe default dict without raising."""
+        from engines.book_content.services.classifier_service import _parse_json
+
+        result = _parse_json("This is not JSON at all!!!")
+        assert result["subject"] == "Indian Polity & Constitution"
+        assert result["module"] == "General Topics"
+        assert result["confirmed_topic"] == ""
+        assert result["secondary_subjects"] == []
+
+    def test_parse_json_empty_string_returns_safe_defaults(self) -> None:
+        """Empty string returns safe defaults."""
+        from engines.book_content.services.classifier_service import _parse_json
+
+        result = _parse_json("")
+        assert isinstance(result, dict)
+        assert "subject" in result
+
+    # ── _build_topic_prompt ──────────────────────────────────────────────────
+
+    def test_build_topic_prompt_contains_critical_rules(self) -> None:
+        """_build_topic_prompt must include 'CRITICAL RULES' block to prevent LLM hallucination."""
+        _FAKE_HIERARCHY = "EXACT subject and module names seeded in the database:\n\nSubject: Indian Polity & Constitution\n  - Union Legislature"
+
+        with patch(
+            "engines.book_content.services.classifier_service._load_seeded_hierarchy",
+            return_value=_FAKE_HIERARCHY,
+        ):
+            from engines.book_content.services.classifier_service import (
+                _build_topic_prompt,
+            )
+
+            prompt = _build_topic_prompt("Parliament of India")
+
+        assert "CRITICAL RULES" in prompt
+        assert "character-for-character" in prompt
+
+    def test_build_topic_prompt_contains_hierarchy_text(self) -> None:
+        """_build_topic_prompt embeds the hierarchy string returned by _load_seeded_hierarchy."""
+        _FAKE_HIERARCHY = "Subject: TestSubject\n  - TestModule"
+
+        with patch(
+            "engines.book_content.services.classifier_service._load_seeded_hierarchy",
+            return_value=_FAKE_HIERARCHY,
+        ):
+            from engines.book_content.services.classifier_service import (
+                _build_topic_prompt,
+            )
+
+            prompt = _build_topic_prompt("Any Topic")
+
+        assert "TestSubject" in prompt
+        assert "TestModule" in prompt
+
+    def test_build_topic_prompt_includes_topic_name(self) -> None:
+        """The supplied topic_name appears verbatim in the generated prompt."""
+        with patch(
+            "engines.book_content.services.classifier_service._load_seeded_hierarchy",
+            return_value="Subjects: ...",
+        ):
+            from engines.book_content.services.classifier_service import (
+                _build_topic_prompt,
+            )
+
+            prompt = _build_topic_prompt("Fundamental Rights")
+
+        assert "Fundamental Rights" in prompt
+
+    # ── classify_hierarchy — map-hit path ────────────────────────────────────
+
+    def test_classify_hierarchy_map_hit_skips_llm(self) -> None:
+        """When fuzzy_lookup finds the topic, llm_call must NOT be called."""
+        _MAP_ENTRY = {
+            "primary_subject": "Indian Polity & Constitution",
+            "module": "Union Legislature",
+            "secondary_subjects": ["Governance & Social Justice"],
+        }
+        with (
+            patch(
+                "engines.book_content.services.classifier_service.fuzzy_lookup",
+                return_value=_MAP_ENTRY,
+            ),
+            patch(
+                "engines.book_content.services.classifier_service.llm_call"
+            ) as mock_llm,
+        ):
+            from engines.book_content.services.classifier_service import (
+                classify_hierarchy,
+            )
+
+            result = classify_hierarchy(topic_name="Parliament of India")
+
+        mock_llm.assert_not_called()
+        assert result["subject"] == "Indian Polity & Constitution"
+        assert result["module"] == "Union Legislature"
+        assert result["confirmed_topic"] == "Parliament of India"
+        assert "Governance & Social Justice" in result["secondary_subjects"]
+
+    # ── classify_hierarchy — LLM fallback path ──────────────────────────────
+
+    def test_classify_hierarchy_llm_fallback_called_for_unknown_topic(self) -> None:
+        """When fuzzy_lookup returns None, llm_call is invoked for classification."""
+        _LLM_JSON = json.dumps(
+            {
+                "subject": "Indian Polity & Constitution",
+                "module": "Constitutional Framework",
+                "confirmed_topic": "Unknown Topic XYZ",
+                "secondary_subjects": [],
+            }
+        )
+        with (
+            patch(
+                "engines.book_content.services.classifier_service.fuzzy_lookup",
+                return_value=None,
+            ),
+            patch(
+                "engines.book_content.services.classifier_service.llm_call",
+                return_value=_LLM_JSON,
+            ) as mock_llm,
+            patch(
+                "engines.book_content.services.classifier_service._load_seeded_hierarchy",
+                return_value="Subject: Indian Polity & Constitution\n  - Constitutional Framework",
+            ),
+        ):
+            from engines.book_content.services.classifier_service import (
+                classify_hierarchy,
+            )
+
+            result = classify_hierarchy(topic_name="Unknown Topic XYZ")
+
+        mock_llm.assert_called_once()
+        assert result["subject"] == "Indian Polity & Constitution"
+
+    def test_classify_hierarchy_subject_validation_rejects_hallucinated_name(
+        self,
+    ) -> None:
+        """
+        If LLM returns a subject name not in UPSC_SUBJECTS, it defaults to
+        'Indian Polity & Constitution' — hallucinated subjects are rejected.
+        """
+        _LLM_JSON = json.dumps(
+            {
+                "subject": "Totally Made Up Subject",
+                "module": "Some Module",
+                "confirmed_topic": "Test Topic",
+                "secondary_subjects": [],
+            }
+        )
+        with (
+            patch(
+                "engines.book_content.services.classifier_service.fuzzy_lookup",
+                return_value=None,
+            ),
+            patch(
+                "engines.book_content.services.classifier_service.llm_call",
+                return_value=_LLM_JSON,
+            ),
+            patch(
+                "engines.book_content.services.classifier_service._load_seeded_hierarchy",
+                return_value="Subjects: ...",
+            ),
+        ):
+            from engines.book_content.services.classifier_service import (
+                classify_hierarchy,
+            )
+
+            result = classify_hierarchy(topic_name="Test Topic")
+
+        # Must default — "Totally Made Up Subject" is not in UPSC_SUBJECTS
+        assert result["subject"] == "Indian Polity & Constitution"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CROSS SUBJECT MAP
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestCrossSubjectMap(unittest.TestCase):
+    """
+    Tests for engines.book_content.services.cross_subject_map.
+    Pure in-memory operations — no DB, no HTTP, no mocks needed.
+    """
+
+    # ── SUBJECTS dict ────────────────────────────────────────────────────────
+
+    def test_subjects_dict_has_required_keys(self) -> None:
+        """SUBJECTS must contain all 9 canonical UPSC subject keys."""
+        from engines.book_content.services.cross_subject_map import SUBJECTS
+
+        required_keys = {
+            "POLITY",
+            "HISTORY",
+            "GEOGRAPHY",
+            "ECONOMY",
+            "ENVIRONMENT",
+            "SCIENCE",
+            "IR",
+            "GOVERNANCE",
+            "SECURITY",
+        }
+        assert required_keys.issubset(set(SUBJECTS.keys()))
+
+    def test_subjects_values_are_non_empty_strings(self) -> None:
+        """Every value in SUBJECTS is a non-empty string (canonical name)."""
+        from engines.book_content.services.cross_subject_map import SUBJECTS
+
+        for key, value in SUBJECTS.items():
+            assert (
+                isinstance(value, str) and value.strip()
+            ), f"SUBJECTS[{key!r}] must be a non-empty string"
+
+    # ── lookup_topic ─────────────────────────────────────────────────────────
+
+    def test_lookup_topic_returns_entry_for_canonical_name(self) -> None:
+        """Exact canonical name returns the correct registry entry."""
+        from engines.book_content.services.cross_subject_map import lookup_topic
+
+        entry = lookup_topic("Parliament of India")
+        assert entry is not None
+        assert entry["module"] == "Union Legislature"
+
+    def test_lookup_topic_returns_none_for_unknown(self) -> None:
+        """Unknown topic name returns None."""
+        from engines.book_content.services.cross_subject_map import lookup_topic
+
+        assert lookup_topic("Nonexistent Topic XYZABC") is None
+
+    # ── fuzzy_lookup ─────────────────────────────────────────────────────────
+
+    def test_fuzzy_lookup_finds_by_exact_canonical_name(self) -> None:
+        """fuzzy_lookup with exact canonical name returns the entry."""
+        from engines.book_content.services.cross_subject_map import fuzzy_lookup
+
+        entry = fuzzy_lookup("Climate Change")
+        assert entry is not None
+        assert "primary_subject" in entry
+
+    def test_fuzzy_lookup_finds_by_alias(self) -> None:
+        """fuzzy_lookup with a known alias ('ISRO') resolves to Space Technology entry."""
+        from engines.book_content.services.cross_subject_map import fuzzy_lookup
+
+        entry = fuzzy_lookup("ISRO")
+        assert entry is not None
+        assert entry["module"] == "Space Technology"
+
+    def test_fuzzy_lookup_finds_by_partial_match(self) -> None:
+        """'Budget' is a partial match for 'Budget & Fiscal Policy'."""
+        from engines.book_content.services.cross_subject_map import fuzzy_lookup
+
+        entry = fuzzy_lookup("Budget")
+        assert entry is not None
+        assert entry["module"] == "Fiscal Policy"
+
+    def test_fuzzy_lookup_returns_none_for_unrelated_string(self) -> None:
+        """A completely unrelated string returns None."""
+        from engines.book_content.services.cross_subject_map import fuzzy_lookup
+
+        assert fuzzy_lookup("ZXQWRandomNonsense12345") is None
+
+    def test_fuzzy_lookup_case_insensitive_canonical(self) -> None:
+        """Lowercase canonical name still resolves via fuzzy_lookup."""
+        from engines.book_content.services.cross_subject_map import fuzzy_lookup
+
+        entry = fuzzy_lookup("parliament of india")
+        assert entry is not None
+
+    # ── get_secondary_subjects ────────────────────────────────────────────────
+
+    def test_get_secondary_subjects_returns_list_for_known_topic(self) -> None:
+        """Known topic returns its secondary_subjects list (may be empty or non-empty)."""
+        from engines.book_content.services.cross_subject_map import (
+            get_secondary_subjects,
+        )
+
+        result = get_secondary_subjects("Climate Change")
+        assert isinstance(result, list)
+        # Climate Change spans Geography, Economy, IR — at least one secondary subject
+        assert len(result) >= 1
+
+    def test_get_secondary_subjects_returns_empty_list_for_unknown(self) -> None:
+        """Unknown topic returns an empty list — never raises."""
+        from engines.book_content.services.cross_subject_map import (
+            get_secondary_subjects,
+        )
+
+        result = get_secondary_subjects("Completely Unknown Topic XYZABC")
+        assert result == []
+
+    def test_get_secondary_subjects_ethics_has_none(self) -> None:
+        """Ethics, Integrity & Aptitude has secondary_subjects=[] by design."""
+        from engines.book_content.services.cross_subject_map import (
+            get_secondary_subjects,
+        )
+
+        result = get_secondary_subjects("Ethics, Integrity & Aptitude")
+        assert result == []

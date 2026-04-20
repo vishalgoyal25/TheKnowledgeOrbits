@@ -102,6 +102,391 @@ def _resolve_concept_links(book_content_obj: BookContent) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# HIERARCHY ENFORCEMENT — strict matching, locking, skip logic
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class SkipGenerationError(Exception):
+    """
+    Raised when subject or module cannot be matched to the seeded hierarchy.
+    Caught in ingest_topic() — logs a warning and returns a skip dict.
+    Never propagates to callers.
+    """
+
+    pass
+
+
+def _word_overlap(a: str, b: str) -> float:
+    """
+    Enhanced word-overlap similarity.
+
+    Handles prefix/stem variants so module names like:
+      "Judicial System"  matches  "Union Judiciary"   (judici… prefix)
+      "Legislative Body" matches  "Union Legislature"  (legislat… prefix)
+      "Executive Powers" matches  "Union Executive"    (execut… prefix)
+
+    Returns a score in [0, 1]. Higher = closer match.
+    """
+    STOPWORDS = frozenset(
+        {
+            "of",
+            "the",
+            "and",
+            "in",
+            "to",
+            "a",
+            "an",
+            "for",
+            "with",
+            "by",
+            "its",
+            "their",
+            "this",
+            "that",
+        }
+    )
+    words_a = [w for w in a.lower().split() if w not in STOPWORDS and len(w) > 2]
+    words_b = [w for w in b.lower().split() if w not in STOPWORDS and len(w) > 2]
+
+    if not words_a or not words_b:
+        return 0.0
+
+    matches = 0
+    for wa in words_a:
+        for wb in words_b:
+            if (
+                wa == wb
+                or wa in wb
+                or wb in wa
+                or (len(wa) >= 4 and len(wb) >= 4 and wa[:4] == wb[:4])
+            ):
+                matches += 1
+                break  # count each word_a at most once
+
+    return matches / max(len(words_a), len(words_b))
+
+
+def _get_subject_strict(
+    subject_name: str, threshold: float = 0.30
+) -> Optional[Subject]:
+    """
+    Returns the best-matching seeded Subject or None.
+    NEVER creates a new subject.
+
+    Tries exact (case-insensitive) match first, then fuzzy word-overlap.
+    If best score < threshold → returns None → caller raises SkipGenerationError.
+    """
+    try:
+        # Exact match first (fastest path)
+        exact = Subject.objects.filter(name__iexact=subject_name).first()
+        if exact:
+            logger.info("ingestor_subject_exact_matched", name=exact.name)
+            return exact
+
+        # Fuzzy match across all seeded subjects
+        all_subjects = list(Subject.objects.values_list("name", flat=True))
+        best_score = 0.0
+        best_name = None
+
+        for name in all_subjects:
+            score = _word_overlap(subject_name, name)
+            if score > best_score:
+                best_score = score
+                best_name = name
+
+        if best_score >= threshold and best_name:
+            logger.info(
+                "ingestor_subject_fuzzy_matched",
+                input=subject_name,
+                matched=best_name,
+                score=round(best_score, 2),
+            )
+            return Subject.objects.get(name=best_name)
+
+        logger.warning(
+            "ingestor_subject_no_match",
+            input=subject_name,
+            best_score=round(best_score, 2),
+            threshold=threshold,
+        )
+        return None
+
+    except Exception as exc:
+        logger.warning("ingestor_subject_lookup_error", error=str(exc)[:120])
+        return None
+
+
+def _get_module_strict(
+    module_name: str, subject: Subject, threshold: float = 0.25
+) -> Optional[Module]:
+    """
+    Returns the best-matching seeded Module under the given subject or None.
+    NEVER creates a new module.
+
+    Uses enhanced prefix/stem matching so LLM-invented names like
+    "Judicial System" correctly map to seeded "Union Judiciary".
+    """
+    try:
+        # Exact match first
+        exact = Module.objects.filter(name__iexact=module_name, subject=subject).first()
+        if exact:
+            logger.info("ingestor_module_exact_matched", name=exact.name)
+            return exact
+
+        # Fuzzy match across modules of this subject
+        all_modules = list(
+            Module.objects.filter(subject=subject).values_list("name", flat=True)
+        )
+        if not all_modules:
+            logger.warning("ingestor_no_modules_seeded", subject=subject.name)
+            return None
+
+        best_score = 0.0
+        best_name = None
+
+        for name in all_modules:
+            score = _word_overlap(module_name, name)
+            if score > best_score:
+                best_score = score
+                best_name = name
+
+        if best_score >= threshold and best_name:
+            logger.info(
+                "ingestor_module_fuzzy_matched",
+                input=module_name,
+                matched=best_name,
+                subject=subject.name,
+                score=round(best_score, 2),
+            )
+            return Module.objects.get(name=best_name, subject=subject)
+
+        logger.warning(
+            "ingestor_module_no_match",
+            input=module_name,
+            subject=subject.name,
+            best_score=round(best_score, 2),
+            threshold=threshold,
+        )
+        return None
+
+    except Exception as exc:
+        logger.warning("ingestor_module_lookup_error", error=str(exc)[:120])
+        return None
+
+
+def _get_or_match_topic_fuzzy(
+    topic_name: str,
+    module: Module,
+    subject: Subject,
+    node_type: str = "topic",
+    parent_topic: Optional[Topic] = None,
+) -> Topic:
+    """
+    Tries to find a seeded topic by fuzzy match first.
+    Only creates a new topic node if no seeded topic matches closely.
+
+    This keeps the seeded hierarchy intact while still allowing genuinely
+    new CA-triggered topics to be added at the correct place.
+    """
+    # Exact match
+    exact = Topic.objects.filter(name__iexact=topic_name, module=module).first()
+    if exact:
+        logger.info("ingestor_topic_exact_matched", name=exact.name)
+        return exact
+
+    # Fuzzy match against existing topics in this module
+    existing_names = list(
+        Topic.objects.filter(module=module, node_type="topic").values_list(
+            "name", flat=True
+        )
+    )
+
+    best_score = 0.0
+    best_name = None
+
+    for name in existing_names:
+        score = _word_overlap(topic_name, name)
+        if score > best_score:
+            best_score = score
+            best_name = name
+
+    if best_score >= 0.30 and best_name:
+        matched = Topic.objects.filter(name=best_name, module=module).first()
+        if matched:
+            logger.info(
+                "ingestor_topic_fuzzy_matched",
+                input=topic_name,
+                matched=best_name,
+                score=round(best_score, 2),
+            )
+            return matched
+
+    # Genuinely new topic — create inside the correctly matched module
+    topic_obj, created = Topic.objects.get_or_create(
+        name=topic_name,
+        module=module,
+        defaults={
+            "subject": subject,
+            "parent_topic": parent_topic,
+            "topic_type": "syllabus",
+            "is_active": True,
+        },
+    )
+    if created:
+        Topic.objects.filter(id=topic_obj.id).update(node_type=node_type)
+        logger.info("topic_created", name=topic_name, node_type=node_type)
+    else:
+        logger.info("topic_reused", name=topic_name)
+    return topic_obj
+
+
+def _find_complete_topic(topic_name: str) -> Optional[Topic]:
+    """
+    Returns the Topic object if fully generated (content_status="complete"), else None.
+
+    Tries exact name match first, then fuzzy match with threshold=0.50
+    (higher threshold for lock detection to avoid false positives).
+    """
+    if not topic_name:
+        return None
+
+    # Exact
+    exact = Topic.objects.filter(
+        name__iexact=topic_name, content_status="complete"
+    ).first()
+    if exact:
+        return exact
+
+    # Fuzzy among complete topics
+    complete_names = list(
+        Topic.objects.filter(content_status="complete").values_list("name", flat=True)
+    )
+    best_score = 0.0
+    best_name = None
+
+    for name in complete_names:
+        score = _word_overlap(topic_name, name)
+        if score > best_score:
+            best_score = score
+            best_name = name
+
+    if best_score >= 0.50 and best_name:
+        logger.info(
+            "ingestor_topic_locked_fuzzy_match",
+            input=topic_name,
+            matched=best_name,
+            score=round(best_score, 2),
+        )
+        return Topic.objects.filter(name=best_name, content_status="complete").first()
+
+    return None
+
+
+def _extend_sub_subtopics_only(
+    topic_obj: Topic,
+    topic_name: str,
+    subject_name: Optional[str],
+    start_time: float,
+) -> dict:
+    """
+    Called when a topic is locked (content_status="complete").
+
+    Only action allowed: discover new sub-subtopics under existing subtopics
+    and generate their content. Topic overview and subtopics are NEVER regenerated.
+    """
+    logger.info("ingestor_locked_extend_only", topic=topic_obj.name)
+
+    subject_actual = (
+        topic_obj.subject.name if topic_obj.subject_id else (subject_name or "")
+    )
+    module_obj = topic_obj.module
+    subject_obj = topic_obj.subject
+    added = 0
+
+    subtopics = list(Topic.objects.filter(parent_topic=topic_obj, node_type="subtopic"))
+
+    for sub_topic_obj in subtopics:
+        sub_name = sub_topic_obj.name
+        sub_subtopics = find_sub_subtopics(sub_name, topic_obj.name)
+
+        for ss_name in sub_subtopics:
+            if BookContent.objects.filter(topic__name=ss_name).exists():
+                continue  # already generated — skip
+
+            ss_wiki = fetch_full_page(ss_name)
+            ss_section = extract_relevant_section(ss_wiki["content"], ss_name)[:3000]
+
+            previously_covered = get_previously_covered_concepts(
+                subject_actual, ss_name
+            )
+            ss_article, ss_quality = generate_quality_article(
+                subtopic=ss_name,
+                parent_topic=sub_name,
+                ncert_section="",
+                wiki_content=ss_section,
+                previously_covered=previously_covered,
+                subject=subject_actual,
+            )
+
+            ss_topic_obj = _get_or_match_topic_fuzzy(
+                ss_name,
+                module_obj,
+                subject_obj,
+                node_type="sub_subtopic",
+                parent_topic=sub_topic_obj,
+            )
+
+            with transaction.atomic():
+                ss_bc_obj, _ = BookContent.objects.update_or_create(
+                    topic=ss_topic_obj,
+                    defaults={
+                        "subject": subject_obj,
+                        "content_markdown": ss_article,
+                        "word_count": len(ss_article.split()),
+                        "quality_score": ss_quality,
+                        "source_mode": "wiki_only",
+                        "is_published": False,
+                    },
+                )
+                Topic.objects.filter(id=ss_topic_obj.id).update(
+                    content_status="book_quality"
+                )
+
+            _create_chunks_and_embeddings(ss_bc_obj)
+            _cross_link_to_ca(ss_bc_obj)
+            _cross_link_inter_subject(ss_bc_obj)
+            _fetch_and_store_hero_image(ss_bc_obj)
+            _resolve_concept_links(ss_bc_obj)
+
+            update_concept_registry(
+                subject_actual, ss_name, str(ss_topic_obj.id), ss_name
+            )
+            _log_generation(
+                topic_name=ss_name,
+                subject_name=subject_actual,
+                status="success",
+                nodes_created=1,
+                quality_score=ss_quality,
+                word_count=len(ss_article.split()),
+                start_time=start_time,
+            )
+            added += 1
+            logger.info(
+                "ingestor_locked_sub_subtopic_added",
+                name=ss_name,
+                quality=ss_quality,
+            )
+
+    logger.info("ingestor_locked_extend_done", topic=topic_obj.name, added=added)
+    return {
+        "nodes_created": added,
+        "relations_created": added,
+        "topic": topic_obj.name,
+        "locked_extension": True,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # PUBLIC ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -114,10 +499,18 @@ def ingest_topic(
 
     Call with:
       ingest_topic(topic_name="Parliament of India")
-      ingest_topic(topic_name="Parliament of India", subject_name="Indian Constitution & Polity")
+      ingest_topic(topic_name="Parliament of India", subject_name="Indian Polity & Constitution")
 
     Returns:
       {"nodes_created": int, "relations_created": int, "topic": str}
+      OR {"nodes_created": 0, "skipped": True, "reason": "..."} — hierarchy mismatch
+      OR {"nodes_created": N, "locked_extension": True} — topic was locked, only sub-subtopics added
+
+    Hierarchy enforcement:
+      - Subject and Module MUST match seeded DB — SkipGenerationError if not found
+      - Topic/Subtopic/Sub-subtopic: fuzzy-matched first, created only if genuinely new
+      - After Step 9 coherence pass, topic is marked content_status="complete" (locked)
+      - Re-running a locked topic ONLY discovers/generates new sub-subtopics
     """
     _separator()
     logger.info("ingestor_start", topic_name=topic_name, subject_name=subject_name)
@@ -130,6 +523,18 @@ def ingest_topic(
     nodes_created = 0
     relations_created = 0
     start_time = time.time()
+
+    # ── Lock Check: if topic already fully generated, only add sub-subtopics ──
+    locked_topic = _find_complete_topic(topic_name or "")
+    if locked_topic:
+        logger.info(
+            "ingestor_topic_locked",
+            topic=locked_topic.name,
+            action="extend_sub_subtopics_only",
+        )
+        return _extend_sub_subtopics_only(
+            locked_topic, topic_name or "", subject_name, start_time
+        )
 
     try:
         # ── Step 3: Hierarchy Classification ─────────────────────────────────
@@ -149,10 +554,22 @@ def ingest_topic(
         if not subtopics:
             logger.warning("ingestor_no_subtopics_found", topic=topic)
 
-        # ── Resolve / create knowledge hierarchy nodes ────────────────────────
-        subject_obj = _get_or_create_subject(subject)
-        module_obj = _get_or_create_module(module, subject_obj)
-        topic_obj = _get_or_create_topic(
+        # ── Resolve / match knowledge hierarchy nodes (strict — never invents) ─
+        subject_obj = _get_subject_strict(subject)
+        if subject_obj is None:
+            raise SkipGenerationError(
+                f"Subject '{subject}' not found in seeded hierarchy. "
+                f"Topic '{topic_name}' skipped to prevent hierarchy drift."
+            )
+
+        module_obj = _get_module_strict(module, subject_obj)
+        if module_obj is None:
+            raise SkipGenerationError(
+                f"Module '{module}' not found under '{subject_obj.name}' in seeded "
+                f"hierarchy. Topic '{topic_name}' skipped to prevent hierarchy drift."
+            )
+
+        topic_obj = _get_or_match_topic_fuzzy(
             topic, module_obj, subject_obj, node_type="topic"
         )
 
@@ -238,7 +655,7 @@ def ingest_topic(
                 )
 
                 # Save subtopic node + BookContent
-                sub_topic_obj = _get_or_create_topic(
+                sub_topic_obj = _get_or_match_topic_fuzzy(
                     sub_name,
                     module_obj,
                     subject_obj,
@@ -337,7 +754,7 @@ def ingest_topic(
                         subject=subject,
                     )
 
-                    ss_topic_obj = _get_or_create_topic(
+                    ss_topic_obj = _get_or_match_topic_fuzzy(
                         ss_name,
                         module_obj,
                         subject_obj,
@@ -397,8 +814,10 @@ def ingest_topic(
         logger.info("ingestor_step9_coherence", topic=topic)
         run_coherence_pass(str(topic_obj.id), topic, subject)
 
-        # Mark parent topic as book_quality
-        Topic.objects.filter(id=topic_obj.id).update(content_status="book_quality")
+        # Mark parent topic as COMPLETE — locks it permanently.
+        # Re-running with the same topic will only add new sub-subtopics.
+        Topic.objects.filter(id=topic_obj.id).update(content_status="complete")
+        logger.info("ingestor_topic_marked_complete", topic=topic)
 
         # Final generation log
         elapsed = int(time.time() - start_time)
@@ -412,6 +831,31 @@ def ingest_topic(
             word_count=0,
             start_time=start_time,
         )
+
+    except SkipGenerationError as skip_exc:
+        # Hierarchy not found in seeded DB — graceful skip, no Sentry noise.
+        logger.warning(
+            "ingestor_hierarchy_skip",
+            topic_name=topic_name,
+            reason=str(skip_exc),
+        )
+        try:
+            GenerationLog.objects.create(
+                topic_name=topic_name or "",
+                subject_name=subject_name or "",
+                status="skipped",
+                error_message=str(skip_exc),
+                generation_time_seconds=int(time.time() - start_time),
+            )
+        except Exception:
+            pass
+        return {
+            "nodes_created": 0,
+            "relations_created": 0,
+            "topic": topic_name or "",
+            "skipped": True,
+            "reason": str(skip_exc),
+        }
 
     except Exception as e:
         elapsed = int(time.time() - start_time)
