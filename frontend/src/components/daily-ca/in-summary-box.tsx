@@ -5,12 +5,12 @@ import { useState } from "react";
 /**
  * InSummaryBox — collapsible "In Summary" card.
  *
- * Primary source: `newsContext` — the article's news_context field, which is a
- * concise editorial summary of why the topic is in the news. Sentence-split into
- * bullet points (up to 3) so the box never duplicates body content.
+ * Primary source: `bodyMd` — extracts the opening lede paragraph from the
+ * LLM-written article body, which is always a high-quality 2-3 sentence
+ * summary of what happened, why it matters, and what's next.
  *
- * Fallback: `bodyMd` — used only when newsContext is absent or too short.
- * Extracts up to 3 meaningful sentences/bullets from the article body.
+ * Fallback: `newsContext` — used only when bodyMd lede extraction fails.
+ * Last resort: first bullet items found anywhere in the body.
  */
 
 interface Props {
@@ -21,17 +21,94 @@ interface Props {
 // ── Extraction helpers ─────────────────────────────────────────────────────────
 
 /**
- * Split newsContext into up to 3 clean bullet points.
- * Handles both sentence-break (". ") and semicolon ("; ") delimiters.
+ * PRIMARY: Extract the opening lede paragraph from the article body.
+ *
+ * The LLM always writes the first section's opening paragraph as a concise
+ * news-style summary. We grab it, clean markdown, split into up to 3 sentences.
+ *
+ * Rules:
+ *  - Skip headings (## / ###)
+ *  - Skip callout blocks (:::callout … :::)
+ *  - Skip blank lines
+ *  - Take the FIRST paragraph of real prose text
+ *  - Split into sentences and return up to 3
+ */
+function extractLedeParagraph(md: string): string[] {
+  if (!md) return [];
+
+  // Strip callout blocks entirely
+  const stripped = md.replace(/:::callout[\s\S]*?:::/g, "");
+
+  const lines = stripped.split("\n");
+  const paraLines: string[] = [];
+  let inPara = false;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+
+    // Skip headings
+    if (line.startsWith("#")) continue;
+
+    // Skip blank lines — if we were collecting a paragraph, stop
+    if (line === "") {
+      if (inPara && paraLines.length > 0) break; // end of first paragraph
+      continue;
+    }
+
+    // Skip standalone bullet/numbered lines (we want prose, not bullet lists)
+    if (/^[-*•]\s+/.test(line) || /^\d+\.\s+/.test(line)) {
+      // If we haven't started collecting prose yet, keep looking
+      if (!inPara) continue;
+      // If mid-paragraph bullets appear, stop
+      break;
+    }
+
+    // This is a prose line — clean markdown and collect
+    const clean = line
+      .replace(/\*\*/g, "")
+      .replace(/\*/g, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/`/g, "")
+      .trim();
+
+    if (clean.length > 20) {
+      paraLines.push(clean);
+      inPara = true;
+    }
+  }
+
+  if (paraLines.length === 0) return [];
+
+  // Join all lines of the paragraph, then split into sentences
+  const paragraph = paraLines.join(" ");
+  const sentences = paragraph
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 30);
+
+  return sentences.slice(0, 3);
+}
+
+/**
+ * FALLBACK: Split newsContext into up to 3 clean bullet points.
+ * Skips known garbage fallback strings written by the proposal generator.
  */
 function extractFromNewsContext(text: string): string[] {
-  if (!text || text.trim().length < 20) return [];
+  if (!text || text.trim().length < 30) return [];
+
+  // Reject known garbage fallback patterns
+  if (
+    /^Recent development on .+\. Review source articles\.?$/i.test(text.trim())
+  ) {
+    return [];
+  }
+  if (/review source articles/i.test(text)) return [];
 
   // Try semicolon split first (structured news context)
   const bySemicolon = text
     .split(/;\s*/)
     .map((s) => s.trim().replace(/\.$/, ""))
-    .filter((s) => s.length >= 20);
+    .filter((s) => s.length >= 25);
 
   if (bySemicolon.length >= 2) return bySemicolon.slice(0, 3);
 
@@ -39,62 +116,44 @@ function extractFromNewsContext(text: string): string[] {
   const bySentence = text
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 20 && s.length <= 250);
+    .filter((s) => s.length >= 25 && s.length <= 280);
 
   if (bySentence.length >= 1) return bySentence.slice(0, 3);
 
   // Single block — return as one point
-  return [text.trim().slice(0, 250)];
+  return [text.trim().slice(0, 280)];
 }
 
 /**
- * Fallback: extract 3 key points from article body markdown.
- * Used only when newsContext is absent/too short.
+ * LAST RESORT: pick first bullet items from anywhere in the article body.
  */
-function extractFromBodyMd(md: string): string[] {
+function extractBulletsFromBody(md: string): string[] {
   if (!md) return [];
 
-  // Strategy 1: find bullet/numbered list items (min 30 chars, max 150)
   const bulletMatches = md.match(/^[-*•]\s+(.{30,150})$/gm) ?? [];
-  const bullets = bulletMatches
+  return bulletMatches
     .map((l) =>
       l
         .replace(/^[-*•]\s+/, "")
         .replace(/\*\*/g, "")
         .trim(),
     )
-    .filter((l) => !l.startsWith("#") && l.length > 20)
+    .filter((l) => l.length > 25)
     .slice(0, 3);
-
-  if (bullets.length >= 2) return bullets;
-
-  // Strategy 2: first 3 meaningful sentences from cleaned text
-  const cleaned = md
-    .replace(/^#+\s.+$/gm, "") // remove headings
-    .replace(/:::callout[\s\S]*?:::/g, "") // remove callouts
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // link text only
-    .replace(/\*\*/g, "")
-    .replace(/\*/g, "")
-    .replace(/^\s*[-*•]\s+/gm, "")
-    .replace(/\n+/g, " ")
-    .trim();
-
-  const sentences = cleaned
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 40 && s.length < 200);
-
-  return sentences.slice(0, 3);
 }
 
 function getSummaryPoints(newsContext?: string, bodyMd?: string): string[] {
-  // Primary: use news_context
+  // Primary: lede paragraph from LLM article body
+  const fromLede = extractLedeParagraph(bodyMd ?? "");
+  if (fromLede.length >= 1) return fromLede;
+
+  // Secondary: news_context field (if it's meaningful, not a fallback placeholder)
   const fromContext = extractFromNewsContext(newsContext ?? "");
   if (fromContext.length >= 1) return fromContext;
 
-  // Fallback: extract from body
-  const fromBody = extractFromBodyMd(bodyMd ?? "");
-  if (fromBody.length >= 1) return fromBody;
+  // Last resort: first bullets from body
+  const fromBullets = extractBulletsFromBody(bodyMd ?? "");
+  if (fromBullets.length >= 1) return fromBullets;
 
   return ["Key developments covered in this article."];
 }

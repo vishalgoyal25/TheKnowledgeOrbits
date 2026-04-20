@@ -483,3 +483,138 @@ class TestDailyCaGeneratorService:
 
         mock_trigger.assert_called_once()
         assert results["static_triggered"] == 1
+
+
+# ── HeroImageService ──────────────────────────────────────────────────────────
+
+
+class TestHeroImageService:
+    """Tests for engines.daily_ca.services.image_service.HeroImageService."""
+
+    def test_fetch_and_upload_returns_cloudinary_url_on_unsplash_success(self):
+        """Unsplash returns a valid URL → Cloudinary upload called → URL returned."""
+        from engines.daily_ca.services.image_service import HeroImageService
+
+        with patch.object(
+            HeroImageService,
+            "_try_unsplash",
+            return_value="https://images.unsplash.com/photo-abc.jpg",
+        ):
+            with patch.object(
+                HeroImageService,
+                "_upload_to_cloudinary",
+                return_value="https://res.cloudinary.com/test/image/upload/ca_test.jpg",
+            ) as mock_upload:
+                result = HeroImageService.fetch_and_upload(
+                    source_urls=[],
+                    topic_name="Parliament of India",
+                    article_id="test-001",
+                )
+
+        assert result == "https://res.cloudinary.com/test/image/upload/ca_test.jpg"
+        mock_upload.assert_called_once()
+
+    def test_fetch_and_upload_falls_back_to_wikipedia_when_unsplash_fails(self):
+        """Unsplash returns '' → Wikipedia fallback tried → upload called."""
+        from engines.daily_ca.services.image_service import HeroImageService
+
+        with patch.object(HeroImageService, "_try_unsplash", return_value=""):
+            with patch.object(
+                HeroImageService,
+                "_try_wikipedia_thumbnail",
+                return_value="https://upload.wikimedia.org/wikipedia/photo.jpg",
+            ):
+                with patch.object(
+                    HeroImageService,
+                    "_upload_to_cloudinary",
+                    return_value="https://res.cloudinary.com/test/ca_wiki.jpg",
+                ) as mock_upload:
+                    result = HeroImageService.fetch_and_upload(
+                        source_urls=[], topic_name="Monsoon", article_id="test-002"
+                    )
+
+        assert result == "https://res.cloudinary.com/test/ca_wiki.jpg"
+        mock_upload.assert_called_once()
+
+    def test_fetch_and_upload_returns_empty_string_when_both_sources_fail(self):
+        """Both Unsplash and Wikipedia return '' → fetch_and_upload returns ''."""
+        from engines.daily_ca.services.image_service import HeroImageService
+
+        with patch.object(HeroImageService, "_try_unsplash", return_value=""):
+            with patch.object(
+                HeroImageService, "_try_wikipedia_thumbnail", return_value=""
+            ):
+                result = HeroImageService.fetch_and_upload(
+                    source_urls=[], topic_name="Obscure Topic", article_id="test-003"
+                )
+
+        assert result == ""
+
+    def test_fetch_and_upload_never_raises_on_exception(self):
+        """Any internal exception must be swallowed — never propagates to caller."""
+        from engines.daily_ca.services.image_service import HeroImageService
+
+        with patch.object(
+            HeroImageService,
+            "_try_unsplash",
+            side_effect=RuntimeError("API crashed"),
+        ):
+            with patch.object(
+                HeroImageService,
+                "_try_wikipedia_thumbnail",
+                side_effect=RuntimeError("also crashed"),
+            ):
+                result = HeroImageService.fetch_and_upload(
+                    source_urls=[], topic_name="Any Topic", article_id="test-004"
+                )
+
+        assert result == ""
+
+    def test_is_valid_image_url_rejects_svg_extension(self):
+        """URLs ending in .svg must be rejected."""
+        from engines.daily_ca.services.image_service import _is_valid_image_url
+
+        assert _is_valid_image_url("https://example.com/image.svg") is False
+
+    def test_is_valid_image_url_rejects_svg_png_wikipedia_render(self):
+        """.svg.png (Wikipedia SVG rendered as PNG) must be rejected."""
+        from engines.daily_ca.services.image_service import _is_valid_image_url
+
+        assert (
+            _is_valid_image_url(
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/"
+                "RajyaSabha.svg/330px-RajyaSabha.svg.png"
+            )
+            is False
+        )
+
+    def test_is_valid_image_url_accepts_valid_jpeg(self):
+        """Normal JPEG URLs must pass validation."""
+        from engines.daily_ca.services.image_service import _is_valid_image_url
+
+        assert (
+            _is_valid_image_url("https://images.unsplash.com/photo-12345.jpg") is True
+        )
+
+    def test_is_valid_image_url_rejects_data_uri(self):
+        """data: URIs must be rejected."""
+        from engines.daily_ca.services.image_service import _is_valid_image_url
+
+        assert _is_valid_image_url("data:image/png;base64,ABC123") is False
+
+    def test_try_unsplash_returns_empty_when_no_access_key(self):
+        """With blank UNSPLASH_ACCESS_KEY, _try_unsplash returns '' before any HTTP call."""
+        import os
+
+        from engines.daily_ca.services.image_service import HeroImageService
+
+        original = os.environ.get("UNSPLASH_ACCESS_KEY", "")
+        os.environ["UNSPLASH_ACCESS_KEY"] = ""
+        try:
+            # requests is imported locally inside _try_unsplash; with no key set
+            # the method returns "" immediately before reaching the import statement.
+            result = HeroImageService._try_unsplash("Parliament of India")
+        finally:
+            os.environ["UNSPLASH_ACCESS_KEY"] = original
+
+        assert result == ""

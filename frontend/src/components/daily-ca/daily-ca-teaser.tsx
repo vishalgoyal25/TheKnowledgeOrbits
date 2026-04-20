@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   getTodayArticles,
@@ -77,46 +78,63 @@ function MiniCard({
   return (
     <Link
       href={`/daily-ca/article/${article.slug}`}
-      className="group relative flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm
+      className="group relative flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden
                  hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
     >
-      {/* Number badge + GS chip row */}
-      <div className="flex items-center justify-between">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-900 text-[10px] font-bold text-white flex-shrink-0">
-          {index + 1}
-        </span>
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${gs.bg} ${gs.text}`}
-          >
-            {gs.label}
-          </span>
-          <span className="text-[10px] text-slate-400 font-medium truncate max-w-[80px]">
-            {article.subject_name}
-          </span>
+      {/* Hero image thumbnail */}
+      {article.hero_image_url && (
+        <div className="relative w-full h-32 flex-shrink-0">
+          <Image
+            src={article.hero_image_url}
+            alt={article.title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 250px"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
         </div>
-      </div>
-
-      {/* Title */}
-      <p className="text-sm font-bold text-blue-900 leading-snug line-clamp-2 group-hover:text-blue-700 transition-colors">
-        {article.title}
-      </p>
-
-      {/* News context */}
-      {article.news_context && (
-        <p className="text-xs text-slate-500 italic leading-relaxed line-clamp-1">
-          {article.news_context}
-        </p>
       )}
 
-      {/* Footer */}
-      <div className="mt-auto flex items-center justify-between pt-1">
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-          ⏱ {readMin} min read
-        </span>
-        <span className="text-[10px] font-semibold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
-          Read →
-        </span>
+      {/* Card content */}
+      <div className="flex flex-col gap-2.5 p-4">
+        {/* Number badge + GS chip row */}
+        <div className="flex items-center justify-between">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-900 text-[10px] font-bold text-white flex-shrink-0">
+            {index + 1}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${gs.bg} ${gs.text}`}
+            >
+              {gs.label}
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium truncate max-w-[80px]">
+              {article.subject_name}
+            </span>
+          </div>
+        </div>
+
+        {/* Title */}
+        <p className="text-sm font-bold text-blue-900 leading-snug line-clamp-2 group-hover:text-blue-700 transition-colors">
+          {article.title}
+        </p>
+
+        {/* News context */}
+        {article.news_context && (
+          <p className="text-xs text-slate-500 italic leading-relaxed line-clamp-1">
+            {article.news_context}
+          </p>
+        )}
+
+        {/* Footer */}
+        <div className="mt-auto flex items-center justify-between pt-1">
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+            ⏱ {readMin} min read
+          </span>
+          <span className="text-[10px] font-semibold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+            Read →
+          </span>
+        </div>
       </div>
     </Link>
   );

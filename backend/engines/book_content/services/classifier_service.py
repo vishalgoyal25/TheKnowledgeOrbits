@@ -28,6 +28,53 @@ logger = structlog.get_logger(__name__)
 UPSC_SUBJECTS = list(SUBJECTS.values())
 
 
+def _load_seeded_hierarchy() -> str:
+    """
+    Queries the live DB for all seeded subjects and their modules.
+    Returns a formatted string for injection into the LLM classifier prompt.
+
+    Format:
+      Subject: Indian Polity & Constitution
+        - Union Legislature
+        - Union Executive
+        - Union Judiciary
+        ...
+
+    Cached per-process in _HIERARCHY_CACHE so the DB is only queried once
+    per worker restart (subjects/modules don't change at runtime).
+    """
+    if _HIERARCHY_CACHE["text"]:
+        return _HIERARCHY_CACHE["text"]
+
+    try:
+        from engines.knowledge.models import Module, Subject
+
+        lines = ["EXACT subject and module names seeded in the database:"]
+        subjects = Subject.objects.prefetch_related("modules").order_by("name")
+
+        for subj in subjects:
+            lines.append(f"\nSubject: {subj.name}")
+            modules = Module.objects.filter(subject=subj).order_by("name")
+            for mod in modules:
+                lines.append(f"  - {mod.name}")
+
+        text = "\n".join(lines)
+        _HIERARCHY_CACHE["text"] = text
+        return text
+
+    except Exception as exc:
+        logger.warning("classifier_hierarchy_load_failed", error=str(exc)[:120])
+        # Fallback: just list subject names from cross_subject_map
+        lines = ["Available subjects (exact wording):"]
+        for s in UPSC_SUBJECTS:
+            lines.append(f"  - {s}")
+        return "\n".join(lines)
+
+
+# Module-level cache — populated on first LLM call, reused for all subsequent calls.
+_HIERARCHY_CACHE: dict = {"text": ""}
+
+
 def classify_hierarchy(
     topic_name: Optional[str] = None, ncert_text: Optional[str] = None
 ) -> dict:
@@ -40,7 +87,7 @@ def classify_hierarchy(
 
     Returns:
         {
-          "subject":            "Indian Constitution & Polity",
+          "subject":            "Indian Polity & Constitution",
           "module":             "Union Legislature",
           "confirmed_topic":    "Parliament of India",
           "secondary_subjects": ["Governance & Social Justice"]
@@ -87,9 +134,9 @@ def classify_hierarchy(
         else:
             logger.warning(
                 "classifier_unknown_subject",
-                defaulting_to="Indian Constitution & Polity",
+                defaulting_to="Indian Polity & Constitution",
             )
-            result["subject"] = "Indian Constitution & Polity"
+            result["subject"] = "Indian Polity & Constitution"
 
     # Ensure all keys exist
     if not result.get("confirmed_topic"):
@@ -110,21 +157,27 @@ def classify_hierarchy(
 
 
 def _build_topic_prompt(topic_name: str) -> str:
+    hierarchy = _load_seeded_hierarchy()
     return f"""You are a UPSC Civil Services Examination syllabus expert.
 
 Determine the exact place of this topic in the UPSC syllabus:
 Topic: "{topic_name}"
 
-Available top-level subjects (use EXACT wording):
-{chr(10).join(f"  - {s}" for s in UPSC_SUBJECTS)}
+{hierarchy}
+
+CRITICAL RULES — you MUST follow these without exception:
+1. Use ONLY the subject names listed above. Copy the name character-for-character.
+2. Use ONLY the module names listed under your chosen subject. Copy exactly.
+3. Do NOT invent new subject or module names. Do NOT paraphrase or rename.
+4. If you are unsure of the module, pick the closest existing module name from the list.
 
 Also identify if this topic SPANS multiple subjects (cross-subject topics
 like Budget, Climate Change, etc. typically appear in 2-3 subjects).
 
 Return ONLY a valid JSON object. No explanation, no markdown:
 {{
-  "subject": "primary subject from the list above (exact wording)",
-  "module": "specific module within that subject (2-5 words)",
+  "subject": "EXACT subject name from the list above",
+  "module": "EXACT module name from the list above",
   "confirmed_topic": "{topic_name}",
   "secondary_subjects": ["other subject if cross-subject", "..."]
 }}
@@ -134,6 +187,7 @@ If the topic belongs to only one subject, set secondary_subjects to [].
 
 
 def _build_ncert_prompt(ncert_excerpt: str) -> str:
+    hierarchy = _load_seeded_hierarchy()
     return f"""You are a UPSC Civil Services Examination syllabus expert.
 
 Analyze this excerpt from an NCERT chapter and determine its place in the UPSC syllabus:
@@ -143,13 +197,18 @@ NCERT EXCERPT:
 {ncert_excerpt}
 \"\"\"
 
-Available top-level subjects (use EXACT wording):
-{chr(10).join(f"  - {s}" for s in UPSC_SUBJECTS)}
+{hierarchy}
+
+CRITICAL RULES — you MUST follow these without exception:
+1. Use ONLY the subject names listed above. Copy the name character-for-character.
+2. Use ONLY the module names listed under your chosen subject. Copy exactly.
+3. Do NOT invent new subject or module names. Do NOT paraphrase or rename.
+4. If you are unsure of the module, pick the closest existing module name from the list.
 
 Return ONLY a valid JSON object. No explanation, no markdown:
 {{
-  "subject": "primary subject from the list above (exact wording)",
-  "module": "specific module within that subject (2-5 words)",
+  "subject": "EXACT subject name from the list above",
+  "module": "EXACT module name from the list above",
   "confirmed_topic": "the main topic of this chapter (3-6 words)",
   "secondary_subjects": ["other subject if cross-subject", "..."]
 }}
@@ -175,7 +234,7 @@ def _parse_json(text: str) -> dict:
             pass
     logger.warning("classifier_json_parse_failed", using="safe defaults")
     return {
-        "subject": "Indian Constitution & Polity",
+        "subject": "Indian Polity & Constitution",
         "module": "General Topics",
         "confirmed_topic": "",
         "secondary_subjects": [],

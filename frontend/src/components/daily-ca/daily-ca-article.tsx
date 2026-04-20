@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -194,7 +195,7 @@ export function DailyCaArticle({
       }`}
     >
       {/* Article Header */}
-      <div className="px-6 pt-5 pb-3">
+      <div className="px-4 sm:px-6 pt-5 pb-3">
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
           {article.gs_paper && (
@@ -233,18 +234,34 @@ export function DailyCaArticle({
             {article.news_context}
           </p>
         )}
+      </div>
 
-        {/* In Summary — primary: news_context; fallback: body markdown */}
-        {(article.news_context || article.body_md_processed) && (
+      {/* Hero Image — full width, above summary */}
+      {article.hero_image_url && (
+        <div className="relative w-full h-48 sm:h-64 overflow-hidden">
+          <Image
+            src={article.hero_image_url}
+            alt={article.title}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 860px"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+        </div>
+      )}
+
+      {/* In Summary — primary: body lede; fallback: news_context */}
+      {(article.news_context || article.body_md_processed) && (
+        <div className="px-4 sm:px-6 pt-4">
           <InSummaryBox
             newsContext={article.news_context ?? undefined}
             bodyMd={article.body_md_processed ?? undefined}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Article Body */}
-      <div className="px-6 pb-6 antialiased">
+      <div className="px-4 sm:px-6 pb-6 antialiased">
         {parts.map((part, i) =>
           part.type === "callout" ? (
             <CalloutBlock key={i} content={part.content} />

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -123,14 +124,20 @@ function makeMarkdownComponents(activeHeadingId: string) {
       <p className="text-sm leading-relaxed text-gray-700 mb-3">{children}</p>
     ),
     ul: ({ children }: { children?: React.ReactNode }) => (
-      <ul className="my-3 space-y-1 pl-4">{children}</ul>
+      <ul className="my-3 space-y-2 pl-1 border-l-2 border-blue-100 ml-1">
+        {children}
+      </ul>
     ),
     ol: ({ children }: { children?: React.ReactNode }) => (
-      <ol className="my-3 space-y-1 pl-4 list-decimal">{children}</ol>
+      <ol className="my-3 space-y-2 pl-5 list-decimal [&>li]:pl-1 [&>li]:text-sm [&>li]:text-gray-700 [&>li]:leading-relaxed marker:text-blue-500 marker:font-semibold">
+        {children}
+      </ol>
     ),
     li: ({ children }: { children?: React.ReactNode }) => (
-      <li className="text-sm text-gray-700 leading-relaxed flex gap-2">
-        <span className="flex-shrink-0 text-blue-400 mt-1.5">•</span>
+      <li className="text-sm text-gray-700 leading-relaxed flex gap-2 pl-3">
+        <span className="flex-shrink-0 text-blue-500 font-bold mt-0.5 text-xs">
+          ▸
+        </span>
         <span>{children}</span>
       </li>
     ),
@@ -423,7 +430,7 @@ export default function ArticleDetailPage() {
       </div>
 
       {/* Layout */}
-      <div className="max-w-[1400px] mx-auto px-4 py-6">
+      <div className="max-w-[1400px] mx-auto px-2 sm:px-4 py-4 sm:py-6">
         <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_300px] gap-6">
           {/* Left — Section ToC */}
           <div className="hidden lg:block">
@@ -439,7 +446,7 @@ export default function ArticleDetailPage() {
           {/* Main — Article */}
           <article className="rounded-2xl border border-gray-200 bg-white shadow-sm">
             {/* Header */}
-            <div className="px-6 pt-6 pb-4">
+            <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4">
               {/* Meta */}
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 {article.gs_paper && (
@@ -473,15 +480,36 @@ export default function ArticleDetailPage() {
                   {article.news_context}
                 </p>
               )}
-
-              {/* In Summary */}
-              {article.body_md_processed && (
-                <InSummaryBox bodyMd={article.body_md_processed} />
-              )}
             </div>
 
+            {/* Hero Image */}
+            {article.hero_image_url && (
+              <div className="relative w-full h-56 sm:h-72 overflow-hidden">
+                <Image
+                  src={article.hero_image_url}
+                  alt={article.title}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 860px"
+                  priority
+                />
+                {/* Subtle gradient overlay for visual depth */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+              </div>
+            )}
+
+            {/* In Summary */}
+            {article.body_md_processed && (
+              <div className="px-4 sm:px-6 pt-4">
+                <InSummaryBox
+                  bodyMd={article.body_md_processed}
+                  newsContext={article.news_context}
+                />
+              </div>
+            )}
+
             {/* Body */}
-            <div className="px-6 pb-6">
+            <div className="px-4 sm:px-6 pb-6">
               {parts.map((part, i) =>
                 part.type === "callout" ? (
                   <CalloutBlock key={i} content={part.content} />
@@ -520,7 +548,7 @@ export default function ArticleDetailPage() {
                 </div>
               )}
 
-              {/* Sources */}
+              {/* Sources & Attribution */}
               <SourceAccordion sources={article.sources_used ?? []} />
             </div>
           </article>
