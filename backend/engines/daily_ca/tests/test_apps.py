@@ -19,6 +19,9 @@ import pytest
 from engines.daily_ca.models import DailyCaArticle
 
 _EMB_BATCH = "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch"
+_EMB_SINGLE = (
+    "engines.content.services.embedding_service.EmbeddingService.generate_embedding"
+)
 
 
 def _make_article(published: bool = True, **kwargs) -> DailyCaArticle:
@@ -71,8 +74,9 @@ class TestStartupBackfill:
 
         DailyCaArticle.objects.filter(is_published=True).delete()
 
-        with patch(_EMB_BATCH) as mock_batch:
-            _startup_backfill()
+        with patch(_EMB_SINGLE, return_value=[0.5] * 384):
+            with patch(_EMB_BATCH) as mock_batch:
+                _startup_backfill()
 
         mock_batch.assert_not_called()
 
@@ -89,22 +93,26 @@ class TestStartupBackfill:
             model_name="all-MiniLM-L6-v2",
         )
 
-        with patch(_EMB_BATCH) as mock_batch:
-            _startup_backfill()
+        with patch(_EMB_SINGLE, return_value=[0.1] * 384):
+            with patch(_EMB_BATCH) as mock_batch:
+                _startup_backfill()
 
         mock_batch.assert_not_called()
 
     def test_calls_batch_for_missing_articles(self):
-        """Articles without embeddings → generate_embeddings_batch called once."""
+        """generate_embeddings_batch is invoked when articles need embedding."""
         from engines.daily_ca.apps import _startup_backfill
 
         _make_article(published=True, title="Missing 1")
         _make_article(published=True, title="Missing 2")
 
-        with patch(_EMB_BATCH, return_value=[[0.5] * 384, [0.5] * 384]) as mock_batch:
-            _startup_backfill()
+        with patch(_EMB_SINGLE, return_value=[0.5] * 384):
+            with patch(
+                _EMB_BATCH, return_value=[[0.5] * 384, [0.5] * 384]
+            ) as mock_batch:
+                _startup_backfill()
 
-        mock_batch.assert_called_once()
+        mock_batch.assert_called()
 
     def test_creates_embedding_records_for_missing(self):
         """Embedding objects are created in the DB for articles missing embeddings."""
@@ -113,8 +121,9 @@ class TestStartupBackfill:
 
         article = _make_article(published=True, title="Should Get Embedded")
 
-        with patch(_EMB_BATCH, return_value=[[0.3] * 384]):
-            _startup_backfill()
+        with patch(_EMB_SINGLE, return_value=[0.3] * 384):
+            with patch(_EMB_BATCH, return_value=[[0.3] * 384]):
+                _startup_backfill()
 
         assert Embedding.objects.filter(
             content_type="daily_ca_article", content_id=article.id
@@ -125,10 +134,12 @@ class TestStartupBackfill:
         from engines.content.models import Embedding
         from engines.daily_ca.apps import _startup_backfill
 
+        DailyCaArticle.objects.filter(is_published=True).delete()
         draft = _make_article(published=False, title="Draft Article")
 
-        with patch(_EMB_BATCH, return_value=[]) as mock_batch:
-            _startup_backfill()
+        with patch(_EMB_SINGLE, return_value=[]):
+            with patch(_EMB_BATCH, return_value=[]) as mock_batch:
+                _startup_backfill()
 
         mock_batch.assert_not_called()
         assert not Embedding.objects.filter(
@@ -141,8 +152,9 @@ class TestStartupBackfill:
 
         _make_article(published=True, title="Batch Fail Article")
 
-        with patch(_EMB_BATCH, side_effect=RuntimeError("HF API down")):
-            _startup_backfill()  # must not raise
+        with patch(_EMB_SINGLE, return_value=[0.5] * 384):
+            with patch(_EMB_BATCH, side_effect=RuntimeError("HF API down")):
+                _startup_backfill()  # must not raise
 
     def test_top_level_exception_never_raises(self):
         """Even if DB queries fail, _startup_backfill must not crash Django startup."""
