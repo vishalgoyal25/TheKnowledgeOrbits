@@ -401,6 +401,10 @@ class TestBackfillDailyCaEmbeddingsCommand(unittest.TestCase):
         """Unpublished drafts must never be embedded by the backfill command."""
         from engines.content.models import Embedding
 
+        from engines.daily_ca.models import DailyCaArticle
+
+        # Remove any published articles left by earlier tests in this class
+        DailyCaArticle.objects.filter(is_published=True).delete()
         draft = self._make_article(title="Draft Should Be Skipped", published=False)
 
         with patch(
