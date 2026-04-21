@@ -1,3 +1,4 @@
+import os
 import sys
 import threading
 
@@ -10,6 +11,26 @@ logger = structlog.get_logger(__name__)
 
 # Management commands that mutate the schema — skip startup backfill during these.
 _SKIP_COMMANDS = frozenset({"migrate", "makemigrations", "test", "shell", "dbshell"})
+
+
+def _is_running_under_pytest() -> bool:
+    """
+    Reliably detect pytest/xdist worker processes via multiple signals.
+    sys.modules check alone can miss early-init in xdist workers.
+    """
+    # pytest sets this env var for every test it runs
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return True
+    # pytest-xdist workers always have this var set
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return True
+    # pytest core module present in any pytest process
+    if "pytest" in sys.modules or "_pytest" in sys.modules:
+        return True
+    # argv-based fallback: covers `python -m pytest ...`
+    if any("pytest" in arg for arg in sys.argv):
+        return True
+    return False
 
 
 def _startup_backfill() -> None:
@@ -137,9 +158,9 @@ class DailyCaConfig(AppConfig):
         import engines.daily_ca.signals  # noqa: F401
 
         # Startup backfill — handle articles published before the signal existed.
-        # Skip during schema-mutating management commands (migrate, makemigrations, …).
+        # Skip during schema-mutating commands and all pytest/xdist runs.
         argv0 = sys.argv[1] if len(sys.argv) > 1 else ""
-        if argv0 not in _SKIP_COMMANDS:
+        if argv0 not in _SKIP_COMMANDS and not _is_running_under_pytest():
             thread = threading.Thread(
                 target=_startup_backfill,
                 daemon=True,

@@ -31,6 +31,38 @@ def _make_article(published: bool = True, **kwargs) -> DailyCaArticle:
     )
 
 
+class TestIsPytestRunning:
+    """Unit tests for _is_running_under_pytest() detection logic."""
+
+    def test_returns_true_under_pytest(self):
+        """When called from within a pytest process, must return True."""
+        from engines.daily_ca.apps import _is_running_under_pytest
+
+        assert _is_running_under_pytest() is True
+
+    def test_xdist_worker_env_var_triggers_true(self):
+        """PYTEST_XDIST_WORKER env var alone must return True (xdist worker detection)."""
+        import os
+        from unittest.mock import patch
+        from engines.daily_ca.apps import _is_running_under_pytest
+
+        with patch.dict(os.environ, {"PYTEST_XDIST_WORKER": "gw0"}):
+            result = _is_running_under_pytest()
+
+        assert result is True
+
+    def test_pytest_current_test_env_var_triggers_true(self):
+        """PYTEST_CURRENT_TEST env var alone must return True."""
+        import os
+        from unittest.mock import patch
+        from engines.daily_ca.apps import _is_running_under_pytest
+
+        with patch.dict(os.environ, {"PYTEST_CURRENT_TEST": "test_foo::bar"}):
+            result = _is_running_under_pytest()
+
+        assert result is True
+
+
 @pytest.mark.django_db
 class TestStartupBackfill:
     def test_early_exit_when_no_published_articles(self):
