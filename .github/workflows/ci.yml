@@ -103,7 +103,7 @@ jobs:
         working-directory: ./backend
         run: python manage.py migrate --noinput
 
-      - name: Execute 379 Tests (Parallel)
+      - name: Execute 590 Tests (Parallel)
         working-directory: ./backend
         run: |
           pytest -n auto --cov=engines --cov-report=xml --maxfail=10
