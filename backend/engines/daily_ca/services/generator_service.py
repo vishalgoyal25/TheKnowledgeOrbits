@@ -52,6 +52,15 @@ from engines.tags.services.tag_service import TagService
 
 logger = structlog.get_logger(__name__)
 
+# ── Rate-limit guard — sleep between articles ────────────────────────────────
+# GROQ free tier: 6,000 tokens/minute per key.  Each article consumes ~20,000
+# tokens (2 calls × ~10,000 tokens each).  With 2 keys that's 12,000 TPM, so
+# one article needs ~100 s of bucket-refill time.  We sleep 90 s between cycles
+# (generation itself takes ~30 s, meaning the bucket has already partially
+# refilled by the time we enter the sleep).  This prevents the chain of 429s
+# that would otherwise waste 4 minutes of retry back-off per article.
+INTER_CYCLE_SLEEP = 90  # seconds — proactive throttle between Daily CA articles
+
 # ── Quality scoring constants ─────────────────────────────────────────────────
 _QUALITY_MIN_WORDS = 450
 _QUALITY_MAX_WORDS = 1000
@@ -684,6 +693,20 @@ class DailyCaGeneratorService:
                     pass
                 results["failed"] += 1
                 # DO NOT break — a failed cycle is not catastrophic — continue
+
+            # ── Inter-cycle rate-limit guard ──────────────────────────────────
+            # Sleep between articles (not after the last one) so the GROQ token
+            # bucket has time to refill before the next 20,000-token cycle.
+            # Without this every article after #2 hits 429 on the first attempt
+            # and wastes 4+ minutes of exponential back-off.
+            if i < len(proposals):
+                logger.info(
+                    "inter_cycle_sleep",
+                    sleeping_seconds=INTER_CYCLE_SLEEP,
+                    next_cycle=i + 1,
+                    total=len(proposals),
+                )
+                time.sleep(INTER_CYCLE_SLEEP)
 
         results["groq_calls_used"] = groq_calls_used
 
