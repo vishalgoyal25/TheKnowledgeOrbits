@@ -116,6 +116,12 @@ export default function Header({ initialHierarchy }: HeaderProps) {
   // Timer ref to delay closing dropdowns (prevents flicker when moving mouse from button to panel)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // P3.5 — staleness guard: track when hierarchy was last fetched.
+  // Initialised to now() if server-baked data arrived, else 0 (force fetch).
+  const lastHierarchyFetchRef = useRef<number>(
+    initialHierarchy ? Date.now() : 0,
+  );
+
   const closeAllDropdowns = () => {
     setHoveredModuleId(null);
     setDropdownPos(null);
@@ -164,9 +170,11 @@ export default function Header({ initialHierarchy }: HeaderProps) {
   const displaySubjectId = hoveredSubject || currentSubjectId;
 
   useEffect(() => {
-    // Always refresh from the book content engine on mount.
-    // This ensures hamburger/navbar use the SAME topic UUIDs as the graph + outline
-    // (book content ingestion creates new knowledge_topic rows; old hierarchy rows are stale).
+    // P3.5 — skip re-fetch when server-baked data is still fresh (< 30 min old).
+    // layout.tsx ISR revalidates every 30 min, so client re-fetch within that
+    // window is redundant — it only adds N+1 HTTP calls per navigation.
+    const STALE_MS = 30 * 60 * 1000; // 30 minutes
+    if (Date.now() - lastHierarchyFetchRef.current < STALE_MS) return;
 
     // Moved to useEffect root (not inside async arrow) to satisfy linter rule.
     function treeTopicToHierarchy(t: TreeTopic): HierarchyTopic {
@@ -200,6 +208,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
         );
 
         setHierarchyData([NEWS_SUBJECT, ...hierarchySubjects]);
+        lastHierarchyFetchRef.current = Date.now();
       } catch (err) {
         console.warn("Hierarchy refresh failed, keeping cached version.", err);
       }

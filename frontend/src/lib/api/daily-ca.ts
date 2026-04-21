@@ -78,6 +78,7 @@ export interface ArchiveDay {
 
 export interface ArchiveResponse {
   days: number;
+  has_more: boolean; // P2.6 — true if older articles exist beyond this page
   archive: ArchiveDay[];
 }
 
@@ -102,8 +103,16 @@ export async function getArticleDetail(
   return res.data;
 }
 
-export async function getArchive(): Promise<ArchiveResponse> {
-  const res = await apiClient.get("/daily-ca/archive/");
+/**
+ * P2.6 — Paginated archive. Fetches `days` calendar days ending at (but not
+ * including) `before`. Omit `before` to get the most recent days.
+ * Use `response.has_more + oldest date in result` as the cursor for "Load more".
+ */
+export async function getArchive(params?: {
+  days?: number;
+  before?: string;
+}): Promise<ArchiveResponse> {
+  const res = await apiClient.get("/daily-ca/archive/", { params });
   return res.data;
 }
 

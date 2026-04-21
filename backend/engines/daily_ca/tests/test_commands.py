@@ -302,3 +302,114 @@ class TestApplyDiversityCap(unittest.TestCase):
         # The overflow topic (score=2.0) is the last topic object
         last_topic = result[-1][0]
         assert last_topic.module.subject.name == "Indian Polity & Constitution"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# backfill_daily_ca_embeddings management command
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+import pytest
+from io import StringIO
+from unittest.mock import patch
+import uuid
+
+
+@pytest.mark.django_db
+class TestBackfillDailyCaEmbeddingsCommand(unittest.TestCase):
+    """
+    Tests for the backfill_daily_ca_embeddings management command.
+
+    DB access is used for article/embedding creation.
+    EmbeddingService is mocked to avoid HF API calls.
+    """
+
+    def _call_command(self, *args, **kwargs):
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command("backfill_daily_ca_embeddings", *args, stdout=out, **kwargs)
+        return out.getvalue()
+
+    def _make_article(
+        self, title: str = "Backfill Article", published: bool = True
+    ) -> object:
+        from engines.daily_ca.models import DailyCaArticle
+
+        return DailyCaArticle.objects.create(
+            title=title,
+            slug=f"2026-04-22-bf-{uuid.uuid4().hex[:6]}",
+            published_date=date(2026, 4, 22),
+            body_md="Some body content.",
+            is_published=published,
+        )
+
+    def test_nothing_to_do_when_all_embedded(self):
+        """When all published articles are already embedded, prints success and exits."""
+        from engines.content.models import Embedding
+
+        article = self._make_article()
+        Embedding.objects.create(
+            content_type="daily_ca_article",
+            content_id=article.id,
+            vector=[0.1] * 384,
+            model_name="all-MiniLM-L6-v2",
+        )
+
+        with patch(
+            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch"
+        ) as mock_batch:
+            output = self._call_command()
+
+        mock_batch.assert_not_called()
+        assert "Nothing to do" in output or "already have embeddings" in output
+
+    def test_dry_run_shows_ids_without_saving(self):
+        """--dry-run prints what would be processed without creating embeddings."""
+        from engines.content.models import Embedding
+
+        article = self._make_article(title="Dry Run Article")
+
+        with patch(
+            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch"
+        ) as mock_batch:
+            self._call_command("--dry-run")
+
+        mock_batch.assert_not_called()
+        assert not Embedding.objects.filter(
+            content_type="daily_ca_article", content_id=article.id
+        ).exists()
+
+    def test_embeds_missing_articles(self):
+        """Command creates Embedding records for published articles with none."""
+        from engines.content.models import Embedding
+
+        article = self._make_article(title="Should Be Embedded")
+
+        with patch(
+            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch",
+            return_value=[[0.4] * 384],
+        ):
+            output = self._call_command()
+
+        assert Embedding.objects.filter(
+            content_type="daily_ca_article", content_id=article.id
+        ).exists()
+        assert "Backfill complete" in output
+
+    def test_skips_unpublished_articles(self):
+        """Unpublished drafts must never be embedded by the backfill command."""
+        from engines.content.models import Embedding
+
+        draft = self._make_article(title="Draft Should Be Skipped", published=False)
+
+        with patch(
+            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch",
+            return_value=[],
+        ) as mock_batch:
+            self._call_command()
+
+        mock_batch.assert_not_called()
+        assert not Embedding.objects.filter(
+            content_type="daily_ca_article", content_id=draft.id
+        ).exists()

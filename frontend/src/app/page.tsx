@@ -41,11 +41,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import {
-  getTodayArticles,
-  getAllArticleDetails,
-  DailyCaArticleDetail,
-} from "@/lib/api/daily-ca";
+import { getTodayArticles, DailyCaArticleList } from "@/lib/api/daily-ca";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KNOWLEDGE ORBITS GRAPH TEASER
@@ -241,29 +237,15 @@ const GS_BADGE_COLORS: Record<string, string> = {
   CSAT: "bg-gray-100 text-gray-600",
 };
 
-function HeroLiveCA() {
-  const [articles, setArticles] = useState<DailyCaArticleDetail[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const list = await getTodayArticles();
-        if (list.articles.length > 0) {
-          const slugs = list.articles.slice(0, 5).map((a) => a.slug);
-          const details = await getAllArticleDetails(slugs);
-          details.sort((a, b) => a.order_on_date - b.order_on_date);
-          setArticles(details.slice(0, 5));
-        }
-      } catch {
-        // silent — hero panel is non-critical
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
-
+// P3.2 — HeroLiveCA is now a pure presentation component.
+// Data is fetched once in HomePage and passed down; no self-fetch, no getAllArticleDetails.
+function HeroLiveCA({
+  articles,
+  loading,
+}: {
+  articles: DailyCaArticleList[];
+  loading: boolean;
+}) {
   const today = new Date().toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -603,6 +585,24 @@ export default function HomePage() {
   const articles = articlesArray.slice(0, 9);
   const { isCollapsed } = useSidebar();
 
+  // P3.2 — fetch today's articles ONCE here; pass to both HeroLiveCA and DailyCaTeaserWidget.
+  // Before: each component called getTodayArticles() independently → 2 identical requests on every homepage load.
+  // After: 1 request total. undefined = loading, [] or [...] = ready (including error case → []).
+  const [todayArticles, setTodayArticles] = useState<
+    DailyCaArticleList[] | undefined
+  >(undefined);
+
+  useEffect(() => {
+    getTodayArticles()
+      .then((res) => {
+        const sorted = [...res.articles].sort(
+          (a, b) => a.order_on_date - b.order_on_date,
+        );
+        setTodayArticles(sorted);
+      })
+      .catch(() => setTodayArticles([])); // empty array signals "loaded but empty"
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/*
@@ -714,14 +714,18 @@ export default function HomePage() {
 
               {/* ── RIGHT: Live CA Preview ── */}
               <div className="lg:w-[46%] w-full max-w-md mx-auto lg:mx-0">
-                <HeroLiveCA />
+                <HeroLiveCA
+                  articles={(todayArticles ?? []).slice(0, 5)}
+                  loading={todayArticles === undefined}
+                />
               </div>
             </div>
           </div>
         </section>
 
         {/* 2. DAILY CA TEASER — full date-navigable feed strip */}
-        <DailyCaTeaserWidget />
+        {/* P3.2 — pass today's articles so DailyCaTeaserWidget skips its own initial fetch */}
+        <DailyCaTeaserWidget initialArticles={todayArticles} />
 
         {/* 3. KNOWLEDGE GRAPH TEASER — visual wow */}
         <KnowledgeGraphTeaser />

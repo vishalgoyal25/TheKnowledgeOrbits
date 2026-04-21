@@ -1,3 +1,4 @@
+import hashlib
 import sentry_sdk
 
 """
@@ -6,6 +7,7 @@ Knowledge Engine Views
 
 from typing import Any, Optional, cast
 
+from django.core.cache import cache
 from django.db.models import QuerySet
 
 from rest_framework import status, viewsets, views
@@ -445,13 +447,26 @@ class SearchViewSet(viewsets.ViewSet):
         if not query or len(query) < 2:
             return Response([])
 
-        limit = int(request.query_params.get("limit", 10))
+        limit = min(int(request.query_params.get("limit", 50)), 100)
+
+        # Search result cache (5 min TTL) — same query by N users hits DB once.
+        # Key includes limit so ?limit=5 and ?limit=10 stay independent.
+        cache_key = (
+            f"search_{hashlib.md5(query.lower().encode()).hexdigest()}_{limit}_v1"
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            logger.debug("search_cache_hit", query=query[:60])
+            return Response(cached)
 
         # Use our Unified Search Service
         results = SearchService.semantic_search(
             query=query, limit=limit, user=request.user
         )
 
+        cache.set(
+            cache_key, results, timeout=300
+        )  # 5 min — fresh enough for CA content
         return Response(results)
 
 

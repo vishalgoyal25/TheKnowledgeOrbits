@@ -12,6 +12,7 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
+from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.db import models
 
 
@@ -201,6 +202,15 @@ class CAChunk(models.Model):
         help_text="Reference to embedding in content_embedding table",
     )
 
+    # Search: precomputed tsvector for BM25 (GIN indexed — see migration 0005).
+    # Equivalent to BookChunk.search_vector. Eliminates on-the-fly tsvector
+    # computation in _bm25_ca_chunk_search() on every search request.
+    search_vector = SearchVectorField(
+        null=True,
+        blank=True,
+        help_text="Precomputed tsvector for BM25 full-text search (auto-populated on save).",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -213,13 +223,23 @@ class CAChunk(models.Model):
             models.Index(fields=["expiry_date"]),
             models.Index(fields=["is_expired"]),
             models.Index(fields=["source_type"]),
+            # GIN index for search_vector created via RunSQL in migration 0005
+            # (SearchVectorField GIN indexes must be created manually — Django
+            #  cannot auto-create them via Meta.indexes for this field type).
         ]
 
     def save(self, *args, **kwargs) -> Any:  # type: ignore
-        """Auto-set expiry_date if not set"""
+        """Auto-set expiry_date and populate search_vector on save."""
         if not self.expiry_date and self.published_at:
             self.expiry_date = self.published_at + timedelta(days=180)
         super().save(*args, **kwargs)
+        # Populate search_vector via post-save UPDATE so PostgreSQL evaluates
+        # SearchVector("chunk_text") as a server-side tsvector expression.
+        # The GIN index on this field (migration 0005) makes BM25 search <5ms.
+        if self.chunk_text and self.pk:
+            CAChunk.objects.filter(pk=self.pk).update(
+                search_vector=SearchVector("chunk_text", config="english")
+            )
 
     def __str__(self) -> Any:
         return f"CA Chunk {self.chunk_index} from {self.ca_article.title[:50]}"

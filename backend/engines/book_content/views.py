@@ -21,6 +21,7 @@ from typing import Any
 
 import sentry_sdk
 import structlog
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -75,7 +76,14 @@ def _build_topic_tree(topic: Topic) -> dict:
         "subtopics": [],
     }
 
-    for child in topic.subtopics.filter(is_active=True).order_by("order_index", "name"):
+    # P2.2 — .filter() on a prefetched relation discards the cache and fires a
+    # new DB query per topic. Use Python-level filtering on .all() instead so
+    # Django reads from the already-fetched in-memory prefetch cache.
+    children = sorted(
+        [t for t in topic.subtopics.all() if t.is_active],
+        key=lambda t: (t.order_index, t.name),
+    )
+    for child in children:
         node["subtopics"].append(_build_topic_tree(child))
 
     return node
@@ -95,7 +103,13 @@ def subject_list(request: Request) -> Response:
     can still render them (just with zero progress).
     Used by: subject selector in frontend.
     """
-    subjects = Subject.objects.filter(is_active=True).order_by("order_index", "name")
+    # P2.3 — select_related joins BookPlan in the same query instead of
+    # firing 1 extra query per subject (20 subjects = 20 extra queries without this)
+    subjects = (
+        Subject.objects.filter(is_active=True)
+        .select_related("book_plan")
+        .order_by("order_index", "name")
+    )
     result = []
 
     for subject in subjects:
@@ -139,6 +153,13 @@ def subject_tree(request: Request, subject_id: str) -> Response:
     can show generation progress inline (e.g. grey=empty, green=book_quality).
     Used by: hamburger/navbar UI.
     """
+    # P3.4 — Redis cache: topic hierarchy changes only when topics are added/edited.
+    # Invalidated by post_save signal on Topic and BookContent (see signals.py).
+    cache_key = f"book_subject_tree_{subject_id}_v1"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return Response(cached)
+
     subject = get_object_or_404(Subject, id=subject_id, is_active=True)
 
     modules = (
@@ -165,15 +186,22 @@ def subject_tree(request: Request, subject_id: str) -> Response:
             "order_index": module.order_index,
             "topics": [],
         }
-        # Only top-level topics (no parent_topic) under this module
-        root_topics = module.topics.filter(
-            parent_topic__isnull=True, is_active=True
-        ).order_by("order_index", "name")
+        # P2.2 — use Python-level filter on prefetch cache; .filter() would
+        # discard prefetch and fire a fresh DB query per module.
+        root_topics = sorted(
+            [
+                t
+                for t in module.topics.all()
+                if t.parent_topic_id is None and t.is_active
+            ],
+            key=lambda t: (t.order_index, t.name),
+        )
         for topic in root_topics:
             module_node["topics"].append(_build_topic_tree(topic))
 
         tree["modules"].append(module_node)
 
+    cache.set(cache_key, tree, timeout=3600)
     logger.info(
         "book_tree_fetched", subject_id=subject_id, modules=len(tree["modules"])
     )
@@ -198,6 +226,11 @@ def subject_graph(request: Request, subject_id: str) -> Response:
 
     Used by: Knowledge Graph UI (eye toggle).
     """
+    cache_key = f"book_subject_graph_{subject_id}_v1"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return Response(cached)
+
     subject = get_object_or_404(Subject, id=subject_id, is_active=True)
 
     # ── Topic nodes (knowledge_topic table) ───────────────────────────────
@@ -300,6 +333,9 @@ def subject_graph(request: Request, subject_id: str) -> Response:
         },
     }
 
+    cache.set(
+        cache_key, payload, timeout=3600
+    )  # 60 min — graph only changes on new topics
     logger.info(
         "book_graph_fetched",
         subject_id=subject_id,

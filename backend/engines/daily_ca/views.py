@@ -24,6 +24,7 @@ import sentry_sdk
 import structlog
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -38,7 +39,40 @@ from engines.daily_ca.serializers import (
 
 logger = structlog.get_logger(__name__)
 
-_TODAY_CACHE_TTL = 300  # 5 minutes
+_TODAY_CACHE_TTL = 300  # 5 minutes  — today's articles change once/day
+_DATE_CACHE_TTL = 3600  # 60 minutes — past-date articles are immutable
+_ARCHIVE_CACHE_TTL = 300  # 5 minutes  — archive changes when new articles publish
+
+
+def _build_tags_map(articles: list) -> dict:
+    """
+    P2.1 — Bulk-fetch all ArticleTags for a list of DailyCaArticle objects
+    in a single query and return a dict keyed by article UUID string.
+
+    Without this: ArchiveView fires 1 ArticleTag query per article = 300 queries.
+    With this: 1 query total, regardless of article count.
+
+    Usage:
+        articles_list = list(qs)
+        tags_map = _build_tags_map(articles_list)
+        DailyCaArticleListSerializer(articles_list, many=True,
+                                     context={"prefetched_tags": tags_map})
+    """
+    from engines.tags.models import ArticleTag
+
+    if not articles:
+        return {}
+
+    ids = [a.id for a in articles]
+    article_tags = (
+        ArticleTag.objects.filter(content_type="daily_ca", object_id__in=ids)
+        .select_related("tag")
+        .order_by("-relevance")
+    )
+    tags_map: dict = {}
+    for at in article_tags:
+        tags_map.setdefault(str(at.object_id), []).append(at.tag)
+    return tags_map
 
 
 # ── Public Views ──────────────────────────────────────────────────────────────
@@ -64,14 +98,27 @@ class TodayView(APIView):
             if cached is not None:
                 return Response(cached)
 
-        articles = DailyCaArticle.objects.filter(
-            published_date=today, is_published=True
-        ).order_by("order_on_date")
+        articles = (
+            DailyCaArticle.objects.filter(published_date=today, is_published=True)
+            .defer(
+                "body_md",
+                "body_md_processed",
+                "generation_metadata",
+                "ca_chunk_ids",
+                "static_links",
+            )
+            .order_by("order_on_date")
+        )
 
         if category:
             articles = articles.filter(news_category=category)
 
-        data = DailyCaArticleListSerializer(articles, many=True).data
+        # P2.1 — evaluate queryset once, bulk-fetch tags in 1 query
+        articles_list = list(articles)
+        tags_map = _build_tags_map(articles_list)
+        data = DailyCaArticleListSerializer(
+            articles_list, many=True, context={"prefetched_tags": tags_map}
+        ).data
         payload = {"date": str(today), "count": len(data), "articles": data}
 
         if not category:
@@ -104,15 +151,40 @@ class DateView(APIView):
 
         category = request.query_params.get("category", "").strip().lower()
 
-        articles = DailyCaArticle.objects.filter(
-            published_date=target_date, is_published=True
-        ).order_by("order_on_date")
+        # Cache per date+category — past dates are immutable (60-min TTL)
+        if not category:
+            cache_key = f"daily_ca_date_{date_str}_v1"
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+
+        articles = (
+            DailyCaArticle.objects.filter(published_date=target_date, is_published=True)
+            .defer(
+                "body_md",
+                "body_md_processed",
+                "generation_metadata",
+                "ca_chunk_ids",
+                "static_links",
+            )
+            .order_by("order_on_date")
+        )
 
         if category:
             articles = articles.filter(news_category=category)
 
-        data = DailyCaArticleListSerializer(articles, many=True).data
-        return Response({"date": date_str, "count": len(data), "articles": data})
+        # P2.1 — evaluate queryset once, bulk-fetch tags in 1 query
+        articles_list = list(articles)
+        tags_map = _build_tags_map(articles_list)
+        data = DailyCaArticleListSerializer(
+            articles_list, many=True, context={"prefetched_tags": tags_map}
+        ).data
+        payload = {"date": date_str, "count": len(data), "articles": data}
+
+        if not category:
+            cache.set(cache_key, payload, timeout=_DATE_CACHE_TTL)
+
+        return Response(payload)
 
 
 class ArticleDetailView(APIView):
@@ -138,30 +210,97 @@ class ArticleDetailView(APIView):
 class ArchiveView(APIView):
     """
     GET /api/v1/daily-ca/archive/
-    Last 30 days, date-grouped summary: {date, count, articles (list)}.
+    Date-grouped archive with cursor pagination.
+
+    Query params:
+      ?days=10     — number of calendar days to return (default: 10, max: 30)
+      ?before=YYYY-MM-DD — return days strictly before this date (cursor for "load more")
+
+    Response shape:
+      { days: int, has_more: bool, archive: [{date, count, articles[]}] }
+
+    P2.6 — replaces the old 30-day single-shot response (300 articles at once)
+    with a paginated response. Frontend requests 10 days at a time; "Load more"
+    passes ?before=<oldest_date_in_current_result> to fetch the next page.
     """
 
     permission_classes = [AllowAny]
 
-    def get(self, request):
-        cutoff = timezone.now().date() - timedelta(days=30)
-        articles = DailyCaArticle.objects.filter(
-            published_date__gte=cutoff, is_published=True
-        ).order_by("-published_date", "order_on_date")
+    _MAX_DAYS = 30
+    _DEFAULT_DAYS = 10
 
-        # Group by date
+    def get(self, request):
+        # ── Parse query params ────────────────────────────────────────────────
+        try:
+            days_limit = min(
+                int(request.query_params.get("days", self._DEFAULT_DAYS)),
+                self._MAX_DAYS,
+            )
+        except (ValueError, TypeError):
+            days_limit = self._DEFAULT_DAYS
+
+        before_str = request.query_params.get("before", "").strip()
+        if before_str:
+            try:
+                before_date = datetime.strptime(before_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid before date format. Use YYYY-MM-DD."}, status=400
+                )
+            end_date = before_date - timedelta(days=1)
+        else:
+            end_date = timezone.now().date()
+
+        cutoff = end_date - timedelta(days=days_limit)
+
+        # ── Cache (keyed by days + cursor) ────────────────────────────────────
+        cache_key = f"daily_ca_archive_{days_limit}_{before_str}_v1"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        # ── Fetch & group ─────────────────────────────────────────────────────
+        articles = (
+            DailyCaArticle.objects.filter(
+                published_date__gt=cutoff,
+                published_date__lte=end_date,
+                is_published=True,
+            )
+            .defer(
+                "body_md",
+                "body_md_processed",
+                "generation_metadata",
+                "ca_chunk_ids",
+                "static_links",
+            )
+            .order_by("-published_date", "order_on_date")
+        )
+
+        # P2.1 — evaluate once, bulk-fetch all tags in 1 query, then group
+        articles_list = list(articles)
+        tags_map = _build_tags_map(articles_list)
+        serializer_context = {"prefetched_tags": tags_map}
+
         grouped: dict = {}
-        for article in articles:
+        for article in articles_list:
             d = str(article.published_date)
-            if d not in grouped:
-                grouped[d] = []
-            grouped[d].append(DailyCaArticleListSerializer(article).data)
+            grouped.setdefault(d, []).append(
+                DailyCaArticleListSerializer(article, context=serializer_context).data
+            )
 
         result = [
             {"date": d, "count": len(items), "articles": items}
             for d, items in sorted(grouped.items(), reverse=True)
         ]
-        return Response({"days": len(result), "archive": result})
+
+        # ── has_more: any published articles exist before the fetched window ──
+        has_more = DailyCaArticle.objects.filter(
+            published_date__lte=cutoff, is_published=True
+        ).exists()
+
+        payload = {"days": len(result), "has_more": has_more, "archive": result}
+        cache.set(cache_key, payload, timeout=_ARCHIVE_CACHE_TTL)
+        return Response(payload)
 
 
 # ── Admin Views (no auth — solo developer) ────────────────────────────────────
@@ -248,12 +387,14 @@ class AdminGenerateStatusView(APIView):
         else:
             target_date = timezone.now().date()
 
-        proposals = CaDailyProposal.objects.filter(date=target_date)
-        status_counts: dict = {}
-        for p in proposals:
-            status_counts[p.status] = status_counts.get(p.status, 0) + 1
-
-        total = proposals.count()
+        # P1.6 — single aggregate query replaces loop + .count() double-hit
+        status_data = (
+            CaDailyProposal.objects.filter(date=target_date)
+            .values("status")
+            .annotate(count=Count("id"))
+        )
+        status_counts: dict = {item["status"]: item["count"] for item in status_data}
+        total = sum(status_counts.values())
         generated = status_counts.get("generated", 0)
 
         return Response(
@@ -289,9 +430,11 @@ class AdminPublishDateView(APIView):
                 published_date=target_date, is_published=False
             ).update(is_published=True)
 
-            # Bust the today cache if publishing today's articles
-            if target_date == timezone.now().date():
-                cache.delete(f"daily_ca_today_{target_date}")
+            # Bust today + archive + date caches on any publish
+            cache.delete(f"daily_ca_today_{target_date}")
+            cache.delete(f"daily_ca_date_{date_str}_v1")
+            cache.delete("daily_ca_archive_v1")  # legacy key (backward compat)
+            cache.delete("daily_ca_archive_10__v1")  # P2.6 default paginated key
 
             logger.info("admin_publish_date", date=date_str, published=updated)
             return Response({"date": date_str, "published": updated})

@@ -272,6 +272,11 @@ class DailyCaArticle(models.Model):
             models.Index(fields=["slug"]),
             models.Index(fields=["topic"]),
             models.Index(fields=["news_category"]),
+            # P1.4 — compound index for TodayView/DateView ORDER BY published_date + order_on_date
+            models.Index(
+                fields=["published_date", "order_on_date"],
+                name="daily_ca_date_order_idx",
+            ),
         ]
 
     def __str__(self) -> str:
