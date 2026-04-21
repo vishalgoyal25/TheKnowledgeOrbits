@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import unittest
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+import pytest
+from io import StringIO
+import uuid
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -309,10 +312,10 @@ class TestApplyDiversityCap(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-import pytest
-from io import StringIO
-from unittest.mock import patch
-import uuid
+_EMB_BATCH = "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch"
+_EMB_SINGLE = (
+    "engines.content.services.embedding_service.EmbeddingService.generate_embedding"
+)
 
 
 @pytest.mark.django_db
@@ -322,6 +325,11 @@ class TestBackfillDailyCaEmbeddingsCommand(unittest.TestCase):
 
     DB access is used for article/embedding creation.
     EmbeddingService is mocked to avoid HF API calls.
+
+    Both generate_embeddings_batch AND generate_embedding are patched
+    together in every test — the post_save signal fires generate_embedding
+    (which internally delegates to generate_embeddings_batch), so patching
+    only one of them leaves the mock vulnerable to signal-thread interference.
     """
 
     def _call_command(self, *args, **kwargs):
@@ -356,10 +364,9 @@ class TestBackfillDailyCaEmbeddingsCommand(unittest.TestCase):
             model_name="all-MiniLM-L6-v2",
         )
 
-        with patch(
-            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch"
-        ) as mock_batch:
-            output = self._call_command()
+        with patch(_EMB_SINGLE, return_value=[0.1] * 384):
+            with patch(_EMB_BATCH) as mock_batch:
+                output = self._call_command()
 
         mock_batch.assert_not_called()
         assert "Nothing to do" in output or "already have embeddings" in output
@@ -370,10 +377,9 @@ class TestBackfillDailyCaEmbeddingsCommand(unittest.TestCase):
 
         article = self._make_article(title="Dry Run Article")
 
-        with patch(
-            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch"
-        ) as mock_batch:
-            self._call_command("--dry-run")
+        with patch(_EMB_SINGLE, return_value=[0.5] * 384):
+            with patch(_EMB_BATCH) as mock_batch:
+                self._call_command("--dry-run")
 
         mock_batch.assert_not_called()
         assert not Embedding.objects.filter(
@@ -386,11 +392,9 @@ class TestBackfillDailyCaEmbeddingsCommand(unittest.TestCase):
 
         article = self._make_article(title="Should Be Embedded")
 
-        with patch(
-            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch",
-            return_value=[[0.4] * 384],
-        ):
-            output = self._call_command()
+        with patch(_EMB_SINGLE, return_value=[0.4] * 384):
+            with patch(_EMB_BATCH, return_value=[[0.4] * 384]):
+                output = self._call_command()
 
         assert Embedding.objects.filter(
             content_type="daily_ca_article", content_id=article.id
@@ -407,11 +411,9 @@ class TestBackfillDailyCaEmbeddingsCommand(unittest.TestCase):
         DailyCaArticle.objects.filter(is_published=True).delete()
         draft = self._make_article(title="Draft Should Be Skipped", published=False)
 
-        with patch(
-            "engines.content.services.embedding_service.EmbeddingService.generate_embeddings_batch",
-            return_value=[],
-        ) as mock_batch:
-            self._call_command()
+        with patch(_EMB_SINGLE, return_value=[]):
+            with patch(_EMB_BATCH, return_value=[]) as mock_batch:
+                self._call_command()
 
         mock_batch.assert_not_called()
         assert not Embedding.objects.filter(
