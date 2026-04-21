@@ -84,14 +84,24 @@ function NewsPageInner() {
 
   const [allArticles, setAllArticles] = useState<DailyCaArticleList[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [oldestDate, setOldestDate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Derive oldest date from articles loaded so far (used as cursor for load more)
+  const updateOldestDate = (articles: DailyCaArticleList[]) => {
+    if (articles.length === 0) return;
+    const dates = articles.map((a) => a.published_date);
+    setOldestDate(dates.reduce((min, d) => (d < min ? d : min)));
+  };
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const archive = await getArchive();
-      // Flatten all days → sort latest date first, then order_on_date asc within same date
+      // P2.6 — fetch 10 days at a time instead of all 300 articles at once
+      const archive = await getArchive({ days: 10 });
       const flat = archive.archive.flatMap((day) => day.articles);
       flat.sort((a, b) => {
         const dateDiff =
@@ -101,12 +111,40 @@ function NewsPageInner() {
         return a.order_on_date - b.order_on_date;
       });
       setAllArticles(flat);
+      setHasMore(archive.has_more);
+      updateOldestDate(flat);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load articles");
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (!oldestDate || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const archive = await getArchive({ days: 10, before: oldestDate });
+      const flat = archive.archive.flatMap((day) => day.articles);
+      flat.sort((a, b) => {
+        const dateDiff =
+          new Date(b.published_date).getTime() -
+          new Date(a.published_date).getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return a.order_on_date - b.order_on_date;
+      });
+      setAllArticles((prev) => {
+        const combined = [...prev, ...flat];
+        updateOldestDate(combined);
+        return combined;
+      });
+      setHasMore(archive.has_more);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load more articles");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [oldestDate, loadingMore]);
 
   useEffect(() => {
     fetchArticles();
@@ -176,11 +214,26 @@ function NewsPageInner() {
 
         {/* Articles list */}
         {!loading && !error && filtered.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            {filtered.map((article) => (
-              <NewsArticleRow key={article.id} article={article} />
-            ))}
-          </div>
+          <>
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              {filtered.map((article) => (
+                <NewsArticleRow key={article.id} article={article} />
+              ))}
+            </div>
+
+            {/* P2.6 — Load more (only shown when not filtering by category) */}
+            {activeCategory === "all" && hasMore && (
+              <div className="flex justify-center mt-4">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loadingMore ? "Loading…" : "Load 10 more days"}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* Empty state */}

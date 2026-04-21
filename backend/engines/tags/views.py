@@ -78,14 +78,13 @@ class TagArticlesView(APIView):
         limit = int(request.query_params.get("limit", 20))
         offset = int(request.query_params.get("offset", 0))
 
-        article_tags = ArticleTag.objects.filter(
-            tag=tag, content_type="daily_ca"
-        ).order_by("-created_at")
-        ids = [at.object_id for at in article_tags]
-        total = len(ids)
+        # P1.7 — count via DB aggregate, not by materialising all rows into a Python list
+        article_tags = ArticleTag.objects.filter(tag=tag, content_type="daily_ca")
+        total = article_tags.count()
 
+        tag_ids = article_tags.values_list("object_id", flat=True)
         articles = DailyCaArticle.objects.filter(
-            id__in=ids, is_published=True
+            id__in=tag_ids, is_published=True
         ).order_by("-published_date")[offset : offset + limit]
         serializer = DailyCaArticleListSerializer(articles, many=True)
         return Response(

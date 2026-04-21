@@ -253,7 +253,14 @@ function DateChipStrip({ selectedDate, todayStr, onSelect }: ChipStripProps) {
 
 // ── Main Widget ───────────────────────────────────────────────────────────────
 
-export function DailyCaTeaserWidget() {
+// P3.2 — accepts today's articles from the homepage so we don't double-fetch.
+// initialArticles: undefined = parent still loading; [] or [...] = data ready.
+// When selectedDate changes to a non-today date, self-fetch runs as normal.
+export function DailyCaTeaserWidget({
+  initialArticles,
+}: {
+  initialArticles?: DailyCaArticleList[];
+}) {
   const TODAY = todayISO();
 
   const [selectedDate, setSelectedDate] = useState<string>(TODAY);
@@ -282,8 +289,20 @@ export function DailyCaTeaserWidget() {
   );
 
   useEffect(() => {
+    if (selectedDate === TODAY) {
+      // P3.2 — today's data comes from parent (HomePage fetched it once).
+      // Wait for initialArticles to become non-undefined; don't self-fetch.
+      if (initialArticles !== undefined) {
+        setArticles(initialArticles.slice(0, 10));
+        setLoading(false);
+        setHasEverLoaded(true);
+      }
+      // else: still undefined (parent loading) — stay in loading state
+      return;
+    }
+    // Non-today dates: self-fetch as normal
     fetchArticles(selectedDate);
-  }, [fetchArticles, selectedDate]);
+  }, [fetchArticles, selectedDate, TODAY, initialArticles]);
 
   const handleDateSelect = (iso: string) => {
     if (iso === selectedDate) return;

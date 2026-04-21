@@ -157,6 +157,11 @@ class ArticleTag(models.Model):
             models.Index(fields=["content_type", "object_id"]),
             models.Index(fields=["tag", "content_type"]),
             models.Index(fields=["object_id"]),
+            # P1.4 — covers ORDER BY relevance DESC in get_tags() serializer calls
+            models.Index(
+                fields=["content_type", "object_id", "relevance"],
+                name="article_tag_relevance_idx",
+            ),
         ]
 
     def __str__(self) -> str:

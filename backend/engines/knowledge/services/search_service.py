@@ -24,7 +24,7 @@ from typing import Any, Dict, List
 
 import sentry_sdk
 import structlog
-from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
+from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.cache import cache
 from django.db.models import Q
 from pgvector.django import CosineDistance
@@ -33,6 +33,7 @@ from engines.article_generation.models import Article as GeneratedArticle
 from engines.content.models import Chunk, Embedding
 from engines.content.services.embedding_service import EmbeddingService
 from engines.current_affairs.models import CAArticle
+from engines.daily_ca.models import DailyCaArticle
 from engines.knowledge.models import Topic
 
 logger = structlog.get_logger(__name__)
@@ -44,13 +45,13 @@ _NOISE_THRESHOLD: float = 0.62
 _EMBEDDING_CACHE_TTL: int = 3600
 
 # Candidate pool: fetch this many from vector search before Python-filtering
-_VECTOR_CANDIDATES: int = 30
+_VECTOR_CANDIDATES: int = 60
 
 
 class SearchService:
     @classmethod
     def semantic_search(
-        cls, query: str, limit: int = 10, user: Any = None
+        cls, query: str, limit: int = 50, user: Any = None
     ) -> List[Dict]:
         """
         Perform search across all content types.
@@ -99,6 +100,11 @@ class SearchService:
             # Better than LIKE for multi-word queries; catches "UNSC resolution" etc.
             bm25_ca_results = cls._bm25_ca_chunk_search(query, results)
             results.extend(bm25_ca_results)
+
+            # ── Step 9: Daily CA article title + news_context match ───────────
+            # Feature 2 articles (/daily-ca/) — keyword search on published articles.
+            daily_ca_results = cls._daily_ca_article_search(query, results)
+            results.extend(daily_ca_results)
 
             logger.info(
                 "search_complete",
@@ -171,6 +177,7 @@ class SearchService:
                         "ca_chunk",
                         "book_chunk",
                         "book_article",
+                        "daily_ca_article",  # Feature 2 — auto-embedded on publish
                     ]
                 )
                 .annotate(distance=CosineDistance("vector", query_vector))
@@ -216,6 +223,7 @@ class SearchService:
         ca_chunk_map: Dict = {}
         book_chunk_map: Dict = {}
         book_article_map: Dict = {}
+        daily_ca_map: Dict = {}
 
         if "chunk" in by_type:
             chunk_map = {
@@ -255,6 +263,22 @@ class SearchService:
                 for a in BookContent.objects.filter(
                     id__in=by_type["book_article"]
                 ).select_related("topic", "subject")
+            }
+        if "daily_ca_article" in by_type:
+            daily_ca_map = {
+                a.id: a
+                for a in DailyCaArticle.objects.filter(
+                    id__in=by_type["daily_ca_article"],
+                    is_published=True,
+                )
+                .defer(
+                    "body_md",
+                    "body_md_processed",
+                    "generation_metadata",
+                    "ca_chunk_ids",
+                    "sources_used",
+                )
+                .select_related("topic")
             }
 
         # Build results in embedding order (already sorted by distance)
@@ -372,6 +396,28 @@ class SearchService:
                     }
                     seen_ids.add(dedup_id)
 
+            elif ctype == "daily_ca_article":
+                obj = daily_ca_map.get(cid)
+                if obj:
+                    row = {
+                        "id": str(obj.id),
+                        "type": "current_affair",
+                        "title": obj.title,
+                        "snippet": (
+                            obj.news_context[:200] + "..."
+                            if obj.news_context
+                            else "Daily Current Affairs article."
+                        ),
+                        "url": f"/daily-ca/article/{obj.slug}",
+                        "metadata": {
+                            "source": "Daily CA",
+                            "subject": obj.subject_name
+                            or (obj.topic.name if obj.topic else "General"),
+                            "date": obj.published_date.strftime("%Y-%m-%d"),
+                            "gs_paper": obj.gs_paper,
+                        },
+                    }
+
             if row and row["id"] not in seen_ids:
                 seen_ids.add(row["id"])
                 results.append(row)
@@ -398,7 +444,7 @@ class SearchService:
         try:
             keyword_chunks = Chunk.objects.filter(
                 Q(document__title__icontains=query)
-            ).select_related("document")[:5]
+            ).select_related("document")[:10]
 
             for chunk in keyword_chunks:
                 if str(chunk.id) not in existing_ids:
@@ -429,7 +475,7 @@ class SearchService:
         try:
             topics = Topic.objects.filter(
                 Q(name__icontains=query) | Q(description__icontains=query)
-            )[:5]
+            )[:10]
 
             for topic in topics:
                 if str(topic.id) not in existing_ids:
@@ -471,7 +517,7 @@ class SearchService:
         try:
             current_affairs = CAArticle.objects.select_related("source").filter(
                 Q(title__icontains=query) | Q(summary__icontains=query)
-            )[:5]
+            )[:10]
 
             for ca in current_affairs:
                 if str(ca.id) not in existing_ids:
@@ -517,7 +563,7 @@ class SearchService:
                     Q(title__icontains=query) | Q(topic__name__icontains=query)
                 )
                 .filter(is_published=True)
-                .select_related("topic")[:5]
+                .select_related("topic")[:10]
             )
 
             for art in generated_articles:
@@ -571,7 +617,7 @@ class SearchService:
                 .order_by("-rank")
                 .select_related(
                     "book_content", "book_content__topic", "book_content__subject"
-                )[:10]
+                )[:15]
             )
 
             seen_article_ids: set = set()
@@ -606,14 +652,17 @@ class SearchService:
     @classmethod
     def _bm25_ca_chunk_search(cls, query: str, existing: List[Dict]) -> List[Dict]:
         """
-        BM25 full-text search on CAChunk via inline tsvector (no pre-computed column).
+        BM25 full-text search on CAChunk via precomputed search_vector (GIN indexed).
 
-        PostgreSQL computes tsvector on-the-fly — no GIN index, but still faster
-        than LIKE for multi-word queries because tsvector skips stop words,
-        stems properly, and uses parallel scan.
+        Previously computed tsvector on-the-fly (sequential scan, 50–200ms).
+        Now uses precomputed search_vector column + GIN index — same as BookChunk.
+        Speed: <5ms even at 500k rows.
 
         Best for: exact proper nouns — "UNSC resolution", "Article 370",
         "Quad Summit", "Cyclone Biparjoy" — terms unlikely to match by vectors.
+
+        search_vector populated by: CAChunk.save() + migration 0005 backfill.
+        GIN index: ca_chunk_search_vector_idx (created in migration 0005).
         """
         from engines.current_affairs.models import CAChunk
 
@@ -622,15 +671,14 @@ class SearchService:
 
         try:
             search_q = SearchQuery(query, config="english", search_type="websearch")
-            # SearchVector wraps the plain TextField so PostgreSQL treats it as tsvector.
-            # Computed on-the-fly (no pre-indexed column) — sequential scan but correct.
-            sv = SearchVector("chunk_text", config="english")  # noqa: F821
 
+            # Use precomputed search_vector (GIN indexed) — no on-the-fly tsvector.
+            # Mirrors BookChunk BM25 pattern exactly.
             chunks = (
-                CAChunk.objects.annotate(sv=sv, rank=SearchRank(sv, search_q))
-                .filter(sv=search_q)
+                CAChunk.objects.filter(search_vector=search_q)
+                .annotate(rank=SearchRank("search_vector", search_q))
                 .order_by("-rank")
-                .select_related("ca_article", "ca_article__source")[:10]
+                .select_related("ca_article", "ca_article__source")[:15]
             )
 
             seen_article_ids: set = set()
@@ -661,5 +709,64 @@ class SearchService:
 
         except Exception as e:
             logger.warning("bm25_ca_chunk_search_failed", error=str(e))
+
+        return results
+
+    @classmethod
+    def _daily_ca_article_search(cls, query: str, existing: List[Dict]) -> List[Dict]:
+        """
+        Keyword search on DailyCaArticle (Feature 2 — /daily-ca/ engine).
+
+        Searches published Daily CA articles by title and news_context.
+        Both fields have GIN trigram indexes (migration 0006) — sub-5ms.
+
+        Only is_published=True articles are returned — unpublished drafts stay hidden.
+        Heavy fields deferred: body_md, body_md_processed, generation_metadata,
+        ca_chunk_ids, sources_used — list search needs title/slug/subject only.
+        """
+        existing_ids = {r["id"] for r in existing}
+        results = []
+
+        try:
+            articles = (
+                DailyCaArticle.objects.filter(
+                    Q(title__icontains=query) | Q(news_context__icontains=query),
+                    is_published=True,
+                )
+                .defer(
+                    "body_md",
+                    "body_md_processed",
+                    "generation_metadata",
+                    "ca_chunk_ids",
+                    "sources_used",
+                )
+                .select_related("topic")
+                .order_by("-published_date")[:10]
+            )
+
+            for article in articles:
+                if str(article.id) not in existing_ids:
+                    results.append(
+                        {
+                            "id": str(article.id),
+                            "type": "current_affair",
+                            "title": article.title,
+                            "snippet": (
+                                article.news_context[:200] + "..."
+                                if article.news_context
+                                else "Daily Current Affairs article."
+                            ),
+                            "url": f"/daily-ca/article/{article.slug}",
+                            "metadata": {
+                                "source": "Daily CA",
+                                "subject": article.subject_name
+                                or (article.topic.name if article.topic else "General"),
+                                "date": article.published_date.strftime("%Y-%m-%d"),
+                                "gs_paper": article.gs_paper,
+                            },
+                        }
+                    )
+        except Exception as e:
+            logger.warning("daily_ca_article_search_failed", error=str(e))
 
         return results

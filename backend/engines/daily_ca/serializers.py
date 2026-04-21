@@ -72,8 +72,16 @@ class DailyCaArticleListSerializer(serializers.ModelSerializer):
         ]
 
     def get_tags(self, obj):
-        from engines.tags.models import ArticleTag
         from engines.tags.serializers import TagSerializer
+
+        # P2.1 — use bulk-prefetched map from view context to avoid N+1 per article
+        prefetched = self.context.get("prefetched_tags")
+        if prefetched is not None:
+            tags = prefetched.get(str(obj.id), [])
+            return TagSerializer(tags, many=True).data
+
+        # Fallback: direct DB query (standalone serializer use, tests, admin)
+        from engines.tags.models import ArticleTag
 
         article_tags = (
             ArticleTag.objects.filter(content_type="daily_ca", object_id=obj.id)
@@ -167,14 +175,37 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
 
     def get_related_articles(self, obj):
         """5 recent published articles from the same subject (excluding self)."""
+        from engines.tags.models import ArticleTag
+
         qs = (
             DailyCaArticle.objects.filter(
                 subject_name=obj.subject_name, is_published=True
             )
             .exclude(id=obj.id)
+            .defer(
+                "body_md", "body_md_processed", "generation_metadata", "ca_chunk_ids"
+            )
             .order_by("-published_date")[:5]
         )
-        return DailyCaArticleListSerializer(qs, many=True).data
+        related = list(qs)
+        if not related:
+            return []
+
+        # P2.4 — bulk-fetch tags for all 5 related articles in 1 query
+        # (without this, DailyCaArticleListSerializer fires 1 tag query per article)
+        ids = [a.id for a in related]
+        article_tags = (
+            ArticleTag.objects.filter(content_type="daily_ca", object_id__in=ids)
+            .select_related("tag")
+            .order_by("-relevance")
+        )
+        tags_map: dict = {}
+        for at in article_tags:
+            tags_map.setdefault(str(at.object_id), []).append(at.tag)
+
+        return DailyCaArticleListSerializer(
+            related, many=True, context={"prefetched_tags": tags_map}
+        ).data
 
 
 # ── CaDailyProposal ───────────────────────────────────────────────────────────

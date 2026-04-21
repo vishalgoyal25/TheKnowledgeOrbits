@@ -43,7 +43,7 @@ jobs:
         run: mypy .
 
   # ============================================
-  # JOB 2: Backend Logic (379 Tests)
+  # JOB 2: Backend Logic (590 Tests)
   # ============================================
   backend-tests:
     name: Backend Laboratory (Pytest)

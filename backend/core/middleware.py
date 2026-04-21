@@ -33,6 +33,45 @@ class CacheControlMiddleware:
 
         # Target public APIs that benefit from ISR/CDN caching
         path = request.path
+
+        # Daily CA — articles change once per day at publish time
+        if re.match(r"^/api/v1/daily-ca/\d{4}-\d{2}-\d{2}/", path):
+            # Past-date articles are immutable — cache aggressively
+            response["Cache-Control"] = (
+                "public, max-age=3600, stale-while-revalidate=300"
+            )
+            return response
+
+        if re.match(r"^/api/v1/daily-ca/today/", path):
+            response["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+            return response
+
+        if re.match(r"^/api/v1/daily-ca/archive/", path):
+            response["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+            return response
+
+        if re.match(r"^/api/v1/daily-ca/article/", path):
+            # Article detail — immutable after publish
+            response["Cache-Control"] = (
+                "public, max-age=3600, stale-while-revalidate=300"
+            )
+            return response
+
+        # Book content — changes only when new topics/content generated
+        if re.match(r"^/api/v1/book/(subjects|tree|graph)/", path):
+            response["Cache-Control"] = (
+                "public, max-age=3600, stale-while-revalidate=300"
+            )
+            return response
+
+        # Tags & concepts — slow-changing
+        if re.match(r"^/api/v1/(tags|concepts)/", path):
+            response["Cache-Control"] = (
+                "public, max-age=3600, stale-while-revalidate=300"
+            )
+            return response
+
+        # Original pattern — existing endpoints
         public_api_pattern = (
             r"^/api/v1/(current-affairs|articles|knowledge|topics|subjects)/"
         )

@@ -205,3 +205,37 @@ class TestCATopicLinkModel:
         with transaction.atomic():
             with pytest.raises(IntegrityError):
                 CATopicLink.objects.create(ca_chunk=chunk, topic=topic)
+
+
+@pytest.mark.django_db
+class TestCAChunkSearchVector:
+    """Tests for CAChunk.search_vector precomputed tsvector field (migration 0005/0006)."""
+
+    def test_search_vector_field_exists_on_model(self):
+        """search_vector must be a declared field on the CAChunk model."""
+        field_names = [f.name for f in CAChunk._meta.get_fields()]
+        assert "search_vector" in field_names
+
+    def test_search_vector_field_is_nullable(self):
+        """search_vector must allow null (newly created chunks before backfill)."""
+        field = CAChunk._meta.get_field("search_vector")
+        assert field.null is True
+
+    def test_chunk_creation_does_not_raise(self, ca_source):
+        """Creating a CAChunk with chunk_text must succeed even if search_vector is not set."""
+        article = CAArticle.objects.create(
+            source=ca_source,
+            title="Search Vector Test",
+            url=f"https://example.com/sv-test-{uuid.uuid4()}",
+            content="Content",
+            published_at=timezone.now(),
+        )
+        chunk = CAChunk.objects.create(
+            ca_article=article,
+            chunk_text="The RBI raised interest rates by 25 basis points.",
+            chunk_index=0,
+            published_at=timezone.now(),
+        )
+        # Reload from DB — must not raise
+        chunk.refresh_from_db()
+        assert chunk.chunk_text is not None

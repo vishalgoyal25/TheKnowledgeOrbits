@@ -294,9 +294,10 @@ class TopicRelation(models.Model):
                 fields=["relation_type"],
                 name="topic_rel_type_idx",
             ),
+            # P1.4 — partial index for cross_subject relation lookups (renamed to fix duplicate)
             models.Index(
                 fields=["relation_type"],
-                name="topic_rel_cross_subject_idx",
+                name="topic_rel_cross_subj_idx",
                 condition=models.Q(relation_type="cross_subject"),
             ),
         ]

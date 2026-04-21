@@ -12,7 +12,9 @@ class StandardPageNumberPagination(PageNumberPagination):
 
     page_size = 20
     page_size_query_param = "page_size"
-    max_page_size = 1000
+    max_page_size = (
+        100  # P2.5 — prevent ?page_size=1000 from dumping 1000 rows in one response
+    )
 
     def get_count(self, queryset):
         """

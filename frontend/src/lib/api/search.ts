@@ -23,7 +23,7 @@ export interface SearchResult {
 export const searchAPI = {
   // UNIFIED SEMANTIC SEARCH
   search: async (params: SearchParams) => {
-    const { q, limit = 10 } = params;
+    const { q, limit = 50 } = params;
 
     // Call our new Unified Search Endpoint
     const response = await apiClient.get("/knowledge/search/", {
