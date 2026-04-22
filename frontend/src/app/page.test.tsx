@@ -103,7 +103,10 @@ describe("Page (ISR home page server component)", () => {
   });
 
   it("passes an empty array when API responds with a non-ok status", async () => {
-    mockFetch.mockResolvedValue({ ok: false, json: jest.fn() } as unknown as Response);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      json: jest.fn(),
+    } as unknown as Response);
     const articles = await getPassedArticles();
     expect(articles).toEqual([]);
   });
