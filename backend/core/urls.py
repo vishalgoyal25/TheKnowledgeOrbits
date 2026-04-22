@@ -18,27 +18,21 @@ def deep_health_check(request: Any) -> JsonResponse:
     """
     Deep health check that verifies Database connectivity.
     Used by Vercel pre-build to ensure Render is 100% "Hot".
+
+    Uses a single `SELECT 1` instead of 3 COUNT(*) queries — same signal
+    (DB is reachable) at 1/3 the cost.  COUNT(*) on large tables scanned the
+    full index; SELECT 1 returns in microseconds with zero table access.
     """
     try:
-        from engines.article_generation.models import Article
-        from engines.current_affairs.models import CAArticle
-        from engines.knowledge.models import Program
+        from django.db import connection
 
-        # Verify DB connection with multiple critical tables
-        # This provides a much stronger signal for the Vercel pre-build
-        program_count = Program.objects.count()
-        article_count = Article.objects.count()
-        ca_article_count = CAArticle.objects.count()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
 
         return JsonResponse(
             {
                 "status": "fully_online",
                 "database": "connected",
-                "checks": {
-                    "programs": program_count >= 0,
-                    "articles": article_count >= 0,
-                    "ca_articles": ca_article_count >= 0,
-                },
             },
             status=200,
         )
