@@ -46,6 +46,8 @@ async function fetchArticle(
   try {
     const res = await fetch(`${apiBase}/daily-ca/article/${slug}/`, {
       next: { revalidate: 3600 },
+      // 45 s timeout — Render free tier cold-starts can take 10–30 s.
+      signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) return null;
     return res.json() as Promise<DailyCaArticleDetail>;
@@ -59,9 +61,10 @@ async function fetchArticle(
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const article = await fetchArticle(params.slug);
+  const { slug } = await params;
+  const article = await fetchArticle(slug);
   if (!article) return { title: "Article not found | TheKnowledgeOrbits" };
   return {
     title: `${article.title} | TheKnowledgeOrbits`,
@@ -231,9 +234,10 @@ const GS_COLORS: Record<string, string> = {
 export default async function ArticleDetailPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const article = await fetchArticle(params.slug);
+  const { slug } = await params;
+  const article = await fetchArticle(slug);
 
   if (!article) notFound();
 
