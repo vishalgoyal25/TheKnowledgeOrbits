@@ -117,9 +117,12 @@ export default function Header({ initialHierarchy }: HeaderProps) {
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // P3.5 — staleness guard: track when hierarchy was last fetched.
-  // Initialised to now() if server-baked data arrived, else 0 (force fetch).
+  // Initialised to now() only when server-baked data is genuinely non-empty.
+  // IMPORTANT: [] (empty array) is truthy in JS, so we must check .length > 0
+  // here — otherwise a cold-start ISR miss (returns []) would set the ref to
+  // Date.now() and permanently block the client re-fetch fallback.
   const lastHierarchyFetchRef = useRef<number>(
-    initialHierarchy ? Date.now() : 0,
+    initialHierarchy && initialHierarchy.length > 0 ? Date.now() : 0,
   );
 
   const closeAllDropdowns = () => {

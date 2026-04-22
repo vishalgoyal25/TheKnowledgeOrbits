@@ -11,16 +11,18 @@ const BACKEND_URL =
 export async function getHierarchyData(): Promise<HierarchySubject[]> {
   try {
     const res = await fetch(`${BACKEND_URL}/knowledge/hierarchy/`, {
-      // Revalidate every 30 minutes (1800 seconds) in the background
+      // Revalidate every 30 minutes (1800 seconds) in the background.
       next: { revalidate: 1800 },
-      // Important: No-cache during local development if needed,
-      // but ISR is primarily for production speed.
+      // 45 s timeout — Render free tier cold-starts can take 10–30 s.
+      // Without this, the default Node.js socket timeout (~30 s) races
+      // unpredictably; an explicit 45 s gives Render time to wake up.
+      signal: AbortSignal.timeout(45_000),
     });
 
     if (!res.ok) {
-      console.warn(
-        "Hierarchy fetch failed on server, falling back to empty list.",
-      );
+      // Non-ok response (e.g. 500 from Render cold start) — return empty list
+      // gracefully. layout.tsx will render the header with no subjects; the
+      // client staleness guard will re-fetch once the server warms up.
       return [];
     }
 
@@ -32,8 +34,9 @@ export async function getHierarchyData(): Promise<HierarchySubject[]> {
     }
 
     return Array.isArray(data) ? data : [];
-  } catch (error) {
-    console.error("ISR Hierarchy fetch error:", error);
+  } catch {
+    // Network error / timeout / Render asleep — fail silently.
+    // The client staleness guard (header.tsx) will re-fetch on next navigation.
     return [];
   }
 }
