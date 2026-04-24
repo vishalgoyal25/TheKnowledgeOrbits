@@ -18,7 +18,6 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -41,17 +40,8 @@ class QuizGeneratorService:
     CA_RELEVANCE_DAYS = 60
 
     def __init__(self) -> Any:  # type: ignore
-        """Initialize quiz generator with Groq configs."""
-        self._groq_client = None
-        self.model = "llama-3.1-8b-instant"
-
-    @property
-    def groq_client(self):
-        if self._groq_client is None:
-            from groq import Groq
-
-            self._groq_client = Groq(api_key=settings.GROQ_API_KEY)
-        return self._groq_client
+        """Initialize quiz generator — LLM calls routed via shared llm_service pool."""
+        pass
 
     def generate_quiz(
         self,
@@ -374,23 +364,14 @@ class QuizGeneratorService:
                     include_ca=include_ca,
                 )
 
-                # Call Groq API
-                response = self.groq_client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You are an expert UPSC question creator. Generate response in valid JSON format only.",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    temperature=0.7,
-                    max_tokens=4000,
-                    response_format={"type": "json_object"},
-                )
+                # Call shared LLM pool (round-robin, all providers)
+                from engines.book_content.services.llm_service import llm_call_json
 
-                # Extract response text
-                response_text = response.choices[0].message.content.strip()  # type: ignore
+                response_text = llm_call_json(
+                    prompt=prompt,
+                    system_prompt="You are an expert UPSC question creator. Generate response in valid JSON format only.",
+                    mode="quiz",
+                )
 
                 # Clean response (remove markdown if present)
                 if response_text.startswith("```json"):

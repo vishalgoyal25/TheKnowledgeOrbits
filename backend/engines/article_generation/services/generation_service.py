@@ -9,7 +9,6 @@ RAG-based article generation using GROQ with integrated Contextual Analysis.
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import structlog
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -24,11 +23,6 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger(__name__)
 
-
-# GROQ Configuration
-GROQ_MODEL = "llama-3.1-8b-instant"
-GROQ_TEMPERATURE = 0.7
-GROQ_MAX_TOKENS = 2000
 
 # Article specs
 TARGET_WORD_COUNT = 1000
@@ -244,33 +238,22 @@ class ArticleGenerationService:
         topic: Topic, context: str, include_ca: bool
     ) -> Dict[str, Any]:
         """
-        Generate article using GROQ API.
+        Generate article using the shared LLM pool (round-robin, all providers).
         """
+        from engines.book_content.services.llm_service import llm_call
+
         # Build prompt
         prompt = ArticleGenerationService._build_prompt(topic, context, include_ca)
 
         logger.info(
-            "calling_groq",
+            "calling_llm_pool",
             topic_id=str(topic.id),
-            model=GROQ_MODEL,
             context_length=len(context),
         )
 
-        # Call GROQ (Lazy Load)
-        from groq import Groq
-
-        client = Groq(api_key=settings.GROQ_API_KEY)
-
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=GROQ_TEMPERATURE,
-            max_tokens=GROQ_MAX_TOKENS,
-        )
-
-        content = response.choices[0].message.content
+        content = llm_call(prompt, mode="article")
         if not content:
-            raise ValueError("Empty response received from Groq LLM API")
+            raise ValueError("Empty response received from LLM pool")
 
         # Parse output
         article_data = ArticleGenerationService._parse_groq_output(content)
@@ -433,7 +416,7 @@ Generate the article now:"""
             generation_metadata={
                 "static_chunks_used": len(static_chunks),
                 "ca_chunks_used": len(ca_chunks) if include_ca else 0,
-                "model": GROQ_MODEL,
+                "model": "llm_pool",
                 "include_ca": include_ca,
             },
         )

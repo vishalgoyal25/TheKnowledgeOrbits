@@ -120,7 +120,7 @@ describe("Page (ISR home page server component)", () => {
   });
 
   it("passes all articles received from the API (no silent drops)", async () => {
-    const five = [1, 2, 3, 4, 5].map(makeArticle);
+    const five = [1, 2, 3, 4, 5].map((n) => makeArticle(n));
     mockFetch.mockResolvedValue(makeOkResponse(five));
     const articles = await getPassedArticles();
     expect(articles).toHaveLength(5);
