@@ -341,6 +341,12 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "dummy-key-for-build")
 if not GROQ_API_KEY and not os.getenv("RENDER"):
     raise ImproperlyConfigured("GROQ_API_KEY environment variable is not set")
 
+# ── Additional LLM Providers (optional — add keys to unlock more capacity) ───
+# Cerebras: free tier, llama-3.3-70b, api.cerebras.ai/v1
+# Comma-separated if multiple keys from same provider.
+CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
 
 # ==============================================================================
 # EMAIL CONFIGURATION

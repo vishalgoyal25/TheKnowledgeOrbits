@@ -4,7 +4,7 @@ pytest-django>=4.9.0
 pytest-cov>=6.0.0
 factory-boy>=3.3.1
 faker>=33.1.0
-schemathesis>=3.39.6
+schemathesis>=3.39.6,<4.0.0  # 4.0+ requires tenacity>=9.1.2 which conflicts with langchain==0.2.16
 
 # Code Quality
 black>=24.10.0

@@ -2,6 +2,9 @@
 sentence-transformers>=3.3.1
 # torch will be installed as a dependency of sentence-transformers
 
-# LangChain (used by book_content engine llm_service)
+# API integration
+groq>=0.13.0
 langchain-groq==0.1.9
 langchain==0.2.16
+cerebras-cloud-sdk>=1.67.0   # Cerebras free-tier LLM (llama-3.3-70b)
+openai>=1.0.0                 # OpenAI-compatible client — used for Gemini + future providers
