@@ -100,12 +100,27 @@ apiClient.interceptors.response.use(
 
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - logout user
-        logger.warn("Token refresh failed, logging out user...", refreshError);
+        // Refresh failed - clear tokens
+        logger.warn("Token refresh failed, clearing tokens...", refreshError);
 
         if (typeof window !== "undefined") {
           tokenManager.clearTokens();
-          window.location.href = "/auth/login";
+
+          // Only redirect to login from routes that genuinely require auth.
+          // Public routes (quiz pages, daily-ca, homepage, articles) must
+          // remain accessible even after token expiry — guests can still browse.
+          const path = window.location.pathname;
+          const protectedPaths = [
+            "/dashboard",
+            "/notebook",
+            "/generate",
+            "/profile",
+            "/assessment/generate",
+          ];
+          const isProtected = protectedPaths.some((p) => path.startsWith(p));
+          if (isProtected) {
+            window.location.href = "/auth/login";
+          }
         }
         return Promise.reject(refreshError);
       }

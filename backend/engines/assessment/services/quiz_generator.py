@@ -441,66 +441,70 @@ class QuizGeneratorService:
         Build specialized Groq prompt for UPSC question generation.
 
         Args:
-            context: RAG context
+            context: RAG context assembled from chunks
             topic_name: Topic name
-            difficulty: Difficulty level
-            question_count: Number of questions
-            include_ca: Whether CA is included
+            difficulty: 'easy', 'medium', or 'hard'
+            question_count: Number of questions to generate
+            include_ca: Whether CA chunks are included
 
         Returns:
             Complete prompt string
         """
-        # Strategy varies based on mode
-        if include_ca:
-            strategy = """Generate UPSC-style questions that TEST THE INTERSECTION of theory and current events.
+        mode_label = (
+            "HYBRID (Textbook Theory + Current Affairs)"
+            if include_ca
+            else "STATIC (Textbook Theory Only)"
+        )
 
-CRITICAL: Your questions MUST force students to APPLY static theoretical knowledge to analyze recent developments.
-
-Example (Good Hybrid Question):
-"Consider the following statements about Monetary Policy:
-1. Repo rate is the rate at which RBI lends to commercial banks [THEORY]
-2. In February 2026, RBI maintained repo rate at 6.5% citing inflation concerns [CURRENT]
-3. Higher repo rates typically lead to reduced liquidity in the economy [THEORY]
-
-Which of the above is/are correct?"
-
-This question tests:
-- Understanding of repo rate concept (from textbook)
-- Awareness of current RBI policy (from news)
-- Ability to connect theory to real policy decisions"""
-        else:
-            strategy = """Generate pure conceptual questions testing fundamental understanding from textbooks.
-
-Focus on:
-- Definitions and core concepts
-- Relationships between concepts
-- Application of theoretical principles
-- Common misconceptions to test
-
-Do NOT reference any recent events, dates, or current developments."""
-
-        # Difficulty instructions
         difficulty_guide = {
-            "easy": "Direct factual questions from single chunks. Test recall and basic understanding.",
-            "medium": "Conceptual questions requiring understanding of relationships between 2-3 concepts. Test application.",
-            "hard": "Complex analytical questions requiring synthesis across multiple chunks. Test critical thinking and UPSC-level reasoning.",
+            "easy": (
+                "Easy: Direct factual recall from a single chunk. "
+                "Test basic definitions, names, or provisions. "
+                "Use single_mcq or a straightforward 3-statement multi_statement."
+            ),
+            "medium": (
+                "Medium: Require understanding of relationships between 2–3 concepts. "
+                "Test application of principles, not just recall. "
+                "Mix single_mcq, multi_statement (3–4 stmts), and assertion_reasoning."
+            ),
+            "hard": (
+                "Hard: Require synthesis across multiple chunks. "
+                "Use multi-statement (4–5 statements) or nuanced assertion-reason pairs. "
+                "Distractors must be highly plausible. Correct answer non-obvious."
+            ),
         }
-
         difficulty_instruction = difficulty_guide.get(
             difficulty, difficulty_guide["medium"]
         )
 
-        # Full prompt
-        prompt = f"""You are an expert UPSC Prelims question creator. Generate {question_count} multiple-choice questions about "{topic_name}".
+        if include_ca:
+            strategy = (
+                "HYBRID MODE: Each question should force the student to connect "
+                "textbook theory with the current affairs context in the source. "
+                "The best questions make the news event the 'hook' and the theoretical "
+                "concept the 'depth' — a student who read the news but doesn't know the "
+                "theory (or vice versa) should struggle. Vary the question type across "
+                "the batch: do not make all questions the same format."
+            )
+        else:
+            strategy = (
+                "STATIC MODE: Questions test conceptual understanding from textbook "
+                "material only. Focus on definitions, mechanisms, provisions, and "
+                "relationships between concepts. Avoid any reference to recent events. "
+                "Vary the question type across the batch for richness."
+            )
 
-=== CONTENT TO USE ===
+        prompt = f"""You are a senior question setter for India's most competitive examinations.
+Generate {question_count} original, challenging questions about "{topic_name}".
+
+=== SOURCE MATERIAL ===
 {context}
 
-=== GENERATION PARAMETERS ===
-Topic: {topic_name}
-Difficulty: {difficulty}
-Question Count: {question_count}
-Mode: {"HYBRID (Theory + Current Affairs)" if include_ca else "STATIC (Theory Only)"}
+=== PARAMETERS ===
+Topic      : {topic_name}
+Difficulty : {difficulty}
+Mode       : {mode_label}
+Count      : {question_count}
 
 === STRATEGY ===
 {strategy}
@@ -508,73 +512,97 @@ Mode: {"HYBRID (Theory + Current Affairs)" if include_ca else "STATIC (Theory On
 === DIFFICULTY CALIBRATION ===
 {difficulty_instruction}
 
-=== QUESTION TYPES TO USE ===
-1. **Multi-Statement Questions** (Preferred for UPSC authenticity):
-   Format: "Consider the following statements: 1. [Statement] 2. [Statement] 3. [Statement]. Which of the above is/are correct?"
-   Options: Use UPSC-style options like "1 and 2 only", "2 and 3 only", "1 and 3 only", "All of the above", "None of the above"
+=== QUESTION TYPES — use a diverse mix across the {question_count} questions ===
 
-2. **Assertion-Reasoning Questions**:
-   Format: "Assertion (A): [Statement]. Reason (R): [Statement]"
-   Options:
-   A) Both A and R are true and R is the correct explanation of A
-   B) Both A and R are true but R is not the correct explanation of A
-   C) A is true but R is false
-   D) A is false but R is true
+TYPE 1 — MULTI-STATEMENT (3 to 5 statements)
+  "Consider the following statements regarding [subject]:
+  1. [Statement]  2. [Statement]  3. [Statement]  [4. optional]  [5. optional]
+  Which of the above statements is/are correct?"
+  OR: "How many of the above statements are correct?"
 
-3. **Single Best Answer** (Use only when multi-statement doesn't fit):
-   Format: Standard MCQ with one correct answer
+  Options for combination-style:
+    Use UPSC-authentic combinations: "1 only", "2 and 3 only", "1 and 3 only",
+    "2, 3 and 4 only", "All of the above", "None of the above", etc.
+  Options for count-style ("How many"):
+    A: Only one   B: Only two   C: Only three   D: All four / All five
 
-=== EXPLANATION REQUIREMENTS ===
-For EVERY question, provide a detailed explanation that includes:
-1. **Why the correct answer is correct** (cite specific facts from chunks)
-2. **Why wrong options are incorrect** (explain the misconception)
-3. **Source Citations** (reference which chunks provided the information)
+  — Number of correct statements is YOUR choice each time. Vary it freely:
+    sometimes only 1 is correct, sometimes all are, sometimes 2 of 5.
+  — "All of the above" and "None of the above" are valid correct answers.
+  — Exactly ONE option must be unambiguously correct.
 
-Format: "**Correct Answer: [X]**
+TYPE 2 — ASSERTION-REASON
+  "Assertion (A): [precise factual or causal claim]
+   Reason    (R): [claim intended to explain A]"
 
-**Why [X] is correct:** [Explanation citing chunk sources]
+  Options (always these four for this type):
+    A: Both A and R are true, and R is the correct explanation of A
+    B: Both A and R are true, but R is NOT the correct explanation of A
+    C: A is true but R is false
+    D: A is false but R is true
 
-**Why other options are wrong:**
-- Option [Y]: [Explanation]
-- Option [Z]: [Explanation]
+TYPE 3 — SINGLE BEST ANSWER
+  A direct question with one clearly correct answer and three plausible distractors.
+  Best when the source material has one specific verifiable fact to test.
+  Distractors must be factually close — not obviously wrong.
 
-**Sources:** [List source chunks used]"
+=== EXPLANATION FORMAT (shown to users after submission) ===
 
-=== OUTPUT FORMAT ===
-Return ONLY valid JSON with NO markdown formatting, NO extra text, NO preamble.
+For MULTI-STATEMENT:
+  Statement 1: CORRECT/INCORRECT — [one sentence with the exact fact and source]
+  Statement 2: CORRECT/INCORRECT — [one sentence with the exact fact and source]
+  ... (repeat for each statement)
+  Therefore, correct answer is [X]: [option text].
+
+For ASSERTION-REASON:
+  Assertion: CORRECT/INCORRECT — [brief factual justification]
+  Reason: CORRECT/INCORRECT — [brief factual justification]
+  Relationship: [one sentence on whether R explains A]
+  Therefore, correct answer is [X].
+
+For SINGLE BEST ANSWER:
+  Option A: correct/incorrect — [one line why]
+  Option B: correct/incorrect — [one line why]
+  Option C: correct/incorrect — [one line why]
+  Option D: correct/incorrect — [one line why]
+  Therefore, correct answer is [X].
+
+Rules: 80–160 words. Every wrong statement/option gets a one-line factual rebuttal
+with the correct fact stated explicitly. No exam-language, no "this tests...".
+
+=== ABSOLUTE RULES ===
+1. Generate EXACTLY {question_count} questions — no more, no less.
+2. Use ONLY facts present in the source material above. No fabrication.
+3. Each question must use a different question type where possible.
+4. Correct answer must not be predictable from the question format.
+5. correct_answer must be exactly one of: "A", "B", "C", "D".
+6. For multi_statement questions, "statements" array must match the numbered
+   statements in question_text (one entry per statement, no numbering in the string).
+7. For assertion_reasoning, "statements" must be exactly two entries:
+   ["Assertion: ...", "Reason: ..."].
+8. For single_mcq, "statements" must be an empty list [].
+
+=== OUTPUT FORMAT — valid JSON only, no markdown, no preamble ===
 
 {{
   "questions": [
     {{
-      "question_text": "Consider the following statements about [Topic]:\\n1. [Statement 1]\\n2. [Statement 2]\\n3. [Statement 3]\\n\\nWhich of the above is/are correct?",
-      "question_type": "multi_statement",
-      "statements": [
-        "Statement 1 text",
-        "Statement 2 text",
-        "Statement 3 text"
-      ],
+      "question_text": "[full question text including numbered statements if multi_statement]",
+      "question_type": "multi_statement" | "assertion_reasoning" | "single_mcq",
+      "statements": ["[stmt 1]", "[stmt 2]", "[stmt 3 optional]", "[stmt 4 optional]", "[stmt 5 optional]"],
       "options": {{
-        "A": "1 and 2 only",
-        "B": "2 and 3 only",
-        "C": "1 and 3 only",
-        "D": "All of the above"
+        "A": "[option A]",
+        "B": "[option B]",
+        "C": "[option C]",
+        "D": "[option D]"
       }},
-      "correct_answer": "B",
-      "explanation": "**Correct Answer: B**\\n\\n**Why B is correct:** Statements 2 and 3 are accurate because [detailed explanation citing chunks]. Statement 1 contains an error - [explain misconception].\\n\\n**Why other options are wrong:**\\n- Option A: Includes Statement 1 which is incorrect because [reason]\\n- Option C: Includes Statement 1 which is incorrect\\n- Option D: Includes Statement 1 which is incorrect\\n\\n**Sources:** NCERT Polity Chapter 3, The Hindu (12 Feb 2026)",
+      "correct_answer": "A" | "B" | "C" | "D",
+      "explanation": "[structured explanation per format above]",
       "difficulty": "{difficulty}",
-      "source_chunk_indices": [0, 1, 3]
+      "source_chunk_indices": [0, 1, 2]
     }}
   ]
 }}
-
-=== CRITICAL RULES ===
-1. Generate EXACTLY {question_count} questions
-2. Each question MUST have detailed explanations with source citations
-3. For multi-statement questions, provide the "statements" array
-4. Use only information from the provided context
-5. Ensure correct_answer is one of the option keys (A, B, C, or D)
-6. Keep question_text clear and grammatically correct
-7. Make distractors plausible but clearly incorrect upon analysis
 
 Generate the {question_count} questions now:"""
 
@@ -623,7 +651,7 @@ Generate the {question_count} questions now:"""
                 "static_chunk_count": len(static_chunks),
                 "ca_chunk_count": len(ca_chunks),
                 "generated_at": timezone.now().isoformat(),
-                "model": self.model,
+                "model": "llama-3.3-70b-versatile",
             },
         )
 

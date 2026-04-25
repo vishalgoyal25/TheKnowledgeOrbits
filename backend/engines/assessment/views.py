@@ -16,7 +16,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
+from engines.assessment.authentication import OptionalJWTAuthentication
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -177,6 +182,7 @@ def get_quiz_job_status(request: Request, job_id: str) -> Response:
 
 
 @api_view(["GET"])
+@authentication_classes([OptionalJWTAuthentication])
 @permission_classes([AllowAny])
 def list_quizzes(request: Request) -> Response:
     """
@@ -268,6 +274,7 @@ def my_quizzes(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def get_quiz(request: Request, quiz_id: str) -> Response:
     """
@@ -290,6 +297,7 @@ def get_quiz(request: Request, quiz_id: str) -> Response:
 
 
 @api_view(["POST"])
+@authentication_classes([OptionalJWTAuthentication])
 @permission_classes([AllowAny])
 def start_quiz(request: Request, quiz_id: str) -> Response:
     """
@@ -342,6 +350,7 @@ def start_quiz(request: Request, quiz_id: str) -> Response:
 
 
 @api_view(["POST"])
+@authentication_classes([OptionalJWTAuthentication])
 @permission_classes([AllowAny])
 @transaction.atomic
 def submit_quiz(request: Request) -> Response:
@@ -521,6 +530,7 @@ def submit_quiz(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@authentication_classes([OptionalJWTAuthentication])
 @permission_classes([AllowAny])
 def get_attempt_result(request: Request, attempt_id: str) -> Response:
     """
@@ -558,6 +568,88 @@ def get_attempt_result(request: Request, attempt_id: str) -> Response:
         result_data["questions_with_answers"] = questions_with_answers
 
     return Response(result_data)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def daily_public_quiz_today(request: Request) -> Response:
+    """
+    Return the Daily Public Quiz for today or a specific date.
+
+    GET /api/v1/assessment/public/daily/
+    GET /api/v1/assessment/public/daily/?date=YYYY-MM-DD
+
+    Used by the homepage widget and any client that needs to deep-link
+    directly to a daily quiz without knowing its UUID.
+
+    Query params:
+        date (optional): ISO date string YYYY-MM-DD. Defaults to today.
+
+    Response (200): QuizDetailSerializer payload — includes quiz_id,
+        title, question_count, time_limit, questions (without answers).
+    Response (400): Invalid date format.
+    Response (404): Quiz not yet generated for the requested date.
+
+    Cached 5 minutes — same TTL as daily_ca TodayView.
+    No authentication required. Re-attempt is always allowed.
+    """
+    from datetime import datetime as _dt
+
+    date_param = request.query_params.get("date")
+    if date_param:
+        try:
+            target_date = _dt.strptime(date_param.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            return Response(
+                {
+                    "error": "INVALID_DATE",
+                    "message": "Invalid date format. Use YYYY-MM-DD.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        target_date = timezone.now().date()
+
+    cache_key = f"daily_public_quiz_{target_date}"
+
+    cached = cache.get(cache_key)
+    if cached:
+        return Response(cached)
+
+    date_label = target_date.strftime("%d %B %Y")
+    quiz_title = f"Daily Current Affairs Quiz \u2014 {date_label}"
+
+    quiz = (
+        Quiz.objects.filter(
+            title=quiz_title,
+            is_public=True,
+            created_by=None,
+            is_active=True,
+        )
+        .prefetch_related("questions")
+        .select_related("topic")
+        .first()
+    )
+
+    if not quiz:
+        return Response(
+            {
+                "error": "NOT_FOUND",
+                "message": f"Daily quiz for {target_date} is not available yet.",
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    data = QuizDetailSerializer(quiz).data
+    cache.set(cache_key, data, 300)  # 5 minutes
+
+    logger.info(
+        "daily_public_quiz_served",
+        quiz_id=str(quiz.id),
+        date=str(target_date),
+    )
+    return Response(data)
 
 
 @api_view(["GET"])

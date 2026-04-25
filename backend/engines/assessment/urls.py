@@ -24,4 +24,8 @@ urlpatterns = [
     path("attempts/<uuid:attempt_id>/", views.get_attempt_result, name="get-attempt"),
     path("my-attempts/", views.list_user_attempts, name="my-attempts"),
     path("my-quizzes/", views.my_quizzes, name="my-quizzes"),
+    # Daily Public Quiz — no auth required
+    path(
+        "public/daily/", views.daily_public_quiz_today, name="daily-public-quiz-today"
+    ),
 ]
