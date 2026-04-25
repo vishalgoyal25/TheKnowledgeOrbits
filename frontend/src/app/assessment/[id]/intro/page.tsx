@@ -107,7 +107,10 @@ export default function QuizIntroPage() {
       <div className="container mx-auto px-4 py-10 max-w-2xl">
         {/* Back link */}
         <Link href="/">
-          <Button variant="ghost" className="mb-6 gap-2 text-slate-600 hover:text-slate-900">
+          <Button
+            variant="ghost"
+            className="mb-6 gap-2 text-slate-600 hover:text-slate-900"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to Home
           </Button>

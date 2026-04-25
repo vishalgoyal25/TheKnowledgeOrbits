@@ -80,8 +80,7 @@ function EmptyQuizCard({ dateLabel }: { dateLabel: string }) {
         No quiz for {dateLabel}
       </p>
       <p className="text-sm text-slate-400 max-w-xs mx-auto">
-        Daily quizzes go live after Daily Current Affairs.
-        Check back later.
+        Daily quizzes go live after Daily Current Affairs. Check back later.
       </p>
     </div>
   );
