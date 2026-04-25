@@ -48,9 +48,9 @@ from engines.assessment.services.daily_quiz_prompt_builder import build_quiz_pro
 logger = structlog.get_logger(__name__)
 
 # ── Constants ────────────────────────────────────────────────────────────────
-MAX_QUESTIONS = 10          # questions per daily quiz
-MAX_GROQ_CALLS = 15         # session safety cap (10 questions + 5 retries)
-QUIZ_TIME_LIMIT = 600       # 10 minutes in seconds
+MAX_QUESTIONS = 10  # questions per daily quiz
+MAX_GROQ_CALLS = 15  # session safety cap (10 questions + 5 retries)
+QUIZ_TIME_LIMIT = 600  # 10 minutes in seconds
 QUIZ_DIFFICULTY = "medium"  # daily quiz is always mixed medium
 
 
@@ -71,6 +71,7 @@ def _fetch_enriched_ca_context(
     from engines.daily_ca.services.generator_service import (
         _fetch_enriched_ca_context as _inner,
     )
+
     return _inner(ca_chunk_ids, db_alias=db_alias)
 
 
@@ -83,6 +84,7 @@ def _get_wiki_enrichment(topic_name: str) -> dict:
         from engines.daily_ca.services.wiki_enrichment_service import (
             WikiEnrichmentService,
         )
+
         return WikiEnrichmentService.get_enrichment(topic_name)
     except Exception as exc:
         logger.warning("wiki_enrichment_failed", topic=topic_name, error=str(exc))
@@ -94,7 +96,9 @@ def _strip_llm_source_lines(explanation: str) -> str:
     Remove any 'Source:' line the LLM may have written in the explanation.
     We append the real URLs ourselves below.
     """
-    return re.sub(r"\n?\s*Source\s*:\s*.+", "", explanation, flags=re.IGNORECASE).strip()
+    return re.sub(
+        r"\n?\s*Source\s*:\s*.+", "", explanation, flags=re.IGNORECASE
+    ).strip()
 
 
 def _append_sources(explanation: str, source_urls: list) -> str:
@@ -220,11 +224,15 @@ class DailyQuizGeneratorService:
         quiz_title = f"Daily Current Affairs Quiz — {date_label}"
 
         # ── Idempotency check ──────────────────────────────────────────────
-        existing = Quiz.objects.using(db_alias).filter(
-            title=quiz_title,
-            is_public=True,
-            created_by=None,
-        ).first()
+        existing = (
+            Quiz.objects.using(db_alias)
+            .filter(
+                title=quiz_title,
+                is_public=True,
+                created_by=None,
+            )
+            .first()
+        )
 
         if existing:
             logger.info(
@@ -315,9 +323,7 @@ class DailyQuizGeneratorService:
     # ── Single-question generation ─────────────────────────────────────────
 
     @staticmethod
-    def _generate_single_question(
-        proposal, db_alias: str = "default"
-    ) -> dict | None:
+    def _generate_single_question(proposal, db_alias: str = "default") -> dict | None:
         """
         Generate one question from one CaDailyProposal.
 
@@ -485,7 +491,7 @@ class DailyQuizGeneratorService:
         logger.info("daily_quiz_record_created", quiz_id=str(quiz.id))
 
         for idx, q_data in enumerate(questions_data):
-            q_data.pop("_proposal_id", None)   # internal tracking key — not a DB field
+            q_data.pop("_proposal_id", None)  # internal tracking key — not a DB field
             ca_chunk_ids = q_data.pop("_ca_chunk_ids", [])
 
             question = Question.objects.using(db_alias).create(
