@@ -55,34 +55,36 @@ def chunks(topic):
 class TestQuizGeneratorService:
     """Test QuizGeneratorService."""
 
-    @patch("groq.Groq")
-    def test_generate_quiz_basic(self, mock_groq_class, topic, chunks):
+    def test_generate_quiz_basic(self, topic, chunks):
         """Test basic quiz generation."""
-        # Mock GROQ client instance
+        mock_message = MagicMock()
+        mock_message.content = '{"questions": [{"question_text": "Test question?", "options": {"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"}, "correct_answer": "A", "explanation": "Test explanation", "question_type": "single_mcq", "difficulty": "medium"}]}'
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
         mock_client = MagicMock()
-        mock_groq_class.return_value = mock_client
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_entry = MagicMock()
+        mock_entry.client = mock_client
+        mock_entry.model = "llama-3.3-70b-versatile"
+        mock_entry.provider = "groq"
 
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[
-                MagicMock(
-                    message=MagicMock(
-                        content='{"questions": [{"question_text": "Test question?", "options": {"A": "Option 1", "B": "Option 2", "C": "Option 3", "D": "Option 4"}, "correct_answer": "A", "explanation": "Test explanation", "question_type": "single_mcq", "difficulty": "medium"}]}'
-                    )
-                )
-            ]
-        )
+        with (
+            patch("engines.book_content.services.llm_service._pool", [mock_entry]),
+            patch("engines.book_content.services.llm_service._pool_size", 1),
+        ):
+            service = QuizGeneratorService()
+            quiz = service.generate_quiz(
+                topic_id=str(topic.id),
+                difficulty="medium",
+                include_ca=False,
+                question_count=5,
+            )
 
-        service = QuizGeneratorService()
-        quiz = service.generate_quiz(
-            topic_id=str(topic.id),
-            difficulty="medium",
-            include_ca=False,
-            question_count=5,
-        )
-
-        assert quiz is not None
-        assert quiz.topic == topic
-        assert quiz.difficulty_level == "medium"
+            assert quiz is not None
+            assert quiz.topic == topic
+            assert quiz.difficulty_level == "medium"
 
     def test_generate_quiz_invalid_topic(self):
         """Test generation fails with invalid topic."""

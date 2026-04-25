@@ -151,11 +151,13 @@ export function DailyQuizWidget({
   const [notFound, setNotFound] = useState(initialTodayQuiz === null);
 
   /**
-   * skipInitialFetch: true when today's quiz was pre-loaded from ISR props —
-   * avoids a redundant network call on first render (same pattern as
-   * DailyCaTeaserWidget + initialArticles).
+   * skipInitialFetch: true ONLY when today's quiz was successfully pre-loaded
+   * from ISR props — avoids a redundant network call on first render.
+   * When ISR returned null (Render cold start / quiz not yet generated at
+   * revalidation time), we must NOT skip — the client-side fetch is the
+   * only way to show the quiz without waiting for the next 5-min revalidation.
    */
-  const skipInitialFetch = useRef(activeDate === todayStr);
+  const skipInitialFetch = useRef(initialTodayQuiz !== null);
 
   const fetchQuiz = useCallback(
     async (date: string) => {

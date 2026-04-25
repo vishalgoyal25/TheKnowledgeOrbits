@@ -62,16 +62,8 @@ class TestArticleGenerationService:
     @patch(
         "engines.content.services.embedding_service.EmbeddingService.generate_embedding"
     )
-    @patch("groq.Groq")
-    def test_generate_article_basic(
-        self, mock_groq_class, mock_embedding, topic, chunks
-    ):
+    def test_generate_article_basic(self, mock_embedding, topic, chunks):
         """Test basic article generation."""
-        # Mock GROQ client instance
-        mock_client = MagicMock()
-        mock_groq_class.return_value = mock_client
-
-        # Generate enough content to pass quality checks
         generated_content = (
             "# Generated Article About Article 370\n\n"
             "This is a comprehensive overview of Article 370. " * 50 + "\n\n"
@@ -80,17 +72,30 @@ class TestArticleGenerationService:
             * 20
         )
 
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content=generated_content))]
-        )
+        mock_message = MagicMock()
+        mock_message.content = generated_content
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_entry = MagicMock()
+        mock_entry.client = mock_client
+        mock_entry.model = "llama-3.3-70b-versatile"
+        mock_entry.provider = "groq"
 
-        result = ArticleGenerationService.generate_article(
-            topic_id=str(topic.id), include_ca=False, user_id=None
-        )
+        with (
+            patch("engines.book_content.services.llm_service._pool", [mock_entry]),
+            patch("engines.book_content.services.llm_service._pool_size", 1),
+        ):
+            result = ArticleGenerationService.generate_article(
+                topic_id=str(topic.id), include_ca=False, user_id=None
+            )
 
-        assert "article_id" in result
-        assert result["word_count"] > 0
-        assert result["quality_score"] >= 0
+            assert "article_id" in result
+            assert result["word_count"] > 0
+            assert result["quality_score"] >= 0
 
     def test_generate_article_invalid_topic(self):
         """Test generation fails with invalid topic."""
