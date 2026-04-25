@@ -5,10 +5,12 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
   const { pathname } = request.nextUrl;
 
-  // Protected routes
+  // Protected routes — require an access_token cookie.
+  // NOTE: /assessment (listing, quiz detail, intro) is intentionally PUBLIC.
+  //       Only /assessment/generate needs auth (AI generation costs money).
   const protectedPaths = [
     "/profile",
-    "/assessment",
+    "/assessment/generate",
     "/articles/my-notebook",
     "/generate",
   ];
@@ -34,7 +36,8 @@ export const config = {
     "/dashboard/:path*",
     "/profile/:path*",
     "/auth/:path*",
-    "/assessment/:path*",
+    // /assessment listing + quiz detail + intro = public (no matcher entry)
+    "/assessment/generate/:path*",
     "/articles/my-notebook",
     "/generate/:path*",
   ],

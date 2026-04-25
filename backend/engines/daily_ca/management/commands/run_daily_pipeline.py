@@ -6,7 +6,7 @@ Phase J2 — Full automation pipeline (zero human involvement).
 Runs every day via Render Cron at 02:00 UTC (07:30 IST).
 Replaces manual execution of three separate commands.
 
-Pipeline (4 steps, sequential):
+Pipeline (5 steps, sequential):
   Step 1 — generate_ca_proposals
              Reads last-24hr CAArticles → scores → groups by topic →
              creates up to 30 CaDailyProposal records (status="pending").
@@ -23,6 +23,12 @@ Pipeline (4 steps, sequential):
 
   Step 4 — auto-publish
              Sets is_published=True on all articles generated in this run.
+
+  Step 5 — generate_daily_quiz
+             Reads the same approved/generated proposals → runs
+             DailyQuizGeneratorService → creates one public Quiz (10 questions).
+             Quiz is immediately public (no separate publish step).
+             Idempotent: skips if quiz for this date already exists.
 
 Usage:
     python manage.py run_daily_pipeline
@@ -53,8 +59,8 @@ _DIVIDER = "━" * 60
 
 class Command(BaseCommand):
     help = (
-        "Full Daily CA pipeline: proposals → auto-approve top N → "
-        "generate articles → auto-publish. Designed for Render Cron."
+        "Full Daily pipeline: proposals → auto-approve → generate CA articles → "
+        "auto-publish → generate Daily Public Quiz. Designed for Render Cron."
     )
 
     def add_arguments(self, parser):
@@ -127,7 +133,7 @@ class Command(BaseCommand):
         # ── STEP 2: Auto-approve top N by relevance_score ─────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                f"\n▶ Step 2/4 — Auto-approving top {top_n} proposals..."
+                f"\n▶ Step 2/5 — Auto-approving top {top_n} proposals..."
             )
         )
         try:
@@ -162,12 +168,12 @@ class Command(BaseCommand):
         # ── STEP 3 + 4: Generate articles + auto-publish ──────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                "\n▶ Step 3/4 — Generating articles from approved proposals..."
+                "\n▶ Step 3/5 — Generating articles from approved proposals..."
             )
         )
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                "▶ Step 4/4 — Auto-publish enabled (--auto-publish flag active)"
+                "▶ Step 4/5 — Auto-publish enabled (--auto-publish flag active)"
             )
         )
         try:
@@ -183,14 +189,37 @@ class Command(BaseCommand):
             sentry_sdk.capture_exception(exc)
             logger.error("pipeline_step3_failed", error=str(exc))
             self.stderr.write(self.style.ERROR(f"\n✗ Step 3/4 failed: {exc}"))
-            return
+            # Don't return — quiz generation can still proceed independently
+
+        # ── STEP 5: Generate Daily Public Quiz ───────────────────────────────
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("\n▶ Step 5/5 — Generating Daily Public Quiz...")
+        )
+        try:
+            call_command(
+                "generate_daily_quiz",
+                date=options["date"],
+                database=db_alias,
+                stdout=self.stdout,
+                stderr=self.stderr,
+            )
+        except Exception as exc:
+            sentry_sdk.capture_exception(exc)
+            logger.error("pipeline_step5_failed", error=str(exc))
+            self.stderr.write(
+                self.style.ERROR(
+                    f"\n✗ Step 5 failed: {exc}\n"
+                    "  (CA articles unaffected — quiz generation is independent)"
+                )
+            )
 
         # ── Final summary ─────────────────────────────────────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
                 f"\n{_DIVIDER}\n"
                 f"  Pipeline complete for {target_date}.\n"
-                f"  Articles are LIVE on /news.\n"
+                f"  CA Articles : LIVE on /news\n"
+                f"  Daily Quiz  : LIVE on /quiz\n"
                 f"{_DIVIDER}\n"
             )
         )

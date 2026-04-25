@@ -43,6 +43,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { DailyCaArticleList } from "@/lib/api/daily-ca";
+import type { Quiz } from "@/lib/types";
+import { DailyQuizWidget } from "@/components/home/daily-quiz-widget";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KNOWLEDGE ORBITS GRAPH TEASER
@@ -585,8 +587,11 @@ function KnowledgeGraphTeaser() {
 
 export default function HomePageClient({
   initialTodayArticles,
+  initialTodayQuiz = null,
 }: {
   initialTodayArticles: DailyCaArticleList[];
+  /** Today's Daily Public Quiz, pre-fetched via ISR. null = not yet generated. */
+  initialTodayQuiz?: Quiz | null;
 }) {
   const { data: articlesData, isLoading } = useArticles({ page_size: 9 });
   const articlesArray = articlesData?.results || [];
@@ -666,11 +671,17 @@ export default function HomePageClient({
                       Today&apos;s Current Affairs
                     </Button>
                   </Link>
-                  <Link href="/assessment">
+                  <Link
+                    href={
+                      initialTodayQuiz
+                        ? `/assessment/${initialTodayQuiz.id}/intro`
+                        : "/assessment"
+                    }
+                  >
                     <Button
                       size="lg"
                       variant="outline"
-                      className="h-11 px-6 text-sm text-slate-700 border-slate-200 bg-white hover:bg-slate-50 gap-2"
+                      className="h-11 px-6 text-sm text-violet-700 border-violet-200 bg-violet-50 hover:bg-violet-100 gap-2"
                     >
                       <FileQuestion className="h-4 w-4" />
                       Try a Quiz
@@ -721,7 +732,11 @@ export default function HomePageClient({
         {/* todayArticles is server-baked, so DailyCaTeaserWidget skips its own initial fetch */}
         <DailyCaTeaserWidget initialArticles={todayArticles} />
 
-        {/* 3. KNOWLEDGE GRAPH TEASER — visual wow */}
+        {/* 3. DAILY QUIZ WIDGET — public quiz, no login needed */}
+        {/* initialTodayQuiz is server-baked via ISR — skips redundant first fetch */}
+        <DailyQuizWidget initialTodayQuiz={initialTodayQuiz} />
+
+        {/* 4. KNOWLEDGE GRAPH TEASER — visual wow */}
         <KnowledgeGraphTeaser />
       </div>
 

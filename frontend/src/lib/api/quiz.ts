@@ -113,3 +113,33 @@ export const quizAPI = {
       : response.data.results || [];
   },
 };
+
+/**
+ * Get today's Daily Public Quiz.
+ * Returns null if the quiz is not yet generated or on any network error.
+ * No auth required — public endpoint.
+ */
+export async function getDailyPublicQuiz(): Promise<Quiz | null> {
+  try {
+    const response = await apiClient.get("/assessment/public/daily/");
+    return response.data as Quiz;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get the Daily Public Quiz for a specific date (YYYY-MM-DD).
+ * Returns null if not found or on any network error.
+ * Used by the homepage widget's date-tab navigation.
+ */
+export async function getDailyQuizByDate(date: string): Promise<Quiz | null> {
+  try {
+    const response = await apiClient.get(
+      `/assessment/public/daily/?date=${date}`,
+    );
+    return response.data as Quiz;
+  } catch {
+    return null;
+  }
+}

@@ -34,49 +34,62 @@ from django.test import TestCase
 class TestLlmService(unittest.TestCase):
     """Tests for engines.book_content.services.llm_service.llm_call"""
 
+    def _make_pool_entry(self, content: str) -> MagicMock:
+        """Build a mock _LLMEntry whose client returns the given content string."""
+        mock_message = MagicMock()
+        mock_message.content = content
+        mock_choice = MagicMock()
+        mock_choice.message = mock_message
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+        entry = MagicMock()
+        entry.client = mock_client
+        entry.model = "llama-3.3-70b-versatile"
+        entry.provider = "groq"
+        return entry
+
+    def _make_failing_pool_entry(self, exc: Exception) -> MagicMock:
+        """Build a mock _LLMEntry whose client always raises exc."""
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = exc
+        entry = MagicMock()
+        entry.client = mock_client
+        entry.model = "llama-3.3-70b-versatile"
+        entry.provider = "groq"
+        return entry
+
     @patch("engines.book_content.services.llm_service.time.sleep", return_value=None)
     def test_llm_call_returns_stripped_string_on_success(
         self, _mock_sleep: MagicMock
     ) -> None:
-        """llm_call() returns stripped content string from the GROQ response."""
-        mock_response = MagicMock()
-        mock_response.content = "  Article content here.  "
-        mock_client = MagicMock()
-        mock_client.invoke.return_value = mock_response
+        """llm_call() returns stripped content string from the provider response."""
+        entry = self._make_pool_entry("  Article content here.  ")
 
-        with patch(
-            "engines.book_content.services.llm_service._pool_standard",
-            [mock_client],
+        with (
+            patch("engines.book_content.services.llm_service._pool", [entry]),
+            patch("engines.book_content.services.llm_service._pool_size", 1),
         ):
-            from engines.book_content.services.llm_service import llm_call
+            import engines.book_content.services.llm_service as llm_mod
 
-            result = llm_call("Test prompt", mode="standard")
+            llm_mod._current_key_idx = 0
+            result = llm_mod.llm_call("Test prompt", mode="standard")
 
         assert isinstance(result, str)
         assert result == "Article content here."
-        mock_client.invoke.assert_called_once_with("Test prompt")
+        entry.client.chat.completions.create.assert_called_once()
 
     @patch("engines.book_content.services.llm_service.time.sleep", return_value=None)
     def test_llm_call_returns_empty_string_after_all_retries_exhausted(
         self, _mock_sleep: MagicMock
     ) -> None:
         """llm_call() returns '' when every key and every retry fails."""
-        mock_client = MagicMock()
-        mock_client.invoke.side_effect = Exception("Rate limit exceeded")
+        entry = self._make_failing_pool_entry(Exception("Rate limit exceeded"))
 
         with (
-            patch(
-                "engines.book_content.services.llm_service._pool_standard",
-                [mock_client],
-            ),
-            patch(
-                "engines.book_content.services.llm_service._pool_writer",
-                [mock_client],
-            ),
-            patch(
-                "engines.book_content.services.llm_service._pool_critique",
-                [mock_client],
-            ),
+            patch("engines.book_content.services.llm_service._pool", [entry]),
+            patch("engines.book_content.services.llm_service._pool_size", 1),
             patch(
                 "engines.book_content.services.llm_service.sentry_sdk.capture_message"
             ),
@@ -89,64 +102,42 @@ class TestLlmService(unittest.TestCase):
         assert result == ""
 
     @patch("engines.book_content.services.llm_service.time.sleep", return_value=None)
-    def test_llm_call_writer_mode_uses_writer_pool_not_standard(
+    def test_llm_call_writer_mode_passes_writer_temperature(
         self, _mock_sleep: MagicMock
     ) -> None:
-        """llm_call(mode='writer') invokes _pool_writer; _pool_standard is untouched."""
-        mock_response = MagicMock()
-        mock_response.content = "Long article text"
-        mock_writer = MagicMock()
-        mock_writer.invoke.return_value = mock_response
-        mock_standard = MagicMock()
+        """llm_call(mode='writer') uses temperature=0.25 (writer config), not 0.10."""
+        entry = self._make_pool_entry("Long article text")
 
         with (
-            patch(
-                "engines.book_content.services.llm_service._pool_writer", [mock_writer]
-            ),
-            patch(
-                "engines.book_content.services.llm_service._pool_standard",
-                [mock_standard],
-            ),
+            patch("engines.book_content.services.llm_service._pool", [entry]),
+            patch("engines.book_content.services.llm_service._pool_size", 1),
         ):
-            from engines.book_content.services.llm_service import llm_call
+            import engines.book_content.services.llm_service as llm_mod
 
-            llm_call("prompt", mode="writer")
+            llm_mod._current_key_idx = 0
+            llm_mod.llm_call("prompt", mode="writer")
 
-        mock_writer.invoke.assert_called_once()
-        mock_standard.invoke.assert_not_called()
+        call_kwargs = entry.client.chat.completions.create.call_args
+        assert call_kwargs.kwargs["temperature"] == 0.25
 
     @patch("engines.book_content.services.llm_service.time.sleep", return_value=None)
-    def test_llm_call_critique_mode_uses_critique_pool(
+    def test_llm_call_critique_mode_passes_critique_temperature(
         self, _mock_sleep: MagicMock
     ) -> None:
-        """llm_call(mode='critique') invokes _pool_critique; others untouched."""
-        mock_response = MagicMock()
-        mock_response.content = '{"score": 80}'
-        mock_critique = MagicMock()
-        mock_critique.invoke.return_value = mock_response
-        mock_standard = MagicMock()
-        mock_writer = MagicMock()
+        """llm_call(mode='critique') uses temperature=0.10 (critique config)."""
+        entry = self._make_pool_entry('{"score": 80}')
 
         with (
-            patch(
-                "engines.book_content.services.llm_service._pool_critique",
-                [mock_critique],
-            ),
-            patch(
-                "engines.book_content.services.llm_service._pool_standard",
-                [mock_standard],
-            ),
-            patch(
-                "engines.book_content.services.llm_service._pool_writer", [mock_writer]
-            ),
+            patch("engines.book_content.services.llm_service._pool", [entry]),
+            patch("engines.book_content.services.llm_service._pool_size", 1),
         ):
-            from engines.book_content.services.llm_service import llm_call
+            import engines.book_content.services.llm_service as llm_mod
 
-            llm_call("prompt", mode="critique")
+            llm_mod._current_key_idx = 0
+            llm_mod.llm_call("prompt", mode="critique")
 
-        mock_critique.invoke.assert_called_once()
-        mock_standard.invoke.assert_not_called()
-        mock_writer.invoke.assert_not_called()
+        call_kwargs = entry.client.chat.completions.create.call_args
+        assert call_kwargs.kwargs["temperature"] == 0.10
 
 
 # ─────────────────────────────────────────────────────────────────────────────
