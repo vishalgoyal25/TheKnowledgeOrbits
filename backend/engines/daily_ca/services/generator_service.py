@@ -9,8 +9,8 @@ Main entry point: run_generation_cycle(proposals, groq_calls_used=0) → dict
 Architecture: CA-First, Static-Background
   _run_single_cycle()       — generates ONE CA article (fast, ~15-20s)
                               never blocks, never waits for static
-  run_generation_cycle()    — runs all cycles, collects topics needing static,
-                              fires trigger_pending_static_generation() ONCE after all done
+  run_generation_cycle()    — runs all cycles sequentially; static content
+                              generation is handled by a separate cron job (Phase B)
 
 GROQ call budget per cycle:
   1 call  — main CA article generation (writer mode, high token limit)
@@ -33,7 +33,6 @@ Phase D1 context enrichment:
 
 import re
 import time
-from uuid import UUID
 
 import sentry_sdk
 import structlog
@@ -581,7 +580,9 @@ class DailyCaGeneratorService:
         Stops gracefully when session cap is reached.
         Failed cycles do not stop the run — marked 'failed' and skipped.
 
-        AFTER all cycles: triggers background static generation for topics without static.
+        Static content generation is handled by the separate `generate_static_content`
+        management command (Phase B) — it runs as a dedicated Render cron job AFTER
+        the full CA+Quiz pipeline completes.
 
         Returns summary dict:
           {generated, failed, capped, static_triggered, total, groq_calls_used}
@@ -590,11 +591,10 @@ class DailyCaGeneratorService:
             "generated": 0,
             "failed": 0,
             "capped": 0,
-            "static_triggered": 0,
+            "static_triggered": 0,  # always 0 — static is handled by separate cron job
             "total": len(proposals),
             "groq_calls_used": groq_calls_used,
         }
-        pending_static_topic_ids: list[UUID] = []
 
         for i, proposal in enumerate(proposals, 1):
             logger.info(
@@ -661,9 +661,6 @@ class DailyCaGeneratorService:
                         title=article.title[:60],
                     )
 
-                if needs_static and proposal.topic_id:
-                    pending_static_topic_ids.append(proposal.topic_id)
-
                 logger.info(
                     "cycle_complete",
                     cycle=i,
@@ -709,22 +706,6 @@ class DailyCaGeneratorService:
                 time.sleep(INTER_CYCLE_SLEEP)
 
         results["groq_calls_used"] = groq_calls_used
-
-        # ── Post-cycle: trigger background static generation ──────────────────
-        if pending_static_topic_ids:
-            logger.info(
-                "post_cycle_static_trigger_start",
-                topic_count=len(pending_static_topic_ids),
-            )
-            triggered = StaticBackgroundService.trigger_pending_static_generation(
-                pending_static_topic_ids
-            )
-            results["static_triggered"] = triggered
-            logger.info(
-                "post_cycle_static_trigger_done",
-                triggered=triggered,
-                total_queued=len(pending_static_topic_ids),
-            )
 
         logger.info("generation_run_complete", **results)
         return results

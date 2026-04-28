@@ -48,7 +48,9 @@ from engines.tags.models import ConceptArticleLink, ConceptPage
 logger = structlog.get_logger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-SIMILARITY_THRESHOLD = 0.75  # Phase B2: lowered from 0.85 for better semantic dedup
+SIMILARITY_THRESHOLD = 0.85  # Phase D: raised from 0.75 — prevents false positives like
+# national-solar-mission→national-labour-commission,
+# trinamool-congress→indian-national-trade-union-congress
 MAX_CONCEPT_LINKS = 8  # per article hard limit
 
 # Regex: matches [[any text here]] — captures the inner term
@@ -192,6 +194,19 @@ _FILLER_WORDS = frozenset(
         "governance",
     }
 )
+
+
+def _slug_has_digits(slug: str) -> bool:
+    """
+    Returns True if the slug contains any digit character.
+
+    Numeric slugs like "government-of-india-act-1935", "article-21", "schedule-7"
+    must NEVER be fuzzy-matched — a high similarity score between two act numbers
+    is meaningless and produces wrong concept links
+    (government-of-india-act-1935 → indian-government, etc.).
+    Exact slug / exact name match (Pass 1 / Pass 2) is the only safe path.
+    """
+    return any(ch.isdigit() for ch in slug)
 
 
 def _normalize_for_match(text: str) -> str:
@@ -408,36 +423,44 @@ class ConceptPageResolver:
             all_slugs = [c["slug"] for c in all_concepts]
 
             # Pass 3a: fuzzy on raw slug
-            matches = difflib.get_close_matches(
-                slug, all_slugs, n=1, cutoff=SIMILARITY_THRESHOLD
-            )
-            if matches:
-                matched = ConceptPage.objects.using(db_alias).get(slug=matches[0])
-                logger.info(
-                    "concept_resolver_fuzzy_match",
-                    term=term,
-                    input_slug=slug,
-                    matched_slug=matches[0],
+            # Numeric slugs (government-of-india-act-1935, article-21 …) must NEVER
+            # fuzzy-match — the number IS the identity; similarity scores are
+            # meaningless across different act numbers / article numbers.
+            if not _slug_has_digits(slug):
+                matches = difflib.get_close_matches(
+                    slug, all_slugs, n=1, cutoff=SIMILARITY_THRESHOLD
                 )
-                return matched
+                if matches:
+                    matched = ConceptPage.objects.using(db_alias).get(slug=matches[0])
+                    logger.info(
+                        "concept_resolver_fuzzy_match",
+                        term=term,
+                        input_slug=slug,
+                        matched_slug=matches[0],
+                    )
+                    return matched
 
             # Pass 3b: fuzzy on normalized slug (strips filler words)
-            norm_slug = _normalize_for_match(slug)
-            norm_map = {_normalize_for_match(s): s for s in all_slugs}
-            norm_matches = difflib.get_close_matches(
-                norm_slug, list(norm_map.keys()), n=1, cutoff=SIMILARITY_THRESHOLD
-            )
-            if norm_matches:
-                original_slug = norm_map[norm_matches[0]]
-                matched = ConceptPage.objects.using(db_alias).get(slug=original_slug)
-                logger.info(
-                    "concept_resolver_normalized_fuzzy_match",
-                    term=term,
-                    input_slug=slug,
-                    normalized_input=norm_slug,
-                    matched_slug=original_slug,
+            # Also skipped for numeric slugs — same rationale as Pass 3a.
+            if not _slug_has_digits(slug):
+                norm_slug = _normalize_for_match(slug)
+                norm_map = {_normalize_for_match(s): s for s in all_slugs}
+                norm_matches = difflib.get_close_matches(
+                    norm_slug, list(norm_map.keys()), n=1, cutoff=SIMILARITY_THRESHOLD
                 )
-                return matched
+                if norm_matches:
+                    original_slug = norm_map[norm_matches[0]]
+                    matched = ConceptPage.objects.using(db_alias).get(
+                        slug=original_slug
+                    )
+                    logger.info(
+                        "concept_resolver_normalized_fuzzy_match",
+                        term=term,
+                        input_slug=slug,
+                        normalized_input=norm_slug,
+                        matched_slug=original_slug,
+                    )
+                    return matched
 
         # All passes failed — create new stub with LLM-generated brief_description
         return cls._create_stub(term, slug, db_alias=db_alias)

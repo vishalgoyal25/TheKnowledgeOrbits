@@ -287,16 +287,27 @@ def _get_or_match_topic_fuzzy(
 
     This keeps the seeded hierarchy intact while still allowing genuinely
     new CA-triggered topics to be added at the correct place.
+
+    CRITICAL: matching is scoped strictly to the same node_type level.
+    A subtopic must NEVER match a parent topic even at high word-overlap
+    scores (e.g. "Introduction to Electoral Reforms in India" must NOT
+    match "Electoral Reforms in India" which is a topic-level node).
+    Without this guard the subtopic's content overwrites the parent's
+    BookContent record — data corruption.
     """
-    # Exact match
-    exact = Topic.objects.filter(name__iexact=topic_name, module=module).first()
+    # Exact match — scoped to the same node_type level only
+    exact = Topic.objects.filter(
+        name__iexact=topic_name, module=module, node_type=node_type
+    ).first()
     if exact:
         logger.info("ingestor_topic_exact_matched", name=exact.name)
         return exact
 
-    # Fuzzy match against existing topics in this module
+    # Fuzzy match — only against nodes at the same hierarchy level (node_type)
+    # Using node_type=node_type prevents subtopics from matching topic-level nodes
+    # and sub-subtopics from matching subtopic-level nodes.
     existing_names = list(
-        Topic.objects.filter(module=module, node_type="topic").values_list(
+        Topic.objects.filter(module=module, node_type=node_type).values_list(
             "name", flat=True
         )
     )
@@ -311,7 +322,9 @@ def _get_or_match_topic_fuzzy(
             best_name = name
 
     if best_score >= 0.30 and best_name:
-        matched = Topic.objects.filter(name=best_name, module=module).first()
+        matched = Topic.objects.filter(
+            name=best_name, module=module, node_type=node_type
+        ).first()
         if matched:
             logger.info(
                 "ingestor_topic_fuzzy_matched",
@@ -350,16 +363,20 @@ def _find_complete_topic(topic_name: str) -> Optional[Topic]:
     if not topic_name:
         return None
 
-    # Exact
+    # Exact — scoped to node_type="topic": only topic-level nodes ever reach
+    # content_status="complete".  Subtopics stay at "book_quality" permanently,
+    # so filtering here prevents a false lock if that invariant is ever broken.
     exact = Topic.objects.filter(
-        name__iexact=topic_name, content_status="complete"
+        name__iexact=topic_name, content_status="complete", node_type="topic"
     ).first()
     if exact:
         return exact
 
-    # Fuzzy among complete topics
+    # Fuzzy among complete topic-level nodes only
     complete_names = list(
-        Topic.objects.filter(content_status="complete").values_list("name", flat=True)
+        Topic.objects.filter(content_status="complete", node_type="topic").values_list(
+            "name", flat=True
+        )
     )
     best_score = 0.0
     best_name = None
@@ -377,7 +394,9 @@ def _find_complete_topic(topic_name: str) -> Optional[Topic]:
             matched=best_name,
             score=round(best_score, 2),
         )
-        return Topic.objects.filter(name=best_name, content_status="complete").first()
+        return Topic.objects.filter(
+            name=best_name, content_status="complete", node_type="topic"
+        ).first()
 
     return None
 
@@ -410,7 +429,13 @@ def _extend_sub_subtopics_only(
         sub_subtopics = find_sub_subtopics(sub_name, topic_obj.name)
 
         for ss_name in sub_subtopics:
-            if BookContent.objects.filter(topic__name=ss_name).exists():
+            # Phase C: scope to node_type="sub_subtopic" AND module so a same-named
+            # node in another module never blocks generation here.
+            if BookContent.objects.filter(
+                topic__name=ss_name,
+                topic__node_type="sub_subtopic",
+                topic__module=module_obj,
+            ).exists():
                 continue  # already generated — skip
 
             ss_wiki = fetch_full_page(ss_name)
@@ -573,39 +598,58 @@ def ingest_topic(
             topic, module_obj, subject_obj, node_type="topic"
         )
 
-        # Generate topic overview and save to BookContent
-        topic_wiki = fetch_full_page(topic)
-        topic_overview = _generate_topic_overview(
-            topic, clean_ncert_text, topic_wiki["summary"]
-        )
+        # ── Phase C: Protect topic overview from re-generation ───────────────
+        # If BookContent already exists for this topic node (e.g. an interrupted
+        # prior run), reuse it — never call the LLM again for the same overview.
+        # Scoped to node_type="topic" so a subtopic with the same name never
+        # causes a false skip.
+        existing_topic_bc = BookContent.objects.filter(
+            topic=topic_obj, topic__node_type="topic"
+        ).first()
 
-        with transaction.atomic():
-            topic_bc_obj, _ = BookContent.objects.update_or_create(
-                topic=topic_obj,
-                defaults={
-                    "subject": subject_obj,
-                    "content_markdown": topic_overview,
-                    "word_count": len(topic_overview.split()),
-                    "quality_score": 75.0,  # Fixed high score for intro overviews
-                    "source_mode": "wiki_only",
-                    "is_published": False,
-                },
+        if existing_topic_bc:
+            topic_bc_obj = existing_topic_bc
+            logger.info(
+                "ingestor_topic_overview_skipped",
+                topic=topic,
+                reason="already_exists",
             )
-            # Mark topic as generating
-            Topic.objects.filter(id=topic_obj.id).update(content_status="generating")
+        else:
+            # Generate topic overview and save to BookContent
+            topic_wiki = fetch_full_page(topic)
+            topic_overview = _generate_topic_overview(
+                topic, clean_ncert_text, topic_wiki["summary"]
+            )
 
-        # Chunk + embed outside transaction so failures don't roll back the save
-        _create_chunks_and_embeddings(topic_bc_obj)
-        # Cross-link: Book↔CA and Book↔Book inter-subject (needs book_article embedding)
-        _cross_link_to_ca(topic_bc_obj)
-        _cross_link_inter_subject(topic_bc_obj)
-        # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
-        _fetch_and_store_hero_image(topic_bc_obj)
-        # K3: resolve [[concept]] links in content_markdown
-        _resolve_concept_links(topic_bc_obj)
+            with transaction.atomic():
+                topic_bc_obj, _ = BookContent.objects.update_or_create(
+                    topic=topic_obj,
+                    defaults={
+                        "subject": subject_obj,
+                        "content_markdown": topic_overview,
+                        "word_count": len(topic_overview.split()),
+                        "quality_score": 75.0,  # Fixed high score for intro overviews
+                        "source_mode": "wiki_only",
+                        "is_published": False,
+                    },
+                )
 
-        nodes_created += 1
-        logger.info("ingestor_topic_overview_saved", topic=topic)
+            # Chunk + embed outside transaction so failures don't roll back the save
+            _create_chunks_and_embeddings(topic_bc_obj)
+            # Cross-link: Book↔CA and Book↔Book inter-subject (needs book_article embedding)
+            _cross_link_to_ca(topic_bc_obj)
+            _cross_link_inter_subject(topic_bc_obj)
+            # G4: Fetch Wikipedia hero image → re-host on Cloudinary → save ContentMedia
+            _fetch_and_store_hero_image(topic_bc_obj)
+            # K3: resolve [[concept]] links in content_markdown
+            _resolve_concept_links(topic_bc_obj)
+
+            nodes_created += 1
+            logger.info("ingestor_topic_overview_saved", topic=topic)
+
+        # Always mark as generating — reflects current pipeline state regardless
+        # of whether the overview was freshly generated or reused from a prior run.
+        Topic.objects.filter(id=topic_obj.id).update(content_status="generating")
 
         # ── Steps 5-8: Process each subtopic ─────────────────────────────────
         for i, sub in enumerate(subtopics, 1):
@@ -621,7 +665,14 @@ def ingest_topic(
             )
 
             # ── Smart Skip: check if BookContent already exists ───────────────
-            existing = BookContent.objects.filter(topic__name=sub_name).first()
+            # Phase C: scoped to node_type="subtopic" AND topic__module=module_obj
+            # so (a) a sub-subtopic with the same name, and (b) a same-named
+            # subtopic in a different module, never cause a false skip here.
+            existing = BookContent.objects.filter(
+                topic__name=sub_name,
+                topic__node_type="subtopic",
+                topic__module=module_obj,
+            ).first()
             if existing:
                 logger.info(
                     "ingestor_smart_skip", subtopic=sub_name, reason="already_exists"
@@ -721,8 +772,12 @@ def ingest_topic(
                     logger.info("ingestor_sub_subtopic_start", name=ss_name)
 
                     # Smart Skip for sub-subtopics
+                    # Phase C: scoped to node_type="sub_subtopic" AND module so
+                    # same-named sub-subtopics in other modules never cause a false skip.
                     existing_ss = BookContent.objects.filter(
-                        topic__name=ss_name
+                        topic__name=ss_name,
+                        topic__node_type="sub_subtopic",
+                        topic__module=module_obj,
                     ).first()
                     if existing_ss:
                         logger.info(

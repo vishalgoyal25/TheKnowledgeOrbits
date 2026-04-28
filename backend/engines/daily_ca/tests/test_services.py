@@ -450,16 +450,13 @@ class TestDailyCaGeneratorService:
         queued = CaDailyProposal.objects.filter(status="queued_next_run").count()
         assert queued > 0
 
-    def test_trigger_static_called_after_all_cycles(self):
-        """trigger_pending_static_generation fires ONCE after all cycles complete.
-        Sets topic_id only in-memory (no DB write) to avoid FK constraint at teardown."""
+    def test_trigger_static_not_called_after_cycles(self):
+        """Phase A (FEATURES5): trigger_pending_static_generation is NEVER called
+        from run_generation_cycle — static generation is a separate cron job.
+        static_triggered is always 0 in results for backward compatibility."""
         from engines.daily_ca.services.generator_service import DailyCaGeneratorService
 
         proposal = self._make_proposal("Static Trigger Test")
-        fake_topic_id = uuid.uuid4()
-
-        # Set topic_id only on the in-memory object — DB row stays NULL (no FK violation)
-        proposal.__dict__["topic_id"] = fake_topic_id
 
         def mock_single_cycle(p, db_alias="default"):
             article = DailyCaArticle.objects.create(
@@ -468,7 +465,7 @@ class TestDailyCaGeneratorService:
                 published_date=date(2026, 4, 10),
                 body_md="Content.",
             )
-            return article, 1, True  # needs_static=True
+            return article, 1, False  # needs_static irrelevant — trigger removed
 
         with patch.object(
             DailyCaGeneratorService, "_run_single_cycle", mock_single_cycle
@@ -481,8 +478,9 @@ class TestDailyCaGeneratorService:
                     proposals=[proposal], groq_calls_used=0
                 )
 
-        mock_trigger.assert_called_once()
-        assert results["static_triggered"] == 1
+        # Phase A: static trigger is decoupled — must NEVER fire from this path
+        mock_trigger.assert_not_called()
+        assert results["static_triggered"] == 0
 
 
 # ── HeroImageService ──────────────────────────────────────────────────────────
