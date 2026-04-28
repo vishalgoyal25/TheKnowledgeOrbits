@@ -47,7 +47,8 @@ logger = structlog.get_logger(__name__)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MAX_TAGS_PER_ARTICLE = 8
-FUZZY_THRESHOLD = 0.75  # Phase B1: lowered from 0.85 for better semantic dedup
+FUZZY_THRESHOLD = 0.85  # Phase D: raised from 0.75 — prevents false positives like
+# hindi→india, culture→agriculture, article-324→article-81
 
 VALID_CONTENT_TYPES = {c[0] for c in ARTICLE_CONTENT_TYPE_CHOICES}
 VALID_TAG_TYPES = {t[0] for t in TAG_TYPE_CHOICES}
@@ -190,6 +191,18 @@ _FILLER_WORDS = frozenset(
         "governance",
     }
 )
+
+
+def _slug_has_digits(slug: str) -> bool:
+    """
+    Returns True if the slug contains any digit character.
+
+    Numeric slugs like "article-324", "schedule-7", "section-144", "rti-2005"
+    must NEVER be fuzzy-matched — even high similarity scores produce wrong
+    matches (article-324 → article-81, rti-2005 → rti-1923, etc.).
+    Exact slug or name match (Pass 1 / Pass 2) is the only safe path for these.
+    """
+    return any(ch.isdigit() for ch in slug)
 
 
 def _normalize_for_match(text: str) -> str:
@@ -516,34 +529,40 @@ class TagService:
             all_slugs = [t["slug"] for t in all_tags_qs]
 
             # Pass 3a: fuzzy on raw slug
-            matches = difflib.get_close_matches(
-                slug, all_slugs, n=1, cutoff=FUZZY_THRESHOLD
-            )
-            if matches:
-                tag = Tag.objects.using(db_alias).get(slug=matches[0])
-                logger.info(
-                    "tag_service_fuzzy_match",
-                    input_slug=slug,
-                    matched_slug=matches[0],
+            # Numeric slugs (article-324, schedule-7, rti-2005 …) must NEVER fuzzy-match —
+            # digits encode the exact identity of the law/article; fuzzy scores are
+            # misleading (article-324 ≈ article-81 at high similarity). Skip to creation.
+            if not _slug_has_digits(slug):
+                matches = difflib.get_close_matches(
+                    slug, all_slugs, n=1, cutoff=FUZZY_THRESHOLD
                 )
-                return tag
+                if matches:
+                    tag = Tag.objects.using(db_alias).get(slug=matches[0])
+                    logger.info(
+                        "tag_service_fuzzy_match",
+                        input_slug=slug,
+                        matched_slug=matches[0],
+                    )
+                    return tag
 
             # Pass 3b: fuzzy on normalized slug (strips filler words)
-            norm_slug = _normalize_for_match(slug)
-            norm_map = {_normalize_for_match(s): s for s in all_slugs}
-            norm_matches = difflib.get_close_matches(
-                norm_slug, list(norm_map.keys()), n=1, cutoff=FUZZY_THRESHOLD
-            )
-            if norm_matches:
-                original_slug = norm_map[norm_matches[0]]
-                tag = Tag.objects.using(db_alias).get(slug=original_slug)
-                logger.info(
-                    "tag_service_normalized_fuzzy_match",
-                    input_slug=slug,
-                    normalized_input=norm_slug,
-                    matched_slug=original_slug,
+            # Also skipped for numeric slugs — same rationale as Pass 3a.
+            if not _slug_has_digits(slug):
+                norm_slug = _normalize_for_match(slug)
+                norm_map = {_normalize_for_match(s): s for s in all_slugs}
+                norm_matches = difflib.get_close_matches(
+                    norm_slug, list(norm_map.keys()), n=1, cutoff=FUZZY_THRESHOLD
                 )
-                return tag
+                if norm_matches:
+                    original_slug = norm_map[norm_matches[0]]
+                    tag = Tag.objects.using(db_alias).get(slug=original_slug)
+                    logger.info(
+                        "tag_service_normalized_fuzzy_match",
+                        input_slug=slug,
+                        normalized_input=norm_slug,
+                        matched_slug=original_slug,
+                    )
+                    return tag
 
             # All passes failed — create new tag with LLM-generated description
             return cls._create_new_tag(name, slug, tag_type, db_alias=db_alias)

@@ -6,6 +6,7 @@
 
 "use client";
 
+import { useState } from "react";
 import type { Question } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -13,6 +14,104 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Flag, CheckCircle2, XCircle } from "lucide-react";
+
+// ── Explanation helpers ───────────────────────────────────────────────────────
+
+/**
+ * Parse the LLM explanation string.
+ * The LLM sometimes appends raw URLs after a "Source:" / "Sources Used:" label.
+ * We extract them so they can be shown in a collapsible accordion instead of
+ * appearing as plain text in the explanation body.
+ */
+function parseExplanation(text: string): { cleanText: string; urls: string[] } {
+  if (!text) return { cleanText: "", urls: [] };
+
+  const splitIdx = text.search(/\n*\s*Sources?\s*(Used)?:/i);
+  if (splitIdx <= 0) return { cleanText: text.trim(), urls: [] };
+
+  const cleanText = text.slice(0, splitIdx).trim();
+  const urlBlock = text.slice(splitIdx);
+  const urls = (urlBlock.match(/https?:\/\/[^\s\n]+/g) ?? []).filter(
+    (u) => u.length > 10,
+  );
+  return { cleanText, urls };
+}
+
+/**
+ * Add a blank line before each "Statement N:" occurrence and before
+ * "Therefore," so multi-statement explanations are visually separated.
+ */
+function formatExplanationText(text: string): string {
+  return text
+    .replace(/(?<=[^\n])\s+(Statement\s+\d+:)/gi, "\n\n$1")
+    .replace(/(?<=[^\n])\s+(Therefore[,\s])/gi, "\n\n$1")
+    .trim();
+}
+
+// ── Inline sources accordion for quiz explanations ────────────────────────────
+
+function getDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url.slice(0, 40);
+  }
+}
+
+function QuizSourceAccordion({ urls }: { urls: string[] }) {
+  const [open, setOpen] = useState(false);
+  if (urls.length === 0) return null;
+
+  return (
+    <div className="mt-4 rounded-lg border border-blue-100 overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-blue-50/70 hover:bg-blue-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm">📰</span>
+          <p className="text-xs font-semibold text-blue-800">
+            News Sources &amp; Attribution
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-[11px] text-blue-500">
+            {urls.length} source{urls.length !== 1 ? "s" : ""}
+          </span>
+          <span className="text-blue-400 text-xs">{open ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="divide-y divide-blue-50 bg-white">
+          <p className="px-4 py-2 text-[11px] text-gray-400 border-b border-gray-50">
+            This question was generated using the following news sources as
+            context. All rights belong to the respective publishers.
+          </p>
+          {urls.map((url, i) => (
+            <a
+              key={i}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors group"
+            >
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 text-[10px] text-blue-700 flex items-center justify-center font-bold">
+                {i + 1}
+              </span>
+              <p className="flex-1 text-xs text-blue-700 truncate group-hover:text-blue-900">
+                {getDomain(url)}
+              </p>
+              <span className="text-blue-300 text-xs group-hover:text-blue-500 transition-colors">
+                ↗
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface QuestionDisplayProps {
   question: Question;
@@ -37,6 +136,11 @@ export default function QuestionDisplay({
   showExplanation = false,
   readOnly = false,
 }: QuestionDisplayProps) {
+  // Pre-parse explanation so the render section stays clean
+  const { cleanText: explanationText, urls: explanationUrls } =
+    parseExplanation(question.explanation ?? "");
+  const formattedExplanation = formatExplanationText(explanationText);
+
   const renderQuestionText = () => {
     if (
       question.question_type === "multi_statement" &&
@@ -164,30 +268,36 @@ export default function QuestionDisplay({
               <div className="h-6 w-1 bg-blue-600 rounded-full" />
               <p className="font-semibold text-blue-900">Explanation</p>
             </div>
-            <div className="prose prose-sm max-w-none text-blue-800 whitespace-pre-wrap">
-              {question.explanation}
+
+            {/* Formatted explanation — statements each on their own line */}
+            <div className="prose prose-sm max-w-none text-blue-800 whitespace-pre-wrap leading-relaxed">
+              {formattedExplanation}
             </div>
 
-            {/* Source indicators */}
-            {(question.has_static_sources || question.has_ca_sources) && (
-              <div className="mt-4 pt-4 border-t border-blue-200">
-                <p className="text-xs text-blue-700 font-medium mb-2">
-                  Sources Used:
-                </p>
-                <div className="flex gap-2">
-                  {question.has_static_sources && (
-                    <Badge variant="outline" className="text-xs">
-                      📚 Textbook
-                    </Badge>
-                  )}
-                  {question.has_ca_sources && (
-                    <Badge variant="outline" className="text-xs">
-                      📰 Current Affairs
-                    </Badge>
-                  )}
+            {/* Collapsible sources accordion (URLs extracted from LLM text) */}
+            <QuizSourceAccordion urls={explanationUrls} />
+
+            {/* Fallback badge indicators when no raw URLs were embedded */}
+            {explanationUrls.length === 0 &&
+              (question.has_static_sources || question.has_ca_sources) && (
+                <div className="mt-4 pt-4 border-t border-blue-200">
+                  <p className="text-xs text-blue-700 font-medium mb-2">
+                    Sources Used:
+                  </p>
+                  <div className="flex gap-2">
+                    {question.has_static_sources && (
+                      <Badge variant="outline" className="text-xs">
+                        📚 Textbook
+                      </Badge>
+                    )}
+                    {question.has_ca_sources && (
+                      <Badge variant="outline" className="text-xs">
+                        📰 Current Affairs
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         )}
       </CardContent>

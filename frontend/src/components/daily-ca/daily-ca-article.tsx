@@ -31,6 +31,55 @@ type Part =
   | { type: "text"; content: string }
   | { type: "callout"; content: string };
 
+/**
+ * normalizeDidYouKnow — converts bare "## Did You Know?" headings into
+ * :::callout blocks so splitCallouts() can render them as styled cards.
+ *
+ * The LLM occasionally omits the :::callout wrapper and writes a plain
+ * markdown heading instead. This pre-pass normalises both forms before
+ * splitCallouts() runs.
+ */
+function normalizeDidYouKnow(md: string): string {
+  const lines = md.split("\n");
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Detect any level-1/2/3 heading that is a "Did You Know?" variant
+    if (/^#{1,3}\s+Did You Know\??/i.test(line)) {
+      // Collect body lines until the next heading of any level
+      const bodyLines: string[] = [];
+      i++;
+      while (i < lines.length && !/^#{1,3}\s/.test(lines[i])) {
+        bodyLines.push(lines[i]);
+        i++;
+      }
+
+      // Trim surrounding blank lines from body
+      while (bodyLines.length > 0 && bodyLines[0].trim() === "")
+        bodyLines.shift();
+      while (
+        bodyLines.length > 0 &&
+        bodyLines[bodyLines.length - 1].trim() === ""
+      )
+        bodyLines.pop();
+
+      result.push(":::callout");
+      result.push("**Did You Know?**");
+      result.push("");
+      result.push(...bodyLines);
+      result.push(":::");
+    } else {
+      result.push(line);
+      i++;
+    }
+  }
+
+  return result.join("\n");
+}
+
 function splitCallouts(md: string): Part[] {
   const parts: Part[] = [];
   const regex = /:::callout\n([\s\S]*?)\n:::/g;
@@ -184,7 +233,9 @@ export function DailyCaArticle({
   onNext,
 }: Props) {
   const gsColor = GS_COLORS[article.gs_paper] ?? GS_COLORS["CSAT"];
-  const parts = splitCallouts(article.body_md_processed || "");
+  const parts = splitCallouts(
+    normalizeDidYouKnow(article.body_md_processed || ""),
+  );
   const readMin = estimateReadTime(article.body_md_processed || "");
 
   return (

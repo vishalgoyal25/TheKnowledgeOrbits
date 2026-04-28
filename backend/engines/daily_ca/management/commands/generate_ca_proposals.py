@@ -346,9 +346,13 @@ class Command(BaseCommand):
             return
 
         # Step 3b: Deduplicate by chunk overlap — remove proposals that share
-        # >60% of their source chunks with a higher-scoring proposal.
+        # source chunks with a higher-scoring proposal.
+        # Threshold lowered 0.6 → 0.4 (Phase D fix): with only 3 chunks per group,
+        # sharing 2 chunks yields Jaccard = 0.50 which slipped past the old 0.60 guard.
+        # Two topics covering the same news story routinely share 1–2 chunks and now
+        # get correctly collapsed into the higher-scoring proposal.
         pre_dedup_count = len(topic_groups)
-        topic_groups = self._deduplicate_by_chunk_overlap(topic_groups, threshold=0.6)
+        topic_groups = self._deduplicate_by_chunk_overlap(topic_groups, threshold=0.4)
         removed = pre_dedup_count - len(topic_groups)
         if removed:
             self.stdout.write(
@@ -820,7 +824,14 @@ class Command(BaseCommand):
         if recent_published_titles is None:
             recent_published_titles = []
 
-        _OVERLAP_THRESHOLD = 0.5
+        # Phase D fix: split overlap thresholds by dedup layer.
+        # Intra-day (Layer 1): 0.35 — same-day proposals about the same news story
+        #   can easily produce titles with only 35–45% shared content tokens
+        #   ("Heat Stress Alert 57 Districts" vs "IMD Warning Extreme Heat 57 Districts").
+        # 3-day lookback (Layer 2): 0.5 — cross-day comparison is less sensitive;
+        #   a legitimate follow-up article shares many words with its predecessor.
+        _INTRADAY_OVERLAP_THRESHOLD = 0.35
+        _RECENT_OVERLAP_THRESHOLD = 0.5
 
         # Idempotency check
         exists = (
@@ -861,7 +872,7 @@ class Command(BaseCommand):
         # recent_published_titles fetched once before loop — pure set ops, zero I/O
         for recent_title in recent_published_titles:
             overlap = self._title_token_overlap(title, recent_title)
-            if overlap >= _OVERLAP_THRESHOLD:
+            if overlap >= _RECENT_OVERLAP_THRESHOLD:
                 logger.info(
                     "generate_proposals_skipped_recent_duplicate",
                     topic=topic.name,
@@ -873,16 +884,35 @@ class Command(BaseCommand):
                 return "skipped_title_overlap"
 
         # ── Phase I Layer 1: intra-day dedup against this run's saved titles ────
+        # Phase D: save with status='duplicate' (not silently discarded) so the
+        # record is visible in admin/logs and the idempotency check on re-runs
+        # correctly skips it without re-generating a new proposal for the same topic.
+        # Uses the lower 0.35 threshold — same-day proposals about the same news
+        # story often share only 35–45% content tokens across GROQ-generated titles.
         for existing_title in generated_titles:
             overlap = self._title_token_overlap(title, existing_title)
-            if overlap >= _OVERLAP_THRESHOLD:
-                logger.info(
-                    "generate_proposals_skipped_intraday_duplicate",
+            if overlap >= _INTRADAY_OVERLAP_THRESHOLD:
+                logger.warning(
+                    "generate_proposals_intraday_duplicate_saved",
                     topic=topic.name,
                     proposal_title=title,
                     matched_title=existing_title,
                     overlap=round(overlap, 3),
                 )
+                if not dry_run:
+                    with transaction.atomic(using=db_alias):
+                        CaDailyProposal.objects.using(db_alias).create(
+                            date=target_date,
+                            title=title,
+                            description=description,
+                            topic=topic,
+                            subject_name=subject_name,
+                            gs_paper=gs_paper,
+                            source_urls=group_data["source_urls"],
+                            ca_chunk_ids=[str(c.id) for c in chunks],
+                            relevance_score=round(group_data["combined_score"], 2),
+                            status="duplicate",
+                        )
                 return "skipped_title_overlap"
 
         if dry_run:
@@ -1075,18 +1105,48 @@ class Command(BaseCommand):
         try:
             # Strip markdown fences
             cleaned = re.sub(r"```(?:json)?", "", raw).strip()
-            # Extract JSON object (tolerates extra text before/after)
-            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-            if not match:
-                raise ValueError("No JSON object found in GROQ response")
 
-            data = json.loads(match.group())
+            # Phase D — Stricter JSON extraction (3 attempts, most-specific first):
+            #   Attempt 1: direct parse — LLM returned clean JSON with no preamble
+            #   Attempt 2: find an object that contains both required keys
+            #   Attempt 3: fall back to the first {...} block (old behaviour)
+            data = None
+            try:
+                data = json.loads(cleaned)
+            except json.JSONDecodeError:
+                pass
+
+            if data is None:
+                # Attempt 2: object containing "title" and "description" keys
+                match = re.search(
+                    r'\{[^{}]*"title"[^{}]*"description"[^{}]*\}',
+                    cleaned,
+                    re.DOTALL,
+                )
+                if match:
+                    try:
+                        data = json.loads(match.group())
+                    except json.JSONDecodeError:
+                        pass
+
+            if data is None:
+                # Attempt 3: any {...} block — greedy, same as original behaviour
+                match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+                if not match:
+                    raise ValueError("No JSON object found in GROQ response")
+                data = json.loads(match.group())
 
             title = str(data.get("title", "")).strip()
             description = str(data.get("description", "")).strip()
 
-            # Validate title
+            # Validate title — log WARNING (visible in Render logs) when fallback fires
             if not title or len(title) < 5:
+                logger.warning(
+                    "generate_proposals_fallback_title_used",
+                    topic=topic_name,
+                    reason="title_missing_or_too_short",
+                    raw_title=title[:80],
+                )
                 title = f"{topic_name} — Latest Development"
 
             # Validate description
@@ -1108,6 +1168,13 @@ class Command(BaseCommand):
             )
             for phrase in _exam_phrases:
                 if phrase in title.lower():
+                    logger.warning(
+                        "generate_proposals_fallback_title_used",
+                        topic=topic_name,
+                        reason="exam_phrase_in_title",
+                        phrase_matched=phrase,
+                        raw_title=title[:80],
+                    )
                     title = f"{topic_name} — Latest Development"
                 if phrase in description.lower():
                     description = description.replace(phrase, "").strip().strip(".,;")
@@ -1120,6 +1187,12 @@ class Command(BaseCommand):
                 topic=topic_name,
                 error=str(exc),
                 raw=raw[:200],
+            )
+            logger.warning(
+                "generate_proposals_fallback_title_used",
+                topic=topic_name,
+                reason="json_parse_failed",
+                error=str(exc)[:100],
             )
             return (
                 f"{topic_name} — Latest Development",

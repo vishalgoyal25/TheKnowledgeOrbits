@@ -40,6 +40,7 @@ PROPOSAL_STATUS_CHOICES = [
     ("generated", "Article Generated"),
     ("failed", "Generation Failed"),
     ("queued_next_run", "Queued for Next Run"),
+    ("duplicate", "Duplicate — skipped by title-overlap dedup"),  # Phase D
 ]
 
 

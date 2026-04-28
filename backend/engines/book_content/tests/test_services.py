@@ -567,6 +567,7 @@ class TestIngestorSmartSkip(TestCase):
             subject=self.subject,
             is_active=True,
             topic_type="syllabus",
+            node_type="subtopic",  # Phase C smart-skip filter requires this
             order_index=1,
         )
 
