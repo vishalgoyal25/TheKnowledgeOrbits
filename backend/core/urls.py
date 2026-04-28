@@ -72,6 +72,7 @@ def api_index(request: Any) -> JsonResponse:
                 "daily_ca_admin": "/api/v1/admin/daily-ca/",
                 "tags": "/api/v1/tags/",
                 "concepts": "/api/v1/concepts/",
+                "social": "/api/v1/social/",
             },
         },
         status=200,
@@ -100,6 +101,8 @@ urlpatterns = [
     path("api/v1/admin/daily-ca/", include("engines.daily_ca.admin_urls")),
     path("api/v1/tags/", include("engines.tags.urls")),
     path("api/v1/concepts/", include("engines.tags.concepts_urls")),
+    # Feature 6 — Social Interaction Engine
+    path("api/v1/social/", include("engines.social.urls")),
 ]
 
 # Conditionally add the admin path (not disabled in production)

@@ -7,7 +7,8 @@ import { Article, ArticleSourceMap } from "@/lib/types";
 import ArticleReader from "@/components/articles/article-reader";
 import SourceAttribution from "@/components/quiz/source-attribution";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Share2, BookmarkPlus } from "lucide-react";
+import { ArrowLeft, BookmarkPlus } from "lucide-react";
+import { SocialBar } from "@/components/social/social-bar";
 import Link from "next/link";
 import apiClient from "@/lib/api/client";
 import PrivateArticleFallback from "./private-article-fallback";
@@ -115,15 +116,11 @@ export default async function ArticleDetailPage({
           </Link>
         </div>
 
-        {/* Actions (Client components will hydrate over these) */}
+        {/* Actions */}
         <div className="mb-8 flex gap-2 justify-end">
           <Button variant="outline" size="sm" className="gap-2">
             <BookmarkPlus className="h-4 w-4" />
             Save
-          </Button>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Share
           </Button>
         </div>
 
@@ -158,6 +155,16 @@ export default async function ArticleDetailPage({
             </div>
           );
         })()}
+
+        {/* Social — Like · Comments · Share */}
+        <div className="mt-8 max-w-3xl mx-auto pt-4 border-t border-gray-100">
+          <SocialBar
+            contentType="book_article"
+            contentId={article.id}
+            shareUrl={`https://www.theknowledgeorbits.com/articles/${article.id}`}
+            shareTitle={article.title}
+          />
+        </div>
       </div>
     );
   } catch (error) {

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, RotateCcw, BookOpen } from "lucide-react";
+import { SocialBar } from "@/components/social/social-bar";
 
 export default function QuizResultsPage() {
   const params = useParams();
@@ -66,6 +67,16 @@ export default function QuizResultsPage() {
 
       {/* Results Analysis */}
       <ResultAnalysis attempt={attempt} />
+
+      {/* Social — Like · Comments · Share (quiz-level) */}
+      <div className="mt-4">
+        <SocialBar
+          contentType="quiz"
+          contentId={attempt.quiz.id}
+          shareUrl={`https://www.theknowledgeorbits.com/assessment/${attempt.quiz.id}`}
+          shareTitle={attempt.quiz.topic.name}
+        />
+      </div>
 
       {/* Review Section */}
       <div className="mt-8">
