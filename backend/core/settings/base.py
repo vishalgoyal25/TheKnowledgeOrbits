@@ -57,6 +57,8 @@ INSTALLED_APPS = [
     # Feature 2 engines
     "engines.daily_ca",
     "engines.tags",
+    # Feature 6 — Social Interaction Engine
+    "engines.social",
 ]
 
 # Custom User Model

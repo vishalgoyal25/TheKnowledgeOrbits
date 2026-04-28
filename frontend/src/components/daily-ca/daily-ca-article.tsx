@@ -9,6 +9,7 @@ import { InSummaryBox } from "./in-summary-box";
 import { CalloutBlock } from "./callout-block";
 import { TagChips } from "./tag-chips";
 import { SourceAccordion } from "./source-accordion";
+import { SocialBar } from "@/components/social/social-bar";
 
 /**
  * DailyCaArticle — renders one full CA article in the feed.
@@ -336,6 +337,16 @@ export function DailyCaArticle({
 
         {/* Sources */}
         <SourceAccordion sources={article.sources_used ?? []} />
+
+        {/* Social — Like · Comments · Share */}
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <SocialBar
+            contentType="daily_ca_article"
+            contentId={article.id}
+            shareUrl={`https://www.theknowledgeorbits.com/daily-ca/article/${article.slug}`}
+            shareTitle={article.title}
+          />
+        </div>
 
         {/* Prev / Next navigation */}
         {(onPrev || onNext) && (
