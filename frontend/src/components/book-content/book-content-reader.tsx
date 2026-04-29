@@ -26,6 +26,7 @@ import remarkGfm from "remark-gfm";
 import { BookOpen, ExternalLink, AlertCircle, PenLine } from "lucide-react";
 
 import { getBookContent } from "@/lib/api/book-content";
+import { SocialBar } from "@/components/social/social-bar";
 import { cn } from "@/lib/utils";
 import type {
   BookContent,
@@ -580,6 +581,17 @@ export default function BookContentReader({
                   ? `Refined (${content.generation_pass} passes)`
                   : "First-pass quality"}
               </span>
+            </div>
+
+            {/* ── Social bar ───────────────────────────────────────────────── */}
+            <div className="mt-4 pt-4 border-t border-border/50">
+              <SocialBar
+                key={content.id}
+                contentType="book_article"
+                contentId={content.id}
+                shareUrl={`https://www.theknowledgeorbits.com/knowledge?topic=${content.topic_id}`}
+                shareTitle={content.topic_name}
+              />
             </div>
           </div>
         )}

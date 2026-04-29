@@ -642,7 +642,7 @@ export function CommentsSection({
   if (!isOpen) return null;
 
   return (
-    <div className="mt-3 rounded-xl border border-gray-100 bg-white px-4 py-4 shadow-sm">
+    <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-4 shadow-sm">
       {/* Header */}
       <p className="mb-3 text-sm font-semibold text-gray-700">
         {totalCount > 0
@@ -650,20 +650,10 @@ export function CommentsSection({
           : "Comments"}
       </p>
 
-      {/* Comment input */}
-      {isAuthenticated ? (
+      {/* Comment input — guests see the nudge in SocialBar; only show input when authenticated */}
+      {isAuthenticated && (
         <div className="mb-4">
           <CommentInput onSubmit={handlePost} />
-        </div>
-      ) : (
-        <div className="mb-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-500 text-center">
-          <a
-            href="/auth/login"
-            className="font-medium text-blue-600 hover:underline"
-          >
-            Log in
-          </a>{" "}
-          to join the discussion.
         </div>
       )}
 
