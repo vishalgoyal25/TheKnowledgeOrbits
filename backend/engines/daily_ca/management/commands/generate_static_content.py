@@ -58,6 +58,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from engines.book_content.services.ingestor_service import ingest_topic
+from engines.book_content.services.llm_service import check_any_llm_available
 from engines.daily_ca.models import CaDailyProposal
 from engines.knowledge.models import Topic
 
@@ -291,14 +292,34 @@ class Command(BaseCommand):
             )
             return
 
+        # ── Pre-flight LLM health check ───────────────────────────────────────
+        self.stdout.write("\n  🔍 LLM pre-flight check (GROQ + Cerebras)...")
+        if not check_any_llm_available():
+            self.stdout.write(
+                self.style.WARNING(
+                    "  ⚠️  All LLM providers exhausted. "
+                    "Aborting — retry after UTC midnight when quotas reset."
+                )
+            )
+            logger.warning(
+                "static_gen_preflight_all_llm_exhausted", date=str(target_date)
+            )
+            return
+        self.stdout.write("  ✅ LLM available — proceeding.\n")
+
         # ── Run ingest_topic() for each queued topic ──────────────────────────
+        # Shared budget across all topics this run.
+        # CA topics are focused (not broad like "Parliament of India") so
+        # 3 subtopics + 1 deep × 2 sub-subtopics ≈ 5 articles per topic.
+        budget = {"remaining": max_articles * 5}
+
         generated = 0
         failed = 0
         capped = 0
 
         for i, (topic_obj, subject_name) in enumerate(topic_queue, 1):
             # Hard cap check
-            if generated >= max_articles:
+            if generated >= max_articles or budget["remaining"] <= 0:
                 capped = len(topic_queue) - (i - 1)
                 self.stdout.write(
                     self.style.WARNING(
@@ -334,6 +355,10 @@ class Command(BaseCommand):
                 result = ingest_topic(
                     topic_name=topic_obj.name,
                     subject_name=subject_name or None,
+                    budget=budget,
+                    max_subtopics=3,
+                    max_sub_subtopics=2,
+                    max_deep_per_topic=1,
                 )
 
                 if result.get("skipped"):
@@ -355,6 +380,7 @@ class Command(BaseCommand):
 
                 nodes = result.get("nodes_created", 0)
                 locked_ext = result.get("locked_extension", False)
+                partial = result.get("partial", False)
 
                 status_str = (
                     "locked extension (sub-subtopics only)"
@@ -372,9 +398,25 @@ class Command(BaseCommand):
                     topic_id=str(topic_obj.id),
                     nodes_created=nodes,
                     locked_extension=locked_ext,
+                    partial=partial,
                 )
 
                 generated += 1
+
+                # Budget exhausted mid-topic — stop, don't attempt remaining topics
+                if partial:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"  🛑 Budget exhausted mid-topic. "
+                            f"{len(topic_queue) - i} topic(s) deferred to next run."
+                        )
+                    )
+                    logger.warning(
+                        "static_gen_budget_exhausted",
+                        topic=topic_obj.name,
+                        reason=result.get("reason", ""),
+                    )
+                    break
 
             except Exception as exc:
                 failed += 1
