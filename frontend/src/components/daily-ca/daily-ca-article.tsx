@@ -10,6 +10,7 @@ import { CalloutBlock } from "./callout-block";
 import { TagChips } from "./tag-chips";
 import { SourceAccordion } from "./source-accordion";
 import { SocialBar } from "@/components/social/social-bar";
+import { preprocessArticleBody } from "@/lib/daily-ca-preprocess";
 
 /**
  * DailyCaArticle — renders one full CA article in the feed.
@@ -26,60 +27,11 @@ interface Props {
   onNext: (() => void) | null;
 }
 
-// ── Callout pre-processor ─────────────────────────────────────────────────────
+// ── Callout splitter ──────────────────────────────────────────────────────────
 
 type Part =
   | { type: "text"; content: string }
   | { type: "callout"; content: string };
-
-/**
- * normalizeDidYouKnow — converts bare "## Did You Know?" headings into
- * :::callout blocks so splitCallouts() can render them as styled cards.
- *
- * The LLM occasionally omits the :::callout wrapper and writes a plain
- * markdown heading instead. This pre-pass normalises both forms before
- * splitCallouts() runs.
- */
-function normalizeDidYouKnow(md: string): string {
-  const lines = md.split("\n");
-  const result: string[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Detect any level-1/2/3 heading that is a "Did You Know?" variant
-    if (/^#{1,3}\s+Did You Know\??/i.test(line)) {
-      // Collect body lines until the next heading of any level
-      const bodyLines: string[] = [];
-      i++;
-      while (i < lines.length && !/^#{1,3}\s/.test(lines[i])) {
-        bodyLines.push(lines[i]);
-        i++;
-      }
-
-      // Trim surrounding blank lines from body
-      while (bodyLines.length > 0 && bodyLines[0].trim() === "")
-        bodyLines.shift();
-      while (
-        bodyLines.length > 0 &&
-        bodyLines[bodyLines.length - 1].trim() === ""
-      )
-        bodyLines.pop();
-
-      result.push(":::callout");
-      result.push("**Did You Know?**");
-      result.push("");
-      result.push(...bodyLines);
-      result.push(":::");
-    } else {
-      result.push(line);
-      i++;
-    }
-  }
-
-  return result.join("\n");
-}
 
 function splitCallouts(md: string): Part[] {
   const parts: Part[] = [];
@@ -235,7 +187,7 @@ export function DailyCaArticle({
 }: Props) {
   const gsColor = GS_COLORS[article.gs_paper] ?? GS_COLORS["CSAT"];
   const parts = splitCallouts(
-    normalizeDidYouKnow(article.body_md_processed || ""),
+    preprocessArticleBody(article.body_md_processed || ""),
   );
   const readMin = estimateReadTime(article.body_md_processed || "");
 
@@ -341,6 +293,7 @@ export function DailyCaArticle({
         {/* Social — Like · Comments · Share */}
         <div className="mt-4 pt-4 border-t border-gray-100">
           <SocialBar
+            key={article.id}
             contentType="daily_ca_article"
             contentId={article.id}
             shareUrl={`https://www.theknowledgeorbits.com/daily-ca/article/${article.slug}`}

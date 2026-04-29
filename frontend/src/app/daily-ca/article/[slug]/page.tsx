@@ -30,6 +30,8 @@ import { RightPanel } from "@/components/daily-ca/right-panel";
 import { ConceptCard } from "@/components/daily-ca/concept-card";
 import { ScrollSpyToC, Heading } from "./_components/scroll-spy-toc";
 import { ArticleTopBar } from "./_components/article-top-bar";
+import { SocialBar } from "@/components/social/social-bar";
+import { preprocessArticleBody } from "@/lib/daily-ca-preprocess";
 
 // ── ISR — rebuild CDN cache every hour; articles are immutable after publish ──
 export const revalidate = 3600;
@@ -241,8 +243,9 @@ export default async function ArticleDetailPage({
 
   if (!article) notFound();
 
-  const headings = extractHeadings(article.body_md_processed ?? "");
-  const parts = splitCallouts(article.body_md_processed ?? "");
+  const processedBody = preprocessArticleBody(article.body_md_processed ?? "");
+  const headings = extractHeadings(processedBody);
+  const parts = splitCallouts(processedBody);
   const gsColor = GS_COLORS[article.gs_paper] ?? GS_COLORS["CSAT"];
   const readMin = estimateReadTime(article.body_md_processed ?? "");
 
@@ -364,6 +367,16 @@ export default async function ArticleDetailPage({
 
               {/* Sources */}
               <SourceAccordion sources={article.sources_used ?? []} />
+
+              {/* Social — Like · Comments · Share */}
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <SocialBar
+                  contentType="daily_ca_article"
+                  contentId={article.id}
+                  shareUrl={`https://www.theknowledgeorbits.com/daily-ca/article/${article.slug}`}
+                  shareTitle={article.title}
+                />
+              </div>
             </div>
           </article>
 
