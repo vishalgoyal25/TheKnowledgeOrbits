@@ -319,3 +319,38 @@ def llm_call_json(
         level="error",
     )
     return ""
+
+
+def check_any_llm_available() -> bool:
+    """
+    Fast pre-flight / mid-run circuit breaker.
+
+    Tries one minimal call on each entry in the existing pool (GROQ + Cerebras).
+    Returns True on the first key that responds. Returns False only when every
+    key from every provider fails.
+
+    No sleep, no retry loop — intentionally fast so the caller can decide
+    whether to continue or abort without burning quota.
+    Called by: ingestor_service.py (inside subtopic loop) and the management
+    command (pre-flight + between topics).
+    """
+    for idx, entry in enumerate(_pool):
+        try:
+            entry.client.chat.completions.create(
+                model=entry.model,
+                messages=[{"role": "user", "content": "Reply: OK"}],
+                max_tokens=3,
+                temperature=0,
+            )
+            logger.info("llm_health_ok", provider=entry.provider, key_idx=idx)
+            return True
+        except Exception as e:
+            logger.warning(
+                "llm_health_key_failed",
+                provider=entry.provider,
+                key_idx=idx,
+                error=str(e)[:80],
+            )
+
+    logger.error("llm_health_all_failed", pool_size=len(_pool))
+    return False

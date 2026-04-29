@@ -36,6 +36,7 @@ from engines.book_content.services.book_planner_service import (
     get_book_plan,
 )
 from engines.book_content.services.ingestor_service import ingest_topic
+from engines.book_content.services.llm_service import check_any_llm_available
 from engines.knowledge.models import Subject, Topic
 
 logger = structlog.get_logger(__name__)
@@ -168,11 +169,43 @@ class Command(BaseCommand):
             help="Show what would be generated without making any LLM calls.",
         )
         parser.add_argument(
-            "--max-articles",
+            "--max-topics",
             type=int,
-            default=25,
-            help="Maximum number of topics to generate in this run (default: 25). "
-            "Protects GH Actions free-tier budget: 25 × ~2 min ≈ 50 min.",
+            default=2,
+            help="Maximum number of topics (chapters) to process per run (default: 2).",
+        )
+        parser.add_argument(
+            "--max-actual-articles",
+            type=int,
+            default=15,
+            help=(
+                "Hard cap on total individual articles generated across ALL topics "
+                "(default: 15). Shared with daily_ca + quiz cron — keep low."
+            ),
+        )
+        parser.add_argument(
+            "--max-subtopics-per-topic",
+            type=int,
+            default=4,
+            help="Cap on subtopics processed per topic (default: 4).",
+        )
+        parser.add_argument(
+            "--max-sub-subtopics-per-subtopic",
+            type=int,
+            default=3,
+            help=(
+                "Cap on sub-subtopics per subtopic (default: 3). "
+                "Worst case: 4 subtopics × 2 deep × 3 sub-subtopics = ~10 articles/topic."
+            ),
+        )
+        parser.add_argument(
+            "--max-deep-per-topic",
+            type=int,
+            default=2,
+            help=(
+                "Max subtopics allowed deep-expansion (sub-subtopics) per topic "
+                "(default: 2). Prevents all subtopics triggering sub-subtopic chains."
+            ),
         )
 
     def handle(self, *args, **options):
@@ -201,7 +234,16 @@ class Command(BaseCommand):
         subject_name = options.get("subject") or "Indian Polity & Constitution"
         single_topic = options.get("topic")
         dry_run = options.get("dry_run", False)
-        max_articles = options.get("max_articles", 25)
+        max_topics = options.get("max_topics", 2)
+        max_actual_articles = options.get("max_actual_articles", 15)
+        max_subtopics_per_topic = options.get("max_subtopics_per_topic", 4)
+        max_sub_subtopics = options.get("max_sub_subtopics_per_subtopic", 3)
+        max_deep_per_topic = options.get("max_deep_per_topic", 2)
+
+        # Shared mutable budget — passed by reference into every ingest_topic() call.
+        # Decremented inside ingestor_service.py after each individual article is saved.
+        # When it hits zero ingest_topic() raises BudgetExhaustedError and returns partial.
+        budget = {"remaining": max_actual_articles}
 
         self.stdout.write("")
         self.stdout.write("╔══════════════════════════════════════════════════╗")
@@ -219,7 +261,7 @@ class Command(BaseCommand):
         # Only aborts if ALL keys from ALL providers are simultaneously exhausted.
         if not dry_run:
             self.stdout.write("STEP 1.2: LLM pre-flight check (GROQ + Cerebras)...")
-            if not self._check_any_llm_available():
+            if not check_any_llm_available():
                 self.stdout.write(
                     self.style.WARNING(
                         "   ⚠️  All LLM providers exhausted (GROQ + Cerebras).\n"
@@ -261,25 +303,37 @@ class Command(BaseCommand):
         if topics:
             self.stdout.write("")
             self.stdout.write(
-                f"STEP 2A: Ingesting {len(topics)} topic(s) [Mode A] "
-                f"(cap: {max_articles})..."
+                f"STEP 2A: Ingesting {len(topics)} topic(s) [Mode A] — "
+                f"topic cap: {max_topics}, article budget: {max_actual_articles}, "
+                f"subtopics/topic: {max_subtopics_per_topic}"
             )
 
-            articles_generated = 0
-            # Circuit-breaker: re-check all LLM providers every N topics.
-            # Only aborts if every GROQ key AND every Cerebras key are exhausted.
-            LLM_RECHECK_EVERY = 3
+            topics_processed = 0
 
             for topic_name in topics:
-                # Hard cap — stop before hitting GH Actions timeout
-                if articles_generated >= max_articles:
+                # ── Budget check: stop if article budget exhausted between topics ──
+                if budget["remaining"] <= 0:
                     self.stdout.write(
                         self.style.WARNING(
-                            f"\n  🛑 Article cap reached ({max_articles}). "
-                            "Stopping to protect budget. Remaining topics queued for next run."
+                            f"\n  🛑 Article budget exhausted ({max_actual_articles} articles done). "
+                            "Stopping. Re-run to continue from next unfinished topic."
                         )
                     )
-                    logger.info("max_articles_cap_reached", cap=max_articles)
+                    logger.info(
+                        "article_budget_exhausted_between_topics",
+                        budget=max_actual_articles,
+                    )
+                    break
+
+                # ── Topic cap ────────────────────────────────────────────────────
+                if topics_processed >= max_topics:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"\n  🛑 Topic cap reached ({max_topics}). "
+                            "Remaining topics queued for next run."
+                        )
+                    )
+                    logger.info("max_topics_cap_reached", cap=max_topics)
                     break
 
                 # Only skip if the ENTIRE topic is fully complete (content_status='book_quality').
@@ -300,40 +354,62 @@ class Command(BaseCommand):
                     self.stdout.write(f"  [DRY RUN] Would generate: '{topic_name}'")
                     continue
 
-                # Mid-run circuit breaker — re-check all providers every N articles.
-                # Only stops if every GROQ key AND every Cerebras key are dead.
-                if (
-                    articles_generated > 0
-                    and articles_generated % LLM_RECHECK_EVERY == 0
-                ):
-                    self.stdout.write(
-                        f"  🔍 LLM mid-run health check (after {articles_generated} articles)..."
-                    )
-                    if not self._check_any_llm_available():
+                # ── Between-topic LLM health check ───────────────────────────────
+                # A cheap sanity check before we start a new topic.
+                # The real circuit breaker is now INSIDE ingest_topic() every 3 subtopics.
+                if topics_processed > 0:
+                    self.stdout.write(f"  🔍 LLM health check before '{topic_name}'...")
+                    if not check_any_llm_available():
                         self.stdout.write(
                             self.style.WARNING(
-                                "  ⚠️  All LLM providers exhausted (GROQ + Cerebras simultaneously).\n"
-                                "  🛑 Aborting — no keys available across any provider.\n"
-                                "  ✅ Progress saved. Re-run after UTC midnight to resume."
+                                "  ⚠️  All LLM providers exhausted between topics.\n"
+                                "  🛑 Aborting — re-run after UTC midnight to resume."
                             )
                         )
                         logger.warning(
-                            "all_llm_mid_run_exhausted_aborting",
-                            articles_generated=articles_generated,
+                            "all_llm_exhausted_between_topics",
+                            topics_processed=topics_processed,
                         )
                         break
 
-                self.stdout.write(f"\n  🔄 Generating: '{topic_name}'...")
-                result = ingest_topic(topic_name=topic_name, subject_name=subject_name)
-                articles_generated += 1
+                self.stdout.write(
+                    f"\n  🔄 Generating: '{topic_name}' "
+                    f"(budget left: {budget['remaining']}/{max_actual_articles})..."
+                )
+                result = ingest_topic(
+                    topic_name=topic_name,
+                    subject_name=subject_name,
+                    budget=budget,
+                    max_subtopics=max_subtopics_per_topic,
+                    max_sub_subtopics=max_sub_subtopics,
+                    max_deep_per_topic=max_deep_per_topic,
+                )
+                topics_processed += 1
+
+                status_tag = "partial" if result.get("partial") else "done"
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"  ✅ '{topic_name}' done — "
-                        f"{result.get('nodes_created', 0)} articles, "
-                        f"avg quality: {result.get('avg_quality', 0):.0f}/100  "
-                        f"[{articles_generated}/{max_articles}]"
+                        f"  ✅ '{topic_name}' {status_tag} — "
+                        f"{result.get('nodes_created', 0)} articles  "
+                        f"[topics: {topics_processed}/{max_topics}  "
+                        f"budget left: {budget['remaining']}/{max_actual_articles}]"
                     )
                 )
+
+                # If ingest_topic returned partial (budget hit zero inside), stop now.
+                if result.get("partial"):
+                    self.stdout.write(
+                        self.style.WARNING(
+                            "  🛑 Budget exhausted mid-topic. All progress saved. "
+                            "Re-run to continue."
+                        )
+                    )
+                    logger.info(
+                        "budget_exhausted_mid_topic_outer_loop",
+                        topic=topic_name,
+                        reason=result.get("reason", ""),
+                    )
+                    break
 
         # ── Step 2B: Mode B — PDF ingestion (future feature) ─────────────────
         if PDF_MODE and PDF_FILES_TO_INGEST:
@@ -364,82 +440,6 @@ class Command(BaseCommand):
         self.stdout.write("║                                                  ║")
         self.stdout.write("╚══════════════════════════════════════════════════╝")
         self.stdout.write("")
-
-    # ─────────────────────────────────────────────────────────────────────────
-
-    def _check_any_llm_available(self) -> bool:
-        """
-        Tries every key from every configured provider (GROQ + Cerebras).
-        Bypasses llm_service intentionally — no 12s sleep, no retry loop, no Sentry noise.
-        Returns True on the first key that responds successfully.
-        Returns False only when every key from every provider has failed.
-        """
-        from django.conf import settings
-        import groq as groq_sdk
-        from cerebras.cloud.sdk import Cerebras as CerebrasSDK
-
-        # ── GROQ keys ────────────────────────────────────────────────────────
-        raw_groq = getattr(settings, "GROQ_API_KEY", "")
-        groq_keys = [
-            k.strip()
-            for k in raw_groq.split(",")
-            if k.strip() and k.strip() != "DUMMY_KEY"
-        ]
-        groq_model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
-
-        for idx, key in enumerate(groq_keys):
-            try:
-                client = groq_sdk.Groq(api_key=key)
-                client.chat.completions.create(
-                    model=groq_model,
-                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
-                    max_tokens=3,
-                )
-                logger.info("llm_health_check_passed", provider="groq", key_index=idx)
-                return True
-            except Exception as e:
-                logger.warning(
-                    "llm_health_check_key_failed",
-                    provider="groq",
-                    key_index=idx,
-                    error=str(e)[:120],
-                )
-
-        # ── Cerebras keys ─────────────────────────────────────────────────────
-        raw_cerebras = getattr(settings, "CEREBRAS_API_KEY", "")
-        cerebras_keys = [
-            k.strip()
-            for k in raw_cerebras.split(",")
-            if k.strip() and k.strip() != "DUMMY_KEY"
-        ]
-        cerebras_model = getattr(settings, "CEREBRAS_MODEL", "llama3.1-8b")
-
-        for idx, key in enumerate(cerebras_keys):
-            try:
-                client = CerebrasSDK(api_key=key)
-                client.chat.completions.create(
-                    model=cerebras_model,
-                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
-                    max_tokens=3,
-                )
-                logger.info(
-                    "llm_health_check_passed", provider="cerebras", key_index=idx
-                )
-                return True
-            except Exception as e:
-                logger.warning(
-                    "llm_health_check_key_failed",
-                    provider="cerebras",
-                    key_index=idx,
-                    error=str(e)[:120],
-                )
-
-        logger.error(
-            "all_llm_keys_exhausted_in_health_check",
-            groq_keys_tried=len(groq_keys),
-            cerebras_keys_tried=len(cerebras_keys),
-        )
-        return False
 
     def _verify_db_state(self):
         """

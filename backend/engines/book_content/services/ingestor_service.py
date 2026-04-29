@@ -116,6 +116,17 @@ class SkipGenerationError(Exception):
     pass
 
 
+class BudgetExhaustedError(Exception):
+    """
+    Raised when the shared article budget hits zero, or when the mid-loop
+    circuit breaker finds all LLM providers exhausted.
+    Caught in ingest_topic() — returns partial results without re-raising.
+    Never propagates to the management command.
+    """
+
+    pass
+
+
 def _word_overlap(a: str, b: str) -> float:
     """
     Enhanced word-overlap similarity.
@@ -406,6 +417,8 @@ def _extend_sub_subtopics_only(
     topic_name: str,
     subject_name: Optional[str],
     start_time: float,
+    budget: Optional[dict] = None,
+    max_sub_subtopics: int = 999,
 ) -> dict:
     """
     Called when a topic is locked (content_status="complete").
@@ -427,6 +440,8 @@ def _extend_sub_subtopics_only(
     for sub_topic_obj in subtopics:
         sub_name = sub_topic_obj.name
         sub_subtopics = find_sub_subtopics(sub_name, topic_obj.name)
+        if max_sub_subtopics < 999:
+            sub_subtopics = sub_subtopics[:max_sub_subtopics]
 
         for ss_name in sub_subtopics:
             # Phase C: scope to node_type="sub_subtopic" AND module so a same-named
@@ -437,6 +452,17 @@ def _extend_sub_subtopics_only(
                 topic__module=module_obj,
             ).exists():
                 continue  # already generated — skip
+
+            # Fix #1: budget hard stop
+            if budget is not None and budget.get("remaining", 1) <= 0:
+                logger.warning("ingestor_budget_exhausted_extend", topic=topic_obj.name)
+                return {
+                    "nodes_created": added,
+                    "relations_created": added,
+                    "topic": topic_obj.name,
+                    "locked_extension": True,
+                    "budget_exhausted": True,
+                }
 
             ss_wiki = fetch_full_page(ss_name)
             ss_section = extract_relevant_section(ss_wiki["content"], ss_name)[:3000]
@@ -452,6 +478,20 @@ def _extend_sub_subtopics_only(
                 previously_covered=previously_covered,
                 subject=subject_actual,
             )
+
+            # Fix #2: circuit breaker — empty return means all providers exhausted
+            if not ss_article.strip():
+                logger.warning(
+                    "ingestor_llm_all_providers_failed_extend", ss_name=ss_name
+                )
+                return {
+                    "nodes_created": added,
+                    "relations_created": added,
+                    "topic": topic_obj.name,
+                    "locked_extension": True,
+                    "budget_exhausted": True,
+                    "reason": "LLM permanently failed in locked extension path",
+                }
 
             ss_topic_obj = _get_or_match_topic_fuzzy(
                 ss_name,
@@ -496,10 +536,13 @@ def _extend_sub_subtopics_only(
                 start_time=start_time,
             )
             added += 1
+            if budget is not None:
+                budget["remaining"] -= 1
             logger.info(
                 "ingestor_locked_sub_subtopic_added",
                 name=ss_name,
                 quality=ss_quality,
+                budget_remaining=budget["remaining"] if budget else "unlimited",
             )
 
     logger.info("ingestor_locked_extend_done", topic=topic_obj.name, added=added)
@@ -517,7 +560,12 @@ def _extend_sub_subtopics_only(
 
 
 def ingest_topic(
-    topic_name: Optional[str] = None, subject_name: Optional[str] = None
+    topic_name: Optional[str] = None,
+    subject_name: Optional[str] = None,
+    budget: Optional[dict] = None,
+    max_subtopics: int = 999,
+    max_sub_subtopics: int = 999,
+    max_deep_per_topic: int = 999,
 ) -> dict:
     """
     Master Agent Entry Point.
@@ -558,7 +606,12 @@ def ingest_topic(
             action="extend_sub_subtopics_only",
         )
         return _extend_sub_subtopics_only(
-            locked_topic, topic_name or "", subject_name, start_time
+            locked_topic,
+            topic_name or "",
+            subject_name,
+            start_time,
+            budget=budget,
+            max_sub_subtopics=max_sub_subtopics,
         )
 
     try:
@@ -575,6 +628,13 @@ def ingest_topic(
         # ── Step 4: Subtopic Discovery ────────────────────────────────────────
         logger.info("ingestor_step4_subtopics", topic=topic)
         subtopics = find_subtopics(topic, ncert_text=clean_ncert_text or None)
+
+        # Fix #2: cap subtopics per topic so one topic can't blow the whole budget
+        if max_subtopics < 999:
+            subtopics = subtopics[:max_subtopics]
+            logger.info(
+                "ingestor_subtopics_capped", cap=max_subtopics, total=len(subtopics)
+            )
 
         if not subtopics:
             logger.warning("ingestor_no_subtopics_found", topic=topic)
@@ -652,9 +712,21 @@ def ingest_topic(
         Topic.objects.filter(id=topic_obj.id).update(content_status="generating")
 
         # ── Steps 5-8: Process each subtopic ─────────────────────────────────
+        deep_expansions_done = 0
         for i, sub in enumerate(subtopics, 1):
             sub_name = sub["name"]
             needs_deep = sub["needs_deep"]
+
+            # Fix #1: hard budget stop — check before every subtopic
+            if budget is not None and budget.get("remaining", 1) <= 0:
+                logger.warning(
+                    "ingestor_budget_exhausted_subtopic_loop",
+                    topic=topic,
+                    subtopic_index=i,
+                )
+                raise BudgetExhaustedError(
+                    "Article budget exhausted before subtopic loop"
+                )
 
             logger.info(
                 "ingestor_subtopic_start",
@@ -704,6 +776,15 @@ def ingest_topic(
                     previously_covered=previously_covered,
                     subject=subject,
                 )
+
+                # Fix #3: empty return = all providers permanently exhausted
+                if not article_md.strip():
+                    logger.warning(
+                        "ingestor_llm_all_providers_failed_subtopic", subtopic=sub_name
+                    )
+                    raise BudgetExhaustedError(
+                        "LLM permanently failed — all providers returned empty for subtopic"
+                    )
 
                 # Save subtopic node + BookContent
                 sub_topic_obj = _get_or_match_topic_fuzzy(
@@ -756,20 +837,49 @@ def ingest_topic(
 
                 nodes_created += 1
                 relations_created += 1
+                if budget is not None:
+                    budget["remaining"] -= 1
                 logger.info(
                     "ingestor_subtopic_saved",
                     subtopic=sub_name,
                     quality_score=quality_score,
                     words=len(article_md.split()),
+                    budget_remaining=budget["remaining"] if budget else "unlimited",
                 )
 
             # ── Step 8: Recursive deep expansion ─────────────────────────────
-            if needs_deep:
-                logger.info("ingestor_step8_deep_expand", subtopic=sub_name)
+            if needs_deep and deep_expansions_done < max_deep_per_topic:
+                deep_expansions_done += 1
+                logger.info(
+                    "ingestor_step8_deep_expand",
+                    subtopic=sub_name,
+                    deep_index=deep_expansions_done,
+                    deep_cap=max_deep_per_topic,
+                )
                 sub_subtopics = find_sub_subtopics(sub_name, topic)
 
-                for ss_name in sub_subtopics:
+                # Cap sub-subtopics per subtopic
+                if max_sub_subtopics < 999:
+                    sub_subtopics = sub_subtopics[:max_sub_subtopics]
+                    logger.info(
+                        "ingestor_sub_subtopics_capped",
+                        cap=max_sub_subtopics,
+                        total=len(sub_subtopics),
+                    )
+
+                for ss_idx, ss_name in enumerate(sub_subtopics):
                     logger.info("ingestor_sub_subtopic_start", name=ss_name)
+
+                    # Fix #1: budget hard stop inside sub-subtopic loop
+                    if budget is not None and budget.get("remaining", 1) <= 0:
+                        logger.warning(
+                            "ingestor_budget_exhausted_ss_loop",
+                            subtopic=sub_name,
+                            ss_index=ss_idx,
+                        )
+                        raise BudgetExhaustedError(
+                            "Article budget exhausted in sub-subtopic loop"
+                        )
 
                     # Smart Skip for sub-subtopics
                     # Phase C: scoped to node_type="sub_subtopic" AND module so
@@ -808,6 +918,15 @@ def ingest_topic(
                         previously_covered=previously_covered,
                         subject=subject,
                     )
+
+                    # Fix #3: empty return = all providers permanently exhausted
+                    if not ss_article.strip():
+                        logger.warning(
+                            "ingestor_llm_all_providers_failed_ss", ss_name=ss_name
+                        )
+                        raise BudgetExhaustedError(
+                            "LLM permanently failed — all providers returned empty for sub-subtopic"
+                        )
 
                     ss_topic_obj = _get_or_match_topic_fuzzy(
                         ss_name,
@@ -858,11 +977,14 @@ def ingest_topic(
 
                     nodes_created += 1
                     relations_created += 1
+                    if budget is not None:
+                        budget["remaining"] -= 1
                     logger.info(
                         "ingestor_sub_subtopic_saved",
                         name=ss_name,
                         quality_score=ss_quality,
                         words=len(ss_article.split()),
+                        budget_remaining=budget["remaining"] if budget else "unlimited",
                     )
 
         # ── Step 9: Coherence Pass (Layer 3) ─────────────────────────────────
@@ -886,6 +1008,35 @@ def ingest_topic(
             word_count=0,
             start_time=start_time,
         )
+
+    except BudgetExhaustedError as budget_exc:
+        # Budget hit zero or all LLM providers dead mid-topic — return partial results.
+        # Progress already saved article by article; nothing is lost.
+        elapsed = int(time.time() - start_time)
+        logger.warning(
+            "ingestor_budget_exhausted_partial_return",
+            topic_name=topic_name,
+            nodes_created=nodes_created,
+            reason=str(budget_exc),
+        )
+        try:
+            GenerationLog.objects.create(
+                topic_name=topic_name or "",
+                subject_name=subject_name or "",
+                status="partial",
+                error_message=str(budget_exc),
+                nodes_created=nodes_created,
+                generation_time_seconds=elapsed,
+            )
+        except Exception:
+            pass
+        return {
+            "nodes_created": nodes_created,
+            "relations_created": relations_created,
+            "topic": topic_name or "",
+            "partial": True,
+            "reason": str(budget_exc),
+        }
 
     except SkipGenerationError as skip_exc:
         # Hierarchy not found in seeded DB — graceful skip, no Sentry noise.
