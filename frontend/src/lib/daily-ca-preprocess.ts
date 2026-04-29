@@ -57,13 +57,28 @@ export function normalizeDidYouKnow(md: string): string {
   const lines = md.split("\n");
   const result: string[] = [];
   let i = 0;
+  let insideCallout = false; // track existing :::callout blocks — don't re-wrap
 
   while (i < lines.length) {
     const line = lines[i];
     const trimmed = line.trim();
 
+    // Track callout fence open/close so we never double-wrap
+    if (/^:::callout/.test(trimmed)) {
+      insideCallout = true;
+      result.push(line);
+      i++;
+      continue;
+    }
+    if (trimmed === ":::") {
+      insideCallout = false;
+      result.push(line);
+      i++;
+      continue;
+    }
+
     // ── Format A: heading (# / ## / ###) ──────────────────────────────────
-    if (/^#{1,3}\s+Did You Know\??/i.test(trimmed)) {
+    if (!insideCallout && /^#{1,3}\s+Did You Know\??/i.test(trimmed)) {
       const bodyLines: string[] = [];
       i++;
       while (i < lines.length && !/^#{1,3}\s/.test(lines[i].trim())) {
@@ -90,7 +105,7 @@ export function normalizeDidYouKnow(md: string): string {
     }
 
     // ── Format B: inline bold  **Did You Know?** body on same line ────────
-    if (/^\*\*Did You Know\??\*\*/i.test(trimmed)) {
+    if (!insideCallout && /^\*\*Did You Know\??\*\*/i.test(trimmed)) {
       // Extract everything after the **Did You Know?** prefix
       const body = trimmed.replace(/^\*\*Did You Know\??\*\*\s*/i, "").trim();
       result.push(":::callout");
@@ -109,6 +124,25 @@ export function normalizeDidYouKnow(md: string): string {
   }
 
   return result.join("\n");
+}
+
+// ── 3. Strip orphan callout fence markers ─────────────────────────────────────
+//
+// After normalizeDidYouKnow runs, any :::callout / ::: that still remain in the
+// text are malformed remnants (unclosed block, inline-title not matched, etc.).
+// ReactMarkdown renders them as visible text — strip them before rendering.
+
+export function stripOrphanCalloutMarkers(md: string): string {
+  return md
+    .split("\n")
+    .filter((line) => {
+      const t = line.trim();
+      // Remove any line that IS (or starts with) a callout fence marker
+      if (/^:::callout/.test(t)) return false;
+      if (t === ":::") return false;
+      return true;
+    })
+    .join("\n");
 }
 
 // ── Combined pipeline ─────────────────────────────────────────────────────────

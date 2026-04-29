@@ -14,6 +14,8 @@ from engines.userstate.models import (
     TopicMastery,
     UserEvent,
     UserProgress,
+    UserPreferences,
+    UserProfile,
 )
 
 
@@ -158,3 +160,49 @@ class ReadingProgressUpdateSerializer(serializers.Serializer):  # type: ignore
     article_id = serializers.UUIDField(required=True)
     percent_read = serializers.FloatField(required=True, min_value=0, max_value=100)
     last_position = serializers.IntegerField(required=True, min_value=0)
+
+
+class UserProfileSerializer(serializers.ModelSerializer):  # type: ignore
+    """Full profile read response — includes auth fields flattened in."""
+
+    full_name = serializers.CharField(source="user.full_name", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    is_verified = serializers.BooleanField(source="user.is_verified", read_only=True)
+    subscription_tier = serializers.CharField(
+        source="user.subscription_tier", read_only=True
+    )
+    created_at = serializers.DateTimeField(source="user.created_at", read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            "full_name",
+            "email",
+            "is_verified",
+            "subscription_tier",
+            "created_at",
+            "avatar_url",
+            "bio",
+        ]
+        read_only_fields = fields
+
+
+class UserProfileUpdateSerializer(serializers.Serializer):  # type: ignore
+    """PATCH /userstate/profile/update/ — only mutable fields."""
+
+    full_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    bio = serializers.CharField(max_length=500, required=False, allow_blank=True)
+
+
+class UserPreferencesSerializer(serializers.ModelSerializer):  # type: ignore
+    """GET + PATCH /userstate/preferences/"""
+
+    class Meta:
+        model = UserPreferences
+        fields = [
+            "email_weekly_report",
+            "email_orbit_alerts",
+            "email_comment_replies",
+            "updated_at",
+        ]
+        read_only_fields = ["updated_at"]

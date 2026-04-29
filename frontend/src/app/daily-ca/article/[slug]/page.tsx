@@ -87,7 +87,8 @@ type Part =
 
 function splitCallouts(md: string): Part[] {
   const parts: Part[] = [];
-  const regex = /:::callout\n([\s\S]*?)\n:::/g;
+  // [^\n]* allows optional inline title: ":::callout Did You Know?"
+  const regex = /:::callout[^\n]*\n([\s\S]*?)\n:::/g;
   let last = 0;
   let m: RegExpExecArray | null;
   // eslint-disable-next-line no-cond-assign

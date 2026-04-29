@@ -5,7 +5,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity as ActivityType } from "@/types/dashboard";
-import { BookOpen, Trophy, Clock } from "lucide-react";
+import { BookOpen, Trophy, Clock, Newspaper } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface RecentActivityProps {
@@ -17,6 +17,8 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
     switch (type) {
       case "article_read":
         return <BookOpen className="h-4 w-4 text-blue-600" />;
+      case "daily_ca_article_read":
+        return <Newspaper className="h-4 w-4 text-indigo-600" />;
       case "quiz_completed":
         return <Trophy className="h-4 w-4 text-green-600" />;
       default:
@@ -25,7 +27,6 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
   };
 
   const getMessage = (activity: ActivityType) => {
-    // Cast data safely for rendering
     const data = (activity.event_data as Record<string, unknown>) || {};
 
     switch (activity.event_type) {
@@ -35,6 +36,15 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
             Read{" "}
             <span className="font-semibold">
               {(data.title as string) || "an article"}
+            </span>
+          </p>
+        );
+      case "daily_ca_article_read":
+        return (
+          <p className="text-sm text-gray-700">
+            Read Current Affairs —{" "}
+            <span className="font-semibold">
+              {(data.title as string) || "a CA article"}
             </span>
           </p>
         );
