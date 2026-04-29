@@ -228,7 +228,9 @@ class Command(BaseCommand):
                 )
                 logger.warning("all_llm_preflight_failed_aborting")
                 return  # Exit cleanly — no exception, no Sentry noise
-            self.stdout.write("   ✅ At least one LLM provider responding — proceeding with generation.")
+            self.stdout.write(
+                "   ✅ At least one LLM provider responding — proceeding with generation."
+            )
 
         # ── Step 1.5: Book Intelligence Plan ─────────────────────────────────
         # For each subject being ingested, generate book plan first.
@@ -378,7 +380,11 @@ class Command(BaseCommand):
 
         # ── GROQ keys ────────────────────────────────────────────────────────
         raw_groq = getattr(settings, "GROQ_API_KEY", "")
-        groq_keys = [k.strip() for k in raw_groq.split(",") if k.strip() and k.strip() != "DUMMY_KEY"]
+        groq_keys = [
+            k.strip()
+            for k in raw_groq.split(",")
+            if k.strip() and k.strip() != "DUMMY_KEY"
+        ]
         groq_model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
 
         for idx, key in enumerate(groq_keys):
@@ -392,11 +398,20 @@ class Command(BaseCommand):
                 logger.info("llm_health_check_passed", provider="groq", key_index=idx)
                 return True
             except Exception as e:
-                logger.warning("llm_health_check_key_failed", provider="groq", key_index=idx, error=str(e)[:120])
+                logger.warning(
+                    "llm_health_check_key_failed",
+                    provider="groq",
+                    key_index=idx,
+                    error=str(e)[:120],
+                )
 
         # ── Cerebras keys ─────────────────────────────────────────────────────
         raw_cerebras = getattr(settings, "CEREBRAS_API_KEY", "")
-        cerebras_keys = [k.strip() for k in raw_cerebras.split(",") if k.strip() and k.strip() != "DUMMY_KEY"]
+        cerebras_keys = [
+            k.strip()
+            for k in raw_cerebras.split(",")
+            if k.strip() and k.strip() != "DUMMY_KEY"
+        ]
         cerebras_model = getattr(settings, "CEREBRAS_MODEL", "llama3.1-8b")
 
         for idx, key in enumerate(cerebras_keys):
@@ -407,12 +422,23 @@ class Command(BaseCommand):
                     messages=[{"role": "user", "content": "Reply with exactly: OK"}],
                     max_tokens=3,
                 )
-                logger.info("llm_health_check_passed", provider="cerebras", key_index=idx)
+                logger.info(
+                    "llm_health_check_passed", provider="cerebras", key_index=idx
+                )
                 return True
             except Exception as e:
-                logger.warning("llm_health_check_key_failed", provider="cerebras", key_index=idx, error=str(e)[:120])
+                logger.warning(
+                    "llm_health_check_key_failed",
+                    provider="cerebras",
+                    key_index=idx,
+                    error=str(e)[:120],
+                )
 
-        logger.error("all_llm_keys_exhausted_in_health_check", groq_keys_tried=len(groq_keys), cerebras_keys_tried=len(cerebras_keys))
+        logger.error(
+            "all_llm_keys_exhausted_in_health_check",
+            groq_keys_tried=len(groq_keys),
+            cerebras_keys_tried=len(cerebras_keys),
+        )
         return False
 
     def _verify_db_state(self):
