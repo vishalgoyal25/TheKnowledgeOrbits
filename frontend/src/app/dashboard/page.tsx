@@ -5,6 +5,7 @@
 "use client";
 
 import { useDashboard } from "@/lib/hooks/use-dashboard";
+import { analyticsAPI } from "@/lib/api/analytics";
 import DashboardOverview from "@/components/dashboard/DashboardOverview";
 import PerformanceChart from "@/components/dashboard/PerformanceChart";
 import TopicMasterySection from "@/components/dashboard/TopicMasterySection";
@@ -22,6 +23,7 @@ import {
   FileQuestion,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect } from "react";
 
 const MOCK_DATA = {
   overview: {
@@ -109,18 +111,35 @@ const MOCK_DATA = {
   ],
 };
 
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function DashboardPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const firstName = user?.full_name?.split(" ")[0] || "Aspirant";
   const {
     data: realData,
     isLoading: dataLoading,
     error,
   } = useDashboard(isAuthenticated);
 
+  // H-1: Auto-generate insights on first load if the backend returns none
+  useEffect(() => {
+    if (isAuthenticated && realData && realData.insights.length === 0) {
+      analyticsAPI.generateInsights().catch(() => {
+        /* silent — insights are non-critical */
+      });
+    }
+  }, [isAuthenticated, realData]);
+
   // Determine loading state
   const isLoading = authLoading || (isAuthenticated && dataLoading);
 
-  // Choose data: Real if authenticated and available, Mock as fallback
+  // Choose data: Real if authenticated and available, Mock as fallback for guests
   const data = isAuthenticated && realData ? realData : MOCK_DATA;
 
   if (isLoading) {
@@ -197,7 +216,9 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">
-              Dashboard
+              {isAuthenticated
+                ? `${getGreeting()}, ${firstName} 👋`
+                : "Dashboard"}
             </h1>
             <p className="text-gray-500 mt-1">
               {isAuthenticated

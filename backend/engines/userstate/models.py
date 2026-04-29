@@ -32,6 +32,7 @@ class UserEvent(models.Model):
     EVENT_TYPE_CHOICES = [
         ("article_read", "Article Read"),
         ("article_generated", "Article Generated"),
+        ("daily_ca_article_read", "Daily CA Article Read"),
         ("quiz_started", "Quiz Started"),
         ("quiz_completed", "Quiz Completed"),
         ("bookmark_added", "Bookmark Added"),
@@ -325,3 +326,102 @@ class ReadingProgress(models.Model):
         return (
             f"{self.user.email} - Article {self.article_id}: {self.percent_read:.1f}%"
         )
+
+
+class UserProfile(models.Model):
+    """
+    Extended profile data for each user.
+
+    Kept in userstate (not auth) because engines/auth/ is DO NOT TOUCH.
+    Stores avatar Cloudinary URL + public_id (for deletion) + bio.
+    db_table: userstate_profile
+    """
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text="Unique identifier",
+    )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile",
+        help_text="Owning user",
+    )
+
+    avatar_url = models.URLField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Cloudinary secure URL for avatar image",
+    )
+
+    avatar_public_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Cloudinary public_id — required for deletion",
+    )
+
+    bio = models.TextField(
+        blank=True,
+        default="",
+        max_length=500,
+        help_text="Short user bio",
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "userstate_profile"
+        ordering = ["user"]
+
+    def __str__(self) -> str:
+        return f"{self.user.email} — profile"
+
+
+class UserPreferences(models.Model):
+    """
+    Notification and UI preferences per user.
+    db_table: userstate_preferences
+    """
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text="Unique identifier",
+    )
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="preferences",
+        help_text="Owning user",
+    )
+
+    email_weekly_report = models.BooleanField(
+        default=True,
+        help_text="Weekly learning summary email",
+    )
+
+    email_orbit_alerts = models.BooleanField(
+        default=False,
+        help_text="New articles for saved topics",
+    )
+
+    email_comment_replies = models.BooleanField(
+        default=True,
+        help_text="Email when someone replies to a comment",
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "userstate_preferences"
+        ordering = ["user"]
+
+    def __str__(self) -> str:
+        return f"{self.user.email} — preferences"

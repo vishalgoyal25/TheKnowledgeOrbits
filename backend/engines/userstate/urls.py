@@ -7,6 +7,13 @@ from engines.userstate import views
 app_name = "userstate"
 
 urlpatterns = [
+    # Preferences
+    path("preferences/", views.preferences, name="preferences"),
+    # Profile
+    path("profile/", views.get_profile, name="get-profile"),
+    path("profile/update/", views.update_profile, name="update-profile"),
+    path("profile/avatar/", views.upload_avatar, name="upload-avatar"),
+    path("profile/avatar/delete/", views.delete_avatar, name="delete-avatar"),
     # Progress & Mastery
     path("progress/", views.get_progress, name="progress"),
     path("mastery/", views.get_mastery, name="mastery"),

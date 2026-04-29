@@ -28,6 +28,7 @@ export default function PerformanceChart({ data }: Props) {
       month: "short",
       day: "numeric",
     }),
+    articles: d.articles,
     quizzes: d.quizzes,
     score: d.avg_score,
   }));
@@ -36,12 +37,22 @@ export default function PerformanceChart({ data }: Props) {
     <Card>
       <CardHeader>
         <CardTitle>Weekly Performance</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          {data.period} · {data.total_articles} articles · {data.total_quizzes}{" "}
+          quizzes
+        </p>
       </CardHeader>
       <CardContent>
         <LineChart
           data={chartData}
           xAxisKey="date"
           series={[
+            {
+              key: "articles",
+              name: "Articles",
+              color: "#6366f1",
+              yAxisId: "left",
+            },
             {
               key: "quizzes",
               name: "Quizzes",

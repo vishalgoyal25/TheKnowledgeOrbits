@@ -45,10 +45,10 @@ def client():
 def published_article():
     article = DailyCaArticle.objects.create(
         title="Published Test Article",
-        slug="2026-04-10-published-test-article",
+        slug="2099-04-10-published-test-article",
         subject_name="Polity",
         gs_paper="GS2",
-        published_date=date(2026, 4, 10),
+        published_date=date(2099, 4, 10),
         body_md="This is the raw body with [[Article 370]] concept.",
         body_md_processed="This is processed with [Article 370](/concepts/article-370).",
         news_context="Some news.",
@@ -62,9 +62,9 @@ def published_article():
 def unpublished_article():
     return DailyCaArticle.objects.create(
         title="Unpublished Article",
-        slug="2026-04-10-unpublished-article",
+        slug="2099-04-10-unpublished-article",
         subject_name="Economy",
-        published_date=date(2026, 4, 10),
+        published_date=date(2099, 4, 10),
         body_md="Unpublished content.",
         is_published=False,
     )
@@ -73,7 +73,7 @@ def unpublished_article():
 @pytest.fixture
 def sample_proposal():
     return CaDailyProposal.objects.create(
-        date=date(2026, 4, 10),
+        date=date(2099, 4, 10),
         title="Test Proposal",
         description="Description of news.",
         subject_name="Polity",
@@ -89,12 +89,12 @@ def sample_proposal():
 @pytest.mark.django_db
 class TestTodayView:
     def test_returns_200(self, client, published_article):
-        # Published article has published_date=2026-04-10
+        # Published article has published_date=2099-04-10
         # We need today's date to match — mock timezone.now
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
                 "engines.daily_ca.views.timezone.now",
-                lambda: __import__("datetime").datetime(2026, 4, 10, 12, 0),
+                lambda: __import__("datetime").datetime(2099, 4, 10, 12, 0),
             )
             resp = client.get("/api/v1/daily-ca/today/")
         assert resp.status_code == 200
@@ -103,7 +103,7 @@ class TestTodayView:
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
                 "engines.daily_ca.views.timezone.now",
-                lambda: __import__("datetime").datetime(2026, 4, 10, 12, 0),
+                lambda: __import__("datetime").datetime(2099, 4, 10, 12, 0),
             )
             resp = client.get("/api/v1/daily-ca/today/")
         data = resp.json()
@@ -115,17 +115,17 @@ class TestTodayView:
         with pytest.MonkeyPatch().context() as m:
             m.setattr(
                 "engines.daily_ca.views.timezone.now",
-                lambda: __import__("datetime").datetime(2026, 4, 10, 12, 0),
+                lambda: __import__("datetime").datetime(2099, 4, 10, 12, 0),
             )
             resp = client.get("/api/v1/daily-ca/today/")
         slugs = [a["slug"] for a in resp.json()["articles"]]
-        assert "2026-04-10-unpublished-article" not in slugs
+        assert "2099-04-10-unpublished-article" not in slugs
 
 
 @pytest.mark.django_db
 class TestDateView:
     def test_valid_date_returns_200(self, client, published_article):
-        resp = client.get("/api/v1/daily-ca/2026-04-10/")
+        resp = client.get("/api/v1/daily-ca/2099-04-10/")
         assert resp.status_code == 200
 
     def test_invalid_date_returns_400(self, client):
@@ -135,10 +135,10 @@ class TestDateView:
     def test_returns_only_published(
         self, client, published_article, unpublished_article
     ):
-        resp = client.get("/api/v1/daily-ca/2026-04-10/")
+        resp = client.get("/api/v1/daily-ca/2099-04-10/")
         slugs = [a["slug"] for a in resp.json()["articles"]]
-        assert "2026-04-10-published-test-article" in slugs
-        assert "2026-04-10-unpublished-article" not in slugs
+        assert "2099-04-10-published-test-article" in slugs
+        assert "2099-04-10-unpublished-article" not in slugs
 
     def test_empty_date_returns_empty_list(self, client):
         resp = client.get("/api/v1/daily-ca/2020-01-01/")
@@ -196,11 +196,11 @@ class TestArchiveView:
 @pytest.mark.django_db
 class TestAdminProposalListView:
     def test_returns_200(self, client, sample_proposal):
-        resp = client.get("/api/v1/admin/daily-ca/proposals/2026-04-10/")
+        resp = client.get("/api/v1/admin/daily-ca/proposals/2099-04-10/")
         assert resp.status_code == 200
 
     def test_returns_proposals(self, client, sample_proposal):
-        resp = client.get("/api/v1/admin/daily-ca/proposals/2026-04-10/")
+        resp = client.get("/api/v1/admin/daily-ca/proposals/2099-04-10/")
         data = resp.json()
         assert data["count"] >= 1
         assert data["proposals"][0]["title"] == "Test Proposal"
@@ -245,11 +245,11 @@ class TestAdminApproveView:
 @pytest.mark.django_db
 class TestAdminGenerateStatusView:
     def test_returns_200(self, client, sample_proposal):
-        resp = client.get("/api/v1/admin/daily-ca/generate/status/?date=2026-04-10")
+        resp = client.get("/api/v1/admin/daily-ca/generate/status/?date=2099-04-10")
         assert resp.status_code == 200
 
     def test_status_breakdown_present(self, client, sample_proposal):
-        resp = client.get("/api/v1/admin/daily-ca/generate/status/?date=2026-04-10")
+        resp = client.get("/api/v1/admin/daily-ca/generate/status/?date=2099-04-10")
         data = resp.json()
         assert "status_breakdown" in data
         assert "total" in data
@@ -259,7 +259,7 @@ class TestAdminGenerateStatusView:
 @pytest.mark.django_db
 class TestAdminPublishDateView:
     def test_publishes_all_generated_articles(self, client, unpublished_article):
-        resp = client.post("/api/v1/admin/daily-ca/publish/2026-04-10/")
+        resp = client.post("/api/v1/admin/daily-ca/publish/2099-04-10/")
         assert resp.status_code == 200
         assert resp.json()["published"] >= 1
         unpublished_article.refresh_from_db()
@@ -275,11 +275,11 @@ class TestAdminArticlesDateView:
     def test_returns_all_including_unpublished(
         self, client, published_article, unpublished_article
     ):
-        resp = client.get("/api/v1/admin/daily-ca/articles/2026-04-10/")
+        resp = client.get("/api/v1/admin/daily-ca/articles/2099-04-10/")
         assert resp.status_code == 200
         slugs = [a["slug"] for a in resp.json()["articles"]]
-        assert "2026-04-10-published-test-article" in slugs
-        assert "2026-04-10-unpublished-article" in slugs
+        assert "2099-04-10-published-test-article" in slugs
+        assert "2099-04-10-unpublished-article" in slugs
 
     def test_invalid_date_returns_400(self, client):
         resp = client.get("/api/v1/admin/daily-ca/articles/bad-date/")

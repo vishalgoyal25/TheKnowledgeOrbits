@@ -58,7 +58,30 @@ def get_dashboard(request: Request) -> Response:
     dashboard_service = get_dashboard_service()
     data = dashboard_service.get_dashboard_overview(user)
 
-    # Cache for 1 hour
+    # Auto-generate insights on first load (or when all previous ones expired)
+    if not data.get("insights"):
+        try:
+            insights_service = get_insights_service()
+            new_insights = insights_service.generate_insights(user)
+            data["insights"] = [
+                {
+                    "type": insight.insight_type,
+                    "data": insight.insight_data,
+                    "generated_at": insight.generated_at.isoformat(),
+                }
+                for insight in new_insights
+            ]
+            logger.info("insights_auto_generated", user_email=user.email)
+        except Exception as exc:
+            import sentry_sdk as _sentry
+
+            _sentry.capture_exception(exc)
+            logger.warning(
+                "insights_auto_generate_failed",
+                error=str(exc),
+            )
+
+    # Cache for 1 hour (skip cache so next hit re-reads fresh insights from DB)
     cache.set(cache_key, data, 3600)
 
     logger.info("dashboard_generated", user_email=user.email)

@@ -214,22 +214,21 @@ class Command(BaseCommand):
         self.stdout.write("STEP 1: Verifying DB state...")
         self._verify_db_state()
 
-        # ── Step 1.2: GROQ pre-flight health check ────────────────────────────
-        # One direct test call before the loop starts — no sleep, no retry.
-        # If GROQ is down / quota exhausted, abort cleanly instead of wasting
-        # the GH Actions budget on a 60-min job that generates nothing.
+        # ── Step 1.2: LLM pre-flight health check ────────────────────────────
+        # Pings every key across every provider (GROQ + Cerebras).
+        # Only aborts if ALL keys from ALL providers are simultaneously exhausted.
         if not dry_run:
-            self.stdout.write("STEP 1.2: GROQ pre-flight check...")
-            if not self._check_groq_health():
+            self.stdout.write("STEP 1.2: LLM pre-flight check (GROQ + Cerebras)...")
+            if not self._check_any_llm_available():
                 self.stdout.write(
                     self.style.WARNING(
-                        "   ⚠️  GROQ health check failed — API may be down or quota exhausted.\n"
+                        "   ⚠️  All LLM providers exhausted (GROQ + Cerebras).\n"
                         "   Aborting to protect rate-limit budget. Try again after UTC midnight."
                     )
                 )
-                logger.warning("groq_preflight_failed_aborting")
+                logger.warning("all_llm_preflight_failed_aborting")
                 return  # Exit cleanly — no exception, no Sentry noise
-            self.stdout.write("   ✅ GROQ responding — proceeding with generation.")
+            self.stdout.write("   ✅ At least one LLM provider responding — proceeding with generation.")
 
         # ── Step 1.5: Book Intelligence Plan ─────────────────────────────────
         # For each subject being ingested, generate book plan first.
@@ -265,6 +264,9 @@ class Command(BaseCommand):
             )
 
             articles_generated = 0
+            # Circuit-breaker: re-check all LLM providers every N topics.
+            # Only aborts if every GROQ key AND every Cerebras key are exhausted.
+            LLM_RECHECK_EVERY = 3
 
             for topic_name in topics:
                 # Hard cap — stop before hitting GH Actions timeout
@@ -295,6 +297,29 @@ class Command(BaseCommand):
                 if dry_run:
                     self.stdout.write(f"  [DRY RUN] Would generate: '{topic_name}'")
                     continue
+
+                # Mid-run circuit breaker — re-check all providers every N articles.
+                # Only stops if every GROQ key AND every Cerebras key are dead.
+                if (
+                    articles_generated > 0
+                    and articles_generated % LLM_RECHECK_EVERY == 0
+                ):
+                    self.stdout.write(
+                        f"  🔍 LLM mid-run health check (after {articles_generated} articles)..."
+                    )
+                    if not self._check_any_llm_available():
+                        self.stdout.write(
+                            self.style.WARNING(
+                                "  ⚠️  All LLM providers exhausted (GROQ + Cerebras simultaneously).\n"
+                                "  🛑 Aborting — no keys available across any provider.\n"
+                                "  ✅ Progress saved. Re-run after UTC midnight to resume."
+                            )
+                        )
+                        logger.warning(
+                            "all_llm_mid_run_exhausted_aborting",
+                            articles_generated=articles_generated,
+                        )
+                        break
 
                 self.stdout.write(f"\n  🔄 Generating: '{topic_name}'...")
                 result = ingest_topic(topic_name=topic_name, subject_name=subject_name)
@@ -340,37 +365,55 @@ class Command(BaseCommand):
 
     # ─────────────────────────────────────────────────────────────────────────
 
-    def _check_groq_health(self) -> bool:
+    def _check_any_llm_available(self) -> bool:
         """
-        One minimal GROQ call to verify the API key is valid and quota is available.
+        Tries every key from every configured provider (GROQ + Cerebras).
         Bypasses llm_service intentionally — no 12s sleep, no retry loop, no Sentry noise.
-        Returns True if GROQ responds, False otherwise.
+        Returns True on the first key that responds successfully.
+        Returns False only when every key from every provider has failed.
         """
         from django.conf import settings
-        from langchain_groq import ChatGroq
-        from pydantic.v1 import SecretStr
+        import groq as groq_sdk
+        from cerebras.cloud.sdk import Cerebras as CerebrasSDK
 
-        raw_key = getattr(settings, "GROQ_API_KEY", "")
-        api_key = raw_key.split(",")[0].strip() if raw_key else ""
-        model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+        # ── GROQ keys ────────────────────────────────────────────────────────
+        raw_groq = getattr(settings, "GROQ_API_KEY", "")
+        groq_keys = [k.strip() for k in raw_groq.split(",") if k.strip() and k.strip() != "DUMMY_KEY"]
+        groq_model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
 
-        if not api_key or api_key == "DUMMY_KEY":
-            logger.warning("groq_health_check_no_key")
-            return False
+        for idx, key in enumerate(groq_keys):
+            try:
+                client = groq_sdk.Groq(api_key=key)
+                client.chat.completions.create(
+                    model=groq_model,
+                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    max_tokens=3,
+                )
+                logger.info("llm_health_check_passed", provider="groq", key_index=idx)
+                return True
+            except Exception as e:
+                logger.warning("llm_health_check_key_failed", provider="groq", key_index=idx, error=str(e)[:120])
 
-        try:
-            client = ChatGroq(
-                api_key=SecretStr(api_key),
-                model=model,
-                temperature=0,
-                max_tokens=3,
-                stop_sequences=[],
-            )
-            response = client.invoke("Reply with exactly: OK")
-            return bool(str(response.content).strip())
-        except Exception as e:
-            logger.warning("groq_health_check_failed", error=str(e)[:120])
-            return False
+        # ── Cerebras keys ─────────────────────────────────────────────────────
+        raw_cerebras = getattr(settings, "CEREBRAS_API_KEY", "")
+        cerebras_keys = [k.strip() for k in raw_cerebras.split(",") if k.strip() and k.strip() != "DUMMY_KEY"]
+        cerebras_model = getattr(settings, "CEREBRAS_MODEL", "llama3.1-8b")
+
+        for idx, key in enumerate(cerebras_keys):
+            try:
+                client = CerebrasSDK(api_key=key)
+                client.chat.completions.create(
+                    model=cerebras_model,
+                    messages=[{"role": "user", "content": "Reply with exactly: OK"}],
+                    max_tokens=3,
+                )
+                logger.info("llm_health_check_passed", provider="cerebras", key_index=idx)
+                return True
+            except Exception as e:
+                logger.warning("llm_health_check_key_failed", provider="cerebras", key_index=idx, error=str(e)[:120])
+
+        logger.error("all_llm_keys_exhausted_in_health_check", groq_keys_tried=len(groq_keys), cerebras_keys_tried=len(cerebras_keys))
+        return False
 
     def _verify_db_state(self):
         """

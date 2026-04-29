@@ -28,10 +28,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth/useAuth";
+import { getProfile } from "@/lib/api/userstate";
 import {
   type Comment,
   type ContentType,
@@ -237,6 +239,7 @@ function EditInput({ initialBody, onSave, onCancel }: EditInputProps) {
 interface CommentItemProps {
   comment: Comment;
   currentUserId: string | null;
+  currentUserAvatarUrl?: string;
   contentType: ContentType;
   contentId: string;
   isReply?: boolean;
@@ -248,6 +251,7 @@ interface CommentItemProps {
 function CommentItem({
   comment,
   currentUserId,
+  currentUserAvatarUrl,
   contentType,
   contentId,
   isReply = false,
@@ -329,17 +333,34 @@ function CommentItem({
     <div className={cn("flex gap-2.5", isReply && "ml-8 mt-2")}>
       {/* Avatar */}
       <div className="flex-shrink-0 mt-0.5">
-        <div
-          className={cn(
-            "flex items-center justify-center rounded-full bg-gradient-to-br font-semibold text-white select-none",
-            isReply ? "h-7 w-7 text-xs" : "h-8 w-8 text-sm",
-            isDeleted
-              ? "from-gray-300 to-gray-400"
-              : "from-blue-400 to-indigo-500",
-          )}
-        >
-          {initials(comment.user_display_name)}
-        </div>
+        {isOwner && currentUserAvatarUrl ? (
+          <div
+            className={cn(
+              "relative rounded-full overflow-hidden",
+              isReply ? "h-7 w-7" : "h-8 w-8",
+            )}
+          >
+            <Image
+              src={currentUserAvatarUrl}
+              alt="You"
+              fill
+              className="object-cover"
+              sizes={isReply ? "28px" : "32px"}
+            />
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "flex items-center justify-center rounded-full bg-gradient-to-br font-semibold text-white select-none",
+              isReply ? "h-7 w-7 text-xs" : "h-8 w-8 text-sm",
+              isDeleted
+                ? "from-gray-300 to-gray-400"
+                : "from-blue-400 to-indigo-500",
+            )}
+          >
+            {initials(comment.user_display_name)}
+          </div>
+        )}
       </div>
 
       {/* Body */}
@@ -459,6 +480,7 @@ function CommentItem({
                 key={reply.id}
                 comment={reply}
                 currentUserId={currentUserId}
+                currentUserAvatarUrl={currentUserAvatarUrl}
                 contentType={contentType}
                 contentId={contentId}
                 isReply
@@ -498,6 +520,14 @@ export function CommentsSection({
 }: CommentsSectionProps) {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [currentUserAvatarUrl, setCurrentUserAvatarUrl] = useState<string>("");
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getProfile()
+      .then((p) => setCurrentUserAvatarUrl(p.avatar_url || ""))
+      .catch(() => {});
+  }, [isAuthenticated]);
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -701,6 +731,7 @@ export function CommentsSection({
               key={comment.id}
               comment={comment}
               currentUserId={user?.id ?? null}
+              currentUserAvatarUrl={currentUserAvatarUrl}
               contentType={contentType}
               contentId={contentId}
               onReplyPosted={(reply) => handleReplyPosted(comment.id, reply)}
