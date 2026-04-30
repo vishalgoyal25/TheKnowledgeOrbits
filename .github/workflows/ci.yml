@@ -25,6 +25,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: |
+            backend/requirements/base.txt
+            backend/requirements/dev.txt
 
       - name: Install Dependencies
         run: |
@@ -73,7 +76,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: backend/requirements/base.txt
+          cache-dependency-path: |
+            backend/requirements/base.txt
+            backend/requirements/dev.txt
 
       - name: Install Dependencies
         working-directory: ./backend
