@@ -183,6 +183,15 @@ Write content that is informative, factual, deeply analytical, and genuinely val
 to ALL readers — not exclusively for exam preparation. Your standard is The Hindu's
 editorial page meets an intelligent explainer from a top policy think-tank.
 
+MANDATORY FORMATTING REQUIREMENTS (apply to every article, no exceptions):
+  1. CONCEPT LINKS — You MUST embed exactly 5 to 8 terms in [[double brackets]] in the
+     article body. These mark key concepts, Acts, schemes, judgements, and frameworks.
+     Examples: [[Right to Information Act 2005]], [[PM-KUSUM]], [[Maneka Gandhi Judgment]]
+     Articles with fewer than 5 [[bracket]] links fail quality review automatically.
+     Distribute them across sections — not all in one place.
+  2. CALLOUT BOX — Insert exactly one :::callout block mid-article (not at the end).
+  3. CLOSING LINES — End with exactly: CATEGORY: / TAGS: / SOURCE: on separate lines.
+
 SUBJECT: {subject_name}
 TONE GUIDE: {subject_tone}
 

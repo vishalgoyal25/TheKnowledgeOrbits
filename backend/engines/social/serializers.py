@@ -81,6 +81,7 @@ class CommentSerializer(serializers.ModelSerializer):
     """
 
     user_display_name = serializers.SerializerMethodField()
+    user_avatar_url = serializers.SerializerMethodField()
     body = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
     parent_id = serializers.UUIDField(source="parent.id", read_only=True, default=None)
@@ -91,6 +92,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "id",
             "user_id",
             "user_display_name",
+            "user_avatar_url",
             "body",
             "parent_id",
             "replies",
@@ -103,6 +105,14 @@ class CommentSerializer(serializers.ModelSerializer):
         if obj.is_deleted:
             return "[deleted]"
         return obj.user.full_name or obj.user.email
+
+    def get_user_avatar_url(self, obj: Comment) -> str:
+        if obj.is_deleted:
+            return ""
+        try:
+            return obj.user.profile.avatar_url or ""
+        except Exception:
+            return ""
 
     def get_body(self, obj: Comment) -> str:
         if obj.is_deleted:

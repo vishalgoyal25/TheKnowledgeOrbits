@@ -1,55 +1,53 @@
 """
 engines/daily_ca/management/commands/generate_static_content.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Phase B (FEATURES5) — Dedicated static content generation for today's CA topics.
+Pure static content generation — syllabus-driven, top-down.
 
-Runs as a SEPARATE Render Cron job, 1.5 hours AFTER the main daily pipeline.
-This ensures CA articles (10) + Daily Quiz (10) always complete first before
-any LLM quota is consumed by static content generation.
+Runs as a SEPARATE Render Cron job, after the main daily pipeline.
+NO dependency on daily_CA proposals. Walks the seeded knowledge hierarchy
+(Subject → Module → Topic) and fills in content for incomplete topics.
 
 Render Cron schedule:
   Name   : generate-static-content
   Command: cd backend && python manage.py generate_static_content --max-articles 3 --database=supabase
-  Schedule: 30 9 * * *   (09:30 UTC = 15:00 IST; main pipeline runs at ~08:00 UTC)
+  Schedule: 30 9 * * *   (09:30 UTC = 15:00 IST)
 
 What it does:
-  1. Fetches today's CaDailyProposal records (status='generated') to get their
-     linked knowledge.Topic objects — same topics that drove today's CA articles.
-  2. Deduplicates by topic ID (a topic may appear across multiple proposals).
-  3. Skips topics where content_status='complete' (fully built, no re-generation).
-  4. Skips topics where content_status='generating' (safety guard against concurrency).
-  5. Skips proposals with no topic FK (unlinked proposal — no safe target to ingest).
-  6. Calls ingest_topic() directly (same process — no HTTP, no localhost issue).
-     Each call handles the full 3-layer pipeline: classification → wiki → article
-     → sub-subtopics → coherence. Each subtopic is saved immediately (not batched).
-  7. Hard cap: --max-articles (default 3) to protect LLM quota.
-  8. Per-topic try/except: one failed topic never aborts the run.
+  1. Queries the seeded Topic table directly (node_type='topic', not complete).
+     Ordered: Subject → Module → Topic (alphabetical, deterministic).
+  2. Skips topics where content_status='complete' (already fully built).
+  3. Skips topics where content_status='generating' and flag is < 3 hours old.
+  4. Calls ingest_topic() for each queued topic.
+     ingest_topic() uses ONLY seeded subtopics from the DB — never invents
+     subtopic names via LLM. LLM is only used to generate CONTENT for nodes
+     that already exist in the hierarchy.
+  5. Hard cap: --max-articles (default 3) to protect LLM quota.
+  6. Per-topic try/except: one failed topic never aborts the run.
+
+Hierarchy contract (hardcoded — never violated):
+  Subject     → seeded, read-only
+  Module      → seeded, read-only
+  Topic       → seeded, content generated (never created here)
+  Subtopic    → seeded, content generated (never created here)
+  Sub-subtopic→ ONLY level where new nodes may be created (LLM, cap=2 per subtopic)
+                No children below sub-subtopic — this is the floor.
 
 Key safety properties:
-  - NO re-generation: content_status='complete' guard prevents re-running topics
-  - NO duplication: topic ID dedup set prevents processing same topic twice per run
-  - NO orphan creation: ingest_topic() uses strict hierarchy matching (SkipGenerationError
-    if subject/module not in seeded DB — never invents new hierarchy nodes)
-  - IMMEDIATE saves: ingest_topic() uses atomic transactions per subtopic — each article
-    is written to DB as it completes, so partial runs never lose work
-  - QUOTA safe: hard cap of 3 topics × ~5-10 LLM calls each = max ~30 calls per run
-    (CA+Quiz uses ~22 calls; static gets the remaining quota at safe spacing)
+  - NO re-generation: content_status='complete' guard
+  - NO hierarchy invention: ingest_topic() uses seeded subtopics only
+  - IMMEDIATE saves: atomic transaction per subtopic — partial runs never lose work
+  - QUOTA safe: hard cap of 3 topics × ~5 LLM calls each = max ~15 calls per run
 
 Database note:
-  --database controls BOTH proposal fetching AND ingest writes.
   At startup, if --database != 'default', Django's 'default' alias is rerouted
-  to point to the specified database settings. This ensures ingest_topic() (which
-  always uses 'default' internally) writes to Supabase when --database=supabase
-  is passed — both locally and on Render.
+  to point to the specified database. This ensures ingest_topic() writes to
+  Supabase when --database=supabase is passed — both locally and on Render.
 
 Usage:
     python manage.py generate_static_content
-    python manage.py generate_static_content --date 2026-04-28
     python manage.py generate_static_content --max-articles 2
-    python manage.py generate_static_content --date today --max-articles 3 --database=supabase
+    python manage.py generate_static_content --max-articles 3 --database=supabase
 """
-
-from datetime import datetime
 
 import sentry_sdk
 import structlog
@@ -59,8 +57,7 @@ from django.utils import timezone
 
 from engines.book_content.services.ingestor_service import ingest_topic
 from engines.book_content.services.llm_service import check_any_llm_available
-from engines.daily_ca.models import CaDailyProposal
-from engines.knowledge.models import Topic
+from engines.knowledge.models import Subject, Topic
 
 logger = structlog.get_logger(__name__)
 
@@ -74,12 +71,6 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--date",
-            type=str,
-            default="today",
-            help="Date to pull proposals from. 'today' (default) or YYYY-MM-DD.",
-        )
         parser.add_argument(
             "--max-articles",
             type=int,
@@ -101,7 +92,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         db_alias: str = options["database"]
-        date_str: str = options["date"].strip().lower()
         max_articles: int = options["max_articles"]
 
         # ── Reroute Django 'default' DB to match --database alias ─────────────
@@ -129,108 +119,48 @@ class Command(BaseCommand):
                 to_alias=db_alias,
             )
 
-        # ── Resolve date ──────────────────────────────────────────────────────
-        if date_str == "today":
-            target_date = timezone.now().date()
-        else:
-            try:
-                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            except ValueError:
-                self.stderr.write(
-                    self.style.ERROR(
-                        f"Invalid date format: '{date_str}'. Use YYYY-MM-DD or 'today'."
-                    )
-                )
-                return
+        run_date = timezone.now().date()
 
         self.stdout.write(
             self.style.MIGRATE_HEADING(
                 f"\n{_DIVIDER}\n"
-                f"  Static Content Generator — {target_date}\n"
-                f"  Database: {db_alias}  (proposals + all ingest writes)\n"
-                f"  Max articles this run: {max_articles}\n"
+                f"  Static Content Generator — {run_date}\n"
+                f"  Database : {db_alias}\n"
+                f"  Source   : seeded syllabus hierarchy (Subject → Module → Topic)\n"
+                f"  Max topics this run: {max_articles}\n"
                 f"{_DIVIDER}"
             )
         )
 
-        # ── Fetch today's generated proposals ─────────────────────────────────
-        # Use 'generated' (already processed by daily CA) + 'approved' (edge case:
-        # proposals approved but CA generation failed — still worth ingesting static).
-        proposals = list(
-            CaDailyProposal.objects.using(db_alias)
-            .filter(date=target_date, status__in=["generated", "approved"])
-            .select_related("topic", "topic__subject")
-            .order_by("-relevance_score")
+        # ── Build queue: walk seeded hierarchy top-down ───────────────────────
+        # Source: Topic table, node_type='topic', ordered Subject→Module→Topic.
+        # No proposal dependency — pure syllabus walk.
+        all_topic_qs = (
+            Topic.objects.select_related("module__subject")
+            .filter(node_type="topic", is_active=True)
+            .order_by("module__subject__name", "module__name", "name")
         )
 
-        if not proposals:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"\n  No generated/approved proposals found for {target_date}.\n"
-                    "  Run the daily pipeline first: run_daily_pipeline --database=supabase\n"
-                )
-            )
-            logger.info(
-                "static_gen_no_proposals",
-                date=str(target_date),
-                db_alias=db_alias,
-            )
-            return
-
-        self.stdout.write(
-            f"\n  Found {len(proposals)} proposal(s) for {target_date}.\n"
-            f"  Scanning for ungenerated topics (cap: {max_articles})...\n"
-        )
-
-        # ── Build deduplicated, filtered topic queue ──────────────────────────
-        seen_topic_ids: set = set()
+        skipped_complete = all_topic_qs.filter(content_status="complete").count()
+        skipped_generating = 0
         topic_queue: list[tuple[Topic, str]] = []  # (topic_obj, subject_name)
 
-        skipped_no_topic = 0
-        skipped_complete = 0
-        skipped_generating = 0
-        skipped_duplicate = 0
-
-        for proposal in proposals:
-            # Guard: proposal must have a linked topic
-            if proposal.topic_id is None:
-                skipped_no_topic += 1
-                logger.info(
-                    "static_gen_skip_no_topic",
-                    proposal_id=str(proposal.id),
-                    title=proposal.title[:60],
-                )
-                continue
-
-            topic_obj: Topic = proposal.topic  # type: ignore[assignment]
-
-            # Guard: deduplicate — same topic may appear in multiple proposals
-            if topic_obj.id in seen_topic_ids:
-                skipped_duplicate += 1
-                continue
-            seen_topic_ids.add(topic_obj.id)
-
-            # Guard: topic is fully generated — never re-generate
-            if topic_obj.content_status == "complete":
-                skipped_complete += 1
-                self.stdout.write(
-                    f"  ⏭  Skipping '{topic_obj.name}' — already complete"
-                )
-                logger.info(
-                    "static_gen_skip_complete",
-                    topic=topic_obj.name,
-                    topic_id=str(topic_obj.id),
-                )
-                continue
+        for topic_obj in all_topic_qs.exclude(content_status="complete"):
+            # Resolve subject name from FK chain
+            subject_name: str = (
+                topic_obj.module.subject.name
+                if topic_obj.module_id
+                and topic_obj.module
+                and topic_obj.module.subject_id
+                else ""
+            )
 
             # Guard: topic is currently being generated by another process.
-            # Only skip if the flag was set within the last 3 hours — after that
-            # it is a stuck/interrupted run (e.g. Ctrl+C, OOM kill) and must be
-            # retried, not silently abandoned forever.
+            # Only skip if the flag was set within the last 3 hours.
             if topic_obj.content_status == "generating":
                 age = timezone.now() - topic_obj.updated_at
                 age_minutes = int(age.total_seconds() / 60)
-                if age.total_seconds() < 3 * 3600:  # < 3 h → likely live process
+                if age.total_seconds() < 3 * 3600:
                     skipped_generating += 1
                     self.stdout.write(
                         self.style.WARNING(
@@ -245,12 +175,12 @@ class Command(BaseCommand):
                         age_minutes=age_minutes,
                     )
                     continue
-                # ≥ 3 h old → treat as interrupted run; fall through to ingest
+                # ≥ 3 h old → stale flag, treat as interrupted run, retry
                 age_hours = round(age.total_seconds() / 3600, 1)
                 self.stdout.write(
                     self.style.WARNING(
-                        f"  ↺  '{topic_obj.name}' — generating flag is stale "
-                        f"({age_hours}h old). Treating as interrupted run, retrying."
+                        f"  ↺  '{topic_obj.name}' — generating flag stale "
+                        f"({age_hours}h). Retrying."
                     )
                 )
                 logger.warning(
@@ -260,35 +190,27 @@ class Command(BaseCommand):
                     age_hours=age_hours,
                 )
 
-            # Resolve subject name: prefer topic's subject, fall back to proposal field
-            subject_name: str = (
-                topic_obj.subject.name
-                if topic_obj.subject_id and topic_obj.subject
-                else proposal.subject_name or ""
-            )
-
             topic_queue.append((topic_obj, subject_name))
 
-        # ── Print queue summary ────────────────────────────────────────────────
+        total_in_hierarchy = all_topic_qs.count()
         self.stdout.write(
-            f"\n  Queue: {len(topic_queue)} topic(s) to generate "
-            f"| {skipped_complete} already complete "
-            f"| {skipped_no_topic} no topic link "
-            f"| {skipped_duplicate} duplicates"
+            f"\n  Syllabus topics in DB : {total_in_hierarchy}\n"
+            f"  Already complete      : {skipped_complete}\n"
+            f"  In progress (skip)    : {skipped_generating}\n"
+            f"  Queued for generation : {len(topic_queue)}\n"
+            f"  This run cap          : {max_articles}\n"
         )
 
         if not topic_queue:
             self.stdout.write(
                 self.style.SUCCESS(
-                    "\n  Nothing to generate — all topics already have static content.\n"
-                    "  Static library is up to date for today's CA proposals.\n"
+                    "\n  Nothing to generate — all syllabus topics already complete.\n"
                 )
             )
             logger.info(
                 "static_gen_nothing_to_do",
-                date=str(target_date),
+                run_date=str(run_date),
                 skipped_complete=skipped_complete,
-                skipped_no_topic=skipped_no_topic,
             )
             return
 
@@ -302,7 +224,7 @@ class Command(BaseCommand):
                 )
             )
             logger.warning(
-                "static_gen_preflight_all_llm_exhausted", date=str(target_date)
+                "static_gen_preflight_all_llm_exhausted", run_date=str(run_date)
             )
             return
         self.stdout.write("  ✅ LLM available — proceeding.\n")
@@ -440,24 +362,76 @@ class Command(BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING(f"\n{_DIVIDER}"))
         self.stdout.write(
             self.style.SUCCESS(
-                f"  Static generation complete for {target_date}:\n"
+                f"  Static generation complete — {run_date}:\n"
                 f"  Generated : {generated} topic(s)\n"
                 f"  Failed    : {failed} topic(s)\n"
                 f"  Deferred  : {capped} topic(s) (cap: {max_articles})\n"
                 f"  Skipped   : {skipped_complete} already complete, "
-                f"{skipped_no_topic} no topic link, "
-                f"{skipped_duplicate} duplicates"
+                f"{skipped_generating} generating"
             )
         )
-        self.stdout.write(self.style.MIGRATE_HEADING(f"{_DIVIDER}\n"))
-
         logger.info(
             "static_gen_complete",
-            date=str(target_date),
+            run_date=str(run_date),
             generated=generated,
             failed=failed,
             capped=capped,
             skipped_complete=skipped_complete,
-            skipped_no_topic=skipped_no_topic,
-            skipped_duplicate=skipped_duplicate,
+            skipped_generating=skipped_generating,
         )
+
+        # ── Subject-level progress report ─────────────────────────────────────
+        # Printed after every run so Render logs show exactly which subject is
+        # currently being built and how far along it is.
+        # No DB schema change — derived entirely from Topic.content_status counts.
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("\n  Subject Progress (topic-level nodes):\n")
+        )
+        for subject_obj in Subject.objects.order_by("name"):
+            total_topics = Topic.objects.filter(
+                module__subject=subject_obj, node_type="topic", is_active=True
+            ).count()
+            if total_topics == 0:
+                continue  # subject has no seeded topics — skip display
+
+            done_topics = Topic.objects.filter(
+                module__subject=subject_obj,
+                node_type="topic",
+                content_status="complete",
+            ).count()
+
+            total_subtopics = Topic.objects.filter(
+                module__subject=subject_obj, node_type="subtopic", is_active=True
+            ).count()
+            done_subtopics = Topic.objects.filter(
+                module__subject=subject_obj,
+                node_type="subtopic",
+                content_status="complete",
+            ).count()
+
+            pct = int(done_topics / total_topics * 100) if total_topics else 0
+            bar = "█" * (pct // 10) + "░" * (10 - pct // 10)
+
+            status_line = (
+                f"  [{bar}] {pct:3d}%  {subject_obj.name}\n"
+                f"           Topics   : {done_topics}/{total_topics} complete\n"
+                f"           Subtopics: {done_subtopics}/{total_subtopics} complete"
+            )
+            style = (
+                self.style.SUCCESS
+                if done_topics == total_topics
+                else self.style.WARNING
+            )
+            self.stdout.write(style(status_line))
+
+            logger.info(
+                "static_gen_subject_progress",
+                subject=subject_obj.name,
+                topics_done=done_topics,
+                topics_total=total_topics,
+                subtopics_done=done_subtopics,
+                subtopics_total=total_subtopics,
+                pct_complete=pct,
+            )
+
+        self.stdout.write(self.style.MIGRATE_HEADING(f"{_DIVIDER}\n"))

@@ -91,7 +91,23 @@ def _try_fetch(term: str) -> dict:
         return _empty(term)
 
     except Exception as e:
-        logger.warning("wiki_fetch_error", term=term, error=str(e)[:60])
+        # Classify common transient errors so Render logs are not alarming.
+        # "Expecting value: line 1 column 1 (char 0)" = Wikipedia API returned
+        # an empty HTTP body (transient throttle/network blip). Non-fatal — the
+        # caller (WikiEnrichmentService) handles {} gracefully.
+        err_str = str(e)
+        error_type = (
+            "empty_response"
+            if "Expecting value" in err_str or "line 1 column 1" in err_str
+            else "network_error"
+        )
+        logger.warning(
+            "wiki_fetch_error",
+            term=term,
+            error_type=error_type,
+            error=err_str[:80],
+            hint="Transient Wikipedia API issue — pipeline continues without wiki enrichment.",
+        )
         time.sleep(3)  # Brief pause on network errors
         return _empty(term)
 

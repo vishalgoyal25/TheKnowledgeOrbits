@@ -161,9 +161,27 @@ def _parse_question_json(raw: str, source_urls: list[str]) -> dict | None:
     if question_type not in ("multi_statement", "assertion_reasoning", "single_mcq"):
         question_type = "single_mcq"
 
-    if set(options.keys()) != {"A", "B", "C", "D"}:
-        logger.warning("question_bad_options", keys=list(options.keys()))
-        return None
+    valid_keys = {"A", "B", "C", "D"}
+    if set(options.keys()) != valid_keys:
+        extra_keys = set(options.keys()) - valid_keys
+        missing_keys = valid_keys - set(options.keys())
+        if missing_keys:
+            # Cannot recover — required option letters are absent
+            logger.warning(
+                "question_bad_options",
+                keys=list(options.keys()),
+                missing=list(missing_keys),
+            )
+            return None
+        if extra_keys:
+            # LLM added extra options (e.g. 'E') — strip them if correct_answer is still valid
+            for k in extra_keys:
+                options.pop(k, None)
+            logger.info(
+                "question_extra_options_stripped",
+                stripped=list(extra_keys),
+                remaining=list(options.keys()),
+            )
 
     if correct_answer not in ("A", "B", "C", "D"):
         logger.warning("question_bad_correct_answer", value=correct_answer)

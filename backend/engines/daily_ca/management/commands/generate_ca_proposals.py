@@ -657,6 +657,12 @@ class Command(BaseCommand):
             "over",
             "after",
             "amid",
+            # Fallback-title noise: "X — Latest Development" tokens should not
+            # inflate Jaccard similarity between otherwise unrelated proposals.
+            "latest",
+            "development",
+            "recent",
+            "update",
         }
 
         def _tokens(title: str) -> set[str]:
@@ -825,12 +831,13 @@ class Command(BaseCommand):
             recent_published_titles = []
 
         # Phase D fix: split overlap thresholds by dedup layer.
-        # Intra-day (Layer 1): 0.35 — same-day proposals about the same news story
-        #   can easily produce titles with only 35–45% shared content tokens
-        #   ("Heat Stress Alert 57 Districts" vs "IMD Warning Extreme Heat 57 Districts").
+        # Intra-day (Layer 1): 0.45 — raised from 0.35 to reduce false positives.
+        #   0.35 was too aggressive: fallback titles ("X — Latest Development") share
+        #   "latest" / "development" tokens and were pushing unrelated topics over the
+        #   threshold. 0.45 still catches genuine same-story duplicates.
         # 3-day lookback (Layer 2): 0.5 — cross-day comparison is less sensitive;
         #   a legitimate follow-up article shares many words with its predecessor.
-        _INTRADAY_OVERLAP_THRESHOLD = 0.35
+        _INTRADAY_OVERLAP_THRESHOLD = 0.45
         _RECENT_OVERLAP_THRESHOLD = 0.5
 
         # Idempotency check
@@ -1105,6 +1112,12 @@ class Command(BaseCommand):
         try:
             # Strip markdown fences
             cleaned = re.sub(r"```(?:json)?", "", raw).strip()
+
+            # Pre-sanitise common LLM JSON defects before any parse attempt:
+            #   • Trailing commas — e.g. {"title": "...", "description": "...",}
+            #     These are valid JS but illegal JSON and cause json.loads to raise
+            #     "Illegal trailing comma" or "Expecting property name".
+            cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
 
             # Phase D — Stricter JSON extraction (3 attempts, most-specific first):
             #   Attempt 1: direct parse — LLM returned clean JSON with no preamble

@@ -41,11 +41,30 @@ logger = structlog.get_logger(__name__)
 # Render production: set INTERNAL_API_BASE_URL in environment variables.
 _INTERNAL_API_BASE = getattr(settings, "INTERNAL_API_BASE_URL", "http://127.0.0.1:8000")
 
+# Warn loudly when falling back to localhost — on Render, the cron container
+# cannot reach 127.0.0.1:8000; every call will throw ConnectionError.
+# Fix: add INTERNAL_API_BASE_URL=https://<your-render-service>.onrender.com to Render env vars.
+if _INTERNAL_API_BASE == "http://127.0.0.1:8000":
+    logger.warning(
+        "static_background_localhost_fallback",
+        message=(
+            "INTERNAL_API_BASE_URL not set — using http://127.0.0.1:8000. "
+            "On Render this will fail with ConnectionError on every cycle. "
+            "Set INTERNAL_API_BASE_URL in Render environment variables."
+        ),
+    )
+
 # Timeout for the GET check (should be very fast — DB lookup only)
 _GET_TIMEOUT_SECONDS = 10
 
 # Sleep between trigger POSTs — respects book_content GROQ rate limits (12s)
 _TRIGGER_SLEEP_SECONDS = 12
+
+# ── Session-level circuit breaker ─────────────────────────────────────────────
+# Set to False after the first ConnectionError in this process.
+# Prevents repeated network attempts when the internal API is unreachable —
+# avoids 10× identical ConnectionError logs per pipeline run.
+_api_reachable: bool = True
 
 
 # ── Fact extraction patterns ──────────────────────────────────────────────────
@@ -194,6 +213,11 @@ class StaticBackgroundService:
         if not topic_id:
             return None
 
+        # Circuit breaker: skip immediately if a previous call already failed to connect.
+        global _api_reachable
+        if not _api_reachable:
+            return None
+
         try:
             url = f"{_INTERNAL_API_BASE}/api/v1/book/content/{topic_id}/"
             response = requests.get(url, timeout=_GET_TIMEOUT_SECONDS)
@@ -251,10 +275,17 @@ class StaticBackgroundService:
             return None
 
         except requests.exceptions.ConnectionError:
-            # Server not reachable — expected in test/offline environments
+            # Server not reachable — expected in test/offline environments.
+            # Flip the circuit breaker so subsequent cycles in this run
+            # skip the HTTP call entirely (avoids one log line per cycle).
+            # Note: global _api_reachable is already declared at the top of
+            # this method — no second declaration needed (Python 3.12 SyntaxError).
+            _api_reachable = False
             logger.warning(
                 "static_background_connection_error",
                 topic_id=str(topic_id),
+                base_url=_INTERNAL_API_BASE,
+                hint="Set INTERNAL_API_BASE_URL env var on Render to the web service URL.",
             )
             return None
 
@@ -285,6 +316,17 @@ class StaticBackgroundService:
         """
         if not topic_ids:
             logger.debug("static_trigger_no_topics")
+            return 0
+
+        # Circuit breaker: if get_background_facts() already confirmed the API is
+        # unreachable in this session, skip all trigger POSTs immediately.
+        global _api_reachable
+        if not _api_reachable:
+            logger.warning(
+                "static_trigger_skipped_circuit_open",
+                topic_count=len(topic_ids),
+                hint="INTERNAL_API_BASE_URL not reachable — static generation not triggered.",
+            )
             return 0
 
         triggered = 0
