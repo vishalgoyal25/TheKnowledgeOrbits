@@ -41,9 +41,11 @@ from groq import Groq
 logger = structlog.get_logger(__name__)
 
 # ── Rate Limit Config ─────────────────────────────────────────────────────────
-# 12 s soft throttle keeps us under GROQ free tier's 6 000 tokens/min.
+# 15 s soft throttle — raised from 12 s to reduce GROQ 429s on the free tier.
+# At 12 s, 3 keys × ~5 calls each = 15 calls in ~3 min → hits 6 000 tokens/min cap
+# by cycle 7. At 15 s the same 15 calls spread over ~3.75 min, staying under the cap.
 # Cerebras is more generous but sharing one sleep keeps logic simple.
-INTER_CALL_SLEEP = 12.0
+INTER_CALL_SLEEP = 15.0
 RETRY_WAIT_TIMES = [15, 30, 60, 120]  # Cooldown ladder when all keys are 429
 
 # Temperature / token settings per call mode

@@ -190,8 +190,8 @@ class CommentListView(APIView):
                 parent__isnull=True,  # top-level only
                 is_deleted=False,
             )
-            .select_related("user")
-            .prefetch_related("replies__user")
+            .select_related("user", "user__profile")
+            .prefetch_related("replies__user", "replies__user__profile")
             .order_by("created_at")
         )
 

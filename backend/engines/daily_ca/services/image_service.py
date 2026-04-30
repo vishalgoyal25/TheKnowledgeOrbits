@@ -96,6 +96,12 @@ class HeroImageService:
         Searches Unsplash for a landscape photo matching the topic.
         Returns the 'regular' size URL (1080px) of the first result, or "".
 
+        Two-pass strategy:
+          Pass 1 — full topic_name (specific, best match)
+          Pass 2 — simplified keyword query (broader, fallback for Indian-specific
+                   terms like "Lok Sabha" or "Partition of Bengal" that return 0
+                   results on Unsplash's English-centric photo library)
+
         Uses UNSPLASH_ACCESS_KEY from environment.
         API docs: https://unsplash.com/documentation#search-photos
         """
@@ -108,51 +114,34 @@ class HeroImageService:
             return ""
 
         try:
-            import requests
-
-            # Build a clean search query — topic name is already descriptive
-            query = topic_name.strip()
-
-            resp = requests.get(
-                _UNSPLASH_SEARCH_URL,
-                params={
-                    "query": query,
-                    "per_page": "5",  # fetch 5, pick first valid
-                    "orientation": "landscape",
-                    "content_filter": "high",  # safe content only
-                },
-                headers={"Authorization": f"Client-ID {access_key}"},
-                timeout=_HTTP_TIMEOUT,
+            # ── Pass 1: full topic name ───────────────────────────────────────
+            result = HeroImageService._unsplash_query(
+                access_key, topic_name.strip(), topic_name
             )
+            if result:
+                return result
 
-            if resp.status_code != 200:
-                logger.info(
-                    "hero_image_unsplash_api_error",
-                    status=resp.status_code,
-                    topic=topic_name[:60],
+            # ── Pass 2: simplified keyword fallback ───────────────────────────
+            # Extract the 1-2 most distinctive words (longest, non-stopword).
+            # "Partition of Bengal" → "Partition Bengal"
+            # "Lok Sabha Speaker" → "Parliament India"  (uses subject fallback)
+            # "Electoral Reforms Commission" → "Electoral Commission"
+            simplified = _simplify_query(topic_name)
+            if simplified and simplified.lower() != topic_name.strip().lower():
+                result = HeroImageService._unsplash_query(
+                    access_key, simplified, topic_name
                 )
-                return ""
-
-            data = resp.json()
-            results = data.get("results", [])
-
-            for photo in results:
-                urls = photo.get("urls", {})
-                # 'regular' = 1080px wide, good balance of quality and speed
-                url = urls.get("regular", "") or urls.get("full", "")
-                if url and url.startswith("http") and _is_valid_image_url(url):
+                if result:
                     logger.info(
-                        "hero_image_unsplash_found",
+                        "hero_image_unsplash_fallback_used",
                         topic=topic_name[:60],
-                        photo_id=photo.get("id", ""),
-                        image_url=url[:80],
+                        fallback_query=simplified,
                     )
-                    return url
+                    return result
 
             logger.info(
                 "hero_image_unsplash_no_results",
                 topic=topic_name[:60],
-                total=len(results),
             )
 
         except Exception as exc:
@@ -161,6 +150,50 @@ class HeroImageService:
                 topic=topic_name[:60],
                 error=str(exc)[:100],
             )
+
+        return ""
+
+    @staticmethod
+    def _unsplash_query(access_key: str, query: str, topic_name: str) -> str:
+        """
+        Single Unsplash API call for `query`.
+        Returns URL of first valid result, or "" if none.
+        """
+        import requests
+
+        resp = requests.get(
+            _UNSPLASH_SEARCH_URL,
+            params={
+                "query": query,
+                "per_page": "5",  # fetch 5, pick first valid
+                "orientation": "landscape",
+                "content_filter": "high",  # safe content only
+            },
+            headers={"Authorization": f"Client-ID {access_key}"},
+            timeout=_HTTP_TIMEOUT,
+        )
+
+        if resp.status_code != 200:
+            logger.info(
+                "hero_image_unsplash_api_error",
+                status=resp.status_code,
+                topic=topic_name[:60],
+                query=query,
+            )
+            return ""
+
+        results = resp.json().get("results", [])
+        for photo in results:
+            urls = photo.get("urls", {})
+            url = urls.get("regular", "") or urls.get("full", "")
+            if url and url.startswith("http") and _is_valid_image_url(url):
+                logger.info(
+                    "hero_image_unsplash_found",
+                    topic=topic_name[:60],
+                    query=query,
+                    photo_id=photo.get("id", ""),
+                )
+                return url
 
         return ""
 
@@ -301,3 +334,86 @@ def _is_valid_image_url(url: str) -> bool:
     if any(p in url_lower for p in ("/pixel/", "/beacon/", "/track/", "1x1")):
         return False
     return True
+
+
+def _simplify_query(topic_name: str) -> str:
+    """
+    Builds a simpler Unsplash search query from a topic name.
+
+    Strategy:
+      1. Strip common stopwords and short connector words.
+      2. Keep the 2 longest remaining words (most topically distinctive).
+      3. Map well-known Indian-specific terms to Unsplash-friendly equivalents.
+
+    Examples:
+      "Lok Sabha"                → "Parliament India"
+      "Partition of Bengal"      → "Bengal history"
+      "Electoral Reforms Bill"   → "Electoral Reforms"
+      "MGNREGA Rural Employment" → "Rural Employment"
+    """
+    _STOPWORDS = {
+        "of",
+        "the",
+        "a",
+        "an",
+        "in",
+        "to",
+        "and",
+        "for",
+        "on",
+        "at",
+        "is",
+        "are",
+        "was",
+        "were",
+        "by",
+        "with",
+        "as",
+        "from",
+        "that",
+        "this",
+        "its",
+        "over",
+        "after",
+        "amid",
+        "under",
+        "into",
+        "through",
+    }
+
+    # Hard mappings for Indian governance terms that Unsplash has no photos for
+    _TERM_MAP = {
+        "lok sabha": "parliament india",
+        "rajya sabha": "parliament india",
+        "lok sabha speaker": "parliament india",
+        "sansad": "parliament india",
+        "vidhan sabha": "state legislature india",
+    }
+
+    lower = topic_name.strip().lower()
+
+    # Check hard-map first (exact match)
+    if lower in _TERM_MAP:
+        return _TERM_MAP[lower]
+
+    # Check if any hard-map key is a substring
+    for key, replacement in _TERM_MAP.items():
+        if key in lower:
+            return replacement
+
+    # Generic: strip stopwords, keep 2 longest meaningful words
+    words = [
+        w.strip(".,:-—\"'()")
+        for w in topic_name.split()
+        if w.lower().strip(".,:-—\"'()") not in _STOPWORDS
+        and len(w.strip(".,:-—\"'()")) > 3
+    ]
+
+    if not words:
+        return topic_name.strip()
+
+    # Sort by word length descending — longer words are usually more specific nouns
+    words_by_len = sorted(words, key=len, reverse=True)
+    top_words = words_by_len[:2]
+
+    return " ".join(top_words)

@@ -6,11 +6,12 @@ The Master Orchestrator — runs the full 3-Layer pipeline for one topic.
 Pipeline:
   Step 1-2 — Mode A only (wiki_only): no PDF extraction needed
   Step 3   — Hierarchy Classification (LLM Call #1 or map lookup)
-  Step 4   — Subtopic Discovery (LLM Call #2)
+  Step 4   — Subtopic Discovery (seeded DB lookup — NO LLM, NO invention)
   Step 5   — Wikipedia Full-Page Fetch (per subtopic)
   Step 6   — NCERT Section Extract (Mode B only — skipped for now)
   Step 7   — Quality Article Generation (Layer 2 Quality Engine)
-  Step 8   — Sub-Subtopic Discovery + Articles (for [DEEP] subtopics)
+  Step 8   — Sub-Subtopic Discovery + Articles (LLM, cap=2 per subtopic)
+             ▸ Sub-subtopic is the FLOOR — no children ever created below this level.
   Step 9   — Coherence Pass (Layer 3)
 
 Smart Skip: if BookContent already exists for a subtopic → skip LLM,
@@ -44,7 +45,7 @@ from .classifier_service import classify_hierarchy
 from .coherence_service import run_coherence_pass
 from .llm_service import llm_call
 from .quality_engine_service import generate_quality_article
-from .subtopic_service import find_sub_subtopics, find_subtopics
+from .subtopic_service import find_sub_subtopics
 from .wiki_service import extract_relevant_section, fetch_full_page
 
 logger = structlog.get_logger(__name__)
@@ -625,21 +626,8 @@ def ingest_topic(
         module = hierarchy["module"]
         topic = hierarchy["confirmed_topic"]
 
-        # ── Step 4: Subtopic Discovery ────────────────────────────────────────
-        logger.info("ingestor_step4_subtopics", topic=topic)
-        subtopics = find_subtopics(topic, ncert_text=clean_ncert_text or None)
-
-        # Fix #2: cap subtopics per topic so one topic can't blow the whole budget
-        if max_subtopics < 999:
-            subtopics = subtopics[:max_subtopics]
-            logger.info(
-                "ingestor_subtopics_capped", cap=max_subtopics, total=len(subtopics)
-            )
-
-        if not subtopics:
-            logger.warning("ingestor_no_subtopics_found", topic=topic)
-
-        # ── Resolve / match knowledge hierarchy nodes (strict — never invents) ─
+        # ── Resolve hierarchy nodes (strict — never invents subject or module) ─
+        # Moved before Step 4 so the seeded subtopic lookup has topic_obj available.
         subject_obj = _get_subject_strict(subject)
         if subject_obj is None:
             raise SkipGenerationError(
@@ -656,6 +644,67 @@ def ingest_topic(
 
         topic_obj = _get_or_match_topic_fuzzy(
             topic, module_obj, subject_obj, node_type="topic"
+        )
+
+        # ── Step 4: Subtopic Discovery — seeded DB lookup only, NO LLM ──────
+        # The seeded hierarchy (built by seed_syllabus) is the authoritative source
+        # of subtopic names. LLM is NEVER used to invent subtopic names — it only
+        # generates CONTENT for subtopics that already exist in the DB.
+        #
+        # This prevents hallucinated placements like "Gandhian Phase" appearing
+        # under "Federal Structure / Indian Polity & Constitution".
+        #
+        # Hierarchy contract (enforced here):
+        #   Subject     → read-only (seeded)
+        #   Module      → read-only (seeded)
+        #   Topic       → content generated for existing node only
+        #   Subtopic    → content generated for existing nodes only (NO new nodes)
+        #   Sub-subtopic→ ONLY level where LLM may create new nodes (cap=2)
+        #                 NO children below sub-subtopic — this is the floor.
+        logger.info("ingestor_step4_subtopics", topic=topic)
+        seeded_sub_objs = list(
+            Topic.objects.filter(
+                parent_topic=topic_obj,
+                node_type="subtopic",
+                is_active=True,
+            ).order_by("name")
+        )
+
+        if not seeded_sub_objs:
+            raise SkipGenerationError(
+                f"No seeded subtopics found under '{topic}' (id={topic_obj.id}). "
+                f"Run seed_syllabus to populate subtopics before generating content."
+            )
+
+        # Cap to max_subtopics per run (passed from generate_static_content, default 3)
+        if max_subtopics < 999:
+            seeded_sub_objs = seeded_sub_objs[:max_subtopics]
+
+        # Build subtopic list in the format the processing loop expects.
+        #
+        # needs_deep logic — count-based, not exists-based:
+        #   exists() → misses partial runs: if a crash left 1 of 2 sub-subtopics,
+        #              exists() returns True → needs_deep=False → 2nd never created.
+        #   count < cap → correct: 1 exists, cap=2 → 1 < 2 → needs_deep=True →
+        #              pipeline retries and creates the missing one on next run.
+        #              Smart-skip inside the loop handles the already-existing one.
+        subtopics = [
+            {
+                "name": st.name,
+                "needs_deep": Topic.objects.filter(
+                    parent_topic=st, node_type="sub_subtopic"
+                ).count()
+                < max_sub_subtopics,
+                "source": "seeded",
+            }
+            for st in seeded_sub_objs
+        ]
+
+        logger.info(
+            "ingestor_subtopics_from_db",
+            topic=topic,
+            total=len(subtopics),
+            needs_deep_count=sum(1 for s in subtopics if s["needs_deep"]),
         )
 
         # ── Phase C: Protect topic overview from re-generation ───────────────
@@ -714,7 +763,7 @@ def ingest_topic(
         # ── Steps 5-8: Process each subtopic ─────────────────────────────────
         deep_expansions_done = 0
         for i, sub in enumerate(subtopics, 1):
-            sub_name = sub["name"]
+            sub_name = str(sub["name"])
             needs_deep = sub["needs_deep"]
 
             # Fix #1: hard budget stop — check before every subtopic
@@ -847,7 +896,14 @@ def ingest_topic(
                     budget_remaining=budget["remaining"] if budget else "unlimited",
                 )
 
-            # ── Step 8: Recursive deep expansion ─────────────────────────────
+            # ── Step 8: Sub-Subtopic Discovery + Article Generation ──────────
+            # HIERARCHY FLOOR ENFORCEMENT:
+            #   Sub-subtopic (node_type="sub_subtopic") is the DEEPEST level
+            #   in the hierarchy. No children are EVER created below it.
+            #   LLM is permitted to invent new sub-subtopic NAMES here (via
+            #   find_sub_subtopics), but only capped at max_sub_subtopics=2.
+            #   All nodes created here use node_type="sub_subtopic" and
+            #   parent_topic=sub_topic_obj — never nested deeper.
             if needs_deep and deep_expansions_done < max_deep_per_topic:
                 deep_expansions_done += 1
                 logger.info(
@@ -986,6 +1042,16 @@ def ingest_topic(
                         words=len(ss_article.split()),
                         budget_remaining=budget["remaining"] if budget else "unlimited",
                     )
+
+            # ── Subtopic complete: article + sub-subtopic pass done ───────────
+            # Upgrade subtopic from 'book_quality' → 'complete' only after:
+            #   a) its own article exists (already saved above), AND
+            #   b) the sub-subtopic loop completed without raising BudgetExhaustedError.
+            # If budget is exhausted mid-loop, the exception propagates before
+            # reaching here — the subtopic stays at 'book_quality', and the
+            # count-based needs_deep check (Gap 1) ensures it is retried next run.
+            Topic.objects.filter(id=sub_topic_obj.id).update(content_status="complete")
+            logger.info("ingestor_subtopic_marked_complete", subtopic=sub_name)
 
         # ── Step 9: Coherence Pass (Layer 3) ─────────────────────────────────
         logger.info("ingestor_step9_coherence", topic=topic)
