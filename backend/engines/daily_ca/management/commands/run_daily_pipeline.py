@@ -46,10 +46,14 @@ Notes:
 
 import sentry_sdk
 import structlog
+from datetime import datetime
+
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from datetime import datetime
+
+from engines.assessment.models import Quiz
+from engines.current_affairs.models import CAArticle
 from engines.daily_ca.models import CaDailyProposal
 
 logger = structlog.get_logger(__name__)
@@ -80,11 +84,23 @@ class Command(BaseCommand):
             default="default",
             help="Database alias (default: 'default'). Use 'supabase' for production.",
         )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            default=False,
+            help=(
+                "Inspect only — no LLM calls, no DB writes, no approvals. "
+                "Shows today's CA article count, existing proposals (by status), "
+                "which proposals would be auto-approved, and whether a quiz "
+                "already exists for today. Safe to run anytime."
+            ),
+        )
 
     def handle(self, *args, **options):
         db_alias: str = options["database"]
         date_str: str = options["date"].strip().lower()
         top_n: int = options["top"]
+        dry_run: bool = options["dry_run"]
 
         # Resolve date once — shared by all steps
         if date_str == "today":
@@ -109,6 +125,11 @@ class Command(BaseCommand):
                 f"{_DIVIDER}"
             )
         )
+
+        # ── Dry-run: read-only inspection, zero LLM calls, zero DB writes ────
+        if dry_run:
+            self._dry_run_inspect(target_date, db_alias, top_n)
+            return
 
         # ── STEP 1: Generate proposals ────────────────────────────────────────
         self.stdout.write(
@@ -281,3 +302,139 @@ class Command(BaseCommand):
             self.stdout.write(f"    ✓ [{round(p.relevance_score, 1)}] {p.title[:70]}")
 
         return updated
+
+    # ── Dry-run helper ────────────────────────────────────────────────────────
+
+    def _dry_run_inspect(self, target_date, db_alias: str, top_n: int) -> None:
+        """
+        Read-only pipeline inspection. Zero LLM calls. Zero DB writes.
+        Shows exactly what the real run would do, using live Supabase data.
+        """
+        self.stdout.write(
+            self.style.WARNING(
+                f"\n{'━' * 60}\n"
+                f"  🔍 DRY RUN — Daily CA Pipeline ({target_date})\n"
+                f"  Database : {db_alias} | No writes, no LLM calls.\n"
+                f"{'━' * 60}"
+            )
+        )
+
+        # ── Step 1 preview: CA articles ingested in last 24 hr ───────────────
+        from datetime import timedelta
+
+        since = timezone.now() - timedelta(hours=24)
+        try:
+            raw_ca_count = (
+                CAArticle.objects.using(db_alias).filter(created_at__gte=since).count()
+            )
+        except Exception:
+            raw_ca_count = 0
+
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("\n▶ Step 1 — Proposals (read-only):")
+        )
+        self.stdout.write(f"  CA articles ingested (last 24 hr): {raw_ca_count}")
+
+        proposals_qs = CaDailyProposal.objects.using(db_alias).filter(date=target_date)
+        status_counts: dict = {}
+        for row in proposals_qs.values("status"):
+            status_counts[row["status"]] = status_counts.get(row["status"], 0) + 1
+
+        if not status_counts:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"  No proposals found for {target_date}.\n"
+                    "  Step 1 would run generate_ca_proposals to create them."
+                )
+            )
+        else:
+            for st, cnt in sorted(status_counts.items()):
+                self.stdout.write(f"  {st:12s}: {cnt} proposal(s)")
+
+        # ── Step 2 preview: which proposals would be auto-approved ───────────
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(
+                f"\n▶ Step 2 — Auto-approve top {top_n} (read-only):"
+            )
+        )
+        pending: list[CaDailyProposal] = list(
+            CaDailyProposal.objects.using(db_alias)
+            .filter(date=target_date, status="pending")
+            .order_by("-relevance_score")[:top_n]
+        )
+        if not pending:
+            self.stdout.write("  No pending proposals — nothing to approve.")
+        else:
+            self.stdout.write(
+                f"  Would approve {len(pending)} proposal(s) (sorted by score):"
+            )
+            for p in pending:
+                self.stdout.write(
+                    f"    [{round(p.relevance_score, 1):4.1f}] {p.title[:70]}"
+                )
+
+        # ── Step 3 preview: approved proposals queued for article generation ──
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("\n▶ Step 3 — Article generation (read-only):")
+        )
+        approved: list[CaDailyProposal] = list(
+            CaDailyProposal.objects.using(db_alias)
+            .filter(date=target_date, status="approved")
+            .order_by("-relevance_score")
+        )
+        if not approved:
+            self.stdout.write(
+                "  No approved proposals — Step 3 would wait for Step 2 output."
+            )
+        else:
+            self.stdout.write(
+                f"  {len(approved)} approved proposal(s) ready for article generation:"
+            )
+            for p in approved:
+                self.stdout.write(
+                    f"    [{round(p.relevance_score, 1):4.1f}] {p.title[:70]}"
+                )
+
+        # ── Step 5 preview: quiz ──────────────────────────────────────────────
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("\n▶ Step 5 — Daily Quiz (read-only):")
+        )
+        try:
+            date_label = target_date.strftime("%d %B %Y")
+            quiz_title = f"Daily Current Affairs Quiz — {date_label}"
+            quiz_exists = (
+                Quiz.objects.using(db_alias)
+                .filter(title=quiz_title, is_public=True, created_by=None)
+                .exists()
+            )
+            if quiz_exists:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  ✅ Quiz already exists for {target_date} — Step 5 would skip."
+                    )
+                )
+            else:
+                self.stdout.write(
+                    f"  No quiz yet for {target_date} — Step 5 would generate one."
+                )
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(f"  Quiz check failed: {exc}"))
+
+        # ── Summary ───────────────────────────────────────────────────────────
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"\n{'━' * 60}\n"
+                f"  ✅ Dry run complete — DB connection healthy.\n"
+                f"  Run without --dry-run tomorrow to execute the full pipeline.\n"
+                f"{'━' * 60}\n"
+            )
+        )
+        logger.info(
+            "daily_pipeline_dry_run",
+            date=str(target_date),
+            db_alias=db_alias,
+            raw_ca_last24h=raw_ca_count,
+            proposal_statuses=status_counts,
+            pending_to_approve=len(pending),
+            already_approved=len(approved),
+        )
