@@ -41,7 +41,7 @@ repos:
 
       - id: backend-pytest
         name: Backend Laboratory (Pytest)
-        entry: powershell -Command "cd backend; $env:PYTHONDONTWRITEBYTECODE=1; ..\myvenv\Scripts\pytest engines/ -q --tb=short -p no:cacheprovider"
+        entry: powershell -Command "cd backend; $env:PYTHONDONTWRITEBYTECODE=1; ..\myvenv\Scripts\pytest engines/ -q --tb=short -p no:cacheprovider -n auto"
         language: system
         files: ^backend/
         pass_filenames: false
