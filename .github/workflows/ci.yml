@@ -46,12 +46,20 @@ jobs:
         run: mypy .
 
   # ============================================
-  # JOB 2: Backend Logic (590 Tests)
+  # JOB 2: Backend Logic — 3 Parallel Shards
+  # Runs concurrently with backend-lint (no needs).
+  # Each shard gets its own VM + 2 CPUs.
+  # Shard 1: tests 1–~193 | Shard 2: ~194–~386 | Shard 3: ~387–579
+  # Combined wall-clock: ~4 min instead of ~11 min.
   # ============================================
   backend-tests:
-    name: Backend Laboratory (Pytest)
-    needs: backend-lint
+    name: Backend Tests (Shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false   # Let all shards finish — don't cancel siblings on first failure
+      matrix:
+        shard: [1, 2, 3]
 
     services:
       postgres:
@@ -108,15 +116,19 @@ jobs:
         working-directory: ./backend
         run: python manage.py migrate --noinput
 
-      - name: Execute 590 Tests (Parallel)
+      - name: Execute Tests — Shard ${{ matrix.shard }}/3
         working-directory: ./backend
         run: |
-          pytest -n auto --cov=engines --cov-report=xml --maxfail=10
+          pytest -n auto \
+            --splits 3 --group ${{ matrix.shard }} \
+            --cov=engines --cov-report=xml \
+            --maxfail=10
 
-      - name: Upload Coverage
+      - name: Upload Coverage (Shard ${{ matrix.shard }})
         uses: codecov/codecov-action@v4
         with:
           file: ./backend/coverage.xml
+          flags: shard-${{ matrix.shard }}
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_ci_if_error: false
 
@@ -158,10 +170,13 @@ jobs:
 
   # ============================================
   # JOB 4: Deploy to Render (The Gatekeeper)
+  # needs: backend-tests waits for ALL 3 matrix shards automatically.
+  # needs: backend-lint ensures lint also passed before deploying.
+  # ONLY triggers on main branch after everything is green.
   # ============================================
   deploy:
     name: Trigger Render Deployment
-    needs: [backend-tests, frontend-integrity] # ONLY runs if ALL tests pass
+    needs: [backend-lint, backend-tests, frontend-integrity]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' # Only deploy from the main branch
     steps:
