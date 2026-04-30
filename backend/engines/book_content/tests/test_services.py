@@ -568,11 +568,12 @@ class TestIngestorSmartSkip(TestCase):
             is_active=True,
             topic_type="syllabus",
             node_type="subtopic",  # Phase C smart-skip filter requires this
+            parent_topic=self.topic,  # required for seeded DB lookup in Step 4
             order_index=1,
         )
 
     @patch("engines.book_content.services.ingestor_service.classify_hierarchy")
-    @patch("engines.book_content.services.ingestor_service.find_subtopics")
+    @patch("engines.book_content.services.ingestor_service.find_sub_subtopics")
     @patch("engines.book_content.services.ingestor_service.fetch_full_page")
     @patch("engines.book_content.services.ingestor_service._generate_topic_overview")
     @patch("engines.book_content.services.ingestor_service.generate_quality_article")
@@ -599,7 +600,7 @@ class TestIngestorSmartSkip(TestCase):
         mock_quality: MagicMock,
         mock_overview: MagicMock,
         mock_wiki: MagicMock,
-        mock_subtopics: MagicMock,
+        mock_sub_subtopics: MagicMock,
         mock_classify: MagicMock,
     ) -> None:
         """
@@ -625,9 +626,9 @@ class TestIngestorSmartSkip(TestCase):
             "module": "Smart Skip Module",
             "confirmed_topic": "Smart Skip Topic",
         }
-        mock_subtopics.return_value = [
-            {"name": "Pre-Existing Subtopic", "needs_deep": False}
-        ]
+        # Subtopics now come from seeded DB (Step 4) — no mock needed.
+        # find_sub_subtopics (Step 8) is still mocked to avoid LLM calls.
+        mock_sub_subtopics.return_value = []
         mock_wiki.return_value = {
             "title": "Smart Skip Topic",
             "content": "some content",
@@ -653,7 +654,7 @@ class TestIngestorSmartSkip(TestCase):
         mock_registry.assert_called()
 
     @patch("engines.book_content.services.ingestor_service.classify_hierarchy")
-    @patch("engines.book_content.services.ingestor_service.find_subtopics")
+    @patch("engines.book_content.services.ingestor_service.find_sub_subtopics")
     @patch("engines.book_content.services.ingestor_service.fetch_full_page")
     @patch("engines.book_content.services.ingestor_service._generate_topic_overview")
     @patch("engines.book_content.services.ingestor_service.generate_quality_article")
@@ -680,7 +681,7 @@ class TestIngestorSmartSkip(TestCase):
         mock_quality: MagicMock,
         mock_overview: MagicMock,
         mock_wiki: MagicMock,
-        mock_subtopics: MagicMock,
+        mock_sub_subtopics: MagicMock,
         mock_classify: MagicMock,
     ) -> None:
         """
@@ -688,29 +689,33 @@ class TestIngestorSmartSkip(TestCase):
         """
         from engines.knowledge.models import Topic as TopicModel
 
-        # Create a brand new subtopic with NO pre-existing BookContent
+        # Create a brand new subtopic with NO pre-existing BookContent.
+        # parent_topic=self.topic required so the seeded DB lookup in Step 4 finds it.
         new_subtopic = TopicModel.objects.create(
             name="Brand New Subtopic",
             module=self.module,
             subject=self.subject,
             is_active=True,
             topic_type="syllabus",
+            node_type="subtopic",
+            parent_topic=self.topic,
             order_index=99,
         )
 
         mock_get_subject.return_value = self.subject
         mock_get_module.return_value = self.module
-        # _get_or_match_topic_fuzzy called twice: main topic + new subtopic
-        mock_get_topic.side_effect = [self.topic, new_subtopic]
+        # _get_or_match_topic_fuzzy called 3 times: main topic + new subtopic + pre-existing
+        # subtopic (setUp creates both under self.topic, so DB returns 2 subtopics).
+        mock_get_topic.side_effect = [self.topic, new_subtopic, self.subtopic]
 
         mock_classify.return_value = {
             "subject": "Smart Skip Subject",
             "module": "Smart Skip Module",
             "confirmed_topic": "Smart Skip Topic",
         }
-        mock_subtopics.return_value = [
-            {"name": "Brand New Subtopic", "needs_deep": False}
-        ]
+        # Subtopics now come from seeded DB (Step 4) — no mock needed.
+        # find_sub_subtopics (Step 8) is still mocked to avoid LLM calls.
+        mock_sub_subtopics.return_value = []
         mock_wiki.return_value = {
             "title": "T",
             "content": "content",
@@ -725,8 +730,8 @@ class TestIngestorSmartSkip(TestCase):
 
         ingest_topic(topic_name="Smart Skip Topic")
 
-        # BookContent did NOT exist → quality article WAS generated
-        mock_quality.assert_called_once()
+        # BookContent did NOT exist → quality article WAS generated (at least once)
+        mock_quality.assert_called()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

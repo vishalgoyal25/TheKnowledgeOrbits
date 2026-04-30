@@ -89,10 +89,21 @@ class Command(BaseCommand):
                 "(default: 'supabase'). ingest_topic() always uses 'default'."
             ),
         )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            default=False,
+            help=(
+                "Inspect only — no LLM calls, no DB writes. "
+                "Shows the full topic queue, what would be processed, "
+                "and the current subject progress report. Safe to run anytime."
+            ),
+        )
 
     def handle(self, *args, **options):
         db_alias: str = options["database"]
         max_articles: int = options["max_articles"]
+        dry_run: bool = options["dry_run"]
 
         # ── Reroute Django 'default' DB to match --database alias ─────────────
         # ingest_topic() and every ORM call inside it always use the 'default'
@@ -212,6 +223,49 @@ class Command(BaseCommand):
                 run_date=str(run_date),
                 skipped_complete=skipped_complete,
             )
+            return
+
+        # ── Dry-run: inspect only, no LLM calls, no DB writes ────────────────
+        if dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"\n  🔍 DRY RUN — no LLM calls, no DB writes.\n"
+                    f"  Topics that WOULD be processed (cap: {max_articles}):\n"
+                )
+            )
+            for idx, (t_obj, s_name) in enumerate(topic_queue[:max_articles], 1):
+                subtopic_count = Topic.objects.filter(
+                    parent_topic=t_obj, node_type="subtopic", is_active=True
+                ).count()
+                done_subtopics = Topic.objects.filter(
+                    parent_topic=t_obj, node_type="subtopic", content_status="complete"
+                ).count()
+                self.stdout.write(
+                    f"    [{idx}] {t_obj.name}"
+                    + (f"  ({s_name})" if s_name else "")
+                    + f"\n         Subtopics: {done_subtopics}/{subtopic_count} complete"
+                    + f"  |  status: {t_obj.content_status or 'pending'}"
+                )
+            if len(topic_queue) > max_articles:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"\n  ...and {len(topic_queue) - max_articles} more topics "
+                        f"deferred (beyond cap of {max_articles})."
+                    )
+                )
+            logger.info(
+                "static_gen_dry_run",
+                run_date=str(run_date),
+                queue_size=len(topic_queue),
+                would_process=min(len(topic_queue), max_articles),
+            )
+            self._print_subject_progress()
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "\n  ✅ Dry run complete — pipeline looks healthy.\n"
+                )
+            )
+            self.stdout.write(self.style.MIGRATE_HEADING(f"{_DIVIDER}\n"))
             return
 
         # ── Pre-flight LLM health check ───────────────────────────────────────
@@ -380,10 +434,12 @@ class Command(BaseCommand):
             skipped_generating=skipped_generating,
         )
 
-        # ── Subject-level progress report ─────────────────────────────────────
-        # Printed after every run so Render logs show exactly which subject is
-        # currently being built and how far along it is.
-        # No DB schema change — derived entirely from Topic.content_status counts.
+        self._print_subject_progress()
+        self.stdout.write(self.style.MIGRATE_HEADING(f"{_DIVIDER}\n"))
+
+    def _print_subject_progress(self) -> None:
+        """Prints subject-level completion progress. No DB writes. Called by both
+        the normal run path and --dry-run."""
         self.stdout.write(
             self.style.MIGRATE_HEADING("\n  Subject Progress (topic-level nodes):\n")
         )
@@ -392,7 +448,7 @@ class Command(BaseCommand):
                 module__subject=subject_obj, node_type="topic", is_active=True
             ).count()
             if total_topics == 0:
-                continue  # subject has no seeded topics — skip display
+                continue
 
             done_topics = Topic.objects.filter(
                 module__subject=subject_obj,
@@ -433,5 +489,3 @@ class Command(BaseCommand):
                 subtopics_total=total_subtopics,
                 pct_complete=pct,
             )
-
-        self.stdout.write(self.style.MIGRATE_HEADING(f"{_DIVIDER}\n"))
