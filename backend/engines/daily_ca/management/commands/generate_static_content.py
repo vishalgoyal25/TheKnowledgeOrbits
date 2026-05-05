@@ -338,7 +338,8 @@ class Command(BaseCommand):
                 )
 
                 if result.get("skipped"):
-                    # Hierarchy not found in seeded DB — not an error, just a mismatch
+                    # Hierarchy not found in seeded DB — not an error, just a mismatch.
+                    # Do NOT increment generated — slot stays free for next eligible topic.
                     self.stdout.write(
                         self.style.WARNING(
                             f"  ⚠  '{topic_obj.name}' skipped — "
@@ -350,8 +351,6 @@ class Command(BaseCommand):
                         topic=topic_obj.name,
                         reason=result.get("reason", "")[:200],
                     )
-                    # Count as generated (we attempted it) — don't retry same day
-                    generated += 1
                     continue
 
                 nodes = result.get("nodes_created", 0)
