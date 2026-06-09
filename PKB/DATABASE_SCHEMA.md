@@ -500,3 +500,90 @@ ca_source → ca_article → ca_chunk → ca_topic_link → knowledge_topic
 - content_embedding: ivfflat tuned for 384-dim vectors
 - analytics_daily_aggregate: one row per user per day (bounded growth)
 - ca_chunk: expiry_date enables soft-delete cleanup via cron
+
+---
+
+## 6. RESEARCH AGENT ENGINE TABLES (Current Active Build)
+
+All 5 tables are fully isolated — no FK references to any existing engine tables.
+
+```sql
+CREATE TABLE research_session (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query TEXT NOT NULL,
+    user_id UUID NULL,                    -- NULL = guest user
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                                          -- pending|running|completed|failed
+    langfuse_trace_id VARCHAR(200) DEFAULT '',
+    retry_count SMALLINT DEFAULT 0,
+    search_cache_hit BOOLEAN DEFAULT FALSE,
+    started_at TIMESTAMP DEFAULT NOW(),
+    completed_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE research_report (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES research_session(id) ON DELETE CASCADE,
+    title VARCHAR(500) NOT NULL,
+    summary TEXT DEFAULT '',
+    body_md TEXT NOT NULL,
+    sources JSONB DEFAULT '[]',
+    domain VARCHAR(100) DEFAULT '',
+    confidence_score FLOAT DEFAULT 0.0,   -- derived from DeepEval (0.0-100.0)
+    word_count INTEGER DEFAULT 0,
+    is_public BOOLEAN DEFAULT TRUE,
+    public_share_token VARCHAR(64) UNIQUE NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE agent_execution_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES research_session(id) ON DELETE CASCADE,
+    agent_name VARCHAR(50) NOT NULL,      -- supervisor|planner|search|research|verification|report_generator|reflection
+    status VARCHAR(20) NOT NULL,          -- running|completed|failed|retrying
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP NULL,
+    duration_ms INTEGER DEFAULT 0,
+    tokens_used INTEGER DEFAULT 0,
+    model_used VARCHAR(100) DEFAULT '',
+    provider VARCHAR(20) DEFAULT '',      -- groq|cerebras
+    output_summary TEXT DEFAULT '',
+    error_message TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE evaluation_result (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id UUID NOT NULL REFERENCES research_report(id) ON DELETE CASCADE,
+    hallucination_score FLOAT DEFAULT 0.0,
+    faithfulness_score FLOAT DEFAULT 0.0,
+    relevance_score FLOAT DEFAULT 0.0,
+    completeness_score FLOAT DEFAULT 0.0,
+    overall_score FLOAT DEFAULT 0.0,
+    evaluated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE agent_state_snapshot (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES research_session(id) ON DELETE CASCADE,
+    node_name VARCHAR(50) NOT NULL,
+    sequence_order SMALLINT NOT NULL,     -- 1=supervisor, 2=planner, etc.
+    state_json JSONB NOT NULL,            -- full LangGraph state at this node transition
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Indexes:**
+
+```sql
+CREATE INDEX idx_research_session_user ON research_session(user_id);
+CREATE INDEX idx_research_session_status ON research_session(status);
+CREATE INDEX idx_research_report_session ON research_report(session_id);
+CREATE INDEX idx_research_report_token ON research_report(public_share_token);
+CREATE INDEX idx_agent_log_session ON agent_execution_log(session_id);
+CREATE INDEX idx_agent_log_agent ON agent_execution_log(agent_name);
+CREATE INDEX idx_eval_report ON evaluation_result(report_id);
+CREATE INDEX idx_snapshot_session ON agent_state_snapshot(session_id);
+CREATE INDEX idx_snapshot_node ON agent_state_snapshot(node_name);
+```

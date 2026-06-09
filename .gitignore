@@ -104,7 +104,7 @@ specs
 .claude/
 .postman/
 
-
+CLAUDE.md
 FEATURES.md
 FEATURES1.0.md
 FEATURES1.1.md
@@ -116,10 +116,9 @@ FEATURES6.md
 FEATURES7.md
 Feat_Optimization.md
 AWS_DEPLOYMENT.md
+agentic_ai_roadmap.md
+AgenticAI.md
 
 postman/
-CLAUDE.md
-agentic_ai_roadmap.md
 TheKnowledgeOrbits_Research_Agent.pdf
-AgenticAI.md
-"*.pdf"
+*.pdf

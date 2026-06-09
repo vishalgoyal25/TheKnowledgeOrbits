@@ -115,7 +115,26 @@ Every engine must define:
 
 ---
 
-## 5. PHASE 5+ ENGINES (Summary)
+## 5. RESEARCH AGENT ENGINE (Current Active Build)
+
+### RESEARCH AGENT ENGINE
+
+- **Responsibility:** Domain-agnostic AI Research Agent — accepts any research question, executes multi-agent LangGraph workflow, returns structured research report with live visualization.
+- **Auth:** Public = 3 queries/day (rate-limited by IP). Logged-in = unlimited + history saved.
+- **RBAC:** query → public + all authenticated | history read → own user only | admin = all
+- **Sync/Async:** Query = async (LangGraph + SSE stream). History read = sync.
+- **AgenticAI:** ✅ PRIMARY AgenticAI engine — full 7-agent LangGraph workflow
+  - Supervisor → Planner → Search (parallel) → Research → Verification → Report Generator → Reflection
+  - Tools: Tavily, Exa, Wikipedia, Calculator, Domain Classifier, Credibility Scorer
+  - LLMOps: Langfuse traces, prompt versioning, DeepEval automated evaluation
+  - Real-time: SSE stream + React Flow live workflow visualization
+- **Tables:** research_session, research_report, agent_execution_log, evaluation_result, agent_state_snapshot
+- **Location:** backend/engines/research_agent/ | frontend/src/app/research_agent/
+- **Status:** ⬜ IN DEVELOPMENT — feature/research-agent branch
+
+---
+
+## 6. PHASE 5+ ENGINES (Summary)
 
 | Engine          | Phase | Auth               | AgenticAI Use                       |
 | --------------- | ----- | ------------------ | ----------------------------------- |

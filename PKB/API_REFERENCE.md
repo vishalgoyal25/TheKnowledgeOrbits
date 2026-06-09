@@ -397,7 +397,63 @@
 
 ---
 
-## 11. RULES
+## 11. RESEARCH AGENT ENGINE (Current Active Build)
+
+### POST /api/v1/research/query/
+
+- **Auth:** Optional (guest allowed, 3/day rate limit)
+- **RBAC:** public (rate-limited) | all authenticated (unlimited)
+- **Body:** `{ "query": string }`
+- **Response:** `{ "data": { "session_id": uuid, "stream_url": "/api/v1/research/stream/{session_id}/" } }`
+- **Side Effect:** Starts LangGraph workflow async. Client connects to stream_url for SSE.
+- **Errors:** 429 (guest rate limit), VALIDATION_ERROR
+
+### GET /api/v1/research/stream/{session_id}/
+
+- **Auth:** Optional
+- **Content-Type:** `text/event-stream`
+- **Response:** SSE stream of events: `node_started`, `node_completed`, `node_failed`, `retry_started`, `hitl_interrupt`, `search_progress`, `workflow_completed`, `workflow_failed`
+- **Terminates:** On `workflow_completed` or `workflow_failed` event
+
+### POST /api/v1/research/clarify/{session_id}/
+
+- **Auth:** Optional
+- **Body:** `{ "answer": string }` — user's response to HITL interrupt
+- **Response:** `{ "data": { "status": "resumed" } }`
+- **Side Effect:** Resumes paused LangGraph workflow
+
+### GET /api/v1/research/report/{report_id}/
+
+- **Auth:** Optional (public reports only for guests)
+- **RBAC:** own reports → all authenticated | public reports → anyone
+- **Response:** `{ "data": { report object with full body_md, sources, confidence_score, eval_scores } }`
+
+### GET /api/v1/research/report/{report_id}/export/
+
+- **Auth:** YES
+- **Query Params:** `?format=pdf|md`
+- **Response:** File download (PDF or .md file)
+
+### GET /api/v1/research/history/
+
+- **Auth:** YES
+- **RBAC:** own history only
+- **Query Params:** `?limit=20&cursor=...`
+- **Response:** `{ "data": [{ session + report summary }], "meta": { cursor, has_next } }`
+
+### GET /api/v1/research/share/{token}/
+
+- **Auth:** NO (public)
+- **Response:** `{ "data": { report object } }` — public read of shared report
+
+### GET /api/v1/research/health/
+
+- **Auth:** NO
+- **Response:** `{ "status": "ok", "agents": "ready", "redis": "ok", "langfuse": "ok" }`
+
+---
+
+## 12. RULES
 
 - ❌ No endpoint without Auth specified
 - ❌ No endpoint without RBAC role defined
