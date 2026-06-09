@@ -10,3 +10,6 @@ gunicorn>=23.0.0
 
 # Serve static files directly from Django — no S3/CDN needed on free tier
 whitenoise>=6.9.0
+
+# PDF export — Research Agent report download (production only)
+weasyprint>=69.0

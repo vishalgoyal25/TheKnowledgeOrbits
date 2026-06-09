@@ -17,11 +17,19 @@ argon2-cffi>=23.1.0
 
 # API integration
 groq>=0.13.0
-langchain-groq==0.1.9
-langchain==0.2.16
+langchain-groq>=0.2.10
+langchain>=0.3.25
+langchain-core>=1.4.0
+langchain-text-splitters>=0.3.0
 cerebras-cloud-sdk>=1.67.0   # Cerebras free-tier LLM (llama3.3-70b)
 openai>=1.0.0                 # OpenAI-compatible client — used for Gemini + future providers
 tenacity>=8.1.0,!=8.4.0,<9.0.0
+
+# AgenticAI — Research Agent Engine
+langgraph>=1.2.4
+langfuse>=4.7.1
+tavily-python>=0.7.25
+exa-py>=2.13.2
 
 # PDF Extraction
 pdfplumber>=0.11.4
