@@ -73,6 +73,7 @@ def api_index(request: Any) -> JsonResponse:
                 "tags": "/api/v1/tags/",
                 "concepts": "/api/v1/concepts/",
                 "social": "/api/v1/social/",
+                "research": "/api/v1/research/",
             },
         },
         status=200,
@@ -103,6 +104,8 @@ urlpatterns = [
     path("api/v1/concepts/", include("engines.tags.concepts_urls")),
     # Feature 6 — Social Interaction Engine
     path("api/v1/social/", include("engines.social.urls")),
+    # AgenticAI — Research Agent Engine
+    path("api/v1/research/", include("engines.research_agent.urls")),
 ]
 
 # Conditionally add the admin path (not disabled in production)

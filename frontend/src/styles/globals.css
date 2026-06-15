@@ -43,7 +43,15 @@
   html,
   body {
     @apply bg-background text-foreground;
-    overflow-x: hidden;
+    /*
+     * `clip` (not `hidden`) is deliberate. `overflow-x: hidden` forces the
+     * computed `overflow-y` to `auto`, turning <body> into a scroll container
+     * whose height grows with content — a "dead scrollport" that never scrolls
+     * but still hijacks `position: sticky` resolution, silently breaking every
+     * sticky descendant. `overflow-x: clip` clips horizontal overflow the same
+     * way WITHOUT creating a scroll container, so sticky resolves to the viewport.
+     */
+    overflow-x: clip;
   }
 }
 

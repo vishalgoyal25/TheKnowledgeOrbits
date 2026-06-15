@@ -15,8 +15,16 @@ services:
     # Build configuration
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt && chmod +x render-build.sh && ./render-build.sh"
 
-    # Start command: Optimized for high-concurrency (Threads + Workers)
-    startCommand: "cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 8 --worker-class gthread --timeout 120 --keep-alive 10 --max-requests 500 --max-requests-jitter 50"
+    # Start command: runs the Research Agent background worker (django-background-tasks,
+    # `process_tasks`) ALONGSIDE gunicorn in the same Starter dyno. process_tasks is
+    # backgrounded (&) and executes the LangGraph workflow (run_research) + DeepEval
+    # (evaluate_session); gunicorn stays in the foreground and keeps the dyno alive.
+    # (Paid Starter dyno = always-on, so the in-process worker never sleeps.)
+    # NOTE: the subshell `( … )` is REQUIRED — `cd backend && A & B` parses as
+    # `(cd backend && A) &` + `B`, so gunicorn (B) would run from the repo root and
+    # fail with `ModuleNotFoundError: No module named 'core'`. Wrapping both in a
+    # subshell after `cd backend` makes the `cd` apply to BOTH processes.
+    startCommand: "cd backend && (python manage.py process_tasks & gunicorn core.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --threads 8 --worker-class gthread --timeout 120 --keep-alive 10 --max-requests 500 --max-requests-jitter 50)"
 
     # Pre-deploy: run migrations on DIRECT port (5432) before new version goes live
     # Using 5432 instead of 6543 for migrations is critical for stability.
@@ -78,6 +86,24 @@ services:
         sync: false
       - key: USE_EMBEDDING_API
         value: "True"
+
+      # ── Research Agent (AgenticAI engine) ─────────────────────────────────
+      # REDIS_URL is REQUIRED: SSE pub/sub (worker→browser), Redis rate limiter,
+      # query cache, user memory. Use a free Upstash rediss:// URL.
+      - key: REDIS_URL
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: EXA_API_KEY
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: LANGFUSE_HOST
+        value: https://us.cloud.langfuse.com
 
       # ── Email (Brevo SMTP) ─────────────────────────────────────────────────
       - key: EMAIL_HOST
