@@ -8,7 +8,7 @@ langchain-groq>=0.2.10
 langchain>=0.3.25
 langchain-core>=1.4.0
 langchain-text-splitters>=0.3.0
-cerebras-cloud-sdk>=1.67.0   # Cerebras free-tier LLM (llama-3.3-70b)
+cerebras-cloud-sdk>=1.67.0   # Cerebras free-tier LLM (gpt-oss-120b — Llama retired from public endpoints)
 openai>=1.0.0                 # OpenAI-compatible client — used for Gemini + future providers
 
 # AgenticAI — LLM evaluation (runs locally inside Django process, no external service)

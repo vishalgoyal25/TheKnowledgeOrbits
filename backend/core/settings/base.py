@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     "engines.tags",
     # Feature 6 — Social Interaction Engine
     "engines.social",
+    "engines.research_agent",
 ]
 
 # Custom User Model
@@ -344,11 +345,19 @@ if not GROQ_API_KEY and not os.getenv("RENDER"):
     raise ImproperlyConfigured("GROQ_API_KEY environment variable is not set")
 
 # ── Additional LLM Providers (optional — add keys to unlock more capacity) ───
-# Cerebras: free tier, llama-3.3-70b, api.cerebras.ai/v1
+# Cerebras: free tier, gpt-oss-120b, api.cerebras.ai/v1
 # Comma-separated if multiple keys from same provider.
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+# Research Agent — search API keys
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+EXA_API_KEY = os.getenv("EXA_API_KEY", "")
+
+# Langfuse Configuration
+LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
+LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
 # ==============================================================================
 # EMAIL CONFIGURATION

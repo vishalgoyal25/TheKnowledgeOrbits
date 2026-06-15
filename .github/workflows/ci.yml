@@ -49,8 +49,10 @@ jobs:
   # JOB 2: Backend Logic — 3 Parallel Shards
   # Runs concurrently with backend-lint (no needs).
   # Each shard gets its own VM + 2 CPUs.
-  # Shard 1: tests 1–~193 | Shard 2: ~194–~386 | Shard 3: ~387–579
-  # Combined wall-clock: ~4 min instead of ~11 min.
+  # 699 tests total (incl. research_agent's 120). pytest-split distributes by
+  # timing, so this stays balanced automatically — no per-shard edits needed.
+  # Shard 1: tests 1–~233 | Shard 2: ~234–~466 | Shard 3: ~467–699
+  # Combined wall-clock: ~5 min instead of ~12 min.
   # ============================================
   backend-tests:
     name: Backend Tests (Shard ${{ matrix.shard }}/3)
