@@ -21,12 +21,15 @@ langchain-groq>=0.2.10
 langchain>=0.3.25
 langchain-core>=1.4.0
 langchain-text-splitters>=0.3.0
-cerebras-cloud-sdk>=1.67.0   # Cerebras free-tier LLM (llama3.3-70b)
+cerebras-cloud-sdk>=1.67.0   # Cerebras free-tier LLM (gpt-oss-120b — Llama retired from public endpoints)
 openai>=1.0.0                 # OpenAI-compatible client — used for Gemini + future providers
 tenacity>=8.1.0,!=8.4.0,<9.0.0
 
 # AgenticAI — Research Agent Engine
 langgraph>=1.2.4
+langgraph-checkpoint-postgres>=3.1.0   # PostgreSQL checkpointer — crash-resume of the LangGraph workflow
+psycopg[binary]>=3.2.0                  # psycopg3 driver required by the Postgres checkpointer (binary build = no libpq needed)
+psycopg-pool>=3.2.0                     # connection pool used by the Postgres checkpointer
 langfuse>=4.7.1
 tavily-python>=0.7.25
 exa-py>=2.13.2

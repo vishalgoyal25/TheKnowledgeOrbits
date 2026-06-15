@@ -29,6 +29,7 @@ import {
   Bookmark,
   CheckCircle2,
   FileQuestion,
+  FlaskConical,
   Folder,
   LayoutDashboard,
   Lightbulb,
@@ -45,6 +46,7 @@ import Link from "next/link";
 import type { DailyCaArticleList } from "@/lib/api/daily-ca";
 import type { Quiz } from "@/lib/types";
 import { DailyQuizWidget } from "@/components/home/daily-quiz-widget";
+import { HomepageWidget } from "@/components/research_agent/HomepageWidget";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // KNOWLEDGE ORBITS GRAPH TEASER
@@ -632,43 +634,43 @@ export default function HomePageClient({
               <div className="lg:w-[54%] text-center lg:text-left">
                 <Badge className="mb-5 px-4 py-1.5 bg-blue-100 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-default shadow-sm border inline-flex">
                   <Sparkles className="h-3.5 w-3.5 mr-2" />
-                  Empowering UPSC Aspirants with AI-RAG
+                  8-Agent AI Research · UPSC Focused
                 </Badge>
 
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight mb-5 leading-[1.1]">
-                  Your Personal AI <br />
+                  Your Personal{" "}
                   <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-                    Syllabus Maestro
+                    AI Research Maestro
                   </span>
                 </h1>
 
                 <p className="text-base md:text-lg text-slate-600 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                  Move beyond generic study material. Harness{" "}
+                  Ask any UPSC question — our{" "}
                   <span className="text-slate-900 font-semibold">
-                    Retrieval Augmented Generation
+                    8-agent AI pipeline
                   </span>{" "}
-                  to create syllabus-mapped articles from verified NCERT &amp;
-                  Daily CA sources instantly.
+                  researches, verifies, and streams a cited report in real time.
+                  Syllabus-mapped, source-verified, instantly ready.
                 </p>
 
-                <div className="flex flex-wrap gap-3 justify-center lg:justify-start items-center mb-10">
-                  <Link href="/generate">
+                <div className="grid grid-cols-2 gap-3 mb-10 max-w-md mx-auto lg:mx-0">
+                  <Link href="/research_agent" className="block">
                     <Button
                       size="lg"
-                      className="h-11 px-6 text-sm bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-950/10 gap-2 group"
+                      className="w-full h-11 px-4 text-sm bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-950/10 gap-2 group"
                     >
-                      <Sparkles className="h-4 w-4 group-hover:rotate-12 transition-transform" />
-                      Generate AI Article
+                      <FlaskConical className="h-4 w-4" />
+                      Deep Research
                     </Button>
                   </Link>
-                  <Link href="/daily-ca">
+                  <Link href="/daily-ca" className="block">
                     <Button
                       size="lg"
                       variant="outline"
-                      className="h-11 px-6 text-sm text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 gap-2"
+                      className="w-full h-11 px-4 text-sm text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 gap-2"
                     >
                       <Newspaper className="h-4 w-4" />
-                      Today&apos;s Current Affairs
+                      Today&apos;s CA
                     </Button>
                   </Link>
                   <Link
@@ -677,14 +679,25 @@ export default function HomePageClient({
                         ? `/assessment/${initialTodayQuiz.id}/intro`
                         : "/assessment"
                     }
+                    className="block"
                   >
                     <Button
                       size="lg"
                       variant="outline"
-                      className="h-11 px-6 text-sm text-violet-700 border-violet-200 bg-violet-50 hover:bg-violet-100 gap-2"
+                      className="w-full h-11 px-4 text-sm text-violet-700 border-violet-200 bg-violet-50 hover:bg-violet-100 gap-2"
                     >
                       <FileQuestion className="h-4 w-4" />
                       Try a Quiz
+                    </Button>
+                  </Link>
+                  <Link href="/generate" className="block">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="w-full h-11 px-4 text-sm text-slate-700 border-slate-200 bg-slate-50 hover:bg-slate-100 gap-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Generate Article
                     </Button>
                   </Link>
                 </div>
@@ -717,8 +730,9 @@ export default function HomePageClient({
                 </div>
               </div>
 
-              {/* ── RIGHT: Live CA Preview ── */}
-              <div className="lg:w-[46%] w-full max-w-md mx-auto lg:mx-0">
+              {/* ── RIGHT: Research Agent Widget + Live CA Preview ── */}
+              <div className="lg:w-[46%] w-full max-w-md mx-auto lg:mx-0 flex flex-col gap-4">
+                <HomepageWidget />
                 <HeroLiveCA
                   articles={todayArticles.slice(0, 5)}
                   loading={false}

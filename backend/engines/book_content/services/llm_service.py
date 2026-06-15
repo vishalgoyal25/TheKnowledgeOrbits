@@ -5,7 +5,7 @@ Unified multi-provider LLM client — shared by all engines.
 
 Active provider pool (round-robin rotation):
   • GROQ      — api.groq.com        — llama-3.3-70b-versatile  (primary, free)
-  • Cerebras  — api.cerebras.ai/v1  — llama3.1-8b              (additive, free)
+  • Cerebras  — api.cerebras.ai/v1  — gpt-oss-120b             (additive, free)
 
 Excluded providers:
   • Gemini  — 15 RPM free-tier cap makes it unsuitable for round-robin pool
@@ -100,12 +100,19 @@ def _build_pool() -> list[_LLMEntry]:
     # Do NOT use groq.Groq here: groq SDK hardcodes "/openai/v1/" path prefix,
     # which produces https://api.cerebras.ai/v1/openai/v1/... → 404.
     # The Cerebras SDK knows its own endpoint; no base_url override needed.
+    #
+    # Model is configurable via settings.CEREBRAS_MODEL so a future Cerebras
+    # model swap is an ENV edit, not a code change. Default `gpt-oss-120b` is the
+    # current FREE public *production* model. NOTE: Cerebras RETIRED the Llama
+    # models from public endpoints — the old "llama3.1-8b" now 404s, which is
+    # what silently stopped static book_content generation. (verified 2026-06-11)
+    cerebras_model = getattr(settings, "CEREBRAS_MODEL", "gpt-oss-120b")
     raw_cerebras = getattr(settings, "CEREBRAS_API_KEY", "")
     for key in [k.strip() for k in raw_cerebras.split(",") if k.strip()]:
         pool.append(
             _LLMEntry(
                 client=Cerebras(api_key=key),
-                model="llama3.1-8b",  # Cerebras available model (llama3.3-70b not on this account)
+                model=cerebras_model,
                 provider="cerebras",
             )
         )
