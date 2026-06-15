@@ -82,11 +82,20 @@ def _build_postgres_checkpointer():
     (→ "the connection is closed" at invoke time).
 
     Connection kwargs that PostgresSaver requires / benefits from:
-      - autocommit=True       : PostgresSaver manages its own transactions
-      - row_factory=dict_row  : it reads rows as dicts
-      - prepare_threshold=0   : disable prepared statements → also keeps us
-                                compatible with pooled connections (Supabase /
-                                pgBouncer) in production
+      - autocommit=True        : PostgresSaver manages its own transactions
+      - row_factory=dict_row   : it reads rows as dicts
+      - prepare_threshold=None : DISABLE server-side prepared statements. This is
+                                 mandatory for Supabase's transaction pooler
+                                 (port 6543 / pgBouncer / Supavisor): the pooler
+                                 hands each transaction a DIFFERENT physical
+                                 backend, so a statement prepared on one backend
+                                 won't exist on the next → "prepared statement
+                                 _pg3_N does not exist". With None, psycopg3 never
+                                 creates named prepared statements, so it's
+                                 pooler-safe.
+                                 (NOTE: psycopg3 `0` means "prepare EAGERLY on
+                                 first use" — the opposite of disabling — which
+                                 was the original bug.)
     """
     from psycopg import Connection
     from psycopg.rows import dict_row
@@ -105,7 +114,7 @@ def _build_postgres_checkpointer():
     conn = Connection.connect(
         conn_str,
         autocommit=True,
-        prepare_threshold=0,
+        prepare_threshold=None,  # disable prepared statements → Supabase pooler-safe
         row_factory=dict_row,
     )
     saver = PostgresSaver(conn)
