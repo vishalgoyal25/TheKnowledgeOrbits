@@ -79,11 +79,15 @@ class ExaTool:
                 query=query[:100],
             )
 
+            # NOTE: exa-py >= 2.x removed `use_autoprompt`; the replacement is
+            # `type="auto"` (Exa picks neural vs keyword automatically). Passing
+            # the old kwarg raises "Invalid option: 'use_autoprompt'" → Exa always
+            # failed and the chain silently skipped to Wikipedia.
             response = client.search_and_contents(
                 query,
                 num_results=MAX_RESULTS,
                 highlights={"num_sentences": 3, "highlights_per_url": 1},
-                use_autoprompt=True,
+                type="auto",
             )
 
             results = self._parse_results(response)
