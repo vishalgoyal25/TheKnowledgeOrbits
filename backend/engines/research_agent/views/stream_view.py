@@ -61,4 +61,13 @@ class StreamView(View):
         response["Cache-Control"] = "no-cache"
         response["X-Accel-Buffering"] = "no"  # disable nginx/proxy buffering
         response["Access-Control-Allow-Origin"] = "*"  # CORS on the stream (Risk #51)
+        # Opt THIS SSE response out of GZipMiddleware (enabled in prod settings for
+        # other endpoints). GZip compresses StreamingHttpResponse, and gzip's
+        # buffering batches the tiny per-event SSE frames so they only reach the
+        # browser when the stream closes — which kills the live node/token flow in
+        # production (works locally only because dev settings have no GZipMiddleware).
+        # Django's GZipMiddleware skips any response that already declares a
+        # Content-Encoding, so "identity" (= no transform) bypasses gzip for this
+        # one streaming response WITHOUT disabling compression anywhere else.
+        response["Content-Encoding"] = "identity"
         return response

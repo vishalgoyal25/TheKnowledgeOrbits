@@ -59,16 +59,14 @@ function StatusIcon({ status }: { status: AgentStatus }) {
   switch (status) {
     case "running":
       return (
-        <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" />
+        <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
       );
     case "completed":
-      return (
-        <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-      );
+      return <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />;
     case "failed":
-      return <XCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />;
+      return <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />;
     default:
-      return <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />;
+      return <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />;
   }
 }
 
@@ -80,7 +78,7 @@ export default function AgentNode({ data }: NodeProps<AgentNodeType>) {
   return (
     <div
       className={[
-        "relative w-36 rounded-2xl border-2 px-3 py-2.5 shadow-sm",
+        "relative w-48 rounded-2xl border-2 px-4 py-3.5 shadow-sm",
         "transition-all duration-300",
         styles.border,
         styles.bg,
@@ -103,7 +101,7 @@ export default function AgentNode({ data }: NodeProps<AgentNodeType>) {
       <div className="flex items-center gap-1.5">
         <StatusIcon status={status} />
         <span
-          className={`text-xs font-semibold tracking-wide truncate ${styles.text}`}
+          className={`text-base font-semibold tracking-wide truncate ${styles.text}`}
         >
           {label}
         </span>

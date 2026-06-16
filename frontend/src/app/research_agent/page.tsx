@@ -65,6 +65,11 @@ export default function ResearchAgentPage() {
     "session_id" | "created_at"
   > | null>(null);
 
+  // The exact question the user submitted — shown as the report title. The input
+  // box clears on submit, so without this the question would vanish from view
+  // until the report is later reopened from history.
+  const [submittedQuery, setSubmittedQuery] = useState("");
+
   // Cold start guard — Render free tier sleeps after 15 min inactivity.
   const [showWarmingUp, setShowWarmingUp] = useState(false);
   const warmingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,20 +139,23 @@ export default function ResearchAgentPage() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
-  function handleSessionStarted(id: string) {
+  function handleSessionStarted(id: string, query: string) {
     setSources([]);
     setConfidenceScore(null);
     setCachedReport(null);
     setFetchedSummary(null);
     setRetryConfidence(false);
+    setSubmittedQuery(query);
     setPendingQuery("");
     startSession(id);
   }
 
   function handleCachedResult(
     report: Omit<ResearchReportType, "session_id" | "created_at">,
+    query: string,
   ) {
     clearSession();
+    setSubmittedQuery(query);
     setCachedReport(report);
     setSources(report.sources ?? []);
     // Defense-in-depth: a cache hit may arrive before DeepEval has back-filled
@@ -319,6 +327,11 @@ export default function ResearchAgentPage() {
                 Research Report
               </h2>
               <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+                {submittedQuery && (
+                  <h3 className="mb-4 border-b border-gray-100 pb-3 text-lg font-bold leading-snug text-gray-900">
+                    {submittedQuery}
+                  </h3>
+                )}
                 <ResearchReport
                   sessionId={sessionId}
                   executiveSummary={displaySummary}

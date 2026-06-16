@@ -16,9 +16,10 @@ import type {
 const MAX_CHARS = 500;
 
 export interface ResearchInputProps {
-  onSessionStarted: (sessionId: string) => void;
+  onSessionStarted: (sessionId: string, query: string) => void;
   onCachedResult: (
     report: Omit<ResearchReport, "session_id" | "created_at">,
+    query: string,
   ) => void;
   disabled?: boolean;
   // External query trigger: set by parent when HomepageWidget ?q= param or example chip is clicked.
@@ -60,10 +61,10 @@ export default function ResearchInput({
         const result = await submitResearchQuery(trimmed);
 
         if (result.cached) {
-          onCachedResult((result as QueryCachedResponse).report);
+          onCachedResult((result as QueryCachedResponse).report, trimmed);
           setIsLoading(false);
         } else {
-          onSessionStarted(result.session_id);
+          onSessionStarted(result.session_id, trimmed);
           setIsLoading(false);
         }
       } catch (err: unknown) {

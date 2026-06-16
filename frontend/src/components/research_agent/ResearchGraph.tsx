@@ -15,12 +15,13 @@
  *              browser-only APIs that crash Next.js SSR if imported normally.
  */
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { ComponentType } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
+  MarkerType,
   useNodesState,
   type Node,
   type Edge,
@@ -66,7 +67,7 @@ const AGENT_LABELS: Record<string, string> = {
 const INITIAL_NODES: Node<AgentNodeData>[] = AGENT_NAMES.map((name, index) => ({
   id: name,
   type: "agentNode",
-  position: { x: 0, y: index * 110 },
+  position: { x: 0, y: index * 135 },
   data: {
     label: AGENT_LABELS[name] ?? name,
     status: "pending" as AgentStatus,
@@ -74,26 +75,93 @@ const INITIAL_NODES: Node<AgentNodeData>[] = AGENT_NAMES.map((name, index) => ({
   draggable: false,
 }));
 
-// Sequential pipeline edges: supervisor→planner→search→...→reflection
-const PIPELINE_EDGES: Edge[] = AGENT_NAMES.slice(0, -1).map((name, i) => ({
-  id: `${name}->${AGENT_NAMES[i + 1]}`,
-  source: name,
-  target: AGENT_NAMES[i + 1],
-  style: { stroke: "#cbd5e1", strokeWidth: 1.5 },
-}));
+// Edge palette.
+const EDGE_GRAY = "#cbd5e1"; // pending / upcoming
+const EDGE_GREEN = "#22c55e"; // completed transition
+const EDGE_BLUE = "#3b82f6"; // active (in-progress) transition
+const EDGE_RED = "#ef4444"; // failed target
 
-// Conditional edge: reflection can send workflow back to planner for re-planning.
-const CONDITIONAL_EDGE: Edge = {
-  id: "reflection->planner",
-  source: "reflection",
-  target: "planner",
-  type: "smoothstep",
-  style: { stroke: "#94a3b8", strokeDasharray: "5 4", strokeWidth: 1 },
-  label: "re-plan",
-  labelStyle: { fontSize: 9, fill: "#94a3b8" },
-};
+const isDone = (s: AgentStatus) => s === "completed" || s === "failed";
 
-const EDGES: Edge[] = [...PIPELINE_EDGES, CONDITIONAL_EDGE];
+/**
+ * Build edges IN SYNC with node statuses so the connectors tell the same story
+ * as the nodes:
+ *   • upcoming        → thin gray, light arrow
+ *   • in-progress     → glowing BLUE dashed arrow, animated (dashes flow downward)
+ *   • completed       → solid GREEN arrow
+ *   • failed target   → solid RED arrow
+ * When the whole run is done, every pipeline edge is a solid green down-arrow.
+ */
+function buildEdges(agentStatuses: Record<string, AgentStatus>): Edge[] {
+  const statusOf = (name: string): AgentStatus =>
+    agentStatuses[name] ?? "pending";
+
+  const pipeline: Edge[] = AGENT_NAMES.slice(0, -1).map((name, i) => {
+    const target = AGENT_NAMES[i + 1];
+    const s = statusOf(name);
+    const t = statusOf(target);
+
+    const active = isDone(s) && t === "running"; // the live transition
+    const done = isDone(s) && isDone(t);
+
+    let color = EDGE_GRAY;
+    let width = 1.5;
+    let animated = false;
+    let dashed = false;
+    let glow = false;
+
+    if (active) {
+      color = EDGE_BLUE;
+      width = 2.5;
+      animated = true; // React Flow flowing dashes → moves source→target (down)
+      dashed = true;
+      glow = true;
+    } else if (done) {
+      color = t === "failed" ? EDGE_RED : EDGE_GREEN;
+      width = 2.5;
+    }
+
+    return {
+      id: `${name}->${target}`,
+      source: name,
+      target,
+      animated,
+      style: {
+        stroke: color,
+        strokeWidth: width,
+        strokeDasharray: dashed ? "6 4" : undefined,
+        filter: glow ? `drop-shadow(0 0 5px ${EDGE_BLUE}aa)` : undefined,
+      },
+      markerEnd: { type: MarkerType.ArrowClosed, color, width: 20, height: 20 },
+    };
+  });
+
+  // Conditional re-plan back-edge: glows only while a re-plan is actually running
+  // (reflection done → planner running again); otherwise a subtle dashed hint.
+  const replanActive =
+    isDone(statusOf("reflection")) && statusOf("planner") === "running";
+  const conditional: Edge = {
+    id: "reflection->planner",
+    source: "reflection",
+    target: "planner",
+    type: "smoothstep",
+    animated: replanActive,
+    style: {
+      stroke: replanActive ? EDGE_BLUE : "#94a3b8",
+      strokeDasharray: "5 4",
+      strokeWidth: replanActive ? 2 : 1,
+      filter: replanActive ? `drop-shadow(0 0 5px ${EDGE_BLUE}aa)` : undefined,
+    },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      color: replanActive ? EDGE_BLUE : "#94a3b8",
+    },
+    label: "re-plan",
+    labelStyle: { fontSize: 9, fill: "#94a3b8" },
+  };
+
+  return [...pipeline, conditional];
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -113,11 +181,14 @@ export default function ResearchGraph({ agentStatuses }: ResearchGraphProps) {
     );
   }, [agentStatuses, setNodes]);
 
+  // Edges are derived from the SAME agentStatuses as the nodes → always in sync.
+  const edges = useMemo(() => buildEdges(agentStatuses), [agentStatuses]);
+
   return (
     <div className="w-full h-[480px] sm:h-[560px] lg:h-[calc(100dvh-8rem)] rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
       <ReactFlow
         nodes={nodes}
-        edges={EDGES}
+        edges={edges}
         nodeTypes={NODE_TYPES}
         onNodesChange={onNodesChange}
         fitView

@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Copy, Share2, ExternalLink } from "lucide-react";
+import { Copy, Check, Share2, ExternalLink } from "lucide-react";
 import ConfidenceBadge from "./ConfidenceBadge";
 import ExportButton from "./ExportButton";
 import type { Source } from "@/types/research_agent";
@@ -98,6 +98,8 @@ export default function ResearchReport({
   const hasReport = reportTokens.trim().length > 0;
   const hasContent = hasExecutive || hasReport;
 
+  const [copied, setCopied] = useState(false);
+
   const handleCopy = useCallback(() => {
     const text = [
       executiveSummary ? `## Executive Summary\n\n${executiveSummary}` : "",
@@ -105,7 +107,13 @@ export default function ResearchReport({
     ]
       .filter(Boolean)
       .join("\n\n---\n\n");
-    navigator.clipboard.writeText(text).catch(() => null);
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000); // revert after 2s
+      })
+      .catch(() => null);
   }, [executiveSummary, reportTokens]);
 
   const handleShare = useCallback(() => {
@@ -132,10 +140,19 @@ export default function ResearchReport({
               type="button"
               onClick={handleCopy}
               title="Copy report to clipboard"
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+              className={[
+                "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors",
+                copied
+                  ? "border-green-200 bg-green-50 text-green-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
+              ].join(" ")}
             >
-              <Copy className="w-3.5 h-3.5" />
-              Copy
+              {copied ? (
+                <Check className="w-3.5 h-3.5" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+              {copied ? "Copied" : "Copy"}
             </button>
             <button
               type="button"
