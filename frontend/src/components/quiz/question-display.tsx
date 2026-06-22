@@ -142,17 +142,46 @@ export default function QuestionDisplay({
   const formattedExplanation = formatExplanationText(explanationText);
 
   const renderQuestionText = () => {
-    // Render the question EXACTLY as delivered by the backend. `question_text`
-    // already contains the COMPLETE question — the contextual lead-in and, for
-    // multi-statement questions, the numbered statements plus the closing line
-    // (see daily_quiz_prompt_builder). No hardcoded stems, no reconstruction
-    // from `statements[]` (which dropped the context and showed a generic
-    // "Consider the following statements:" line).
-    return (
-      <p className="whitespace-pre-wrap leading-relaxed">
-        {question.question_text}
-      </p>
-    );
+    const text = (question.question_text ?? "").trim();
+    const statements = question.statements ?? [];
+
+    // Multi-statement: the backend is INCONSISTENT — sometimes it embeds the
+    // numbered statements inside question_text, sometimes it keeps them only in
+    // statements[]. To render reliably (context + clean numbered list) with no
+    // duplication and no missing statements, we always derive the contextual
+    // lead-in from question_text and render the statements from statements[].
+    if (question.question_type === "multi_statement" && statements.length > 0) {
+      // Lead-in = question_text up to the first embedded statement (if any),
+      // dropping a dangling "1." / "1)" marker. If statements aren't embedded,
+      // question_text IS the lead-in.
+      let leadIn = text;
+      const firstIdx = statements[0] ? text.indexOf(statements[0]) : -1;
+      if (firstIdx > 0) {
+        leadIn = text
+          .slice(0, firstIdx)
+          .replace(/\s*\d+[.)]\s*$/, "")
+          .trim();
+      }
+      return (
+        <div className="space-y-3">
+          {leadIn && (
+            <p className="whitespace-pre-wrap leading-relaxed font-medium">
+              {leadIn}
+            </p>
+          )}
+          <ol className="list-decimal list-inside space-y-2 ml-4">
+            {statements.map((statement, idx) => (
+              <li key={idx} className="text-gray-700">
+                {statement}
+              </li>
+            ))}
+          </ol>
+        </div>
+      );
+    }
+
+    // single_mcq / assertion_reasoning: question_text is the complete stem.
+    return <p className="whitespace-pre-wrap leading-relaxed">{text}</p>;
   };
 
   return (

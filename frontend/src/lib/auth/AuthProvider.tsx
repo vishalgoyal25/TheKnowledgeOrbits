@@ -6,6 +6,7 @@
 
 import { useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { AxiosError } from "axios";
 import { AuthContext } from "./AuthContext";
 import { authAPI } from "@/lib/api/auth";
 import { tokenManager } from "./token-manager";
@@ -31,17 +32,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const loadUser = async () => {
-    try {
-      if (tokenManager.hasTokens()) {
+    if (!tokenManager.hasTokens()) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Retry transient failures so a flaky/cold-starting backend (Render free
+    // tier spins down on idle) does NOT bounce a logged-in user to /login.
+    // Only a genuine 401/403 means the token is invalid → real logout.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
         const userData = await authAPI.getCurrentUser();
         setUser(userData);
+        setIsLoading(false);
+        return;
+      } catch (error) {
+        const status = (error as AxiosError)?.response?.status;
+        if (status === 401 || status === 403) {
+          logger.error("Auth token invalid — clearing session:", error);
+          tokenManager.clearTokens();
+          setIsLoading(false);
+          return;
+        }
+        // Transient (network/timeout/5xx/cold-start) — keep tokens, back off, retry.
+        logger.error(`getCurrentUser attempt ${attempt + 1} failed:`, error);
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
-    } catch (error) {
-      logger.error("Failed to load user:", error);
-      tokenManager.clearTokens();
-    } finally {
-      setIsLoading(false);
     }
+    // All retries exhausted on transient errors — do NOT clear tokens or log
+    // out; the session token is still valid and ProtectedRoute keeps the user
+    // in place. A later navigation/refresh re-validates.
+    setIsLoading(false);
   };
 
   const login = async (data: LoginRequest, redirectTo?: string) => {

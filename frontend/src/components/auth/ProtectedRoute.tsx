@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth/useAuth";
+import { tokenManager } from "@/lib/auth/token-manager";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
@@ -14,12 +15,18 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // A user with a stored token HAS a session. Only bounce to /login when there
+  // is genuinely no token — never on a transient user-fetch failure (which used
+  // to log the user out intermittently). The backend still enforces auth on
+  // every API call, so this is safe: an invalid token gets cleared on its 401.
+  const hasSession = isAuthenticated || tokenManager.hasTokens();
+
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isLoading && !hasSession) {
       // Redirect to login, but save the current path to return after login
       router.push(`/auth/login?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [isAuthenticated, isLoading, router, pathname]);
+  }, [hasSession, isLoading, router, pathname]);
 
   if (isLoading) {
     return (
@@ -29,7 +36,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!hasSession) {
     return null;
   }
 
