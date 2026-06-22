@@ -369,8 +369,12 @@ def _find_complete_topic(topic_name: str) -> Optional[Topic]:
     """
     Returns the Topic object if fully generated (content_status="complete"), else None.
 
-    Tries exact name match first, then fuzzy match with threshold=0.50
-    (higher threshold for lock detection to avoid false positives).
+    Tries exact name match first, then a strict near-exact fuzzy match
+    (threshold=0.92). Lock detection MUST be near-exact: a loose threshold
+    misroutes genuinely different topics (e.g. "Disaster Management Cycle" →
+    "Cyclones and Urban Disasters" @0.67, "Climate Change Science" →
+    "Climate Change Impact on India" @0.50) into the locked-extension path,
+    so they never get their own content and the queue head never clears.
     """
     if not topic_name:
         return None
@@ -399,7 +403,7 @@ def _find_complete_topic(topic_name: str) -> Optional[Topic]:
             best_score = score
             best_name = name
 
-    if best_score >= 0.50 and best_name:
+    if best_score >= 0.92 and best_name:
         logger.info(
             "ingestor_topic_locked_fuzzy_match",
             input=topic_name,

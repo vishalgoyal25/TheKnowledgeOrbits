@@ -351,6 +351,13 @@ class Command(BaseCommand):
                         topic=topic_obj.name,
                         reason=result.get("reason", "")[:200],
                     )
+                    # FIX: permanently clear this queued node. A skip means no
+                    # seeded subtopics / hierarchy mismatch — it can NEVER generate,
+                    # so mark it resolved. Without this it returns to the head of
+                    # tomorrow's queue and re-jams the pipeline forever.
+                    Topic.objects.filter(id=topic_obj.id).update(
+                        content_status="complete"
+                    )
                     continue
 
                 nodes = result.get("nodes_created", 0)
@@ -392,6 +399,14 @@ class Command(BaseCommand):
                         reason=result.get("reason", ""),
                     )
                     break
+
+                # FIX: permanently clear this queued node so the queue advances
+                # every run. Whether real generation or locked-extension, this
+                # exact node has been processed — mark it complete so it never
+                # returns to the head of tomorrow's queue and re-jams the pipeline.
+                # (Skipped only when partial=True above, which breaks before here
+                # so a budget-interrupted topic is correctly retried next run.)
+                Topic.objects.filter(id=topic_obj.id).update(content_status="complete")
 
             except Exception as exc:
                 failed += 1
