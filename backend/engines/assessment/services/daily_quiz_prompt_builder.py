@@ -179,7 +179,13 @@ SOURCE MATERIAL
 QUESTION TYPE — CHOOSE ONE that best fits the material
 ═══════════════════════════════════════════════════════════
 
-TYPE 1 — MULTI-STATEMENT (most common, recommended)
+All THREE types below are EQUALLY valid. Pick the format the source material
+genuinely fits best — do NOT default to multi-statement. Rotate deliberately:
+multi-statement, assertion-reason, and single-best-answer should each appear
+regularly across questions. If a fact has one precise verifiable answer, prefer
+single-best-answer; if there is a cause/effect claim, prefer assertion-reason.
+
+TYPE 1 — MULTI-STATEMENT
   Format: "Consider the following statements regarding [specific subject]:
   1. [Statement]
   2. [Statement]

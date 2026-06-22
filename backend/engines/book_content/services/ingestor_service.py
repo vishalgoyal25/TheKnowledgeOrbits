@@ -294,11 +294,14 @@ def _get_or_match_topic_fuzzy(
     parent_topic: Optional[Topic] = None,
 ) -> Topic:
     """
-    Tries to find a seeded topic by fuzzy match first.
-    Only creates a new topic node if no seeded topic matches closely.
+    Resolve a node within the seeded hierarchy by exact then fuzzy match.
 
-    This keeps the seeded hierarchy intact while still allowing genuinely
-    new CA-triggered topics to be added at the correct place.
+    Creation policy (hard guard):
+      - node_type="sub_subtopic": may CREATE a new node (the hierarchy floor).
+      - node_type="topic"/"subtopic": NEVER created — if no seeded node matches,
+        raises SkipGenerationError. The seeded syllabus above the sub-subtopic
+        floor is read-only, so the pipeline can never self-generate topics or
+        subtopics in eternity.
 
     CRITICAL: matching is scoped strictly to the same node_type level.
     A subtopic must NEVER match a parent topic even at high word-overlap
@@ -333,7 +336,20 @@ def _get_or_match_topic_fuzzy(
             best_score = score
             best_name = name
 
-    if best_score >= 0.30 and best_name:
+    # Node-reuse threshold by level — prevents wasted LLM + content overwrite.
+    #   topic        → 0.30 (loose): topics come from the seeded hierarchy by
+    #                  exact name; a strict threshold here would spawn DUPLICATE
+    #                  topic nodes whenever module resolution is imperfect.
+    #   subtopic /   → 0.80 (strict): these names are LLM-discovered. A loose
+    #   sub_subtopic   threshold merges DISTINCT concepts onto one existing node
+    #                  and OVERWRITES its content every run (e.g. "Causes of
+    #                  Earthquakes" + "Earthquake-Prone Zones" both collapsing to
+    #                  "Earthquake Vulnerability"). Strict matching gives each
+    #                  distinct concept its own node and keeps the exact-name
+    #                  smart-skip consistent, so a node is generated once only.
+    match_threshold = 0.30 if node_type == "topic" else 0.80
+
+    if best_score >= match_threshold and best_name:
         matched = Topic.objects.filter(
             name=best_name, module=module, node_type=node_type
         ).first()
@@ -346,7 +362,23 @@ def _get_or_match_topic_fuzzy(
             )
             return matched
 
-    # Genuinely new topic — create inside the correctly matched module
+    # ── HARD GUARD: seeded hierarchy is read-only above the sub-subtopic floor ──
+    # New nodes may be created ONLY at node_type="sub_subtopic". Subject and
+    # Module are never created (enforced upstream by _get_subject_strict /
+    # _get_module_strict). Topic and Subtopic come from the seeded syllabus —
+    # if no seeded node matches here, we MUST NOT invent one: doing so would
+    # mutate the fixed hierarchy and risk runaway self-generation. Instead we
+    # raise SkipGenerationError, which ingest_topic() turns into a clean,
+    # logged topic-skip and the cron advances (DFS continues to the next node).
+    if node_type != "sub_subtopic":
+        raise SkipGenerationError(
+            f"No seeded {node_type} node matches '{topic_name}' under module "
+            f"'{getattr(module, 'name', '?')}'. Refusing to create a new "
+            f"{node_type} — the seeded hierarchy is read-only above the "
+            f"sub-subtopic floor."
+        )
+
+    # Genuinely new sub-subtopic — create at the hierarchy floor only
     topic_obj, created = Topic.objects.get_or_create(
         name=topic_name,
         module=module,

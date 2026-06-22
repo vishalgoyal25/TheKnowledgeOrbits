@@ -72,9 +72,19 @@ class CacheControlMiddleware:
             return response
 
         # Original pattern — existing endpoints
-        public_api_pattern = (
-            r"^/api/v1/(current-affairs|articles|knowledge|topics|subjects)/"
-        )
+        #
+        # NOTE: 'articles' is intentionally EXCLUDED here. The article_generation
+        # endpoints return user-specific content — a logged-in user additionally
+        # sees their own private (is_public=False) articles. Marking them
+        # `public` lets the edge CDN cache an ANONYMOUS response keyed by URL
+        # only (no Vary on Authorization) and then serve that stale anonymous
+        # copy to authenticated users. The article UI reads it as "not logged
+        # in" and bounces the user to the login page in a loop. Quiz endpoints
+        # are never cached, which is exactly why the quiz flow has no such issue.
+        # Authenticated requests are already protected above (no-store); the
+        # only safe fix for the shared-URL anonymous cache is to not mark these
+        # responses public at all.
+        public_api_pattern = r"^/api/v1/(current-affairs|knowledge|topics|subjects)/"
 
         if re.match(public_api_pattern, path):
             if "Cache-Control" not in response:

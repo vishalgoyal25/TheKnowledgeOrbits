@@ -142,26 +142,17 @@ export default function QuestionDisplay({
   const formattedExplanation = formatExplanationText(explanationText);
 
   const renderQuestionText = () => {
-    if (
-      question.question_type === "multi_statement" &&
-      question.statements.length > 0
-    ) {
-      return (
-        <div className="space-y-3">
-          <p className="font-medium">Consider the following statements:</p>
-          <ol className="list-decimal list-inside space-y-2 ml-4">
-            {question.statements.map((statement, idx) => (
-              <li key={idx} className="text-gray-700">
-                {statement}
-              </li>
-            ))}
-          </ol>
-          <p className="font-medium mt-4">Which of the above is/are correct?</p>
-        </div>
-      );
-    }
-
-    return <p className="whitespace-pre-wrap">{question.question_text}</p>;
+    // Render the question EXACTLY as delivered by the backend. `question_text`
+    // already contains the COMPLETE question — the contextual lead-in and, for
+    // multi-statement questions, the numbered statements plus the closing line
+    // (see daily_quiz_prompt_builder). No hardcoded stems, no reconstruction
+    // from `statements[]` (which dropped the context and showed a generic
+    // "Consider the following statements:" line).
+    return (
+      <p className="whitespace-pre-wrap leading-relaxed">
+        {question.question_text}
+      </p>
+    );
   };
 
   return (
