@@ -12,6 +12,7 @@ import structlog
 from django.db import transaction
 from django.utils import timezone
 
+from engines.book_content.services.retrieval_service import retrieve_grounding
 from engines.content.models import Chunk
 from engines.current_affairs.models import CAChunk, CATopicLink
 from engines.knowledge.models import ChunkTopicMap, Topic
@@ -73,18 +74,28 @@ class ArticleGenerationService:
                 ca_chunks = ArticleGenerationService._fetch_ca_chunks(topic, days=180)
                 logger.info("ca_chunks_fetched", count=len(ca_chunks))
 
-            # Validate that we have at least SOME source material (Static OR CA)
-            if not static_chunks and not ca_chunks:
+            # Phase 5 — RAG grounding from the book corpus (publish-agnostic, semantic
+            # + cross-subject). Replaces reliance on the dead NCERT content.Chunk path:
+            # topics with no static chunks no longer fail. k_ca=0 — CA is handled above
+            # via include_ca. Appended to context; provenance stored post-save.
+            grounding = retrieve_grounding(
+                seed_topic_id=topic.id, query=topic.name, k_ca=0
+            )
+
+            # Validate that we have at least SOME source material (Static, CA, or RAG)
+            if not static_chunks and not ca_chunks and not grounding.get("book_chunks"):
                 logger.warning("no_source_material_found", topic_id=topic_id)
                 raise ValueError(
-                    f"No source material (Static or Current Affairs) found for topic: {topic.name}. "
-                    "Please ingest relevant material first."
+                    f"No source material (Static, Current Affairs, or Knowledge Base) "
+                    f"found for topic: {topic.name}. Please ingest relevant material first."
                 )
 
-            # Assemble RAG context
+            # Assemble RAG context (textbook/CA chunks + retrieved knowledge-base theory)
             context = ArticleGenerationService._assemble_context(
                 static_chunks, include_ca, ca_chunks
             )
+            if grounding.get("context_text"):
+                context = (context + "\n\n" + grounding["context_text"]).strip()
 
             # Generate article content
             article_data = ArticleGenerationService._generate_with_groq(
@@ -104,6 +115,17 @@ class ArticleGenerationService:
                 include_ca=include_ca,
                 user_id=user_id,
             )
+
+            # Phase 5 — record RAG grounding provenance. book_chunk can't go in the
+            # content.Chunk-typed ArticleSourceMap, so it lives in generation_metadata.
+            if grounding.get("book_chunks"):
+                article.generation_metadata["rag_grounding"] = grounding.get(
+                    "stats", {}
+                )
+                article.generation_metadata["rag_provenance"] = grounding.get(
+                    "provenance", []
+                )
+                article.save(update_fields=["generation_metadata"])
 
             logger.info(
                 "article_generated_successfully",

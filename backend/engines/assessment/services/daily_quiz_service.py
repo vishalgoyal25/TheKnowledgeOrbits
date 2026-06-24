@@ -51,7 +51,7 @@ logger = structlog.get_logger(__name__)
 MAX_QUESTIONS = 10  # questions per daily quiz
 MAX_GROQ_CALLS = 15  # session safety cap (10 questions + 5 retries)
 QUIZ_TIME_LIMIT = 600  # 10 minutes in seconds
-QUIZ_DIFFICULTY = "medium"  # daily quiz is always mixed medium
+QUIZ_DIFFICULTY = "hard"  # daily public quiz difficulty level
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -397,10 +397,29 @@ class DailyQuizGeneratorService:
             logger.warning("daily_quiz_empty_ca_context", proposal_id=proposal_id)
             return None
 
-        # STEP 2: Wikipedia enrichment
-        # Always fetch wiki — it provides the conceptual background layer
-        # that replaces NCERT chunks in this pipeline.
-        wiki_data = _get_wiki_enrichment(topic_name)
+        # STEP 2: Conceptual background — RAG grounding PRIMARY, wiki FALLBACK
+        # Phase 4: publish-agnostic semantic + cross-subject retrieval from the book
+        # corpus gives each question a real theory anchor — the missing piece that made
+        # questions improvise from thin news. k_ca=0: the quiz's news is the proposal's
+        # own CA chunks; the gateway supplies THEORY only. Falls back to Wikipedia when
+        # retrieval is empty. Feeds the existing wiki_enrichment slot (same dict shape).
+        from engines.book_content.services.retrieval_service import (
+            as_wiki_enrichment,
+            retrieve_grounding,
+        )
+
+        grounding = retrieve_grounding(
+            seed_topic_id=getattr(proposal, "topic_id", None),
+            query=topic_name,
+            k_ca=0,
+            db_alias=db_alias,
+        )
+        if grounding.get("book_chunks"):
+            wiki_data = as_wiki_enrichment(grounding)
+            had_rag_grounding = True
+        else:
+            wiki_data = _get_wiki_enrichment(topic_name)
+            had_rag_grounding = False
 
         # STEP 3: Build prompt
         prompt = build_quiz_prompt(
@@ -447,6 +466,7 @@ class DailyQuizGeneratorService:
         # Store the proposal id for DB linking later
         q_data["_proposal_id"] = proposal_id
         q_data["_ca_chunk_ids"] = ca_chunk_ids
+        q_data["_had_rag_grounding"] = had_rag_grounding
 
         return q_data
 
@@ -503,6 +523,10 @@ class DailyQuizGeneratorService:
                 "generated_at": timezone.now().isoformat(),
                 "proposal_count": len(proposals),
                 "questions_generated": len(questions_data),
+                # Phase 4 — how many questions got real RAG theory grounding
+                "rag_grounded_questions": sum(
+                    1 for q in questions_data if q.get("_had_rag_grounding")
+                ),
             },
         )
 
@@ -510,6 +534,7 @@ class DailyQuizGeneratorService:
 
         for idx, q_data in enumerate(questions_data):
             q_data.pop("_proposal_id", None)  # internal tracking key — not a DB field
+            q_data.pop("_had_rag_grounding", None)  # internal flag — not a DB field
             ca_chunk_ids = q_data.pop("_ca_chunk_ids", [])
 
             question = Question.objects.using(db_alias).create(

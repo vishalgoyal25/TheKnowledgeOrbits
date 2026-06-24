@@ -40,6 +40,10 @@ from django.db import transaction
 from django.utils.text import slugify
 
 from engines.book_content.services.llm_service import INTER_CALL_SLEEP, llm_call
+from engines.book_content.services.retrieval_service import (
+    as_static_facts,
+    retrieve_grounding,
+)
 from engines.daily_ca.models import CaDailyProposal, DailyCaArticle, DailyCaStaticLink
 from engines.daily_ca.services.prompt_builder import (
     build_ca_prompt,
@@ -746,27 +750,50 @@ class DailyCaGeneratorService:
             if static_facts is None:
                 needs_static = True
 
-            # ── STEP 2: Enriched CA context + Wiki enrichment (0 GROQ calls) ────
+            # ── STEP 2: Enriched CA context (the NEWS — proposal's own chunks) ──
             # Phase D1: fetch chunks + parent article content for richer input.
-            # chunk_word_count is the word count of chunks ONLY — used for wiki
-            # enrichment threshold independent of how much parent content was found.
+            # chunk_word_count is the word count of chunks ONLY — used for the wiki
+            # fallback threshold independent of how much parent content was found.
             ca_text, chunk_word_count = _fetch_enriched_ca_context(
                 proposal.ca_chunk_ids, db_alias=db_alias
             )
-            wiki_data: dict = {}
             topic_name_for_wiki = (
                 proposal.topic.name if proposal.topic else proposal.title
             )
-            # Wiki enrichment: trigger when chunk text is thin (< 300 words).
-            # Uses chunk_word_count, not total enriched text length, so adding
-            # parent content doesn't suppress wiki enrichment for genuinely thin sources.
-            if chunk_word_count < 300:
+
+            # ── STEP 2b: RAG grounding — PRIMARY theory source (Phase 3) ───────
+            # Publish-agnostic semantic + cross-subject retrieval from the book
+            # corpus, feeding the existing CONCEPTUAL DEPTH ANCHOR (static_key_facts)
+            # slot. Supersedes StaticBackgroundService's exact-topic regex anchor,
+            # which is effectively dead (only 2/162 BookContent published — it gates
+            # on is_published, the gateway does not). k_ca=0: daily_ca's news is the
+            # proposal's own CA chunks; the gateway supplies THEORY only.
+            grounding = retrieve_grounding(
+                seed_topic_id=proposal.topic_id,
+                query=topic_name_for_wiki,
+                k_ca=0,
+                db_alias=db_alias,
+            )
+            grounding_facts = (
+                as_static_facts(grounding, title=topic_name_for_wiki)
+                if grounding.get("book_chunks")
+                else None
+            )
+
+            # Theory-anchor priority: RAG grounding → published static → none.
+            static_key_facts = grounding_facts or static_facts
+
+            # ── STEP 2c: Wiki enrichment — FALLBACK ONLY (0 GROQ calls) ────────
+            # Fires only when RAG produced NO theory AND the CA source is thin.
+            # Keeps wiki as a true last resort, not a default.
+            wiki_data: dict = {}
+            if not grounding_facts and chunk_word_count < 300:
                 wiki_data = WikiEnrichmentService.get_enrichment(topic_name_for_wiki)
 
             # ── STEP 3: Build prompt + LLM call (1 GROQ call — writer mode) ───
             prompt = build_ca_prompt(
                 ca_chunks_text=ca_text,
-                static_key_facts=static_facts,
+                static_key_facts=static_key_facts,
                 wiki_enrichment=wiki_data if wiki_data else None,
                 subject_name=proposal.subject_name or "",
                 topic_name=proposal.topic.name if proposal.topic else proposal.title,
@@ -828,7 +855,12 @@ class DailyCaGeneratorService:
                     "groq_model": "llama-3.3-70b-versatile",
                     "word_count": word_count,
                     "subject": proposal.subject_name or "",
-                    "had_static_anchor": static_facts is not None,
+                    # Phase 3 — RAG grounding is now the PRIMARY theory anchor.
+                    "had_rag_grounding": bool(grounding_facts),
+                    "grounding_stats": grounding.get("stats", {}),
+                    "grounding_provenance": grounding.get("provenance", []),
+                    "had_static_anchor": static_facts
+                    is not None,  # legacy published-static path (secondary)
                     "had_wiki_enrichment": bool(wiki_data),
                     "had_enriched_ca_context": bool(ca_text),
                     "ca_context_chars": len(ca_text),

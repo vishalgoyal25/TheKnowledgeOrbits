@@ -22,6 +22,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from engines.assessment.models import Question, Quiz
+from engines.book_content.services.retrieval_service import retrieve_grounding
 from engines.content.models import Chunk
 from engines.current_affairs.models import CAChunk
 from engines.knowledge.models import ChunkTopicMap, Topic
@@ -86,18 +87,29 @@ class QuizGeneratorService:
             static_chunks = self._fetch_static_chunks(topic)
             ca_chunks = self._fetch_ca_chunks(topic) if include_ca else []
 
-            if not static_chunks and not ca_chunks:
+            # Phase 5 — RAG grounding from the book corpus (publish-agnostic, semantic
+            # + cross-subject) replaces reliance on the dead NCERT content.Chunk path.
+            # k_ca=0 — CA handled above via the hybrid _fetch_ca_chunks. Appended to
+            # context; provenance stored on the quiz post-save.
+            grounding = retrieve_grounding(
+                seed_topic_id=topic.id, query=topic.name, k_ca=0
+            )
+
+            if not static_chunks and not ca_chunks and not grounding.get("book_chunks"):
                 raise ValueError(f"No chunks available for topic: {topic.name}")
 
             logger.info(
                 "chunks_retrieved",
                 static_count=len(static_chunks),
                 ca_count=len(ca_chunks),
+                rag_book_chunks=len(grounding.get("book_chunks", [])),
                 topic_id=topic_id,
             )
 
-            # Step 3: Build RAG context
+            # Step 3: Build RAG context (chunks + retrieved knowledge-base theory)
             context = self._build_context(static_chunks, ca_chunks, include_ca)
+            if grounding.get("context_text"):
+                context = (context + "\n\n" + grounding["context_text"]).strip()
 
             # Step 4: Generate questions via Groq
             questions_data = self._generate_questions_with_groq(
@@ -117,6 +129,15 @@ class QuizGeneratorService:
                 difficulty=difficulty,
                 include_ca=include_ca,
             )
+
+            # Phase 5 — record RAG grounding provenance. book_chunk can't go in the
+            # content.Chunk-typed source_static_chunks M2M, so it lives in metadata.
+            if grounding.get("book_chunks"):
+                quiz.generation_metadata["rag_grounding"] = grounding.get("stats", {})
+                quiz.generation_metadata["rag_provenance"] = grounding.get(
+                    "provenance", []
+                )
+                quiz.save(update_fields=["generation_metadata"])
 
             logger.info(
                 "quiz_generation_successful",

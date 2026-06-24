@@ -169,7 +169,7 @@ SOURCE MATERIAL
 ── TODAY'S NEWS CONTEXT ──
 {ca_chunks_text}
 
-── CONCEPTUAL BACKGROUND (Wikipedia) ──
+── CONCEPTUAL BACKGROUND (Knowledge Base) ──
 {wiki_text}
 
 ── ORIGINAL SOURCE URLS (for attribution) ──
@@ -242,7 +242,9 @@ CONTENT:
   • Do NOT fabricate names, figures, dates, or provisions not in the sources.
   • The question must reward a student who reads quality newspapers AND understands
     underlying concepts — not just one or the other.
-  • Complexity: aim for medium-to-hard difficulty. Distractors must be plausible.
+  • Complexity: aim for HARD difficulty — require synthesis or multi-step reasoning
+    across the source material, not single-fact recall. Distractors must be highly
+    plausible and factually close to the correct answer; the answer must be non-obvious.
 
 LANGUAGE:
   • Precise, unambiguous statements — no hedging ("it is often said that...").

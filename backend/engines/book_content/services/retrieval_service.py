@@ -1237,3 +1237,503 @@ def _mean_vector(vectors: List[List[float]]) -> List[float]:
         return vectors[0]
     dim = len(vectors[0])
     return [sum(vectors[i][j] for i in range(n)) / n for j in range(dim)]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RAG GROUNDING GATEWAY — Phase 1
+# Single entry point every content generator calls to get its grounding.
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# retrieve_grounding(query, seed_topic_id, ...) is THE grounding source for
+# daily_ca, daily_quiz, quiz_generator and article_generation. Design:
+#   • publish-agnostic — reads BookChunk/Embedding directly (sidesteps the
+#                        is_published gate that left daily_ca with 0 grounding).
+#   • semantic + graph — cosine recall over book_chunk + ca_chunk, then expanded
+#                        along TopicRelation edges (cross_subject / related_to).
+#   • relevance-gated  — drops anything beyond GROUNDING_DISTANCE_THRESHOLD.
+#                        Relevance is the boundary, NOT subject — cross-subject is
+#                        desired (Budget→Polity), out-of-context is cut.
+#   • db-alias aware   — honours 'default' (== Supabase on Render) or 'supabase'.
+#   • never raises     — any failure returns an empty result so the caller falls
+#                        back to its own wiki path.
+#
+# Returns a neutral GroundingResult dict; the two thin adapters at the bottom
+# (as_static_facts / as_wiki_enrichment) render it into the exact shape each
+# existing prompt slot expects, so prompt templates stay unchanged.
+
+# ── Shared retrieval constants (Phase 2 aligns these with knowledge.search_service) ──
+GROUNDING_DISTANCE_THRESHOLD: float = (
+    0.62  # cosine-distance noise floor (== search_service._NOISE_THRESHOLD)
+)
+K_BOOK_DEFAULT: int = 4  # theory chunks (book_chunk)
+K_CA_DEFAULT: int = 4  # recency chunks (ca_chunk)
+_GROUNDING_GRAPH_TOPIC_LIMIT: int = 6  # TopicRelation neighbours to expand into
+_GROUNDING_CANDIDATE_POOL: int = (
+    60  # HNSW candidates fetched before Python threshold filter
+)
+_GROUNDING_EMBED_CACHE_TTL: int = 3600  # Redis TTL for query embeddings (1h)
+_GROUNDING_TEXT_CAP: int = (
+    1400  # per-chunk char cap injected into prompts (token guard)
+)
+
+
+def _grounding_query_embedding(query: str) -> Optional[List[float]]:
+    """Embed the query string, Redis-cached (mirrors knowledge.search_service)."""
+    import hashlib
+
+    from django.core.cache import cache
+
+    from engines.content.services.embedding_service import EmbeddingService
+
+    key = f"qemb:{hashlib.md5(query.strip().lower().encode()).hexdigest()}"
+    try:
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+    except Exception:
+        pass
+    vec = EmbeddingService.generate_embedding(query)
+    try:
+        cache.set(key, vec, timeout=_GROUNDING_EMBED_CACHE_TTL)
+    except Exception:
+        pass
+    return vec
+
+
+def _build_seed_query(seed_topic: Any, explicit_query: Optional[str]) -> str:
+    """Assemble the retrieval query from explicit text + the seed Topic's own semantics."""
+    parts: List[str] = []
+    if explicit_query and explicit_query.strip():
+        parts.append(explicit_query.strip())
+    if seed_topic is not None:
+        if getattr(seed_topic, "name", ""):
+            parts.append(seed_topic.name)
+        if getattr(seed_topic, "description", ""):
+            parts.append(seed_topic.description)
+        kws = getattr(seed_topic, "keywords", None) or []
+        if isinstance(kws, list) and kws:
+            parts.append(", ".join(str(k) for k in kws[:12]))
+    return " — ".join(p for p in parts if p).strip()
+
+
+def _semantic_book_chunks(
+    query_vector: List[float],
+    db_alias: str,
+    limit: int,
+    restrict_topic_ids: Optional[List[Any]] = None,
+) -> List[Tuple[Any, float]]:
+    """Cosine recall over book_chunk embeddings. Returns [(chunk_id, distance)] below threshold."""
+    from pgvector.django import CosineDistance
+
+    from engines.book_content.models import BookChunk
+    from engines.content.models import Embedding
+
+    emb_qs = (
+        Embedding.objects.using(db_alias)
+        .filter(content_type="book_chunk")
+        .annotate(distance=CosineDistance("vector", query_vector))
+        .order_by("distance")
+    )
+    if restrict_topic_ids:
+        valid_ids = list(
+            BookChunk.objects.using(db_alias)
+            .filter(book_content__topic_id__in=list(restrict_topic_ids))
+            .values_list("id", flat=True)
+        )
+        if not valid_ids:
+            return []
+        emb_qs = emb_qs.filter(content_id__in=valid_ids)
+
+    rows = list(emb_qs[:_GROUNDING_CANDIDATE_POOL])
+    scored = [
+        (r.content_id, float(r.distance))
+        for r in rows
+        if float(r.distance) < GROUNDING_DISTANCE_THRESHOLD
+    ]
+    return scored[:limit]
+
+
+def _fetch_book_chunk_dicts(
+    scored: List[Tuple[Any, float]], db_alias: str
+) -> List[Dict[str, Any]]:
+    """Resolve scored book_chunk ids to provenance-rich dicts (RRF order preserved)."""
+    from engines.book_content.models import BookChunk
+
+    ids = [cid for cid, _ in scored]
+    if not ids:
+        return []
+    objs = {
+        c.id: c
+        for c in BookChunk.objects.using(db_alias)
+        .filter(id__in=ids)
+        .select_related("book_content", "book_content__topic", "book_content__subject")
+    }
+    out: List[Dict[str, Any]] = []
+    for cid, dist in scored:
+        c = objs.get(cid)
+        if not c or not c.book_content:
+            continue
+        bc = c.book_content
+        out.append(
+            {
+                "content_type": "book_chunk",
+                "id": str(c.id),
+                "text": (c.chunk_text or "")[:_GROUNDING_TEXT_CAP],
+                "topic": bc.topic.name if bc.topic_id else "",
+                "topic_id": str(bc.topic_id) if bc.topic_id else None,
+                "subject": bc.subject.name if bc.subject_id else "",
+                "source_type": c.source_type,
+                "score": round(1.0 - dist, 4),
+            }
+        )
+    return out
+
+
+def _semantic_ca_chunks(
+    query_vector: List[float], db_alias: str, limit: int
+) -> List[Tuple[Any, float]]:
+    """Cosine recall over ca_chunk embeddings. Returns [(chunk_id, distance)] below threshold."""
+    from pgvector.django import CosineDistance
+
+    from engines.content.models import Embedding
+
+    rows = list(
+        Embedding.objects.using(db_alias)
+        .filter(content_type="ca_chunk")
+        .annotate(distance=CosineDistance("vector", query_vector))
+        .order_by("distance")[:_GROUNDING_CANDIDATE_POOL]
+    )
+    scored = [
+        (r.content_id, float(r.distance))
+        for r in rows
+        if float(r.distance) < GROUNDING_DISTANCE_THRESHOLD
+    ]
+    return scored[
+        : limit * 3
+    ]  # over-fetch; expired/recency filtering happens on resolve
+
+
+def _fetch_ca_chunk_dicts(
+    scored: List[Tuple[Any, float]],
+    db_alias: str,
+    limit: int,
+    recency_days: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """Resolve scored ca_chunk ids to dicts (skip expired; optional recency window)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from engines.current_affairs.models import CAChunk
+
+    ids = [cid for cid, _ in scored]
+    if not ids:
+        return []
+    qs = (
+        CAChunk.objects.using(db_alias)
+        .filter(id__in=ids, is_expired=False)
+        .select_related("ca_article", "ca_article__source")
+    )
+    if recency_days:
+        qs = qs.filter(published_at__gte=timezone.now() - timedelta(days=recency_days))
+    objs = {c.id: c for c in qs}
+
+    out: List[Dict[str, Any]] = []
+    for cid, dist in scored:
+        c = objs.get(cid)
+        if not c:
+            continue
+        ca = c.ca_article
+        out.append(
+            {
+                "content_type": "ca_chunk",
+                "id": str(c.id),
+                "text": (c.chunk_text or "")[:_GROUNDING_TEXT_CAP],
+                "topic": ca.title if ca else "",
+                "topic_id": None,
+                "subject": ca.source.name if (ca and ca.source_id) else "News",
+                "source_type": "ca",
+                "date": c.published_at.strftime("%Y-%m-%d") if c.published_at else "",
+                "score": round(1.0 - dist, 4),
+            }
+        )
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _graph_related_topic_ids(seed_topic_id: Any, db_alias: str) -> List[Any]:
+    """TopicRelation neighbours of the seed (cross_subject + related_to), score-ordered."""
+    from engines.book_content.models import TopicRelation
+
+    rels = (
+        TopicRelation.objects.using(db_alias)
+        .filter(source_topic_id=seed_topic_id)
+        .order_by("-similarity_score")
+        .values_list("target_topic_id", flat=True)[:_GROUNDING_GRAPH_TOPIC_LIMIT]
+    )
+    return list(rels)
+
+
+def _rrf_merge(lanes: List[List[Dict[str, Any]]], cap: int) -> List[Dict[str, Any]]:
+    """Reciprocal Rank Fusion across pre-sorted chunk-dict lanes. Dedup by (type, id)."""
+    scores: Dict[Tuple[str, str], float] = {}
+    first: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for lane in lanes:
+        for rank, ch in enumerate(lane, 1):
+            key = (ch["content_type"], ch["id"])
+            scores[key] = scores.get(key, 0.0) + 1.0 / (_RRF_K + rank)
+            if key not in first:
+                first[key] = ch
+    ordered = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return [first[key] for key, _ in ordered[:cap]]
+
+
+def _format_grounding_context(
+    book_dicts: List[Dict[str, Any]], ca_dicts: List[Dict[str, Any]]
+) -> str:
+    """Render retrieved chunks into an LLM-injectable markdown block."""
+    lines: List[str] = []
+    if book_dicts:
+        lines.append("## Knowledge Base — Relevant Theory (retrieved)")
+        for i, c in enumerate(book_dicts, 1):
+            label = c["topic"] or "Topic"
+            if c["subject"]:
+                label += f" — {c['subject']}"
+            lines.append(f"### [{i}] {label}  (relevance {c['score']:.2f})")
+            lines.append(c["text"])
+            lines.append("")
+    if ca_dicts:
+        lines.append("## Current Affairs — Related Developments (retrieved)")
+        for i, c in enumerate(ca_dicts, 1):
+            label = c["topic"] or "News"
+            src = c.get("subject") or ""
+            date = c.get("date") or ""
+            head = f"### [CA{i}] {label}"
+            if src or date:
+                sep = ", " if src and date else ""
+                head += f"  ({src}{sep}{date})"
+            lines.append(head)
+            lines.append(c["text"])
+            lines.append("")
+    return "\n".join(lines).strip()
+
+
+def retrieve_grounding(
+    query: Optional[str] = None,
+    seed_topic_id: Optional[Any] = None,
+    k_book: int = K_BOOK_DEFAULT,
+    k_ca: int = K_CA_DEFAULT,
+    db_alias: str = "default",
+    ca_recency_days: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    THE grounding gateway. Retrieve cross-subject theory + recency chunks for a topic.
+
+    Args:
+        query:           Optional explicit query text. Combined with the seed topic's
+                         own name/description/keywords to form the retrieval query.
+        seed_topic_id:   knowledge.Topic UUID — the seed for graph expansion + query.
+        k_book:          Max theory (book_chunk) chunks to return.
+        k_ca:            Max recency (ca_chunk) chunks to return.
+        db_alias:        'default' (== Supabase on Render) or 'supabase'.
+        ca_recency_days: Optional recency window for CA chunks (None = no filter).
+
+    Returns a GroundingResult dict:
+        {query, chunks, book_chunks, ca_chunks, provenance, context_text, stats}
+    Never raises — on any failure returns an empty result (caller falls back to wiki).
+    """
+    empty: Dict[str, Any] = {
+        "query": "",
+        "chunks": [],
+        "book_chunks": [],
+        "ca_chunks": [],
+        "provenance": [],
+        "context_text": "",
+        "stats": {"book_hits": 0, "ca_hits": 0, "graph_topics": 0, "returned": 0},
+    }
+    try:
+        from engines.knowledge.models import Topic
+
+        seed_topic = None
+        if seed_topic_id:
+            seed_topic = (
+                Topic.objects.using(db_alias)
+                .filter(id=seed_topic_id)
+                .select_related("subject")
+                .first()
+            )
+
+        query_text = _build_seed_query(seed_topic, query)
+        if not query_text:
+            logger.warning(
+                "grounding_empty_query",
+                seed_topic_id=str(seed_topic_id) if seed_topic_id else None,
+            )
+            return empty
+
+        query_vector = _grounding_query_embedding(query_text)
+        if not query_vector:
+            logger.warning("grounding_embed_failed", query=query_text[:80])
+            return {**empty, "query": query_text}
+
+        # ── Lane 1: global semantic book chunks (theory, unscoped across subjects) ──
+        book_scored = _semantic_book_chunks(
+            query_vector, db_alias, k_book * _CANDIDATE_MULTIPLIER
+        )
+        book_dicts = _fetch_book_chunk_dicts(book_scored, db_alias)
+
+        # ── Lane 2: graph-expanded book chunks (TopicRelation neighbours, still gated) ──
+        graph_topic_ids = (
+            _graph_related_topic_ids(seed_topic_id, db_alias) if seed_topic_id else []
+        )
+        graph_dicts: List[Dict[str, Any]] = []
+        if graph_topic_ids:
+            graph_scored = _semantic_book_chunks(
+                query_vector, db_alias, k_book, restrict_topic_ids=graph_topic_ids
+            )
+            graph_dicts = _fetch_book_chunk_dicts(graph_scored, db_alias)
+
+        book_final = _rrf_merge([book_dicts, graph_dicts], cap=k_book)
+
+        # ── Lane 3: semantic CA chunks (recency layer) ──
+        ca_scored = _semantic_ca_chunks(query_vector, db_alias, k_ca)
+        ca_dicts = _fetch_ca_chunk_dicts(
+            ca_scored, db_alias, k_ca, recency_days=ca_recency_days
+        )
+
+        chunks = book_final + ca_dicts
+        provenance = [
+            {
+                "content_type": c["content_type"],
+                "id": c["id"],
+                "topic": c["topic"],
+                "subject": c["subject"],
+                "score": c["score"],
+            }
+            for c in chunks
+        ]
+        context_text = _format_grounding_context(book_final, ca_dicts)
+
+        logger.info(
+            "grounding_complete",
+            query=query_text[:80],
+            book=len(book_final),
+            ca=len(ca_dicts),
+            graph_topics=len(graph_topic_ids),
+            returned=len(chunks),
+        )
+        return {
+            "query": query_text,
+            "chunks": chunks,
+            "book_chunks": book_final,
+            "ca_chunks": ca_dicts,
+            "provenance": provenance,
+            "context_text": context_text,
+            "stats": {
+                "book_hits": len(book_dicts),
+                "ca_hits": len(ca_dicts),
+                "graph_topics": len(graph_topic_ids),
+                "returned": len(chunks),
+            },
+        }
+
+    except Exception as e:
+        logger.error(
+            "grounding_failed",
+            error=str(e),
+            seed_topic_id=str(seed_topic_id) if seed_topic_id else None,
+        )
+        sentry_sdk.capture_exception(e)
+        return empty
+
+
+# ── Slot adapters — render a GroundingResult into each prompt slot's exact shape ──
+# These keep the existing prompt builders byte-for-byte unchanged.
+
+
+def as_static_facts(result: Dict[str, Any], title: str = "") -> Dict[str, Any]:
+    """
+    Shape for daily_ca prompt_builder._format_static_facts():
+        {title, key_provisions[], key_facts[], statistics[]}
+    Built from retrieved book_chunk text (semantic) — replaces the old exact-topic regex.
+    """
+    import re
+
+    book = result.get("book_chunks", [])
+    texts = [c.get("text", "") for c in book]
+    blob = "\n".join(texts)
+
+    key_facts = [t[:300] for t in texts][:6]
+
+    prov_pat = re.compile(
+        r"[^.]*\b(?:Article|Section)\s+\d+[\w()]*[^.]*\.", re.IGNORECASE
+    )
+    key_provisions: List[str] = []
+    seen_p: set = set()
+    for m in prov_pat.finditer(blob):
+        s = m.group(0).strip()[:250]
+        if len(s) > 20 and s not in seen_p:
+            key_provisions.append(s)
+            seen_p.add(s)
+        if len(key_provisions) >= 5:
+            break
+
+    stat_pat = re.compile(
+        r"(?:₹|Rs\.?\s*|USD?\s*|\$)\s?\d[\d,]*(?:\.\d+)?\s*(?:crore|lakh|billion|million)?"
+        r"|\b\d+(?:\.\d+)?\s*(?:%|percent)\b",
+        re.IGNORECASE,
+    )
+    statistics: List[str] = []
+    seen_s: set = set()
+    for m in stat_pat.finditer(blob):
+        v = m.group(0).strip()
+        if v and v not in seen_s:
+            statistics.append(v)
+            seen_s.add(v)
+        if len(statistics) >= 8:
+            break
+
+    return {
+        "title": title or result.get("query", ""),
+        "key_provisions": key_provisions,
+        "key_facts": key_facts,
+        "statistics": statistics,
+    }
+
+
+def as_wiki_enrichment(result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Shape for daily_quiz prompt_builder._format_wiki_context():
+        {intro, key_facts[], related_terms[], wiki_url}
+    Built from retrieved chunks — replaces the wiki-only conceptual background.
+    """
+    book = result.get("book_chunks", [])
+    ca = result.get("ca_chunks", [])
+
+    intro = ""
+    if book:
+        intro = book[0].get("text", "")[:600]
+    elif ca:
+        intro = ca[0].get("text", "")[:600]
+
+    key_facts = [c.get("text", "")[:240] for c in book[1:6]]
+    if not key_facts:
+        key_facts = [c.get("text", "")[:240] for c in ca[:5]]
+
+    related: List[str] = []
+    seen: set = set()
+    for c in book:
+        t = c.get("topic")
+        if t and t not in seen:
+            related.append(t)
+            seen.add(t)
+        if len(related) >= 5:
+            break
+
+    return {
+        "intro": intro,
+        "key_facts": key_facts,
+        "related_terms": related,
+        "wiki_url": "",
+    }

@@ -36,10 +36,19 @@ from engines.current_affairs.models import CAArticle
 from engines.daily_ca.models import DailyCaArticle
 from engines.knowledge.models import Topic
 
+# Phase 2 — single source of truth for the retrieval relevance floor. The RAG
+# gateway owns this value so the search UI and generation-grounding can never
+# silently drift apart.
+from engines.book_content.services.retrieval_service import (
+    GROUNDING_DISTANCE_THRESHOLD,
+)
+
 logger = structlog.get_logger(__name__)
 
-# Distance threshold applied in Python (not SQL) so HNSW index remains active
-_NOISE_THRESHOLD: float = 0.62
+# Distance threshold applied in Python (not SQL) so HNSW index remains active.
+# Phase 2: sourced from the RAG gateway (GROUNDING_DISTANCE_THRESHOLD) — one value,
+# one place; the search UI and generation grounding stay in lockstep. (Still 0.62.)
+_NOISE_THRESHOLD: float = GROUNDING_DISTANCE_THRESHOLD
 
 # Redis TTL for cached query embeddings (1 hour)
 _EMBEDDING_CACHE_TTL: int = 3600
