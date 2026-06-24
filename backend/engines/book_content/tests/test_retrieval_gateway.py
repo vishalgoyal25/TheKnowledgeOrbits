@@ -102,7 +102,10 @@ class AdapterTests(SimpleTestCase):
         self.assertTrue(any("Article 21" in p for p in facts["key_provisions"]))
         # Figures / percentages are pulled into statistics
         self.assertTrue(
-            any(("%" in s) or ("percent" in s) or ("crore" in s) for s in facts["statistics"])
+            any(
+                ("%" in s) or ("percent" in s) or ("crore" in s)
+                for s in facts["statistics"]
+            )
         )
 
     def test_as_static_facts_empty_grounding(self):

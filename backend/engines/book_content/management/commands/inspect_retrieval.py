@@ -33,7 +33,10 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--topic-id", type=str, default=None, help="knowledge.Topic UUID to seed from."
+            "--topic-id",
+            type=str,
+            default=None,
+            help="knowledge.Topic UUID to seed from.",
         )
         parser.add_argument(
             "--subject",
@@ -54,8 +57,12 @@ class Command(BaseCommand):
             default="default",
             help="DB alias: default | supabase (default: default).",
         )
-        parser.add_argument("--k-book", type=int, default=6, help="Max theory (book) chunks.")
-        parser.add_argument("--k-ca", type=int, default=4, help="Max recency (CA) chunks.")
+        parser.add_argument(
+            "--k-book", type=int, default=6, help="Max theory (book) chunks."
+        )
+        parser.add_argument(
+            "--k-ca", type=int, default=4, help="Max recency (CA) chunks."
+        )
 
     def handle(self, *args, **opts):
         db_alias = opts["db_alias"]
@@ -143,7 +150,9 @@ class Command(BaseCommand):
         ca = [c for c in chunks if c["content_type"] == "ca_chunk"]
 
         if book:
-            self.stdout.write(self.style.MIGRATE_LABEL("\n— Retrieved THEORY (book_chunk) —"))
+            self.stdout.write(
+                self.style.MIGRATE_LABEL("\n— Retrieved THEORY (book_chunk) —")
+            )
             for i, c in enumerate(book, 1):
                 self.stdout.write(
                     f"  [{i}] score={c['score']:.3f}  [{c['subject']}]  {c['topic']}"
@@ -151,7 +160,9 @@ class Command(BaseCommand):
                 self.stdout.write(f"      {c['text'][:160].strip()}...")
 
         if ca:
-            self.stdout.write(self.style.MIGRATE_LABEL("\n— Retrieved RECENCY (ca_chunk) —"))
+            self.stdout.write(
+                self.style.MIGRATE_LABEL("\n— Retrieved RECENCY (ca_chunk) —")
+            )
             for i, c in enumerate(ca, 1):
                 self.stdout.write(
                     f"  [CA{i}] score={c['score']:.3f}  [{c['subject']}]  {c['topic'][:70]}"
@@ -160,7 +171,9 @@ class Command(BaseCommand):
 
         # The headline proof: how many distinct subjects the theory spans.
         subj_counter = Counter(c["subject"] for c in book if c.get("subject"))
-        self.stdout.write(self.style.MIGRATE_HEADING("\n— CROSS-SUBJECT SPREAD (theory) —"))
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("\n— CROSS-SUBJECT SPREAD (theory) —")
+        )
         if subj_counter:
             for subj, n in subj_counter.most_common():
                 self.stdout.write(f"  {n}x  {subj}")
