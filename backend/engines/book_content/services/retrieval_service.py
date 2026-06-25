@@ -35,6 +35,10 @@ import structlog
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.db.models import QuerySet
 
+# Lives at the engine root (NOT under services/) so importers that only need the
+# threshold don't trigger services/__init__.py → the LLM stack → cerebras SDK.
+from engines.book_content.constants import GROUNDING_DISTANCE_THRESHOLD
+
 logger = structlog.get_logger(__name__)
 
 # RRF constant from the original paper — do not change without benchmarking
@@ -1262,9 +1266,10 @@ def _mean_vector(vectors: List[List[float]]) -> List[float]:
 # existing prompt slot expects, so prompt templates stay unchanged.
 
 # ── Shared retrieval constants (Phase 2 aligns these with knowledge.search_service) ──
-GROUNDING_DISTANCE_THRESHOLD: float = (
-    0.62  # cosine-distance noise floor (== search_service._NOISE_THRESHOLD)
-)
+# GROUNDING_DISTANCE_THRESHOLD now lives in engines.book_content.constants (imported
+# at the top of this file) so lean importers — e.g. knowledge.search_service — can
+# read it without loading the LLM stack. It is re-exported here, so existing
+# `from ...retrieval_service import GROUNDING_DISTANCE_THRESHOLD` callers are unchanged.
 K_BOOK_DEFAULT: int = 4  # theory chunks (book_chunk)
 K_CA_DEFAULT: int = 4  # recency chunks (ca_chunk)
 _GROUNDING_GRAPH_TOPIC_LIMIT: int = 6  # TopicRelation neighbours to expand into

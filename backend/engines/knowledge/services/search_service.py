@@ -36,12 +36,11 @@ from engines.current_affairs.models import CAArticle
 from engines.daily_ca.models import DailyCaArticle
 from engines.knowledge.models import Topic
 
-# Phase 2 — single source of truth for the retrieval relevance floor. The RAG
-# gateway owns this value so the search UI and generation-grounding can never
-# silently drift apart.
-from engines.book_content.services.retrieval_service import (
-    GROUNDING_DISTANCE_THRESHOLD,
-)
+# Phase 2 — single source of truth for the retrieval relevance floor. Read from
+# the engine's lightweight constants module (NOT services.retrieval_service) so this
+# import does not pull the book_content LLM stack (cerebras SDK) into the URLconf —
+# that coupling crashed the zero-LLM current_affairs scraper at Django startup.
+from engines.book_content.constants import GROUNDING_DISTANCE_THRESHOLD
 
 logger = structlog.get_logger(__name__)
 
