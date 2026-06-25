@@ -99,11 +99,26 @@ class Command(BaseCommand):
                 "and the current subject progress report. Safe to run anytime."
             ),
         )
+        parser.add_argument(
+            "--backfill-gaps",
+            action="store_true",
+            default=False,
+            help=(
+                "Maintenance: re-queue any topic already marked 'complete' that "
+                "still has unbuilt subtopics (resets ONLY those topics' "
+                "content_status to NULL). The gap-first selector then fills the "
+                "missing subtopics on this and following runs. Fully-built topics "
+                "are left untouched and already-built subtopics are never "
+                "regenerated. Idempotent — safe to run multiple times. "
+                "Honours --dry-run (reports without writing)."
+            ),
+        )
 
     def handle(self, *args, **options):
         db_alias: str = options["database"]
         max_articles: int = options["max_articles"]
         dry_run: bool = options["dry_run"]
+        backfill_gaps: bool = options["backfill_gaps"]
 
         # ── Reroute Django 'default' DB to match --database alias ─────────────
         # ingest_topic() and every ORM call inside it always use the 'default'
@@ -129,6 +144,13 @@ class Command(BaseCommand):
                 "static_gen_db_rerouted",
                 to_alias=db_alias,
             )
+
+        # ── One-off gap backfill (maintenance flag) ───────────────────────────
+        # Re-queue complete topics that still have unbuilt subtopics so the
+        # gap-first selector can fill them. Only resets gapped topics — built
+        # work is never restarted. Runs before the queue is built below.
+        if backfill_gaps:
+            self._requeue_topics_with_subtopic_gaps(dry_run=dry_run)
 
         run_date = timezone.now().date()
 
@@ -450,6 +472,66 @@ class Command(BaseCommand):
 
         self._print_subject_progress()
         self.stdout.write(self.style.MIGRATE_HEADING(f"{_DIVIDER}\n"))
+
+    def _requeue_topics_with_subtopic_gaps(self, dry_run: bool = False) -> None:
+        """Reset content_status=NULL on every topic node missing one or more of
+        its seeded subtopics' BookContent, so it re-enters the queue and the
+        gap-first selector fills the missing subtopics.
+
+        Idempotent and non-destructive:
+          - A topic with ALL subtopics built is left untouched (no restart).
+          - Only the topic flag is reset; existing BookContent is never deleted
+            or regenerated (smart-skip + gap-first protect built subtopics).
+        """
+        from engines.book_content.models import BookContent
+
+        mode = "DRY RUN — " if dry_run else ""
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(
+                f"\n  🔧 {mode}Backfill: re-queuing topics with subtopic gaps..."
+            )
+        )
+
+        topic_nodes = Topic.objects.filter(node_type="topic", is_active=True)
+        requeued = 0
+        for t in topic_nodes:
+            sub_ids = list(
+                Topic.objects.filter(
+                    parent_topic=t, node_type="subtopic", is_active=True
+                ).values_list("id", flat=True)
+            )
+            if not sub_ids:
+                continue  # no seeded subtopics → nothing to backfill
+            built = set(
+                BookContent.objects.filter(topic_id__in=sub_ids).values_list(
+                    "topic_id", flat=True
+                )
+            )
+            if len(built) < len(sub_ids):
+                if not dry_run:
+                    Topic.objects.filter(id=t.id).update(content_status=None)
+                requeued += 1
+                self.stdout.write(
+                    f"    ↺ {t.name}  ({len(built)}/{len(sub_ids)} subtopics built)"
+                )
+                logger.info(
+                    "static_gen_backfill_requeued",
+                    topic=t.name,
+                    topic_id=str(t.id),
+                    built=len(built),
+                    total=len(sub_ids),
+                    dry_run=dry_run,
+                )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"  ✓ Backfill {'would re-queue' if dry_run else 're-queued'} "
+                f"{requeued} topic(s) with gaps.\n"
+            )
+        )
+        logger.info(
+            "static_gen_backfill_complete", requeued=requeued, dry_run=dry_run
+        )
 
     def _print_subject_progress(self) -> None:
         """Prints subject-level completion progress. No DB writes. Called by both
