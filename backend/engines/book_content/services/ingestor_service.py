@@ -712,6 +712,20 @@ def ingest_topic(
                 f"Run seed_syllabus to populate subtopics before generating content."
             )
 
+        # Gap-first ordering: subtopics WITHOUT BookContent come first, so the
+        # per-run cap (max_subtopics) is spent on the MISSING subtopics —
+        # backfilling gaps left by earlier jammed runs or by the cap itself —
+        # instead of re-touching already-built ones. The smart-skip further down
+        # still protects any built subtopic from regeneration (belt + suspenders).
+        built_subtopic_ids = set(
+            BookContent.objects.filter(topic__in=seeded_sub_objs).values_list(
+                "topic_id", flat=True
+            )
+        )
+        # Stable sort: unbuilt (False → 0) sort ahead of built (True → 1),
+        # preserving alphabetical order within each group.
+        seeded_sub_objs.sort(key=lambda st: st.id in built_subtopic_ids)
+
         # Cap to max_subtopics per run (passed from generate_static_content, default 3)
         if max_subtopics < 999:
             seeded_sub_objs = seeded_sub_objs[:max_subtopics]
