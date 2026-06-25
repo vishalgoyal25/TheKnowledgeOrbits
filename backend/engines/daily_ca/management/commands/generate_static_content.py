@@ -492,7 +492,12 @@ class Command(BaseCommand):
             )
         )
 
-        topic_nodes = Topic.objects.filter(node_type="topic", is_active=True)
+        # Scope strictly to topics ALREADY marked complete — those are the only
+        # ones that can be "wrongly complete with gaps". Incomplete topics are
+        # already in the daily queue (gap-first fills them) and must NOT be reset.
+        topic_nodes = Topic.objects.filter(
+            node_type="topic", is_active=True, content_status="complete"
+        )
         requeued = 0
         for t in topic_nodes:
             sub_ids = list(
@@ -529,9 +534,7 @@ class Command(BaseCommand):
                 f"{requeued} topic(s) with gaps.\n"
             )
         )
-        logger.info(
-            "static_gen_backfill_complete", requeued=requeued, dry_run=dry_run
-        )
+        logger.info("static_gen_backfill_complete", requeued=requeued, dry_run=dry_run)
 
     def _print_subject_progress(self) -> None:
         """Prints subject-level completion progress. No DB writes. Called by both
