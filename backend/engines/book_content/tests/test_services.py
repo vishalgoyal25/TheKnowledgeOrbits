@@ -1142,12 +1142,15 @@ class TestClassifierService(unittest.TestCase):
         mock_llm.assert_called_once()
         assert result["subject"] == "Indian Polity & Constitution"
 
-    def test_classify_hierarchy_subject_validation_rejects_hallucinated_name(
+    def test_classify_hierarchy_unknown_subject_kept_not_forced_to_polity(
         self,
     ) -> None:
         """
-        If LLM returns a subject name not in UPSC_SUBJECTS, it defaults to
-        'Indian Polity & Constitution' — hallucinated subjects are rejected.
+        Phase 6 contract: an unrecognised LLM subject is KEPT as-is — NOT silently
+        coerced to 'Indian Polity & Constitution'. The downstream strict resolver
+        (_get_subject_strict) fuzzy-matches against seeded subjects or raises a
+        clean skip. The old blind Polity default was the root cause that mis-routed
+        whole subjects (Ethics/Geography/Economy) into empty-complete topics.
         """
         _LLM_JSON = json.dumps(
             {
@@ -1170,6 +1173,14 @@ class TestClassifierService(unittest.TestCase):
                 "engines.book_content.services.classifier_service._load_seeded_hierarchy",
                 return_value="Subjects: ...",
             ),
+            patch(
+                "engines.book_content.services.classifier_service._seeded_subject_names",
+                return_value=[
+                    "Indian Polity & Constitution",
+                    "Ethics, Integrity & Aptitude",
+                    "Indian & World Geography",
+                ],
+            ),
         ):
             from engines.book_content.services.classifier_service import (
                 classify_hierarchy,
@@ -1177,8 +1188,55 @@ class TestClassifierService(unittest.TestCase):
 
             result = classify_hierarchy(topic_name="Test Topic")
 
-        # Must default — "Totally Made Up Subject" is not in UPSC_SUBJECTS
-        assert result["subject"] == "Indian Polity & Constitution"
+        # New contract: an unknown subject is NOT force-defaulted to Polity;
+        # it is kept verbatim for the strict resolver to handle.
+        assert result["subject"] != "Indian Polity & Constitution"
+        assert result["subject"] == "Totally Made Up Subject"
+
+    def test_classify_hierarchy_preserves_valid_seeded_subject(self) -> None:
+        """
+        Regression guard for the keystone bug: a correctly classified subject that
+        IS seeded (e.g. 'Ethics, Integrity & Aptitude') must be preserved exactly —
+        never rewritten to 'Indian Polity & Constitution'. Before Phase 6 the stale
+        whitelist rejected this real subject and force-defaulted it to Polity.
+        """
+        _LLM_JSON = json.dumps(
+            {
+                "subject": "Ethics, Integrity & Aptitude",
+                "module": "Ethics and Human Values",
+                "confirmed_topic": "Essence and Dimensions of Ethics",
+                "secondary_subjects": [],
+            }
+        )
+        with (
+            patch(
+                "engines.book_content.services.classifier_service.fuzzy_lookup",
+                return_value=None,
+            ),
+            patch(
+                "engines.book_content.services.classifier_service.llm_call",
+                return_value=_LLM_JSON,
+            ),
+            patch(
+                "engines.book_content.services.classifier_service._load_seeded_hierarchy",
+                return_value="Subjects: ...",
+            ),
+            patch(
+                "engines.book_content.services.classifier_service._seeded_subject_names",
+                return_value=[
+                    "Indian Polity & Constitution",
+                    "Ethics, Integrity & Aptitude",
+                    "Indian & World Geography",
+                ],
+            ),
+        ):
+            from engines.book_content.services.classifier_service import (
+                classify_hierarchy,
+            )
+
+            result = classify_hierarchy(topic_name="Essence and Dimensions of Ethics")
+
+        assert result["subject"] == "Ethics, Integrity & Aptitude"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

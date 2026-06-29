@@ -603,6 +603,7 @@ def ingest_topic(
     max_subtopics: int = 999,
     max_sub_subtopics: int = 999,
     max_deep_per_topic: int = 999,
+    topic_id: Optional[str] = None,
 ) -> dict:
     """
     Master Agent Entry Point.
@@ -610,11 +611,22 @@ def ingest_topic(
     Call with:
       ingest_topic(topic_name="Parliament of India")
       ingest_topic(topic_name="Parliament of India", subject_name="Indian Polity & Constitution")
+      ingest_topic(topic_id="<uuid>", subject_name="...")   # trusted-caller (static cron)
 
     Returns:
       {"nodes_created": int, "relations_created": int, "topic": str}
       OR {"nodes_created": 0, "skipped": True, "reason": "..."} — hierarchy mismatch
       OR {"nodes_created": N, "locked_extension": True} — topic was locked, only sub-subtopics added
+
+    Two resolution modes:
+      (a) TRUSTED CALLER — `topic_id` given (the static cron walks the seeded
+          hierarchy, so it already knows the EXACT node). We resolve that node
+          directly and derive subject/module from its own FK chain. The LLM
+          classifier is BYPASSED — this eliminates subject mis-mapping (e.g.
+          Ethics/Geography → "Indian Polity & Constitution") and the cross-subject
+          name-lock, because everything is scoped to one concrete node.
+      (b) LEGACY CALLER — no `topic_id`. Falls back to the name-based lock check +
+          LLM `classify_hierarchy()` exactly as before (behaviour unchanged).
 
     Hierarchy enforcement:
       - Subject and Module MUST match seeded DB — SkipGenerationError if not found
@@ -634,53 +646,112 @@ def ingest_topic(
     relations_created = 0
     start_time = time.time()
 
+    # ── Resolve the target node: trusted-caller (topic_id) vs legacy (name) ───
+    # Trusted path resolves the EXACT seeded node, so both the lock decision and
+    # the subject/module come from THIS node — no LLM classifier, no name-only
+    # cross-subject lock.
+    trusted_obj = None
+    if topic_id:
+        trusted_obj = Topic.objects.filter(id=topic_id, node_type="topic").first()
+        if trusted_obj is None:
+            logger.warning(
+                "ingestor_trusted_topic_id_not_found", topic_id=str(topic_id)
+            )
+
     # ── Lock Check: if topic already fully generated, only add sub-subtopics ──
-    locked_topic = _find_complete_topic(topic_name or "")
-    if locked_topic:
-        logger.info(
-            "ingestor_topic_locked",
-            topic=locked_topic.name,
-            action="extend_sub_subtopics_only",
-        )
-        return _extend_sub_subtopics_only(
-            locked_topic,
-            topic_name or "",
-            subject_name,
-            start_time,
-            budget=budget,
-            max_sub_subtopics=max_sub_subtopics,
-        )
+    if trusted_obj is not None:
+        # Lock decision scoped to THIS node's own status (subject/module-correct).
+        if trusted_obj.content_status == "complete":
+            logger.info(
+                "ingestor_topic_locked",
+                topic=trusted_obj.name,
+                action="extend_sub_subtopics_only",
+            )
+            return _extend_sub_subtopics_only(
+                trusted_obj,
+                trusted_obj.name,
+                subject_name,
+                start_time,
+                budget=budget,
+                max_sub_subtopics=max_sub_subtopics,
+            )
+    else:
+        locked_topic = _find_complete_topic(topic_name or "")
+        if locked_topic:
+            logger.info(
+                "ingestor_topic_locked",
+                topic=locked_topic.name,
+                action="extend_sub_subtopics_only",
+            )
+            return _extend_sub_subtopics_only(
+                locked_topic,
+                topic_name or "",
+                subject_name,
+                start_time,
+                budget=budget,
+                max_sub_subtopics=max_sub_subtopics,
+            )
 
     try:
-        # ── Step 3: Hierarchy Classification ─────────────────────────────────
-        logger.info("ingestor_step3_classify", topic_name=topic_name)
-        hierarchy = classify_hierarchy(
-            topic_name=topic_name,
-            ncert_text=clean_ncert_text[:1500] if clean_ncert_text else None,
-        )
-        subject = hierarchy["subject"]
-        module = hierarchy["module"]
-        topic = hierarchy["confirmed_topic"]
-
-        # ── Resolve hierarchy nodes (strict — never invents subject or module) ─
-        # Moved before Step 4 so the seeded subtopic lookup has topic_obj available.
-        subject_obj = _get_subject_strict(subject)
-        if subject_obj is None:
-            raise SkipGenerationError(
-                f"Subject '{subject}' not found in seeded hierarchy. "
-                f"Topic '{topic_name}' skipped to prevent hierarchy drift."
+        if trusted_obj is not None:
+            # ── Trusted path: derive hierarchy from the seeded node's FK chain ─
+            # No LLM classification — the cron handed us the exact node, so its
+            # own subject/module are authoritative. This is the keystone fix for
+            # the "Ethics/Geography → Indian Polity & Constitution" mis-map.
+            topic_obj = trusted_obj
+            # Annotated Optional so the legacy branch below (which assigns the
+            # Optional return of _get_subject_strict/_get_module_strict) stays
+            # type-compatible; both branches narrow to non-None via the guards.
+            module_obj: Optional[Module] = trusted_obj.module
+            subject_obj: Optional[Subject] = (
+                trusted_obj.module.subject
+                if (trusted_obj.module_id and trusted_obj.module)
+                else trusted_obj.subject
             )
-
-        module_obj = _get_module_strict(module, subject_obj)
-        if module_obj is None:
-            raise SkipGenerationError(
-                f"Module '{module}' not found under '{subject_obj.name}' in seeded "
-                f"hierarchy. Topic '{topic_name}' skipped to prevent hierarchy drift."
+            if subject_obj is None or module_obj is None:
+                raise SkipGenerationError(
+                    f"Trusted topic '{trusted_obj.name}' (id={topic_id}) has no "
+                    f"seeded module/subject FK — cannot place content. Skipped."
+                )
+            subject = subject_obj.name
+            module = module_obj.name
+            topic = trusted_obj.name
+            logger.info(
+                "ingestor_trusted_resolve",
+                topic=topic,
+                subject=subject,
+                module=module,
             )
+        else:
+            # ── Step 3: Hierarchy Classification (legacy path) ────────────────
+            logger.info("ingestor_step3_classify", topic_name=topic_name)
+            hierarchy = classify_hierarchy(
+                topic_name=topic_name,
+                ncert_text=clean_ncert_text[:1500] if clean_ncert_text else None,
+            )
+            subject = hierarchy["subject"]
+            module = hierarchy["module"]
+            topic = hierarchy["confirmed_topic"]
 
-        topic_obj = _get_or_match_topic_fuzzy(
-            topic, module_obj, subject_obj, node_type="topic"
-        )
+            # ── Resolve hierarchy nodes (strict — never invents subject/module) ─
+            # Moved before Step 4 so the seeded subtopic lookup has topic_obj ready.
+            subject_obj = _get_subject_strict(subject)
+            if subject_obj is None:
+                raise SkipGenerationError(
+                    f"Subject '{subject}' not found in seeded hierarchy. "
+                    f"Topic '{topic_name}' skipped to prevent hierarchy drift."
+                )
+
+            module_obj = _get_module_strict(module, subject_obj)
+            if module_obj is None:
+                raise SkipGenerationError(
+                    f"Module '{module}' not found under '{subject_obj.name}' in seeded "
+                    f"hierarchy. Topic '{topic_name}' skipped to prevent hierarchy drift."
+                )
+
+            topic_obj = _get_or_match_topic_fuzzy(
+                topic, module_obj, subject_obj, node_type="topic"
+            )
 
         # ── Step 4: Subtopic Discovery — seeded DB lookup only, NO LLM ──────
         # The seeded hierarchy (built by seed_syllabus) is the authoritative source
@@ -1107,10 +1178,45 @@ def ingest_topic(
         logger.info("ingestor_step9_coherence", topic=topic)
         run_coherence_pass(str(topic_obj.id), topic, subject)
 
-        # Mark parent topic as COMPLETE — locks it permanently.
-        # Re-running with the same topic will only add new sub-subtopics.
-        Topic.objects.filter(id=topic_obj.id).update(content_status="complete")
-        logger.info("ingestor_topic_marked_complete", topic=topic)
+        # ── Completion gating (Phase 2) ──────────────────────────────────────
+        # Lock the parent topic as COMPLETE *only* when EVERY seeded subtopic has
+        # content. The per-run cap (max_subtopics, default 3) means a wide topic
+        # builds only a few subtopics each run — stamping it complete after such a
+        # partial pass was the root cause of "complete-but-gapped" and
+        # "empty-complete" topics (e.g. Governance 9/38, Ethics 0/51). If gaps
+        # remain we reset content_status to None so the topic re-enters the next
+        # run's queue; gap-first selection then fills the NEXT unbuilt subtopics
+        # (in sequence, never re-touching built ones) until it genuinely completes
+        # and locks. A topic with zero seeded subtopics is treated as done.
+        all_seeded_subs = Topic.objects.filter(
+            parent_topic=topic_obj, node_type="subtopic", is_active=True
+        )
+        total_subs = all_seeded_subs.count()
+        built_subs = (
+            BookContent.objects.filter(topic__in=all_seeded_subs)
+            .values_list("topic_id", flat=True)
+            .distinct()
+            .count()
+        )
+        if total_subs == 0 or built_subs >= total_subs:
+            # Genuinely complete — lock it. Re-running only adds new sub-subtopics.
+            Topic.objects.filter(id=topic_obj.id).update(content_status="complete")
+            logger.info(
+                "ingestor_topic_marked_complete",
+                topic=topic,
+                subtopics_built=built_subs,
+                subtopics_total=total_subs,
+            )
+        else:
+            # Still has gaps — leave requeueable (NOT complete, NOT 'generating').
+            Topic.objects.filter(id=topic_obj.id).update(content_status=None)
+            logger.info(
+                "ingestor_topic_partial_progress",
+                topic=topic,
+                subtopics_built=built_subs,
+                subtopics_total=total_subs,
+                remaining=total_subs - built_subs,
+            )
 
         # Final generation log
         elapsed = int(time.time() - start_time)

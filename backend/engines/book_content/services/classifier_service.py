@@ -25,7 +25,35 @@ from .llm_service import llm_call
 logger = structlog.get_logger(__name__)
 
 # ── UPSC Syllabus Subjects (canonical names — must match cross_subject_map.py) ─
+# NOTE: this static list is STALE — it carries only 9 names, several mis-spelled,
+# and is missing whole seeded subjects (Ethics, Geography, Heritage, Economy,
+# Society, Modern/World History). It is kept ONLY as an offline fallback.
+# Validation now uses _seeded_subject_names() (the live DB) — see Phase 6.
 UPSC_SUBJECTS = list(SUBJECTS.values())
+
+# Phase 6 — cache of the ACTUAL seeded Subject names, loaded once per process.
+_SUBJECT_NAME_CACHE: dict = {"names": []}
+
+
+def _seeded_subject_names() -> list:
+    """Return the live seeded Subject names (cached per process).
+
+    This is the authoritative whitelist for validating a classified subject.
+    Falls back to the stale static map ONLY if the DB is unreachable, so an
+    offline/edge call never crashes.
+    """
+    if _SUBJECT_NAME_CACHE["names"]:
+        return _SUBJECT_NAME_CACHE["names"]
+    try:
+        from engines.knowledge.models import Subject
+
+        names = list(Subject.objects.values_list("name", flat=True))
+        if names:
+            _SUBJECT_NAME_CACHE["names"] = names
+            return names
+    except Exception as exc:
+        logger.warning("classifier_subject_list_load_failed", error=str(exc)[:120])
+    return UPSC_SUBJECTS
 
 
 def _load_seeded_hierarchy() -> str:
@@ -124,19 +152,27 @@ def classify_hierarchy(
     response = llm_call(prompt, mode="standard")
     result = _parse_json(response)
 
-    # Validate subject against known list (prevent hallucinated subject names)
-    if result.get("subject") not in UPSC_SUBJECTS:
+    # Validate subject against the ACTUAL seeded subjects (Phase 6).
+    # Previously this checked the stale static list and, on no match, FORCE-set
+    # the subject to "Indian Polity & Constitution" — which silently mis-routed
+    # entire subjects (Ethics/Geography/Economy/Heritage) to Polity, then failed
+    # module resolution → skip → empty-complete. Now: if the LLM's subject isn't
+    # an exact seeded name, try word-overlap against the SEEDED names; if still
+    # no match, KEEP the LLM's answer and let the downstream strict resolver
+    # (_get_subject_strict) fuzzy-match or raise a clean skip. No blind default.
+    seeded_subjects = _seeded_subject_names()
+    if result.get("subject") not in seeded_subjects:
         resp_lower = result.get("subject", "").lower()
-        for known in UPSC_SUBJECTS:
+        for known in seeded_subjects:
             if any(w in resp_lower for w in known.lower().split() if len(w) > 4):
                 result["subject"] = known
                 break
         else:
             logger.warning(
                 "classifier_unknown_subject",
-                defaulting_to="Indian Polity & Constitution",
+                llm_subject=result.get("subject"),
+                note="kept as-is; strict resolver will fuzzy-match or skip",
             )
-            result["subject"] = "Indian Polity & Constitution"
 
     # Ensure all keys exist
     if not result.get("confirmed_topic"):

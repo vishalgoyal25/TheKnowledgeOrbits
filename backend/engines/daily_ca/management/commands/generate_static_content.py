@@ -314,6 +314,13 @@ class Command(BaseCommand):
         generated = 0
         failed = 0
         capped = 0
+        skipped_this_run = 0
+        # Phase 3 — accelerant guard. A skip does NOT consume the generate cap,
+        # so before the keystone fix one run could walk dozens of mis-classified
+        # topics and skip-stamp each complete-empty. Bound how many skips a single
+        # run may perform so blast radius stays small even if some node legitimately
+        # cannot generate. Generous enough never to throttle a healthy run.
+        skip_limit = max(max_articles * 3, 10)
 
         for i, (topic_obj, subject_name) in enumerate(topic_queue, 1):
             # Hard cap check
@@ -357,6 +364,11 @@ class Command(BaseCommand):
                     max_subtopics=3,
                     max_sub_subtopics=2,
                     max_deep_per_topic=1,
+                    # Trusted-caller: hand ingest_topic the EXACT seeded node so it
+                    # derives subject/module from this node's FK chain instead of
+                    # re-classifying via LLM (which mis-mapped whole subjects to
+                    # "Indian Polity & Constitution" → skip → empty-complete).
+                    topic_id=str(topic_obj.id),
                 )
 
                 if result.get("skipped"):
@@ -373,13 +385,30 @@ class Command(BaseCommand):
                         topic=topic_obj.name,
                         reason=result.get("reason", "")[:200],
                     )
-                    # FIX: permanently clear this queued node. A skip means no
-                    # seeded subtopics / hierarchy mismatch — it can NEVER generate,
-                    # so mark it resolved. Without this it returns to the head of
-                    # tomorrow's queue and re-jams the pipeline forever.
+                    # A genuine skip (no seeded subtopics / broken FK) can NEVER
+                    # generate content. Mark it resolved so it does not return to
+                    # the queue head and re-jam the pipeline. NOTE: post-keystone
+                    # (Phase 1) skips should be rare — a subject mis-map no longer
+                    # forces a skip — so this no longer mass-produces empty-completes.
                     Topic.objects.filter(id=topic_obj.id).update(
                         content_status="complete"
                     )
+                    skipped_this_run += 1
+                    # Phase 3 guard: bound runaway skip-walking within one run.
+                    if skipped_this_run >= skip_limit:
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"\n  🛑 Skip limit reached ({skip_limit}). "
+                                "Stopping this run to bound blast radius; "
+                                "remaining topics retried next run."
+                            )
+                        )
+                        logger.warning(
+                            "static_gen_skip_limit_reached",
+                            skip_limit=skip_limit,
+                            at_topic=i,
+                        )
+                        break
                     continue
 
                 nodes = result.get("nodes_created", 0)
@@ -422,13 +451,14 @@ class Command(BaseCommand):
                     )
                     break
 
-                # FIX: permanently clear this queued node so the queue advances
-                # every run. Whether real generation or locked-extension, this
-                # exact node has been processed — mark it complete so it never
-                # returns to the head of tomorrow's queue and re-jams the pipeline.
-                # (Skipped only when partial=True above, which breaks before here
-                # so a budget-interrupted topic is correctly retried next run.)
-                Topic.objects.filter(id=topic_obj.id).update(content_status="complete")
+                # Phase 2: completion is now owned by ingest_topic, which marks the
+                # topic 'complete' ONLY when every seeded subtopic is built, else
+                # leaves it requeueable (content_status=None) so gap-first fills the
+                # remaining subtopics on later runs. The command must NOT force
+                # 'complete' here — doing so was what created complete-but-gapped
+                # topics. Locked-extensions (already-complete topics) keep their
+                # status untouched. The queue still advances because a successful
+                # run builds new subtopics each time (gap-first guarantees progress).
 
             except Exception as exc:
                 failed += 1
