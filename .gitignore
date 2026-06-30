@@ -112,3 +112,9 @@ TheKnowledgeOrbits_Research_Agent.pdf
 
 *.md
 !README.md
+
+# Interview prep — private assets
+INTERVIEW_PREP/
+
+# Features Docs
+FEATURES/

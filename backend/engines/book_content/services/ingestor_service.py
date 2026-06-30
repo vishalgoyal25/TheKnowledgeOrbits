@@ -1208,8 +1208,13 @@ def ingest_topic(
                 subtopics_total=total_subs,
             )
         else:
-            # Still has gaps — leave requeueable (NOT complete, NOT 'generating').
-            Topic.objects.filter(id=topic_obj.id).update(content_status=None)
+            # Still has gaps — leave requeueable. MUST use the "empty" sentinel
+            # (the model default), NOT None/NULL: the cron queue is
+            # `.exclude(content_status="complete")`, and in SQL a NULL row is
+            # excluded by that NOT-equals — so a NULL topic would become invisible
+            # to the queue and never resume. "empty" keeps it in the queue; the
+            # gap-first selector + smart-skip then fill only the missing subtopics.
+            Topic.objects.filter(id=topic_obj.id).update(content_status="empty")
             logger.info(
                 "ingestor_topic_partial_progress",
                 topic=topic,

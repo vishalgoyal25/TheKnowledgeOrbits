@@ -544,7 +544,11 @@ class Command(BaseCommand):
             )
             if len(built) < len(sub_ids):
                 if not dry_run:
-                    Topic.objects.filter(id=t.id).update(content_status=None)
+                    # MUST be the "empty" sentinel, NOT None/NULL: the daily queue
+                    # is `.exclude(content_status="complete")`, which in SQL drops
+                    # NULL rows — a NULL-reset topic would vanish from the queue
+                    # and never refill. "empty" keeps it queued for gap-first fill.
+                    Topic.objects.filter(id=t.id).update(content_status="empty")
                 requeued += 1
                 self.stdout.write(
                     f"    ↺ {t.name}  ({len(built)}/{len(sub_ids)} subtopics built)"
