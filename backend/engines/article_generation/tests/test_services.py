@@ -82,7 +82,7 @@ class TestArticleGenerationService:
         mock_client.chat.completions.create.return_value = mock_response
         mock_entry = MagicMock()
         mock_entry.client = mock_client
-        mock_entry.model = "llama-3.3-70b-versatile"
+        mock_entry.model = "openai/gpt-oss-120b"
         mock_entry.provider = "groq"
 
         with (

@@ -19,7 +19,7 @@ Why stream the FULL report when we already streamed a summary?
   after, so by the time they finish the summary, the detailed report is already
   filling in below — zero perceived dead time.
 
-Provider: Groq llama-3.3-70b (quality matters here) | max_tokens: 1500.
+Provider: Groq gpt-oss-120b (quality matters here) | max_tokens: 1500.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ _SYSTEM_PROMPT = (
 class ReportGeneratorAgent(BaseAgent):
     agent_name = AgentName.REPORT_GENERATOR
     model_provider = "groq"
-    model_name = "llama-3.3-70b-versatile"
+    model_name = "openai/gpt-oss-120b"
     max_tokens = MAX_TOKENS_REPORT_GENERATOR
 
     def execute(self, state: ResearchState) -> tuple[dict, int]:

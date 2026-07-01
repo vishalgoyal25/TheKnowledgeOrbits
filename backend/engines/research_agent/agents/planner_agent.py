@@ -67,7 +67,7 @@ _SYSTEM_PROMPT = (
 class PlannerAgent(BaseAgent):
     agent_name = AgentName.PLANNER
     model_provider = "groq"
-    model_name = "llama-3.3-70b-versatile"
+    model_name = "openai/gpt-oss-120b"
     max_tokens = MAX_TOKENS_PLANNER
 
     def execute(self, state: ResearchState) -> tuple[dict, int]:

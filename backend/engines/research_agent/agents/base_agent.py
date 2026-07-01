@@ -49,13 +49,13 @@ class BaseAgent:
     """
     Subclasses MUST set these 4 class attributes and override execute().
 
-    Defaults below are the Groq llama-3.3-70b config. Fast agents
+    Defaults below are the Groq openai/gpt-oss-120b config. Fast agents
     (Verification, Reflection) override provider="cerebras".
     """
 
     agent_name: str = "base"
     model_provider: str = "groq"
-    model_name: str = "llama-3.3-70b-versatile"
+    model_name: str = "openai/gpt-oss-120b"
     max_tokens: int = 1024
 
     # ──────────────────────────────────────────────────────────────────────────

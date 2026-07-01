@@ -15,7 +15,7 @@ Two production guards baked in:
   • LENIENT PARSE (Risk #46): if the LLM returns malformed JSON, we don't crash —
     we use the raw text as the synthesis and continue best-effort.
 
-Provider: Groq llama-3.3-70b | max_tokens: 1200 (MAX_TOKENS_RESEARCH).
+Provider: Groq gpt-oss-120b | max_tokens: 1200 (MAX_TOKENS_RESEARCH).
 
 NOTE: File named research_agent_node.py to avoid a name clash with the engine
 package name `research_agent`.
@@ -68,7 +68,7 @@ _SYSTEM_PROMPT = (
 class ResearchAgentNode(BaseAgent):
     agent_name = AgentName.RESEARCH
     model_provider = "groq"
-    model_name = "llama-3.3-70b-versatile"
+    model_name = "openai/gpt-oss-120b"
     max_tokens = MAX_TOKENS_RESEARCH
 
     def execute(self, state: ResearchState) -> tuple[dict, int]:

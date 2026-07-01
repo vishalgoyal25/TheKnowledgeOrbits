@@ -46,7 +46,7 @@ class TestLlmService(unittest.TestCase):
         mock_client.chat.completions.create.return_value = mock_response
         entry = MagicMock()
         entry.client = mock_client
-        entry.model = "llama-3.3-70b-versatile"
+        entry.model = "openai/gpt-oss-120b"
         entry.provider = "groq"
         return entry
 
@@ -56,7 +56,7 @@ class TestLlmService(unittest.TestCase):
         mock_client.chat.completions.create.side_effect = exc
         entry = MagicMock()
         entry.client = mock_client
-        entry.model = "llama-3.3-70b-versatile"
+        entry.model = "openai/gpt-oss-120b"
         entry.provider = "groq"
         return entry
 

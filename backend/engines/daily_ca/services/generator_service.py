@@ -852,7 +852,7 @@ class DailyCaGeneratorService:
                 quality_score=_score_quality(body_md),
                 is_published=False,
                 generation_metadata={
-                    "groq_model": "llama-3.3-70b-versatile",
+                    "groq_model": "openai/gpt-oss-120b",
                     "word_count": word_count,
                     "subject": proposal.subject_name or "",
                     # Phase 3 — RAG grounding is now the PRIMARY theory anchor.

@@ -156,7 +156,7 @@ class TestAgentExecutionLog:
             agent_name=AgentName.PLANNER,
             started_at=timezone.now(),
             model_provider="groq",
-            model_name="llama-3.3-70b-versatile",
+            model_name="openai/gpt-oss-120b",
         )
         defaults.update(overrides)
         return AgentExecutionLog.objects.create(**defaults)

@@ -672,7 +672,7 @@ Generate the {question_count} questions now:"""
                 "static_chunk_count": len(static_chunks),
                 "ca_chunk_count": len(ca_chunks),
                 "generated_at": timezone.now().isoformat(),
-                "model": "llama-3.3-70b-versatile",
+                "model": "openai/gpt-oss-120b",
             },
         )
 

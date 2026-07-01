@@ -4,7 +4,7 @@ engines/book_content/services/llm_service.py
 Unified multi-provider LLM client — shared by all engines.
 
 Active provider pool (round-robin rotation):
-  • GROQ      — api.groq.com        — llama-3.3-70b-versatile  (primary, free)
+  • GROQ      — api.groq.com        — openai/gpt-oss-120b       (primary, free)
   • Cerebras  — api.cerebras.ai/v1  — gpt-oss-120b             (additive, free)
 
 Excluded providers:
@@ -84,7 +84,7 @@ def _build_pool() -> list[_LLMEntry]:
     pool: list[_LLMEntry] = []
 
     # ── GROQ (primary) ────────────────────────────────────────────────────────
-    groq_model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+    groq_model = getattr(settings, "GROQ_MODEL", "openai/gpt-oss-120b")
     raw_groq = getattr(settings, "GROQ_API_KEY", "")
     for key in [k.strip() for k in raw_groq.split(",") if k.strip()]:
         pool.append(

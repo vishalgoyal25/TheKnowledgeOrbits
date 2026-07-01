@@ -46,7 +46,7 @@ class _DummyAgent(BaseAgent):
 
     agent_name = AgentName.RESEARCH
     model_provider = "groq"
-    model_name = "llama-3.3-70b-versatile"
+    model_name = "openai/gpt-oss-120b"
 
     def execute(self, state):
         return {"synthesized_content": "hello"}, 7

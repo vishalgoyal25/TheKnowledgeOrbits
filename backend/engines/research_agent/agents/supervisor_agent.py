@@ -41,7 +41,7 @@ class SupervisorAgent(BaseAgent):
     # Supervisor makes no LLM call, but we keep provider metadata consistent
     # so the ra_agent_log row has sensible model_provider/model_name values.
     model_provider = "groq"
-    model_name = "llama-3.3-70b-versatile"
+    model_name = "openai/gpt-oss-120b"
 
     def execute(self, state: ResearchState) -> tuple[dict, int]:
         query = (state.get("query") or "").strip()

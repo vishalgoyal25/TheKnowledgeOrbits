@@ -7,7 +7,7 @@ Despite the file name, this is a MULTI-PROVIDER POOL with automatic failover.
 ALL LLM calls MUST route through here (Hard Rule, Risk #3).
 
 THE POOL (free-tier providers, in failover priority order):
-    1. groq      → llama-3.3-70b-versatile   (primary: fast + high quality)
+    1. groq      → openai/gpt-oss-120b       (primary: fast + high quality)
     2. cerebras  → gpt-oss-120b              (free public model: Verification/Reflection/Summary)
     3. gemini    → gemini-2.0-flash          (last-resort fallback)
 
@@ -57,7 +57,7 @@ POOL_PRIORITY = ["groq", "cerebras"]
 # agent didn't originally request (the requested model name is provider-specific
 # and won't exist on a different provider).
 PROVIDER_DEFAULT_MODEL = {
-    "groq": "llama-3.3-70b-versatile",
+    "groq": "openai/gpt-oss-120b",
     "cerebras": "gpt-oss-120b",  # Cerebras retired Llama on public endpoints; this is the free production model
     "gemini": "gemini-2.0-flash",  # kept for easy re-enable, but not in POOL_PRIORITY
 }

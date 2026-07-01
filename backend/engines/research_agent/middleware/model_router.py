@@ -6,7 +6,7 @@ Redis-backed provider health flag (a lightweight circuit breaker).
 
 Routing philosophy (already reflected in the agents' class attributes; this is
 the documented, queryable central map):
-  - Heavy reasoning / synthesis / report  → Groq  llama-3.3-70b-versatile (quality)
+  - Heavy reasoning / synthesis / report  → Groq  openai/gpt-oss-120b (quality)
   - Fast judgement / summary / reflection  → Cerebras gpt-oss-120b (speed)
   - Tool-only nodes (search)               → no LLM
 
@@ -34,7 +34,7 @@ logger = structlog.get_logger(__name__)
 
 _GROQ = "groq"
 _CEREBRAS = "cerebras"
-_GROQ_MODEL = "llama-3.3-70b-versatile"
+_GROQ_MODEL = "openai/gpt-oss-120b"
 _CEREBRAS_MODEL = "gpt-oss-120b"
 
 # Per-agent model assignment (mirrors each agent's class attributes).
