@@ -112,9 +112,17 @@ TheKnowledgeOrbits_Research_Agent.pdf
 
 *.md
 !README.md
+!SECURITY.md
 
 # Interview prep — private assets
 INTERVIEW_PREP/
 
+# Internal knowledge base — private, never published
+PKB/
+
 # Features Docs
 FEATURES/
+
+# Temporary experimentation lab — feature was successfully integrated into the
+# main project; the standalone lab is no longer part of the shipped codebase.
+upsc-agent-lab/
