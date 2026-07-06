@@ -15,7 +15,7 @@ _Engine-First Django/Next.js Architecture | Built for Scale | Solo-Developed_
   <img src="https://img.shields.io/badge/Gunicorn-gthread-499848?logo=gunicorn&logoColor=white" alt="Gunicorn">
   <img src="https://img.shields.io/badge/django--background--tasks-worker-092E20" alt="django-background-tasks">
   <img src="https://img.shields.io/badge/structlog-logging-2A6DB2" alt="structlog">
-  <img src="https://img.shields.io/badge/Pytest-699%20tests-0A9EDC?logo=pytest&logoColor=white" alt="Pytest">
+  <img src="https://img.shields.io/badge/Pytest-714%20tests-0A9EDC?logo=pytest&logoColor=white" alt="Pytest">
   <img src="https://img.shields.io/badge/Ruff-lint-D7FF64?logo=ruff&logoColor=black" alt="Ruff">
   <img src="https://img.shields.io/badge/mypy-typed-2A6DB2" alt="mypy"><br>
   <sub><b>🗄️ Database &amp; Cache</b></sub><br>
@@ -112,9 +112,7 @@ public quizzes, evergreen theory content, and an agentic AI research assistant.
 flowchart TB
     User([👤 UPSC Aspirant])
 
-    subgraph Edge["▲ Vercel — Edge / CDN"]
-        FE["Next.js 16 · React 19<br/>ISR-cached public content"]
-    end
+    FE["▲ Vercel — Edge / CDN<br/>Next.js 16 · React 19<br/>ISR-cached public content"]
 
     subgraph Render["Render — Django Dyno (1 worker · gthread)"]
         API["DRF API · gunicorn"]
@@ -267,13 +265,12 @@ flowchart TB
         C4["article_generation<br/>user AI articles"]
     end
 
-    C1 --> GW
-    C2 --> GW
-    C3 --> GW
-    C4 --> GW
+    C1 --> SEED
+    C2 --> SEED
+    C3 --> SEED
+    C4 --> SEED
 
     subgraph GW["retrieve_grounding(seed_topic_id, query, k_book, k_ca)"]
-        direction TB
         SEED["Seed query<br/>topic name + desc + keywords"] --> EXP["TopicRelation graph expansion<br/>(cross-subject)"]
         EXP --> HS["Hybrid search"]
         HS --> BM["BM25<br/>tsvector · GIN"]
@@ -486,32 +483,29 @@ flowchart TB
         LT --> PUSH["commit + push"]
     end
 
-    PUSH -->|"push: main / develop · PR: main · manual dispatch"| GHA
+    PUSH -->|"push: main / develop · PR: main · manual dispatch"| RUFF
+    PUSH -->|"push: main / develop · PR: main · manual dispatch"| PGV
+    PUSH -->|"push: main / develop · PR: main · manual dispatch"| FL
 
     subgraph GHA["🐙 GitHub Actions — 3 jobs run in PARALLEL"]
-        direction LR
-
         subgraph J1["Job 1 · backend-lint"]
-            direction TB
             RUFF["Ruff check + format --check"] --> MYPY["mypy ."]
         end
 
         subgraph J2["Job 2 · backend-tests (matrix × 3 shards)"]
-            direction TB
             PGV[("pgvector/pgvector:pg16<br/>service container · per shard")] --> MIG["migrate --noinput"]
             MIG --> SPLIT["pytest -n auto<br/>--splits 3 --group N<br/>--maxfail=10 · fail-fast off"]
             SPLIT --> COV["→ Codecov"]
         end
 
         subgraph J3["Job 3 · frontend-integrity"]
-            direction TB
             FL["npm run lint"] --> FJ["jest"] --> FB["npm run build"]
         end
     end
 
-    J1 --> GATE{"all green?<br/>deploy needs all 3"}
-    J2 --> GATE
-    J3 --> GATE
+    MYPY --> GATE{"all green?<br/>deploy needs all 3"}
+    COV --> GATE
+    FB --> GATE
 
     GATE -->|"❌ any red → blocked"| STOP["No deploy<br/>fix + re-push"]
     GATE -->|"✅ green AND ref = main"| HOOK["curl Render deploy hook"]
@@ -574,22 +568,22 @@ The isolated agentic engine: a compiled `StateGraph` of 8 nodes with two conditi
 transition over SSE, and checkpoints to Postgres (`PostgresSaver`) so a crashed run can resume.
 
 ```mermaid
-flowchart TB
+flowchart LR
     START([START]) --> SUP["supervisor"]
     SUP --> PLAN["planner"]
     PLAN --> SEARCH["search<br/>Tavily · Exa · Wikipedia"]
     SEARCH --> RES["research"]
     RES --> VER{"verification"}
 
-    VER -->|passed / retries exhausted| SUM["summary_generator"]
-    VER -->|failed · retry_count &lt; 1| SEARCH
+    VER -->|passed or retries exhausted| SUM["summary_generator"]
+    VER -->|failed, retry below 1| SEARCH
     VER -->|cancelled| E1([END])
 
     SUM --> REP["report_generator"]
     REP --> REF{"reflection"}
 
-    REF -->|score &lt; 0.7 · re-plan once| PLAN
-    REF -->|score &gt;= 0.7| E2([END])
+    REF -->|score below 0.7, re-plan once| PLAN
+    REF -->|score 0.7 or above| E2([END])
 ```
 
 ### 🧠 LLM Pool (Research Agent) — Multi-Provider Failover
@@ -602,27 +596,19 @@ _answer_ as long as one provider is alive — the agent never sees the failover.
 ```mermaid
 flowchart TB
     CALLER["Caller states a preference<br/>llm_client.call(provider='cerebras', …)"] --> ORDER
+    ORDER["Build failover order<br/>preferred, then rest of POOL_PRIORITY<br/>skip providers with no key"] --> RPM
 
-    subgraph POOL["LLMClient — module-level singleton"]
-        direction TB
-        ORDER["Build failover order<br/>preferred → rest of POOL_PRIORITY<br/>skip providers with no key"]
-        ORDER --> P1
+    RPM{"Redis RPM<br/>under cap?"}
+    RPM -->|at cap| SKIP["pre-emptive skip"]
+    RPM -->|ok| KEY["Round-robin next key<br/>gsk_a, gsk_b, gsk_c"]
+    KEY --> RETRY["Layer 1 · retry SAME provider<br/>tenacity · 2 attempts · backoff 1–4s"]
+    RETRY --> CALL["chat.completions.create<br/>(OpenAI-compatible · all providers)"]
 
-        subgraph P1["Try one provider (groq → cerebras)"]
-            direction TB
-            RPM{"Redis RPM<br/>under cap?"}
-            RPM -->|at cap| SKIP["pre-emptive skip"]
-            RPM -->|ok| KEY["Round-robin next key<br/>gsk_a → gsk_b → gsk_c"]
-            KEY --> RETRY["Layer 1 · retry SAME provider<br/>tenacity · 2 attempts · backoff 1–4s"]
-            RETRY --> CALL["chat.completions.create<br/>(OpenAI-compatible · all providers)"]
-        end
-
-        CALL -->|success| OK["return (text, tokens)"]
-        CALL -->|still failing| FO["Layer 2 · failover"]
-        SKIP --> FO
-        FO -->|another provider left| P1
-        FO -->|pool exhausted| ERR["raise LLMError<br/>(only if ALL providers fail)"]
-    end
+    CALL -->|success| OK["return (text, tokens)"]
+    CALL -->|still failing| FO["Layer 2 · failover"]
+    SKIP --> FO
+    FO -->|another provider left| RPM
+    FO -->|pool exhausted| ERR["raise LLMError<br/>(only if ALL providers fail)"]
 
     OK --> TRACE["Langfuse span<br/>provider · model · tokens · failed_over"]
 ```
@@ -635,17 +621,17 @@ response layer sets `Vary: Authorization` so per-user responses are never served
 
 ```mermaid
 flowchart TB
-    REQ([Request]) --> L1
+    REQ([Request]) --> ISR
 
     subgraph L1["1 · Edge"]
         ISR["Vercel ISR / CDN<br/>static public pages"]
     end
-    L1 -->|miss| L2
+    ISR -->|miss| CCM
 
     subgraph L2["2 · App response"]
         CCM["CacheControlMiddleware<br/>Cache-Control + ETag<br/>Vary: Authorization"]
     end
-    L2 -->|miss| L3
+    CCM -->|miss| REDIS
 
     subgraph L3["3 · Data"]
         REDIS[("Redis<br/>query cache · cached COUNT(*)<br/>rate-limit · SSE pub/sub")]
@@ -707,26 +693,21 @@ score is back-filled into the Redis cache. Cost is governed by a two-tier Redis 
 
 ```mermaid
 flowchart TB
-    DONE["workflow_completed<br/>(user already has the report)"] --> TRIG["orchestrator → evaluate_session<br/>background task · non-blocking"]
+    DONE["workflow_completed<br/>(user already has the report)"] --> TRIG["orchestrator, evaluate_session<br/>background task · non-blocking"]
 
     subgraph QUAL["Quality — DeepEval-style LLM-as-judge"]
-        direction TB
         TRIG --> JP["build_judge_prompt<br/>query + report + sources"]
         JP --> ONECALL["ONE LLM call · JSON mode<br/>Groq/Cerebras pool"]
         ONECALL --> PARSE["parse 4 metrics"]
         PARSE --> M["faithfulness ≥ 0.65 · relevance ≥ 0.60<br/>hallucination ≤ 0.30 · completeness ≥ 0.55"]
-        M --> COMP["composite score<br/>.35 F · .30 R · .20 (1−H) · .15 C"]
+        M --> COMP["composite score<br/>.35 F · .30 R · .20 times 1-H · .15 C"]
         COMP --> SAVE[("ra_evaluation<br/>results stay LOCAL")]
-        COMP --> PATCH["back-fill confidence → Redis cache"]
+        COMP --> PATCH["back-fill confidence into Redis cache"]
         ONECALL -. failure .-> NEUTRAL["neutral 0.5 → badge still renders"]
     end
 
-    subgraph GOV["Cost &amp; rate governance — Redis, fail-open"]
-        direction TB
-        U1["per-user daily cap<br/>anon-by-IP (3) · auth (10)"]
-        U2["per-provider RPM<br/>Groq 30 · Cerebras 60"]
-    end
-
+    U1["Cost governance · per-user daily cap<br/>anon-by-IP (3) · auth (10)"]
+    U2["Cost governance · per-provider RPM<br/>Groq 30 · Cerebras 60"]
     U2 -. guards every LLM call .-> ONECALL
 ```
 
@@ -749,17 +730,12 @@ stateDiagram-v2
     cancelled --> [*]
 
     note right of running
-        Orchestrator owns the LIFECYCLE
-        (background worker, not request thread)
-        Graph owns the WORK (8 nodes)
-        Checkpoint after every node
-        (PostgresSaver, thread_id = session_id)
-        → resume on crash
+        Orchestrator owns the LIFECYCLE, background worker not request thread.
+        Graph owns the WORK, 8 nodes.
+        Checkpoint after every node via PostgresSaver, thread_id equals session_id, enabling resume on crash.
     end note
     note right of completed
-        emit workflow_completed (SSE)
-        → trigger DeepEval (background)
-        → flush Langfuse once
+        Emits workflow_completed over SSE, then triggers DeepEval in the background, then flushes Langfuse once.
     end note
 ```
 
@@ -773,19 +749,16 @@ guardrails screen input and sanitize output around the whole run.
 ```mermaid
 flowchart TB
     Q["Query"] --> GIN["Guardrail IN<br/>injection screen + NFC normalize"]
-    GIN --> WORKER
+    GIN --> AG["Background worker (LangGraph)<br/>agents emit events"]
 
-    subgraph WORKER["Background worker (LangGraph)"]
-        direction TB
-        AG["agents emit events"] --> EMIT["sse_service.emit()"]
-        AG --> GOUT["Guardrail OUT<br/>strip script / onX / javascript:"]
-    end
+    AG --> EMIT["sse_service.emit()"]
+    AG --> GOUT["Guardrail OUT<br/>strip script, onX, javascript:"]
 
     EMIT -->|publish| CH[("Redis pub/sub<br/>channel per session")]
     CH -->|subscribe| STREAM["stream view (generator)"]
-    STREAM -->|"event: … · : heartbeat every 15s"| BROWSER([Browser · React Flow])
+    STREAM -->|"event stream, heartbeat every 15s"| BROWSER([Browser, React Flow])
 
-    BROWSER -. disconnect / GeneratorExit .-> CANCEL["set_cancelled → Redis flag"]
+    BROWSER -. disconnect, GeneratorExit .-> CANCEL["set_cancelled, Redis flag"]
     CANCEL -. every agent checks before LLM work .-> AG
     LATE["late subscriber<br/>(session already done)"] -.-> TERM["terminal_stream<br/>one-shot final event"]
 ```
@@ -838,7 +811,7 @@ npm run dev
 
 ### Running Tests
 
-- Backend: `pytest` (from `backend/`) — 699+ tests against a real `pgvector`-enabled Postgres.
+- Backend: `pytest` (from `backend/`) — 714+ tests against a real `pgvector`-enabled Postgres.
 - Frontend: `npm test` (from `frontend/`).
 - See [🧪 Testing & CI/CD](#-testing--cicd--local--github-actions--render) above for how CI runs
   these in parallel and gates deployment.
