@@ -42,8 +42,8 @@ Instead, report privately using one of these channels:
 1. **Preferred — GitHub Private Vulnerability Reporting:** If enabled on this repository, use the
    **"Report a vulnerability"** option under the repository's **Security** tab. This creates a private
    advisory visible only to the maintainer.
-2. **Email:** Contact the maintainer directly (see the repository owner's GitHub profile,
-   [@vishalgoyal25](https://github.com/vishalgoyal25), for a contact method) with the subject line
+2. **Email:** Email the maintainer directly at
+   [vishal25goyal25@gmail.com](mailto:vishal25goyal25@gmail.com) with the subject line
    `SECURITY: TheKnowledgeOrbits — <short description>`.
 
 **Please include, where possible:**

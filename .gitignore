@@ -108,6 +108,8 @@ specs
 postman/
 TheKnowledgeOrbits_Research_Agent.pdf
 *.pdf
+# Exception: the sample Research Agent report is intentionally published for the README
+!assets/research-agent-sample-report.pdf
 
 
 *.md

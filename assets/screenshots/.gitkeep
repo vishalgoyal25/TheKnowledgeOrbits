@@ -1,0 +1,8 @@
+# Screenshots folder.
+# Add the following files here (referenced by README.md → "Screenshots"):
+#   hero.png                    — landing / home page (top of README)
+#   daily-current-affairs.png   — a generated Daily Current Affairs article
+#   research-agent.png          — the agentic Research Assistant running (React Flow graph + live stream)
+#   daily-quiz.png              — an auto-generated quiz
+#   knowledge_map.png           — the interactive knowledge map (graph)
+# PNG or JPG; ~1200px wide renders best on GitHub.
