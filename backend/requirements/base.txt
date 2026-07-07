@@ -9,6 +9,9 @@ django-cors-headers>=4.6.0
 psycopg2-binary>=2.9.10
 pgvector>=0.3.6
 
+# Numeric (relevance_scorer/topic_linker cosine-similarity math — real runtime dependency)
+numpy>=1.26.0
+
 # Async & Tasks
 django-background-tasks>=1.2.5
 

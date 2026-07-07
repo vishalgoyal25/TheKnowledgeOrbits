@@ -21,9 +21,11 @@ import type { DailyFeedResponse, DailyCaArticleList } from "@/lib/api/daily-ca";
 import type { Quiz } from "@/lib/types";
 import HomePageClient from "@/components/home/home-page-client";
 
-// ISR: Vercel re-generates this page in the background every 5 minutes.
+// ISR: Vercel re-generates this page in the background. 1800s (30 min) instead of
+// 300s — homepage content (today's CA/quiz) only changes a few times/day; 5-min
+// revalidation was burning Vercel's free-tier ISR-write quota for no real benefit.
 // Visitors always get a cached HTML page — Render cold-start never affects them.
-export const revalidate = 300;
+export const revalidate = 1800;
 
 // Mirror the same base-URL logic as server-hierarchy.ts
 const BACKEND_URL =

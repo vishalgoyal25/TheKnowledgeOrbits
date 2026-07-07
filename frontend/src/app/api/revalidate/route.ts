@@ -24,12 +24,16 @@ export async function GET(request: NextRequest) {
     console.log(`🔄 [Revalidate] Triggering revalidation for path: ${path}`);
 
     if (path === "all") {
-      // Refresh all major public directories
-      revalidatePath("/articles", "layout");
-      revalidatePath("/topics", "layout");
-      revalidatePath("/current-affairs", "layout");
+      // Refresh only the index pages themselves — NOT "layout" scope, which
+      // invalidates every dynamic page under each route (every article, every
+      // topic) in one call. That amplification is what was burning through
+      // Vercel's free-tier ISR-write quota. Individual new content still gets
+      // revalidated on its own specific path by the caller.
+      revalidatePath("/articles");
+      revalidatePath("/topics");
+      revalidatePath("/current-affairs");
       console.log(
-        "✅ [Revalidate] Successfully queued Articles, Topics, and CA for refresh",
+        "✅ [Revalidate] Successfully queued Articles, Topics, and CA index pages for refresh",
       );
     } else {
       revalidatePath(path);
