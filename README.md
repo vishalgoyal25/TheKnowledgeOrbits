@@ -568,7 +568,7 @@ The isolated agentic engine: a compiled `StateGraph` of 8 nodes with two conditi
 transition over SSE, and checkpoints to Postgres (`PostgresSaver`) so a crashed run can resume.
 
 ```mermaid
-flowchart LR
+flowchart TB
     START([START]) --> SUP["supervisor"]
     SUP --> PLAN["planner"]
     PLAN --> SEARCH["search<br/>Tavily · Exa · Wikipedia"]
