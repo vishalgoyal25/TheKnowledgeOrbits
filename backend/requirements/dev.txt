@@ -8,6 +8,7 @@ pytest-timeout>=2.3.0
 factory-boy>=3.3.1
 faker>=33.1.0
 schemathesis>=3.39.6,<4.0.0  # 4.0+ requires tenacity>=9.1.2 which conflicts with langchain==0.2.16
+numpy>=1.26.0  # conftest.py mocks embedding vectors (384d) — CI never installs ml.txt/sentence-transformers
 
 # Code Quality
 black>=24.10.0
