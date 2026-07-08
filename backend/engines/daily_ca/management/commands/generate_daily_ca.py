@@ -175,6 +175,7 @@ class Command(BaseCommand):
                 )
                 raise  # re-raise so run_generation_cycle marks it 'failed'
 
+        # pyrefly: ignore [bad-assignment]
         DailyCaGeneratorService._run_single_cycle = _instrumented_cycle
 
         # ── Run generation ────────────────────────────────────────────────────

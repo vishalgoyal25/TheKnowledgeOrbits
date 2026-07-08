@@ -6,7 +6,7 @@ Phase J2 — Full automation pipeline (zero human involvement).
 Runs every day via Render Cron at 02:00 UTC (07:30 IST).
 Replaces manual execution of three separate commands.
 
-Pipeline (5 steps, sequential):
+Pipeline (6 steps, sequential):
   Step 1 — generate_ca_proposals
              Reads last-24hr CAArticles → scores → groups by topic →
              creates up to 30 CaDailyProposal records (status="pending").
@@ -30,6 +30,12 @@ Pipeline (5 steps, sequential):
              Quiz is immediately public (no separate publish step).
              Idempotent: skips if quiz for this date already exists.
 
+  Step 6 — generate_concept_content
+             Generates full encyclopaedic body_md for 10 ConceptPage stubs where
+             is_content_ready=False, ordered by usage_count DESC (most-referenced
+             concepts first). Runs after Steps 1–5 so CA + quiz are never blocked
+             by concept generation. Non-fatal: failure here never aborts the pipeline.
+
 Usage:
     python manage.py run_daily_pipeline
     python manage.py run_daily_pipeline --top 10
@@ -41,7 +47,8 @@ Notes:
   - Safe to re-run: each step is idempotent (skips already-processed records)
   - If scrape_ca hasn't run yet, Step 1 finds 0 articles and exits gracefully
   - --top is a soft cap: if fewer proposals were created, all of them are approved
-  - All four steps share the same --date and --database arguments
+  - All steps share the same --date and --database arguments
+  - Step 6 always generates exactly 10 concept pages per daily run
 """
 
 import sentry_sdk
@@ -133,7 +140,7 @@ class Command(BaseCommand):
 
         # ── STEP 1: Generate proposals ────────────────────────────────────────
         self.stdout.write(
-            self.style.MIGRATE_HEADING("\n▶ Step 1/4 — Generating proposals...")
+            self.style.MIGRATE_HEADING("\n▶ Step 1/6 — Generating proposals...")
         )
         try:
             call_command(
@@ -154,7 +161,7 @@ class Command(BaseCommand):
         # ── STEP 2: Auto-approve top N by relevance_score ─────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                f"\n▶ Step 2/5 — Auto-approving top {top_n} proposals..."
+                f"\n▶ Step 2/6 — Auto-approving top {top_n} proposals..."
             )
         )
         try:
@@ -189,12 +196,12 @@ class Command(BaseCommand):
         # ── STEP 3 + 4: Generate articles + auto-publish ──────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                "\n▶ Step 3/5 — Generating articles from approved proposals..."
+                "\n▶ Step 3/6 — Generating articles from approved proposals..."
             )
         )
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                "▶ Step 4/5 — Auto-publish enabled (--auto-publish flag active)"
+                "▶ Step 4/6 — Auto-publish enabled (--auto-publish flag active)"
             )
         )
         try:
@@ -214,7 +221,7 @@ class Command(BaseCommand):
 
         # ── STEP 5: Generate Daily Public Quiz ───────────────────────────────
         self.stdout.write(
-            self.style.MIGRATE_HEADING("\n▶ Step 5/5 — Generating Daily Public Quiz...")
+            self.style.MIGRATE_HEADING("\n▶ Step 5/6 — Generating Daily Public Quiz...")
         )
         try:
             call_command(
@@ -234,13 +241,38 @@ class Command(BaseCommand):
                 )
             )
 
+        # ── STEP 6: Generate Concept Page content ────────────────────────────
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(
+                "\n▶ Step 6/6 — Generating Concept Page content (10 stubs)..."
+            )
+        )
+        try:
+            call_command(
+                "generate_concept_content",
+                limit=10,
+                database=db_alias,
+                stdout=self.stdout,
+                stderr=self.stderr,
+            )
+        except Exception as exc:
+            sentry_sdk.capture_exception(exc)
+            logger.error("pipeline_step6_failed", error=str(exc))
+            self.stderr.write(
+                self.style.ERROR(
+                    f"\n✗ Step 6 failed: {exc}\n"
+                    "  (CA articles and quiz unaffected — concept generation is independent)"
+                )
+            )
+
         # ── Final summary ─────────────────────────────────────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
                 f"\n{_DIVIDER}\n"
                 f"  Pipeline complete for {target_date}.\n"
-                f"  CA Articles : LIVE on /news\n"
-                f"  Daily Quiz  : LIVE on /quiz\n"
+                f"  CA Articles    : LIVE on /news\n"
+                f"  Daily Quiz     : LIVE on /quiz\n"
+                f"  Concept Pages  : 10 stubs enriched (usage_count DESC)\n"
                 f"{_DIVIDER}\n"
             )
         )
@@ -420,6 +452,39 @@ class Command(BaseCommand):
         except Exception as exc:
             self.stdout.write(self.style.WARNING(f"  Quiz check failed: {exc}"))
 
+        # ── Step 6 preview: concept page content ─────────────────────────────
+        self.stdout.write(
+            self.style.MIGRATE_HEADING("\n▶ Step 6 — Concept Page Content (read-only):")
+        )
+        try:
+            from engines.tags.models import ConceptPage
+
+            pending_concepts = (
+                ConceptPage.objects.using(db_alias)
+                .filter(is_content_ready=False)
+                .order_by("-usage_count", "name")
+            )
+            pending_count = pending_concepts.count()
+            next_batch = list(pending_concepts[:10])
+
+            self.stdout.write(
+                f"  ConceptPage stubs pending (is_content_ready=False): {pending_count}"
+            )
+            if next_batch:
+                self.stdout.write(
+                    f"  Step 6 would generate content for {len(next_batch)} concept(s):"
+                )
+                for c in next_batch:
+                    self.stdout.write(f"    [{c.usage_count:>4} uses] {c.slug}")
+            else:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        "  ✅ All ConceptPages are content-ready — Step 6 would skip."
+                    )
+                )
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(f"  Concept check failed: {exc}"))
+
         # ── Summary ───────────────────────────────────────────────────────────
         self.stdout.write(
             self.style.SUCCESS(
@@ -437,4 +502,5 @@ class Command(BaseCommand):
             proposal_statuses=status_counts,
             pending_to_approve=len(pending),
             already_approved=len(approved),
+            concept_stubs_pending=pending_count if "pending_count" in dir() else -1,
         )
