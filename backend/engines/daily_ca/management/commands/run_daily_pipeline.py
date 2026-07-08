@@ -244,13 +244,13 @@ class Command(BaseCommand):
         # ── STEP 6: Generate Concept Page content ────────────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                "\n▶ Step 6/6 — Generating Concept Page content (10 stubs)..."
+                "\n▶ Step 6/6 — Generating Concept Page content (20 stubs)..."
             )
         )
         try:
             call_command(
                 "generate_concept_content",
-                limit=10,
+                limit=20,
                 database=db_alias,
                 stdout=self.stdout,
                 stderr=self.stderr,
@@ -272,7 +272,7 @@ class Command(BaseCommand):
                 f"  Pipeline complete for {target_date}.\n"
                 f"  CA Articles    : LIVE on /news\n"
                 f"  Daily Quiz     : LIVE on /quiz\n"
-                f"  Concept Pages  : 10 stubs enriched (usage_count DESC)\n"
+                f"  Concept Pages  : 20 stubs enriched (usage_count DESC)\n"
                 f"{_DIVIDER}\n"
             )
         )
