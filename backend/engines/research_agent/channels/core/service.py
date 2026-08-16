@@ -93,9 +93,19 @@ def handle_inbound(adapter: ChannelAdapter, inbound: InboundMessage) -> str:
         return "unsupported"
 
     if inbound.is_callback:
-        # T6 wires this to the email state machine.
-        send_text(adapter, contact, "That button isn't wired up yet — coming soon.")
-        return "callback"
+        # Dismiss the platform's "processing" indicator. A default no-op on
+        # platforms that have no such concept.
+        adapter.acknowledge(inbound)
+
+    # The email conversation gets first refusal. It consumes a message only
+    # when one genuinely belongs to it — a button tap, an address we asked for,
+    # or an address nobody asked for. Otherwise it returns None and the message
+    # is an ordinary question.
+    from engines.research_agent.channels.core import state
+
+    outcome = state.handle(adapter, contact, inbound)
+    if outcome is not None:
+        return outcome
 
     if not inbound.is_text:
         return "ignored"

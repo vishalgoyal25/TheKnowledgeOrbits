@@ -187,6 +187,20 @@ class ChannelAdapter(ABC):
         Core sends the same action either way and never learns which happened.
         """
 
+    # ── Optional hooks ───────────────────────────────────────────────────────
+    def acknowledge(self, inbound: InboundMessage) -> None:
+        """
+        Dismiss a platform's "processing" indicator after an interaction.
+
+        Telegram spins a tapped button until `answerCallbackQuery` arrives.
+        Platforms without that concept inherit this no-op, so core can call it
+        unconditionally rather than asking who it is talking to.
+
+        Called from the WORKER, never the webhook — acknowledgement must stay
+        in milliseconds.
+        """
+        return None
+
     # ── Diagnostics ──────────────────────────────────────────────────────────
     def describe(self) -> dict:
         """Non-sensitive snapshot for health checks and logs. Never credentials."""

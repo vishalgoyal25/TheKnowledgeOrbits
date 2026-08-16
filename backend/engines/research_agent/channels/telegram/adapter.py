@@ -259,6 +259,26 @@ class TelegramAdapter(ChannelAdapter):
             budget=self.capabilities.outbound_budget,
         )
 
+    # ── Optional hooks ───────────────────────────────────────────────────────
+    def acknowledge(self, inbound: InboundMessage) -> None:
+        """
+        Stop the tapped button spinning.
+
+        Telegram shows a loading state on an inline button until
+        `answerCallbackQuery` arrives. Best-effort: a failure here is cosmetic,
+        and must never derail the work the tap actually requested.
+        """
+        callback_id = (inbound.metadata or {}).get("callback_query_id")
+        if not callback_id:
+            return
+        try:
+            http.post_json(
+                config.api_url("answerCallbackQuery"),
+                {"callback_query_id": callback_id},
+            )
+        except Exception as exc:
+            logger.debug("telegram.acknowledge_failed", error=str(exc))
+
     # ── Webhook registration (operational helper, not part of the contract) ──
     def set_webhook(self) -> dict:
         """

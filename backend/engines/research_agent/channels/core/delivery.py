@@ -29,6 +29,8 @@ FAILED_REPLY = "Sorry — that research run didn't complete. Please try asking a
 
 CANCELLED_REPLY = "That research was cancelled."
 
+EMAIL_PROMPT = "Want this report in your inbox?"
+
 # Shown when a run is still going long after it should have finished. Better an
 # honest apology than an acknowledgement followed by permanent silence.
 TIMEOUT_REPLY = (
@@ -177,6 +179,32 @@ def _format_candidates() -> tuple[str, ...]:
     already predict.
     """
     return ("pdf", "md") if _export_format() == "pdf" else ("md",)
+
+
+def send_email_prompt(
+    adapter: ChannelAdapter, contact: ChannelContact, session
+) -> bool:
+    """
+    Offer to email the report.
+
+    The session id travels in the action payload, so tapping a prompt from
+    further up the conversation delivers THAT report rather than the newest one.
+    Telegram allows 64 bytes of callback data; `email_report:<uuid>` is 49.
+
+    Core sends one action regardless of platform — a platform with buttons
+    renders it tappable, one without appends a keyword instruction. Neither
+    branch lives here.
+    """
+    from engines.research_agent.channels.core import constants as k
+
+    result = service.send_prompt(
+        adapter,
+        contact,
+        text=EMAIL_PROMPT,
+        action_id=f"{k.ACTION_EMAIL_REPORT}:{session.id}",
+        session=session,
+    )
+    return result is not None
 
 
 def _document_filename(session, fmt: str) -> str:

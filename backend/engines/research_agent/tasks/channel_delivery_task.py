@@ -86,12 +86,13 @@ def deliver_when_ready(
             if not instant:
                 delivery.send_progress(adapter, contact, session)
 
-            # The document only goes out if there was something to summarise —
-            # otherwise a run that produced no report would still attach a file.
+            # The document and prompt only go out if there was something to
+            # summarise — otherwise a run that produced no report would still
+            # attach a file and offer to email it.
             if delivery.send_summary(adapter, contact, session):
                 delivery.send_document(adapter, contact, session)
+                delivery.send_email_prompt(adapter, contact, session)
 
-            # T6 adds the email prompt here.
             progress.clear(session_id)
             logger.info(
                 "channel.delivery.done",

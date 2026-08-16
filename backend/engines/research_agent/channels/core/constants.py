@@ -80,10 +80,25 @@ EMAIL_KEYWORD = "EMAIL"
 # How long a pending action stays live before it is treated as abandoned and
 # cleared back to NULL. No messaging platform emits a "user dismissed this"
 # event, so a TTL is the only way a walked-away user gets unstuck.
-PENDING_ACTION_TTL_MINUTES = 30
+#
+# 60 rather than 30: "I got distracted and came back" is the common case, and
+# waiting longer costs nothing. The BUTTON itself never expires — only the
+# window in which we are waiting for an address.
+PENDING_ACTION_TTL_MINUTES = 60
 
 # Invalid email attempts allowed before giving up and clearing to NULL.
+#
+# This cap is why a user who taps the button and then changes their mind is not
+# stuck for the full hour: two non-address messages return them to idle.
 MAX_EMAIL_RETRIES = 1
+
+# Emails a single contact may request per day.
+#
+# The button never expires, so without a ceiling someone could tap it repeatedly
+# and mail arbitrary addresses — a spam relay wearing this domain's reputation,
+# which would also poison deliverability for real auth mail.
+EMAIL_DAILY_LIMIT = 5
+EMAIL_QUOTA_KEY = "channel:emailquota:{channel}:{external_hash}:{day}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
