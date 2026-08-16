@@ -168,12 +168,18 @@ def _start_research(
     message.session = session
     message.save(update_fields=["session"])
 
-    # Off the request thread and onto the worker. T4 adds progress pings and
-    # the final delivery; for now the user gets an acknowledgement and the run
-    # completes silently into the database.
+    # Off the request thread and onto the worker.
     from engines.research_agent.tasks.research_task import run_research
 
     run_research(str(session.id))
+
+    # A second task watches that run and delivers the result. It polls by
+    # re-enqueueing itself rather than waiting, because a blocking watcher
+    # would occupy the single worker and starve the research task it is
+    # waiting for.
+    from engines.research_agent.tasks.channel_delivery_task import deliver_when_ready
+
+    deliver_when_ready(str(session.id))
 
     send_text(adapter, contact, ACK_REPLY, session=session)
 
