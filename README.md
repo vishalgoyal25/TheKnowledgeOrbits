@@ -827,19 +827,59 @@ sequenceDiagram
     W->>W: verify · dedupe on provider message id
     W-->>P: 200 OK (milliseconds)
     W->>Q: enqueue
+    Q-->>U: 🔍 researching — about a minute
 
     Q->>A: run_research(session_id)
-    A-->>Q: node events via Redis
-    Q-->>U: 🔍 researching… 📚 8 sources… ✍️ writing…
-
+    Note over A: 8 nodes · ~60s
     A->>Q: report · sources · confidence
-    Q-->>U: 📄 summary + confidence %
+
+    Q-->>U: 📄 summary + work log
     Q-->>U: 📎 report.pdf
     Q-->>U: [📧 Email report]
 
     U->>Q: taps · replies with address
-    Q-->>U: ✅ emailed (PDF attached)
+    Q-->>U: ✅ emailed (PDF + Markdown attached)
 ```
+
+#### Conversation state — the only part that remembers
+
+Everything above is stateless: message in, answer out. The **email flow** is the exception — it has
+to remember that it asked a question, and forget properly when nobody answers.
+
+The hard part isn't the happy path, it's that **no messaging platform emits a "the user walked
+away" event**. So every route out of the waiting state has to be constructed: a TTL, a retry
+ceiling, and a guard for an address that arrives with no prompt behind it.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> Idle
+
+    Idle --> Idle: question<br/>→ research run
+    Idle --> Idle: address with no prompt<br/>→ refused, never researched
+    Idle --> AwaitingEmail: 📧 button tapped<br/>session id rides in the payload
+
+    AwaitingEmail --> AwaitingEmail: invalid address<br/>→ re-prompt once
+    AwaitingEmail --> Idle: valid address<br/>→ queue email · clear to NULL
+    AwaitingEmail --> Idle: second failure<br/>→ cancelled · clear to NULL
+    AwaitingEmail --> Idle: 60-minute TTL<br/>→ expired · clear to NULL
+
+    note right of AwaitingEmail
+        Nothing here can start a research run.
+        Every message is an address attempt.
+    end note
+```
+
+**Three details that make it survive real use:**
+
+- **The session id travels in the button payload** (49 of Telegram's 64 callback bytes), so tapping a
+  prompt further up the conversation emails _that_ report, not the newest one.
+- **`@` present and no spaces** is the whole heuristic. It separates "mistyped" from "changed my
+  mind", and it stops a stale address being researched — otherwise a user who taps, wanders off past
+  the TTL and returns would spend a daily query researching their own email address.
+- **Every exit clears all four `pending_*` fields together**, through one method. Four ways out, one
+  way back to idle.
 
 **Traceability is unchanged.** A channel query creates an ordinary `ResearchSession`, so agent logs,
 state snapshots, the report, DeepEval scores and the Langfuse trace populate exactly as they do for

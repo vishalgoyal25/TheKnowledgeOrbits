@@ -5,12 +5,23 @@ Handing a finished report to whoever asked for it.
 
 Same sequence on every platform:
 
-    progress pings  →  summary  →  document (T5)  →  prompt (T6)
+    summary (+ work log)  →  document  →  email prompt
 
 The report is read straight from `ResearchReport` — the row the agent wrote.
 Nothing is regenerated, and nothing here knows which platform is receiving it:
 text is trimmed to whatever `capabilities.max_text_chars` says, and that is the
 only concession to platform difference.
+
+NO LIVE PROGRESS MESSAGES — AND WHY
+    The design called for three pings during the run. They cannot work: the
+    background worker processes ONE task at a time, so `run_research` holds it
+    for the entire 60–90s and the delivery task cannot interleave. Under test
+    all three "progress" messages arrived seconds before the report, in the
+    present tense, claiming to search when searching was long finished.
+
+    Replaced by one past-tense work log attached to the summary. Live progress
+    would need a second worker on its own queue — a real infrastructure change
+    (`render.yaml` is frozen), not a code change.
 """
 
 from __future__ import annotations
@@ -19,7 +30,7 @@ import re
 
 import structlog
 
-from engines.research_agent.channels.core import progress, service
+from engines.research_agent.channels.core import service
 from engines.research_agent.channels.core.adapter import ChannelAdapter
 from engines.research_agent.channels.core.models import ChannelContact, ChannelMessage
 
@@ -53,14 +64,6 @@ def contact_for_session(session) -> ChannelContact | None:
         .first()
     )
     return message.contact if message else None
-
-
-def send_progress(adapter: ChannelAdapter, contact: ChannelContact, session) -> int:
-    """Send any milestone reached since the last poll. Returns how many went out."""
-    messages = progress.pending_messages(str(session.id))
-    for text in messages:
-        service.send_text(adapter, contact, text, session=session)
-    return len(messages)
 
 
 def send_summary(adapter: ChannelAdapter, contact: ChannelContact, session) -> bool:
@@ -251,21 +254,45 @@ def _export_format() -> str:
 
 def _format_summary(report) -> str:
     """
-    The chat-facing answer.
+    The chat-facing answer, with a one-line record of the work behind it.
 
     Deliberately the executive summary, not the full report: ~300 words reads
-    well on a phone, and the complete text travels in the document (T5). On a
+    well on a phone, and the complete text travels in the document. On a
     platform with a smaller cap the summary is trimmed — core does not decide
     that, `capabilities.max_text_chars` does.
+
+    WHY THE WORK LOG IS HERE AND NOT IN SEPARATE PINGS
+        The plan was three live progress messages. They are impossible: the
+        worker runs ONE task at a time, so `run_research` holds it for the whole
+        60–90s and the delivery task cannot interleave. Every "ping" therefore
+        arrived seconds before the report — and worse, in the present tense,
+        claiming to be searching when searching had finished.
+
+        One past-tense line attached to the answer says the same thing
+        truthfully, in one message instead of four.
     """
     body = (report.executive_summary or "").strip() or "(no summary produced)"
-    parts = [f"📄 {body}"]
+    parts = [f"📄 {body}", "\n\n", _work_log(report)]
+    return "".join(parts)
+
+
+def _work_log(report) -> str:
+    """
+    What the agent actually did, past tense, one line.
+
+    Every figure is read from the finished report, so it can only ever describe
+    work that really happened.
+    """
+    bits = []
+
+    source_count = len(report.sources or [])
+    if source_count:
+        bits.append(f"🌐 {source_count} sources · credibility scored")
+
+    if report.word_count:
+        bits.append(f"📝 {report.word_count} words")
 
     if report.confidence_score is not None:
-        parts.append(
-            f"\n\nResearch confidence: {round(report.confidence_score * 100)}%"
-        )
-    if report.word_count:
-        parts.append(f" · full report: {report.word_count} words")
+        bits.append(f"✅ confidence {round(report.confidence_score * 100)}%")
 
-    return "".join(parts)
+    return " · ".join(bits) if bits else "Report ready."

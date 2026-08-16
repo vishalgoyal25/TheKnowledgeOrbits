@@ -9,12 +9,18 @@ WHY POLLING, AND WHY IT MUST NOT BLOCK
     enqueued alongside `run_research` would occupy the worker while waiting for
     events that the research task, still queued behind it, cannot produce.
 
-    So this task never waits. It checks, sends whatever is due, and RE-ENQUEUES
-    itself a few seconds later. The worker is free between checks, and the
-    research task interleaves normally.
+    So this task never waits. It checks, and if the run is not finished it
+    RE-ENQUEUES itself a few seconds later, leaving the worker free in between.
 
-    Progress comes from `AgentExecutionLog`, which the agent writes as it goes —
-    no pub/sub, and `sse_service.py` (frozen) is untouched.
+⚠️ THIS STILL DOES NOT GIVE LIVE PROGRESS
+    With ONE worker, `run_research` occupies it for the entire 60–90s, so this
+    task cannot actually run mid-flight — its first real execution is after the
+    research has finished. That is why there are no progress pings: they would
+    all arrive at the end, in the present tense, describing work already done.
+
+    The polling loop still earns its place — it is what handles a run that
+    crashes, hangs or is cancelled, and it is what makes live progress possible
+    the day a second worker exists on its own queue.
 
 ⚠️ Registered in `ResearchAgentConfig.ready()`. A @background task the worker
 never imported is enqueued successfully and then never runs — silently.
@@ -37,6 +43,24 @@ POLL_SECONDS = 5
 # is a stuck or crashed run, and an honest apology beats infinite silence.
 MAX_ATTEMPTS = 48
 
+# Extra polls to wait for the confidence score once the report itself is ready.
+#
+# The score is NOT produced by the workflow. The orchestrator writes the report
+# with confidence_score=None, marks the session completed, and only then
+# enqueues `evaluate_session` — a separate task that runs DeepEval and fills it
+# in afterwards.
+#
+# Those two tasks race, and we lose: `background_task` picks the earliest
+# `run_at`, and this task was queued when the question arrived — a minute before
+# the evaluation was queued. So without waiting we always deliver first and the
+# report reads "confidence: pending", then the score appears seconds later,
+# visible in a re-delivery or the emailed copy but not in the original reply.
+#
+# Measured evaluation time: ~3.8s average, 5.6s worst case. Six polls is 30s —
+# roughly five times the worst case, so the wait is invisible in practice while
+# still guaranteeing delivery if DeepEval fails or is disabled entirely.
+SCORE_WAIT_POLLS = 6
+
 
 @background(schedule=POLL_SECONDS)
 def deliver_when_ready(
@@ -52,7 +76,7 @@ def deliver_when_ready(
     Never raises. A delivery failure must not mark the task failed and retry the
     whole thing — that would re-send messages the user already has.
     """
-    from engines.research_agent.channels.core import delivery, progress, registry
+    from engines.research_agent.channels.core import delivery, registry
     from engines.research_agent.constants import SessionChannel, SessionStatus
     from engines.research_agent.models.research_session import ResearchSession
 
@@ -83,8 +107,17 @@ def deliver_when_ready(
 
         # ── Terminal states ──────────────────────────────────────────────────
         if session.status == SessionStatus.COMPLETED:
-            if not instant:
-                delivery.send_progress(adapter, contact, session)
+            # Hold briefly for the confidence score. Delivering without it is
+            # what made the first reply say "pending" while the emailed copy
+            # showed the real number — the same report, contradicting itself.
+            if _awaiting_score(session) and attempt < SCORE_WAIT_POLLS:
+                logger.debug(
+                    "channel.delivery.waiting_for_score",
+                    session_id=session_id,
+                    poll=attempt + 1,
+                )
+                deliver_when_ready(session_id, attempt + 1, instant)
+                return
 
             # The document and prompt only go out if there was something to
             # summarise — otherwise a run that produced no report would still
@@ -93,7 +126,6 @@ def deliver_when_ready(
                 delivery.send_document(adapter, contact, session)
                 delivery.send_email_prompt(adapter, contact, session)
 
-            progress.clear(session_id)
             logger.info(
                 "channel.delivery.done",
                 session_id=session_id,
@@ -105,15 +137,11 @@ def deliver_when_ready(
 
         if session.status in (SessionStatus.FAILED, SessionStatus.CANCELLED):
             delivery.send_failure(adapter, contact, session, session.status)
-            progress.clear(session_id)
             return
 
         # ── Still running ────────────────────────────────────────────────────
-        delivery.send_progress(adapter, contact, session)
-
         if attempt + 1 >= MAX_ATTEMPTS:
             delivery.send_failure(adapter, contact, session, "timeout")
-            progress.clear(session_id)
             logger.error(
                 "channel.delivery.gave_up", session_id=session_id, polls=attempt + 1
             )
@@ -128,3 +156,19 @@ def deliver_when_ready(
             "channel.delivery.poll_failed", session_id=session_id, error=str(exc)
         )
         sentry_sdk.capture_exception(exc)
+
+
+def _awaiting_score(session) -> bool:
+    """
+    True when the report exists but DeepEval has not scored it yet.
+
+    False when there is no report at all — that is a different failure, handled
+    by `send_summary`, and waiting for a score that will never come would only
+    delay telling the user something went wrong.
+    """
+    from engines.research_agent.models.research_report import ResearchReport
+
+    report = (
+        ResearchReport.objects.filter(session=session).only("confidence_score").first()
+    )
+    return report is not None and report.confidence_score is None

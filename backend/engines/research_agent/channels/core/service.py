@@ -43,9 +43,15 @@ UNSUPPORTED_REPLY = (
     "research it for you."
 )
 
-# Sent the moment a run is queued. The workflow takes 40–90s, and silence for
-# that long reads as "broken" rather than "working".
-ACK_REPLY = "🔍 Researching now — this usually takes 40–60 seconds."
+# Sent the moment a run is queued, and then it IS quiet for 40–90s — the single
+# worker is busy with the workflow itself, so nothing can be sent mid-run.
+# The ack therefore has to carry the expectation on its own: how long, and what
+# will arrive. Silence you were warned about reads as working; unexplained
+# silence reads as broken.
+ACK_REPLY = (
+    "🔍 Researching now — this takes about a minute.\n\n"
+    "I'll send a summary, the full report as a file, and the option to email it."
+)
 
 # Same daily allowance as an anonymous web visitor (PUBLIC_DAILY_LIMIT), but
 # counted per contact rather than per IP.
