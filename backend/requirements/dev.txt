@@ -13,9 +13,24 @@ numpy>=1.26.0  # also declared in base.txt (real runtime dep, relevance_scorer.p
 # Code Quality
 black>=24.10.0
 flake8>=7.1.1
-mypy>=1.13.0
-django-stubs>=5.1.0
-djangorestframework-stubs>=3.15.0
+# Type checking — PINNED EXACTLY, deliberately.
+#
+# These were `>=`, so CI installed whatever had shipped that morning while a
+# developer's machine kept whatever it installed months ago. On 2026-08-16 that
+# drift turned a green local run into a red CI run on identical code: a newer
+# stub set began reporting `request.data` as `dict | list`, so four pre-existing
+# `.get()` calls in engines/auth, knowledge and userstate became union-attr
+# errors. Nothing had changed in those files for months.
+#
+# A type checker is part of the build's definition of correct, so it must be
+# reproducible — same reason ruff is pinned to an exact version in ci.yml.
+#
+# Upgrading these is a deliberate task: bump them, run `mypy .`, and narrow the
+# request.data types the new stubs complain about. Not something to inherit
+# silently from a release that happened overnight.
+mypy==1.20.0
+django-stubs==6.0.2
+djangorestframework-stubs==3.16.9
 types-requests>=2.32.0.20241016
 bandit>=1.8.0
 isort>=5.13.2
