@@ -9,10 +9,17 @@ Research Agent engine — URL routing. Included at: /api/v1/research/
   GET   /api/v1/research/history/               → user's past sessions (auth)
   GET   /api/v1/research/history/<session_id>/  → single session + report
   GET   /api/v1/research/export/<session_id>/   → export report (PDF/MD) — Phase 9
+
+  POST  /api/v1/research/channels/<channel>/webhook/  → messaging channel inbound
+
+The channel route is PARAMETERISED on purpose: one entry serves Telegram,
+WhatsApp and every future platform, resolved through channels/core/registry.py.
+Adapters never define URLs, so adding a platform touches nothing in this file.
 """
 
 from django.urls import path
 
+from engines.research_agent.channels.core.webhook import ChannelWebhookView
 from engines.research_agent.views import (
     QueryView,
     StreamView,
@@ -33,4 +40,10 @@ urlpatterns: list = [
         "history/<str:session_id>/", HistoryDetailView.as_view(), name="history-detail"
     ),
     path("export/<str:session_id>/", ExportView.as_view(), name="export"),
+    # ── Messaging channels — ONE route, every platform ───────────────────────
+    path(
+        "channels/<str:channel>/webhook/",
+        ChannelWebhookView.as_view(),
+        name="channel-webhook",
+    ),
 ]

@@ -113,6 +113,42 @@ class DeliveryChannel:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# PUBLIC ADDRESSING
+# ──────────────────────────────────────────────────────────────────────────────
+# Shared by every channel — the ngrok static domain locally, the Render URL in
+# production. No trailing slash.
+#
+# Used for two things, and a stale value breaks both: the webhook URL each
+# provider is told to call, and the media URLs providers fetch documents from.
+BACKEND_PUBLIC_URL = os.getenv("BACKEND_PUBLIC_URL", "").strip().rstrip("/")
+
+# ONE parameterised route serves every channel, owned by core/webhook.py.
+# An adapter never defines a URL — platform #11's endpoint exists the moment its
+# adapter file does.
+WEBHOOK_PATH_TEMPLATE = "/api/v1/research/channels/{channel}/webhook/"
+
+
+def webhook_url(channel: str) -> str:
+    """
+    Absolute URL a provider should call for this channel.
+
+    Some providers (Telegram, Meta) are TOLD this address; others (Twilio) sign
+    it, so it must match what they call character for character.
+    """
+    return f"{BACKEND_PUBLIC_URL}{WEBHOOK_PATH_TEMPLATE.format(channel=channel)}"
+
+
+def export_url(session_id: str, fmt: str = "pdf") -> str:
+    """
+    Public URL of an existing report export.
+
+    THE one media path: the same URL feeds a chat document and an emailed
+    attachment. We never build a second PDF route and never re-render.
+    """
+    return f"{BACKEND_PUBLIC_URL}/api/v1/research/export/{session_id}/?format={fmt}"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # OUTBOUND HTTP POLICY (mechanism lives in http.py)
 # ──────────────────────────────────────────────────────────────────────────────
 
