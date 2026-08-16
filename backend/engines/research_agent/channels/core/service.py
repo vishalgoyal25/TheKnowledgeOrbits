@@ -22,6 +22,9 @@ OUTBOUND IS LOGGED HERE TOO
 
 from __future__ import annotations
 
+import hashlib
+
+import sentry_sdk
 import structlog
 from django.db import IntegrityError, transaction
 
@@ -38,6 +41,18 @@ UNSUPPORTED_REPLY = (
     "I can only read text messages right now — send me a question and I'll "
     "research it for you."
 )
+
+# Sent the moment a run is queued. The workflow takes 40–90s, and silence for
+# that long reads as "broken" rather than "working".
+ACK_REPLY = "🔍 Researching now — this usually takes 40–60 seconds."
+
+# Same daily allowance as an anonymous web visitor (PUBLIC_DAILY_LIMIT), but
+# counted per contact rather than per IP.
+RATE_LIMIT_REPLY = (
+    "You've used your research queries for today 🙏\n\n" "Please try again in 24 hours."
+)
+
+ERROR_REPLY = "Something went wrong starting that research. Please try again."
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -72,19 +87,104 @@ def handle_inbound(adapter: ChannelAdapter, inbound: InboundMessage) -> str:
         send_text(adapter, contact, UNSUPPORTED_REPLY)
         return "unsupported"
 
-    # ── T2: echo, to prove the round trip ────────────────────────────────────
-    # T3 replaces this with: rate limit → create ResearchSession → enqueue
-    # run_research(). The seam is deliberate — everything above this line is
-    # permanent, everything below it is scaffolding.
-    if inbound.is_text:
-        send_text(adapter, contact, inbound.text or "", session=None)
-        return "echoed"
-
     if inbound.is_callback:
-        send_text(adapter, contact, f"(button: {inbound.action_id})")
+        # T6 wires this to the email state machine.
+        send_text(adapter, contact, "That button isn't wired up yet — coming soon.")
         return "callback"
 
-    return "ignored"
+    if not inbound.is_text:
+        return "ignored"
+
+    return _start_research(adapter, contact, inbound, message)
+
+
+def _start_research(
+    adapter: ChannelAdapter,
+    contact: ChannelContact,
+    inbound: InboundMessage,
+    message: ChannelMessage,
+) -> str:
+    """
+    Turn a chat message into a real research run.
+
+    Deliberately mirrors QueryView so a channel session is indistinguishable
+    from a web one downstream: same model, same status, same hash, same task.
+    All five ops tables, Langfuse and DeepEval then populate identically —
+    that equivalence is the whole point of the channel layer.
+
+    Two differences, both required:
+      · the rate limiter is keyed on the contact's HASH, not our server's IP
+      · `channel` / `channel_ref` are set, so the run is attributable
+
+    The query cache is intentionally NOT consulted here. A cache hit returns a
+    report with no session, and with no session there is nothing to export a
+    document from later (FEATURE_WHATSAPP.md §6.3). Deferred, not forgotten.
+    """
+    from engines.research_agent.constants import SessionStatus
+    from engines.research_agent.middleware.rate_limiter import rate_limiter
+    from engines.research_agent.models.research_session import ResearchSession
+
+    query = (inbound.text or "").strip()
+
+    # Same normalisation as QueryView, so a question asked on the website and
+    # in a chat app share a cache key and read as the same query in analytics.
+    query_hash = hashlib.sha256(query.lower().encode("utf-8")).hexdigest()
+
+    # Keyed on the hashed identity: every channel request arrives from OUR
+    # server, so an IP-keyed limit would put all bot users in one bucket.
+    allowed, remaining = rate_limiter.check_query_limit(
+        ip=None,
+        is_authenticated=False,
+        identity_override=f"{adapter.name}:{contact.external_hash}",
+    )
+    if not allowed:
+        logger.info(
+            "channel.query.rate_limited",
+            channel=adapter.name,
+            external_hash=contact.external_hash,
+        )
+        send_text(adapter, contact, RATE_LIMIT_REPLY)
+        return "rate_limited"
+
+    try:
+        session = ResearchSession.objects.create(
+            user=None,
+            query=query,
+            query_hash=query_hash,
+            status=SessionStatus.PENDING,
+            channel=adapter.name,
+            channel_ref=contact.external_hash,
+        )
+    except Exception as exc:
+        logger.error(
+            "channel.query.create_failed", channel=adapter.name, error=str(exc)
+        )
+        sentry_sdk.capture_exception(exc)
+        send_text(adapter, contact, ERROR_REPLY)
+        return "create_failed"
+
+    # Link the inbound message to the run it started, so the audit trail joins
+    # up: message → session → report → agent logs → evaluation.
+    message.session = session
+    message.save(update_fields=["session"])
+
+    # Off the request thread and onto the worker. T4 adds progress pings and
+    # the final delivery; for now the user gets an acknowledgement and the run
+    # completes silently into the database.
+    from engines.research_agent.tasks.research_task import run_research
+
+    run_research(str(session.id))
+
+    send_text(adapter, contact, ACK_REPLY, session=session)
+
+    logger.info(
+        "channel.query.queued",
+        channel=adapter.name,
+        session_id=str(session.id),
+        external_hash=contact.external_hash,
+        remaining=remaining,
+    )
+    return "queued"
 
 
 def _upsert_contact(adapter: ChannelAdapter, inbound: InboundMessage) -> ChannelContact:

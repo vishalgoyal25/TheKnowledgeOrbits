@@ -84,6 +84,7 @@ _Engine-First Django/Next.js Architecture | Built for Scale | Solo-Developed_
   - [Research Agent — LangGraph Workflow](#-research-agent--langgraph-workflow)
   - [LLM Pool (Research Agent)](#-llm-pool-research-agent--multi-provider-failover)
   - [Caching Layers](#-caching-layers)
+  - [Messaging Channels — One Core, Many Doors](#-messaging-channels--one-core-many-doors)
 - [LLMOps & AgentOps — Operating the Agent](#-llmops--agentops--operating-the-agent)
   - [Observability & Tracing (Langfuse)](#-llmops--observability--tracing-langfuse)
   - [Quality Evaluation & Cost Governance](#-llmops--quality-evaluation--cost-governance)
@@ -762,6 +763,88 @@ flowchart TB
     CANCEL -. every agent checks before LLM work .-> AG
     LATE["late subscriber<br/>(session already done)"] -.-> TERM["terminal_stream<br/>one-shot final event"]
 ```
+
+---
+
+### 💬 Messaging Channels — One Core, Many Doors
+
+The same 8-node agent is reachable from a chat app as from the website. The channel layer is
+**ports &amp; adapters**: everything platform-agnostic — contact/message storage, the email state
+machine, delivery, retry, PII hashing — lives in `channels/core/`, and a platform is **two files**
+(`config.py` + `adapter.py`). Core branches on _declared capability_, never on platform name, so
+adding a channel touches **no core file, no table and no route**.
+
+The website is deliberately **not** an adapter: `channel="web"` is an attribution label, and browser
+queries keep their existing `QueryView → SSE` path untouched.
+
+```mermaid
+flowchart TB
+    WEB["🌐 Browser"] -->|QueryView · SSE| ORCH
+    TG["✈️ Telegram"] --> HOOK
+    WA["💬 WhatsApp · held"] -.-> HOOK
+    NEW["➕ Slack · Discord · …<br/>auto-discovered"] -.-> HOOK
+
+    HOOK["ONE parameterised route<br/>/api/v1/research/channels/&lt;channel&gt;/webhook/<br/>verify → parse → enqueue → 200 in ms"]
+
+    HOOK --> CORE
+
+    subgraph CORE["channels/core · platform-agnostic"]
+        SVC["service<br/>dedupe · contact · rate limit"]
+        STATE["state machine<br/>email flow · TTL"]
+        DEL["delivery<br/>summary → document → prompt"]
+        HTTP["http<br/>retry · ordering · budget"]
+    end
+
+    CORE --> ORCH["ResearchSession<br/>8-node LangGraph workflow"]
+    ORCH --> OPS["5 ops tables · Langfuse · DeepEval<br/>identical for every channel"]
+```
+
+**Platform differences are data, not code.** An adapter declares what it can do; core reads it:
+
+| Capability         | Telegram           | WhatsApp (Twilio) |
+| ------------------ | ------------------ | ----------------- |
+| `max_text_chars`   | 4096               | 1600              |
+| `supports_buttons` | ✅ inline keyboard | ❌ typed keyword  |
+| `media_mode`       | public URL         | public URL        |
+| `outbound_budget`  | unlimited          | metered ceiling   |
+
+#### Request lifecycle — a question from a chat app
+
+The webhook never blocks: the workflow takes 40–90 s and finishes long after the HTTP connection
+closed, so **every reply is an independent async REST call** from the background worker.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 👤 User
+    participant P as Platform
+    participant W as Django webhook
+    participant Q as process_tasks worker
+    participant A as 8-node agent
+
+    U->>P: "Significance of the 16th Finance Commission?"
+    P->>W: POST update + secret token
+    W->>W: verify · dedupe on provider message id
+    W-->>P: 200 OK (milliseconds)
+    W->>Q: enqueue
+
+    Q->>A: run_research(session_id)
+    A-->>Q: node events via Redis
+    Q-->>U: 🔍 researching… 📚 8 sources… ✍️ writing…
+
+    A->>Q: report · sources · confidence
+    Q-->>U: 📄 summary + confidence %
+    Q-->>U: 📎 report.pdf
+    Q-->>U: [📧 Email report]
+
+    U->>Q: taps · replies with address
+    Q-->>U: ✅ emailed (PDF attached)
+```
+
+**Traceability is unchanged.** A channel query creates an ordinary `ResearchSession`, so agent logs,
+state snapshots, the report, DeepEval scores and the Langfuse trace populate exactly as they do for
+the web — now additionally filterable by `channel`. Raw identities (chat id, phone, email) never
+leave the contact table: a keyed hash is what reaches `channel_ref`, Langfuse and Sentry.
 
 ---
 

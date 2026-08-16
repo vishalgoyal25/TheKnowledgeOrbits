@@ -66,6 +66,7 @@ class RedisRateLimiter:
         ip: str | None,
         is_authenticated: bool,
         user_id: str | None = None,
+        identity_override: str | None = None,
     ) -> tuple[bool, int]:
         """
         Returns (allowed, remaining). Counts the current request.
@@ -73,6 +74,16 @@ class RedisRateLimiter:
           - Authenticated → AUTH_DAILY_LIMIT/day, keyed by user_id (follows the
             user across IPs/devices).
           - Anonymous     → PUBLIC_DAILY_LIMIT/day, keyed by IP.
+
+        `identity_override` (optional) replaces the key entirely. It exists for
+        messaging channels: every Telegram/WhatsApp request arrives from OUR
+        server, so keying by IP would put every bot user in ONE bucket — the
+        first person to ask 3 questions would silently exhaust the daily quota
+        for everybody. Channels pass a hashed external id instead, which gives
+        the intended 3/day PER CONTACT.
+
+        The web path passes nothing and is completely unaffected: with the
+        argument absent, the IP/user logic below runs exactly as before.
 
         Fails OPEN if Redis is down.
         """
@@ -83,7 +94,7 @@ class RedisRateLimiter:
             return True, limit  # fail open
 
         try:
-            identity = (
+            identity = identity_override or (
                 f"user:{user_id}" if is_authenticated else f"ip:{ip or 'unknown'}"
             )
             key = _DAILY_KEY.format(identity=identity, day=date.today().isoformat())

@@ -26,7 +26,7 @@ from __future__ import annotations
 import structlog
 import sentry_sdk
 
-from engines.research_agent.constants import SSEEvent
+from engines.research_agent.constants import SessionChannel, SSEEvent
 from engines.research_agent.graph.graph import get_compiled_graph
 from engines.research_agent.graph.state import make_initial_state
 from engines.research_agent.models.research_session import ResearchSession
@@ -75,6 +75,13 @@ class ResearchOrchestrator:
             )
 
             final_state = self._invoke_graph(session)
+
+            # Persist the Langfuse trace id. The supervisor opens the trace and
+            # writes the id into graph state, but nothing was copying it onto
+            # the row — so this column was NULL for every session ever created.
+            # Done before the cancellation check: a cancelled run still has a
+            # trace worth linking to.
+            self._save_trace_id(session, final_state)
 
             # The graph may have been cancelled mid-flight (browser disconnect).
             if final_state.get("cancelled"):
@@ -142,10 +149,58 @@ class ResearchOrchestrator:
         initial_state = make_initial_state(
             session_id=str(session.id),
             query=session.query,
-            user_id=str(session.user_id) if session.user_id else None,
+            user_id=self._trace_identity(session),
         )
         config = {"configurable": {"thread_id": str(session.id)}}
         return graph.invoke(initial_state, config=config)
+
+    @staticmethod
+    def _save_trace_id(session: ResearchSession, state: dict) -> None:
+        """
+        Copy the Langfuse trace id from graph state onto the session row.
+
+        Fully defensive: this is a convenience link for support and debugging,
+        and losing it must never fail a run that otherwise succeeded. The trace
+        itself is always findable regardless, because its id is derived
+        deterministically from the session id.
+        """
+        trace_id = state.get("langfuse_trace_id")
+        if not trace_id or session.langfuse_trace_id == trace_id:
+            return
+        try:
+            session.langfuse_trace_id = trace_id
+            session.save(update_fields=["langfuse_trace_id", "updated_at"])
+        except Exception as exc:
+            logger.warning(
+                "research_agent.orchestrator.trace_id_save_failed",
+                session_id=str(session.id),
+                error=str(exc),
+            )
+
+    @staticmethod
+    def _trace_identity(session: ResearchSession) -> str | None:
+        """
+        Who this run belongs to, for the Langfuse trace.
+
+          - Authenticated web  → the Django user id           (unchanged)
+          - Anonymous web      → None                          (unchanged)
+          - Messaging channel  → "<channel>:<hashed identity>"
+
+        The channel case is why this exists: without it, every bot user would
+        appear as an anonymous trace and the two surfaces would be
+        indistinguishable in the dashboard.
+
+        It reads ONLY fields ResearchSession already owns, so the orchestrator
+        never imports a channel module — the dependency stays pointed inward.
+
+        ⚠️ `channel_ref` is a keyed HASH. A raw phone number, chat id or email
+        must never reach Langfuse or Sentry (CLAUDE.md).
+        """
+        if session.user_id:
+            return str(session.user_id)
+        if session.channel != SessionChannel.WEB and session.channel_ref:
+            return f"{session.channel}:{session.channel_ref}"
+        return None
 
     def _save_report(self, session: ResearchSession, state: dict) -> None:
         """
