@@ -67,17 +67,10 @@ class PendingAction:
     ALL = (AWAITING_EMAIL,)
 
 
-class DeliveryChannel:
-    WHATSAPP = "whatsapp"
-    EMAIL = "email"
-    ALL = (WHATSAPP, EMAIL)
-
-
-class DeliveryStatus:
-    PENDING = "pending"
-    SENT = "sent"
-    FAILED = "failed"
-    ALL = (PENDING, SENT, FAILED)
+# DeliveryChannel / DeliveryStatus moved to channels/core/constants.py with
+# ReportDelivery (T1.1). The enums below stay because WhatsAppContact and
+# WhatsAppMessage still use them; this whole module is superseded by core and
+# is retained only until the WhatsApp adapter is rebuilt.
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -343,113 +336,11 @@ class WhatsAppMessage(models.Model):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# DELIVERY
+# DELIVERY — moved to channels/core/models.py during the core extraction (T1.1)
 # ──────────────────────────────────────────────────────────────────────────────
-
-
-class ReportDelivery(models.Model):
-    """
-    One row per attempt to hand a finished report to a user, on any channel.
-
-    A row rather than a column on the session, because one report can be
-    delivered repeatedly — to WhatsApp, then to two different email addresses,
-    with one of them failing. A column cannot express that, and the delivery
-    audit trail is exactly what you want when a user says "I never got it".
-    """
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-
-    session = models.ForeignKey(
-        "research_agent.ResearchSession",
-        on_delete=models.CASCADE,
-        related_name="deliveries",
-    )
-
-    contact = models.ForeignKey(
-        WhatsAppContact,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="deliveries",
-    )
-
-    channel = models.CharField(
-        max_length=20,
-        choices=[(c, c.title()) for c in DeliveryChannel.ALL],
-        db_index=True,
-    )
-
-    # Phone (whatsapp) or email address. PII — never sent to Langfuse/Sentry.
-    destination = models.CharField(max_length=254)
-
-    export_format = models.CharField(
-        max_length=8,
-        default="pdf",
-        help_text="'pdf' normally; 'md' when WeasyPrint is unavailable (local dev).",
-    )
-
-    status = models.CharField(
-        max_length=10,
-        default=DeliveryStatus.PENDING,
-        choices=[(s, s.title()) for s in DeliveryStatus.ALL],
-        db_index=True,
-    )
-
-    error = models.TextField(null=True, blank=True)
-
-    sent_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        app_label = "research_agent"
-        db_table = "ra_report_delivery"
-        ordering = ["-created_at"]
-        indexes = [
-            models.Index(
-                fields=["session", "-created_at"], name="ra_delivery_session_idx"
-            ),
-            models.Index(fields=["status"], name="ra_delivery_status_idx"),
-        ]
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(channel__in=list(DeliveryChannel.ALL)),
-                name="ra_delivery_channel_valid",
-            ),
-            models.CheckConstraint(
-                condition=models.Q(status__in=list(DeliveryStatus.ALL)),
-                name="ra_delivery_status_valid",
-            ),
-        ]
-
-    def __str__(self) -> str:
-        return f"ReportDelivery({self.channel} | {self.status} | {self.export_format})"
-
-    def mark_sent(self) -> None:
-        try:
-            self.status = DeliveryStatus.SENT
-            self.sent_at = timezone.now()
-            self.save(update_fields=["status", "sent_at"])
-            logger.info(
-                "whatsapp.delivery.sent",
-                session_id=str(self.session_id),
-                channel=self.channel,
-                export_format=self.export_format,
-            )
-        except Exception as exc:
-            sentry_sdk.capture_exception(exc)
-            raise
-
-    def mark_failed(self, error: str) -> None:
-        try:
-            self.status = DeliveryStatus.FAILED
-            self.error = error
-            self.save(update_fields=["status", "error"])
-            logger.error(
-                "whatsapp.delivery.failed",
-                session_id=str(self.session_id),
-                channel=self.channel,
-                error=error,
-            )
-        except Exception as exc:
-            sentry_sdk.capture_exception(exc)
-            raise
+# ReportDelivery was never WhatsApp-specific: every channel delivers reports and
+# only `destination` differs. It now lives in core with a FK to ChannelContact,
+# so Telegram and every future platform share one delivery audit trail.
+#
+# Same class name, same app_label, same db_table (ra_report_delivery) — the move
+# is invisible to migrations apart from the contact FK being retargeted.

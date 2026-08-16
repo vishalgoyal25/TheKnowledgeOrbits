@@ -116,14 +116,14 @@ class ResearchSession(models.Model):
     # db_default puts a real DEFAULT on the column, so the schema can be
     # migrated ahead of the code (as we do: Supabase in Phase 1, deploy in
     # Phase 8) without breaking the running release.
+    # `choices` is DERIVED from SessionChannel, not restated. Together with the
+    # ra_session_channel_valid constraint below (also derived), adding a
+    # platform means editing constants.py alone — this file never moves again.
     channel = models.CharField(
         max_length=20,
         default=SessionChannel.WEB,
         db_default=SessionChannel.WEB,
-        choices=[
-            (SessionChannel.WEB, "Web"),
-            (SessionChannel.WHATSAPP, "WhatsApp"),
-        ],
+        choices=[(c, c.title()) for c in SessionChannel.ALL],
         help_text="Transport the query came from. Existing rows are 'web'.",
     )
 

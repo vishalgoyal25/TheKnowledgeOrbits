@@ -20,6 +20,11 @@ from __future__ import annotations
 
 import os
 
+# Shared policy lives in core — an adapter may import core, never the reverse.
+# The names below are re-exported so this held module keeps working unchanged
+# while having exactly ONE definition of each value.
+from engines.research_agent.channels.core import constants as core_k
+
 # ──────────────────────────────────────────────────────────────────────────────
 # CREDENTIALS (see FEATURE_WHATSAPP.md §9)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -102,25 +107,22 @@ TEXT_MAX_CHARS: int = 1600
 CHANNEL_PREFIX: str = "whatsapp:"
 
 # The sandbox has no interactive buttons, so the email flow is triggered by a
-# typed keyword (FEATURE_WHATSAPP.md §3.4). Compared case-insensitively.
-EMAIL_KEYWORD: str = "EMAIL"
+# typed keyword (FEATURE_WHATSAPP.md §3.4). The keyword itself is core policy —
+# platforms differ only in whether a button is offered instead.
+EMAIL_KEYWORD: str = core_k.EMAIL_KEYWORD
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # HTTP BEHAVIOUR (used by client.py)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Outbound sends run in the background worker, never the request thread, so a
-# blocking timeout here is safe.
-HTTP_TIMEOUT_SECONDS: int = 15
-
-# Retry/backoff mirrors llmops/groq_client.py — same discipline, same shape.
-MAX_RETRIES: int = 3
-RETRY_BACKOFF_SECONDS: float = 1.5
-
-# Gap between sequential outbound messages. Ordering is not guaranteed for
-# near-simultaneous sends, and summary → document → prompt must arrive in order.
-SEND_GAP_SECONDS: float = 0.4
+# Defined once in core/constants.py — timeouts, retry discipline and send
+# ordering are identical on every platform, so they are re-exported here rather
+# than restated.
+HTTP_TIMEOUT_SECONDS: int = core_k.HTTP_TIMEOUT_SECONDS
+MAX_RETRIES: int = core_k.MAX_RETRIES
+RETRY_BACKOFF_SECONDS: float = core_k.RETRY_BACKOFF_SECONDS
+SEND_GAP_SECONDS: float = core_k.SEND_GAP_SECONDS
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -139,25 +141,21 @@ SEND_GAP_SECONDS: float = 0.4
 MESSAGE_BUDGET: int = int(os.getenv("WHATSAPP_MESSAGE_BUDGET", "90"))
 
 # Cumulative counter — deliberately NO expiry. The trial allowance is a total,
-# not a daily reset, so this must not roll over at midnight.
-BUDGET_REDIS_KEY: str = "whatsapp:outbound:total"
-
-# Warn once the remaining budget drops below this, so it is visible in logs
-# before sends start being refused.
-BUDGET_WARN_THRESHOLD: int = 15
+# not a daily reset, so this must not roll over at midnight. The key prefix and
+# the warning threshold are core policy; only the ceiling above is per-adapter
+# (and becomes a `Capabilities.outbound_budget` value when this is rebuilt).
+BUDGET_REDIS_KEY: str = f"{core_k.BUDGET_KEY_PREFIX}whatsapp"
+BUDGET_WARN_THRESHOLD: int = core_k.BUDGET_WARN_THRESHOLD
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # CONVERSATION STATE (used by state.py — Phase 6)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# How long `awaiting_email` stays live before it is treated as abandoned and
-# cleared back to NULL. WhatsApp has no "dismiss" event, so a TTL is how a
-# walked-away user gets unstuck (FEATURE_WHATSAPP.md §7.3).
-PENDING_ACTION_TTL_MINUTES: int = 30
-
-# Invalid email attempts allowed before giving up and clearing to NULL.
-MAX_EMAIL_RETRIES: int = 1
+# State-machine policy is core (FEATURE_WHATSAPP.md §7.3) — the TTL and retry
+# budget mean the same thing on every platform. Re-exported, not restated.
+PENDING_ACTION_TTL_MINUTES: int = core_k.PENDING_ACTION_TTL_MINUTES
+MAX_EMAIL_RETRIES: int = core_k.MAX_EMAIL_RETRIES
 
 
 # ──────────────────────────────────────────────────────────────────────────────
