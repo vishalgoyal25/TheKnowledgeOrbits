@@ -48,6 +48,17 @@ class SessionStatus:
     CANCELLED = "cancelled"
 
 
+# ── Session Channels ──────────────────────────────────────────────────────────
+# Which transport a session arrived through. WEB is the default for every
+# existing row and every future browser query — this field exists only so
+# WhatsApp traffic is attributable in the ops tables and in Langfuse
+# (FEATURE_WHATSAPP.md §5.2).
+class SessionChannel:
+    WEB = "web"
+    WHATSAPP = "whatsapp"
+    ALL = (WEB, WHATSAPP)
+
+
 # ── Agent Names ────────────────────────────────────────────────────────────────
 class AgentName:
     SUPERVISOR = "supervisor"

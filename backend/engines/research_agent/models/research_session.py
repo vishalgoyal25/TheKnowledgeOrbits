@@ -16,7 +16,7 @@ import sentry_sdk
 from django.conf import settings
 from django.db import models
 
-from engines.research_agent.constants import SessionStatus
+from engines.research_agent.constants import SessionChannel, SessionStatus
 
 logger = structlog.get_logger(__name__)
 
@@ -100,6 +100,52 @@ class ResearchSession(models.Model):
         blank=True,
     )
 
+    # ── Channel attribution (FEATURE_WHATSAPP.md §5.2) ────────────────────────
+    # Which transport this session arrived through. NOT NULL with a default so
+    # no session can ever be unattributed — every existing row backfills to
+    # "web", and the web code path never needs to mention this field.
+    # No db_index here: the composite index ["channel", "-created_at"] in Meta
+    # already serves channel-only lookups via its leftmost prefix. A standalone
+    # index would be pure write overhead on the engine's busiest table.
+    # `db_default` is REQUIRED here, not decorative. Django's `default` is
+    # Python-side only — AddField uses it to backfill, then drops the database
+    # default. Any INSERT that omits this column then violates NOT NULL, which
+    # is exactly what an older deploy's ORM does: its model has no `channel`
+    # field, so the column never appears in its INSERT statement.
+    #
+    # db_default puts a real DEFAULT on the column, so the schema can be
+    # migrated ahead of the code (as we do: Supabase in Phase 1, deploy in
+    # Phase 8) without breaking the running release.
+    channel = models.CharField(
+        max_length=20,
+        default=SessionChannel.WEB,
+        db_default=SessionChannel.WEB,
+        choices=[
+            (SessionChannel.WEB, "Web"),
+            (SessionChannel.WHATSAPP, "WhatsApp"),
+        ],
+        help_text="Transport the query came from. Existing rows are 'web'.",
+    )
+
+    # Opaque, HASHED external identity for non-web channels (e.g. SHA-256 of an
+    # E.164 phone number). NULL for web — a browser session is identified by
+    # `user` or `ip_address` instead.
+    #
+    # This lives here, rather than being looked up from the channel's own
+    # tables, so the orchestrator can tag a Langfuse trace WITHOUT importing a
+    # channel model. The engine core must never depend on one of its
+    # transports. It is also what the rate limiter keys on for per-contact
+    # quotas (3/day per phone, matching PUBLIC_DAILY_LIMIT).
+    #
+    # NEVER store a raw phone number or email address here (CLAUDE.md).
+    # No db_index here either — covered by ["channel_ref", "-created_at"].
+    channel_ref = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="Hashed external identity. NULL for web sessions.",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -117,6 +163,15 @@ class ResearchSession(models.Model):
             models.Index(fields=["query_hash"], name="ra_session_query_hash_idx"),
             # Admin monitoring: filter by status
             models.Index(fields=["status"], name="ra_session_status_idx"),
+            # Channel analytics: "WhatsApp sessions today", cost per channel.
+            models.Index(
+                fields=["channel", "-created_at"], name="ra_session_channel_idx"
+            ),
+            # Per-contact rate limiting and per-contact history lookups.
+            models.Index(
+                fields=["channel_ref", "-created_at"],
+                name="ra_session_channel_ref_idx",
+            ),
         ]
         constraints = [
             # DB-level CHECK constraint on status (Risk #27).
@@ -134,6 +189,22 @@ class ResearchSession(models.Model):
                     ]
                 ),
                 name="ra_session_status_valid",
+            ),
+            # Same discipline as status: `choices` is Python-only validation, so
+            # the allowed channels are enforced in PostgreSQL too.
+            models.CheckConstraint(
+                condition=models.Q(channel__in=list(SessionChannel.ALL)),
+                name="ra_session_channel_valid",
+            ),
+            # Cross-channel consistency: a non-web session MUST carry its hashed
+            # identity. Without this, a WhatsApp session could be written with a
+            # NULL channel_ref — it would run fine, then be untraceable in
+            # Langfuse and invisible to the per-contact rate limiter. This makes
+            # that state impossible rather than merely unlikely.
+            models.CheckConstraint(
+                condition=models.Q(channel=SessionChannel.WEB)
+                | models.Q(channel_ref__isnull=False),
+                name="ra_session_channel_ref_required",
             ),
         ]
 
