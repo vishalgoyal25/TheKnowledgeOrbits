@@ -48,6 +48,31 @@ class SessionStatus:
     CANCELLED = "cancelled"
 
 
+# ── Session Channels ──────────────────────────────────────────────────────────
+# Which transport a session arrived through. WEB is the default for every
+# existing row and every browser query — the field exists so non-web traffic is
+# attributable in the ops tables and in Langfuse (FEATURE_WHATSAPP.md §5.2).
+#
+# THE SINGLE SOURCE OF TRUTH for channel names. Adding a platform means one
+# entry here, which cascades to:
+#   · ResearchSession.channel choices + the ra_session_channel_valid constraint
+#   · channels/core/constants.py → DeliveryChannel (derived, minus WEB)
+#     → the ra_delivery_channel_valid constraint
+#   · the registry, which refuses an adapter whose name is not listed here
+#
+# Each addition needs one small migration to widen those two CHECK constraints
+# — the documented exception in FEATURE_TELEGRAM.md §12.7. Nothing else changes.
+#
+# WEB is special: it is an attribution label, NOT an adapter. Browser queries
+# keep their existing QueryView → orchestrator → SSE path and never route
+# through channels/.
+class SessionChannel:
+    WEB = "web"
+    WHATSAPP = "whatsapp"
+    TELEGRAM = "telegram"
+    ALL = (WEB, WHATSAPP, TELEGRAM)
+
+
 # ── Agent Names ────────────────────────────────────────────────────────────────
 class AgentName:
     SUPERVISOR = "supervisor"

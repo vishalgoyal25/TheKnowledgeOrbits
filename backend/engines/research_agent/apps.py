@@ -24,3 +24,6 @@ class ResearchAgentConfig(AppConfig):
         # this import stays cheap.
         from engines.research_agent.tasks import research_task  # noqa: F401
         from engines.research_agent.tasks import evaluation_task  # noqa: F401
+        from engines.research_agent.tasks import channel_task  # noqa: F401
+        from engines.research_agent.tasks import channel_delivery_task  # noqa: F401
+        from engines.research_agent.tasks import channel_email_task  # noqa: F401

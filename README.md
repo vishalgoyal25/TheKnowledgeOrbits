@@ -84,6 +84,7 @@ _Engine-First Django/Next.js Architecture | Built for Scale | Solo-Developed_
   - [Research Agent — LangGraph Workflow](#-research-agent--langgraph-workflow)
   - [LLM Pool (Research Agent)](#-llm-pool-research-agent--multi-provider-failover)
   - [Caching Layers](#-caching-layers)
+  - [Messaging Channels — One Core, Many Doors](#-messaging-channels--one-core-many-doors)
 - [LLMOps & AgentOps — Operating the Agent](#-llmops--agentops--operating-the-agent)
   - [Observability & Tracing (Langfuse)](#-llmops--observability--tracing-langfuse)
   - [Quality Evaluation & Cost Governance](#-llmops--quality-evaluation--cost-governance)
@@ -762,6 +763,128 @@ flowchart TB
     CANCEL -. every agent checks before LLM work .-> AG
     LATE["late subscriber<br/>(session already done)"] -.-> TERM["terminal_stream<br/>one-shot final event"]
 ```
+
+---
+
+### 💬 Messaging Channels — One Core, Many Doors
+
+The same 8-node agent is reachable from a chat app as from the website. The channel layer is
+**ports &amp; adapters**: everything platform-agnostic — contact/message storage, the email state
+machine, delivery, retry, PII hashing — lives in `channels/core/`, and a platform is **two files**
+(`config.py` + `adapter.py`). Core branches on _declared capability_, never on platform name, so
+adding a channel touches **no core file, no table and no route**.
+
+The website is deliberately **not** an adapter: `channel="web"` is an attribution label, and browser
+queries keep their existing `QueryView → SSE` path untouched.
+
+```mermaid
+flowchart TB
+    WEB["🌐 Browser"] -->|QueryView · SSE| ORCH
+    TG["✈️ Telegram"] --> HOOK
+    WA["💬 WhatsApp · held"] -.-> HOOK
+    NEW["➕ Slack · Discord · …<br/>auto-discovered"] -.-> HOOK
+
+    HOOK["ONE parameterised route<br/>/api/v1/research/channels/&lt;channel&gt;/webhook/<br/>verify → parse → enqueue → 200 in ms"]
+
+    HOOK --> CORE
+
+    subgraph CORE["channels/core · platform-agnostic"]
+        SVC["service<br/>dedupe · contact · rate limit"]
+        STATE["state machine<br/>email flow · TTL"]
+        DEL["delivery<br/>summary → document → prompt"]
+        HTTP["http<br/>retry · ordering · budget"]
+    end
+
+    CORE --> ORCH["ResearchSession<br/>8-node LangGraph workflow"]
+    ORCH --> OPS["5 ops tables · Langfuse · DeepEval<br/>identical for every channel"]
+```
+
+**Platform differences are data, not code.** An adapter declares what it can do; core reads it:
+
+| Capability         | Telegram           | WhatsApp (Twilio) |
+| ------------------ | ------------------ | ----------------- |
+| `max_text_chars`   | 4096               | 1600              |
+| `supports_buttons` | ✅ inline keyboard | ❌ typed keyword  |
+| `media_mode`       | public URL         | public URL        |
+| `outbound_budget`  | unlimited          | metered ceiling   |
+
+#### Request lifecycle — a question from a chat app
+
+The webhook never blocks: the workflow takes 40–90 s and finishes long after the HTTP connection
+closed, so **every reply is an independent async REST call** from the background worker.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 👤 User
+    participant P as Platform
+    participant W as Django webhook
+    participant Q as process_tasks worker
+    participant A as 8-node agent
+
+    U->>P: "Significance of the 16th Finance Commission?"
+    P->>W: POST update + secret token
+    W->>W: verify · dedupe on provider message id
+    W-->>P: 200 OK (milliseconds)
+    W->>Q: enqueue
+    Q-->>U: 🔍 researching — about a minute
+
+    Q->>A: run_research(session_id)
+    Note over A: 8 nodes · ~60s
+    A->>Q: report · sources · confidence
+
+    Q-->>U: 📄 summary + work log
+    Q-->>U: 📎 report.pdf
+    Q-->>U: [📧 Email report]
+
+    U->>Q: taps · replies with address
+    Q-->>U: ✅ emailed (PDF + Markdown attached)
+```
+
+#### Conversation state — the only part that remembers
+
+Everything above is stateless: message in, answer out. The **email flow** is the exception — it has
+to remember that it asked a question, and forget properly when nobody answers.
+
+The hard part isn't the happy path, it's that **no messaging platform emits a "the user walked
+away" event**. So every route out of the waiting state has to be constructed: a TTL, a retry
+ceiling, and a guard for an address that arrives with no prompt behind it.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> Idle
+
+    Idle --> Idle: question<br/>→ research run
+    Idle --> Idle: address with no prompt<br/>→ refused, never researched
+    Idle --> AwaitingEmail: 📧 button tapped<br/>session id rides in the payload
+
+    AwaitingEmail --> AwaitingEmail: invalid address<br/>→ re-prompt once
+    AwaitingEmail --> Idle: valid address<br/>→ queue email · clear to NULL
+    AwaitingEmail --> Idle: second failure<br/>→ cancelled · clear to NULL
+    AwaitingEmail --> Idle: 60-minute TTL<br/>→ expired · clear to NULL
+
+    note right of AwaitingEmail
+        Nothing here can start a research run.
+        Every message is an address attempt.
+    end note
+```
+
+**Three details that make it survive real use:**
+
+- **The session id travels in the button payload** (49 of Telegram's 64 callback bytes), so tapping a
+  prompt further up the conversation emails _that_ report, not the newest one.
+- **`@` present and no spaces** is the whole heuristic. It separates "mistyped" from "changed my
+  mind", and it stops a stale address being researched — otherwise a user who taps, wanders off past
+  the TTL and returns would spend a daily query researching their own email address.
+- **Every exit clears all four `pending_*` fields together**, through one method. Four ways out, one
+  way back to idle.
+
+**Traceability is unchanged.** A channel query creates an ordinary `ResearchSession`, so agent logs,
+state snapshots, the report, DeepEval scores and the Langfuse trace populate exactly as they do for
+the web — now additionally filterable by `channel`. Raw identities (chat id, phone, email) never
+leave the contact table: a keyed hash is what reaches `channel_ref`, Langfuse and Sentry.
 
 ---
 
