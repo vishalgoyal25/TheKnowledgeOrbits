@@ -27,6 +27,7 @@ import hashlib
 import sentry_sdk
 import structlog
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from engines.research_agent.channels.core import constants as k
 from engines.research_agent.channels.core import http
@@ -53,6 +54,10 @@ RATE_LIMIT_REPLY = (
 )
 
 ERROR_REPLY = "Something went wrong starting that research. Please try again."
+
+# Sent when an identical question was researched recently. Saying so is honest —
+# otherwise an instant answer looks like the bot skipped the work.
+REUSED_REPLY = "⚡ I researched this recently — here's that report:"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -116,19 +121,42 @@ def _start_research(
       · the rate limiter is keyed on the contact's HASH, not our server's IP
       · `channel` / `channel_ref` are set, so the run is attributable
 
-    The query cache is intentionally NOT consulted here. A cache hit returns a
-    report with no session, and with no session there is nothing to export a
-    document from later (FEATURE_WHATSAPP.md §6.3). Deferred, not forgotten.
+    Repeat questions reuse an earlier SESSION rather than the Redis query cache.
+    The cache stores a report blob with no session id, and with no session there
+    is nothing to export a document from — so a cached answer could never carry
+    a PDF. Reusing the session gives the same instant reply AND a working
+    document (FEATURE_WHATSAPP.md §6.3, resolved).
     """
     from engines.research_agent.constants import SessionStatus
     from engines.research_agent.middleware.rate_limiter import rate_limiter
     from engines.research_agent.models.research_session import ResearchSession
+    from engines.research_agent.tasks.channel_delivery_task import deliver_when_ready
 
     query = (inbound.text or "").strip()
 
     # Same normalisation as QueryView, so a question asked on the website and
     # in a chat app share a cache key and read as the same query in analytics.
     query_hash = hashlib.sha256(query.lower().encode("utf-8")).hexdigest()
+
+    # ── Reuse a recent identical answer ──────────────────────────────────────
+    # Checked BEFORE the rate limit, matching QueryView: an answer we already
+    # have should not cost the user one of their three daily questions.
+    reusable = _recent_completed_session(query_hash)
+    if reusable is not None:
+        message.session = reusable
+        message.save(update_fields=["session"])
+
+        send_text(adapter, contact, REUSED_REPLY, session=reusable)
+        # instant=True skips the progress pings — there is no work to narrate.
+        deliver_when_ready(str(reusable.id), instant=True, schedule=0)
+
+        logger.info(
+            "channel.query.reused_session",
+            channel=adapter.name,
+            session_id=str(reusable.id),
+            age_seconds=int((timezone.now() - reusable.created_at).total_seconds()),
+        )
+        return "reused"
 
     # Keyed on the hashed identity: every channel request arrives from OUR
     # server, so an IP-keyed limit would put all bot users in one bucket.
@@ -191,6 +219,40 @@ def _start_research(
         remaining=remaining,
     )
     return "queued"
+
+
+def _recent_completed_session(query_hash: str):
+    """
+    A finished run for this exact question, recent enough to still be current.
+
+    Deliberately channel-agnostic: a question answered on the website is reused
+    for a chat user and vice versa. The report is generic research content, and
+    this is exactly what the existing Redis query cache already does for web.
+
+    The window matches `QUERY_CACHE_TTL`, so chat and web consider an answer
+    stale at the same moment.
+
+    A session is only reusable if a report actually exists — a COMPLETED session
+    without one would deliver silence.
+    """
+    from datetime import timedelta
+
+    from engines.research_agent.constants import QUERY_CACHE_TTL, SessionStatus
+    from engines.research_agent.models.research_report import ResearchReport
+    from engines.research_agent.models.research_session import ResearchSession
+
+    cutoff = timezone.now() - timedelta(seconds=QUERY_CACHE_TTL)
+
+    candidates = ResearchSession.objects.filter(
+        query_hash=query_hash,
+        status=SessionStatus.COMPLETED,
+        created_at__gte=cutoff,
+    ).order_by("-created_at")[:5]
+
+    for session in candidates:
+        if ResearchReport.objects.filter(session=session).exists():
+            return session
+    return None
 
 
 def _upsert_contact(adapter: ChannelAdapter, inbound: InboundMessage) -> ChannelContact:

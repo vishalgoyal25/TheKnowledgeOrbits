@@ -300,3 +300,43 @@ def post_form(
         )
     except requests.RequestException as exc:
         raise ChannelTransientError(f"network error: {exc}") from exc
+
+
+def post_multipart(
+    url: str, data: dict, files: dict, *, auth=None, timeout: int | None = None
+) -> requests.Response:
+    """
+    Multipart POST, for providers we UPLOAD files to rather than hand a URL.
+
+    Uploading beats URL-fetching on every axis that matters here: the provider
+    never has to reach our host, we choose the filename and content type it
+    sees, and a provider that is fussy about content types cannot refuse the
+    file. It costs one extra round trip, which is irrelevant at report size.
+    """
+    try:
+        return requests.post(
+            url,
+            data=data,
+            files=files,
+            auth=auth,
+            timeout=timeout or k.MEDIA_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException as exc:
+        raise ChannelTransientError(f"network error: {exc}") from exc
+
+
+def fetch_bytes(url: str, *, timeout: int | None = None) -> bytes:
+    """
+    Download a file we are about to upload.
+
+    Always the existing export endpoint, so a chat user receives the byte-identical
+    document the website's download button serves — one media path, never a second
+    rendering.
+    """
+    try:
+        response = requests.get(url, timeout=timeout or k.MEDIA_TIMEOUT_SECONDS)
+    except requests.RequestException as exc:
+        raise ChannelTransientError(f"media fetch failed: {exc}") from exc
+
+    raise_for_status(response)
+    return response.content

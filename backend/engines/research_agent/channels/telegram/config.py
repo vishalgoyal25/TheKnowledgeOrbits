@@ -74,12 +74,15 @@ CAPABILITIES = Capabilities(
     # button and taps arrive as callback queries. Core sends the same action
     # either way; only the rendering differs.
     supports_buttons=True,
-    # Telegram fetches documents from a public URL — the existing export
-    # endpoint feeds it directly, with no upload step.
-    media_mode=MediaMode.URL,
-    # Telegram's limit when it fetches by URL (uploads may go higher). Reports
-    # are orders of magnitude below this.
-    max_media_bytes=20 * 1024 * 1024,
+    # UPLOAD, not URL. Telegram *can* fetch a URL, but it refuses content types
+    # it does not recognise — a Markdown export came back as "wrong type of the
+    # web page content", and ExportView's content type is frozen. Uploading the
+    # bytes lets us declare the filename and MIME type, works identically for
+    # .md locally and .pdf in production, and removes any need for Telegram to
+    # reach our host at all.
+    media_mode=MediaMode.UPLOAD,
+    # Telegram's cap for bot uploads. Reports are orders of magnitude below it.
+    max_media_bytes=50 * 1024 * 1024,
     # No metering: the Bot API is free with no message allowance. The budget
     # guard exists for providers like Twilio's trial, which charges per accepted
     # request; here it stays off.

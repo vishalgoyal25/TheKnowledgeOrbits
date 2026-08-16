@@ -156,6 +156,17 @@ def export_url(session_id: str, fmt: str = "pdf") -> str:
 # blocking timeout is safe.
 HTTP_TIMEOUT_SECONDS = 15
 
+# Media moves more bytes than a text message: fetching the export and uploading
+# it are both slower than a plain API call, and a tunnel adds latency on top.
+MEDIA_TIMEOUT_SECONDS = 60
+
+# Content types for the two formats a report can take. Providers reject uploads
+# they cannot classify, so this is sent explicitly rather than guessed.
+MIME_TYPES = {
+    "pdf": "application/pdf",
+    "md": "text/markdown",
+}
+
 # Retry/backoff mirrors llmops/groq_client.py — same discipline, same shape.
 # Only TRANSIENT failures are retried; a 4xx means the request itself is wrong
 # and retrying cannot fix it (and on metered providers, costs a message).

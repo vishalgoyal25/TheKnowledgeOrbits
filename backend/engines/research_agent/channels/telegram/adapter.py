@@ -168,20 +168,45 @@ class TelegramAdapter(ChannelAdapter):
         caption: str | None = None,
     ) -> str | None:
         """
-        Send by public URL — Telegram fetches it itself.
+        Fetch the export ourselves, then UPLOAD the bytes to Telegram.
 
-        `filename` is advisory here: Telegram names the file from the URL path,
-        so core's slugified name must already be in the URL for it to show up
-        nicely in the chat.
+        Telegram can fetch a URL, and that was the original design — but it
+        refuses content types it does not recognise. A Markdown export came back
+        as `wrong type of the web page content`, and `ExportView`'s content type
+        is frozen, so we cannot change what it serves.
+
+        Uploading sidesteps all of it: Telegram never touches our host, we
+        declare the filename and MIME type it sees, and the same code path works
+        for `.md` locally and `.pdf` in production.
+
+        Cost: one extra round trip for a file measured in kilobytes.
         """
-        payload = {"chat_id": external_id, "document": url}
+        content = http.fetch_bytes(url)
+        extension = filename.rsplit(".", 1)[-1].lower()
+        mime = k.MIME_TYPES.get(extension, "application/octet-stream")
+
+        data = {"chat_id": external_id}
         if caption:
-            payload["caption"] = caption
-        return self._send(
-            "sendDocument",
-            payload,
-            external_id=external_id,
+            data["caption"] = caption
+
+        def perform() -> str | None:
+            response = http.post_multipart(
+                config.api_url("sendDocument"),
+                data=data,
+                files={"document": (filename, content, mime)},
+            )
+            http.raise_for_status(response)
+            body = response.json()
+            if not body.get("ok"):
+                raise http.ChannelSendError(f"telegram: {body.get('description')}")
+            return str((body.get("result") or {}).get("message_id") or "")
+
+        return http.guarded_send(
+            channel=self.name,
             kind=k.MessageType.DOCUMENT,
+            external_id=external_id,
+            perform=perform,
+            budget=self.capabilities.outbound_budget,
         )
 
     def send_prompt(self, external_id: str, text: str, action_id: str) -> str | None:

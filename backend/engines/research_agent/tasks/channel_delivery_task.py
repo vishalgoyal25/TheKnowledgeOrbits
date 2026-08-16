@@ -39,9 +39,15 @@ MAX_ATTEMPTS = 48
 
 
 @background(schedule=POLL_SECONDS)
-def deliver_when_ready(session_id: str, attempt: int = 0) -> None:
+def deliver_when_ready(
+    session_id: str, attempt: int = 0, instant: bool = False
+) -> None:
     """
     One poll: send any new progress, then finish or re-schedule.
+
+    `instant=True` is used when reusing an already-finished session for a repeat
+    question. There is no work to narrate, so progress pings are skipped and the
+    report goes straight out.
 
     Never raises. A delivery failure must not mark the task failed and retry the
     whole thing — that would re-send messages the user already has.
@@ -77,15 +83,22 @@ def deliver_when_ready(session_id: str, attempt: int = 0) -> None:
 
         # ── Terminal states ──────────────────────────────────────────────────
         if session.status == SessionStatus.COMPLETED:
-            delivery.send_progress(adapter, contact, session)
-            delivery.send_summary(adapter, contact, session)
-            # T5 adds the document here, T6 the email prompt.
+            if not instant:
+                delivery.send_progress(adapter, contact, session)
+
+            # The document only goes out if there was something to summarise —
+            # otherwise a run that produced no report would still attach a file.
+            if delivery.send_summary(adapter, contact, session):
+                delivery.send_document(adapter, contact, session)
+
+            # T6 adds the email prompt here.
             progress.clear(session_id)
             logger.info(
                 "channel.delivery.done",
                 session_id=session_id,
                 channel=session.channel,
                 polls=attempt + 1,
+                instant=instant,
             )
             return
 
@@ -107,7 +120,7 @@ def deliver_when_ready(session_id: str, attempt: int = 0) -> None:
 
         # Check again shortly. Re-enqueueing rather than sleeping is what keeps
         # the single worker available for the research task itself.
-        deliver_when_ready(session_id, attempt + 1)
+        deliver_when_ready(session_id, attempt + 1, instant)
 
     except Exception as exc:
         logger.error(
