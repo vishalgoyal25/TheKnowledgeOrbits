@@ -28,6 +28,8 @@ import structlog
 from engines.research_agent.constants import (
     PUBLIC_DAILY_LIMIT,
     GROQ_REQUESTS_PER_MINUTE,
+    MISTRAL_REQUESTS_PER_MINUTE,
+    OPENROUTER_REQUESTS_PER_MINUTE,
     CEREBRAS_REQUESTS_PER_MINUTE,
 )
 
@@ -43,9 +45,13 @@ _RPM_KEY = "research:ratelimit:rpm:{provider}:{minute}"
 _DAY_TTL = 24 * 3600
 _MINUTE_TTL = 70  # slightly over a minute so the window can't be evicted early
 
+# A provider absent from this map is UNLIMITED by the limiter (check_provider_rpm
+# returns None), so every pooled provider must appear here.
 _PROVIDER_RPM = {
     "groq": GROQ_REQUESTS_PER_MINUTE,
-    "cerebras": CEREBRAS_REQUESTS_PER_MINUTE,
+    "mistral": MISTRAL_REQUESTS_PER_MINUTE,
+    "openrouter": OPENROUTER_REQUESTS_PER_MINUTE,
+    "cerebras": CEREBRAS_REQUESTS_PER_MINUTE,  # retained; provider disabled
 }
 
 

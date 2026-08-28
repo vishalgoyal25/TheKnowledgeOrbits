@@ -12,11 +12,13 @@ Why a separate summary agent BEFORE the full report?
 This is a pure prose task — NO JSON, NO structured parsing. We take the LLM's
 text output directly as the executive summary. Simpler and faster.
 
-SPEED CHOICE: runs on CEREBRAS gpt-oss-120b — the fastest provider (~3000 tok/s),
-and the summary is on the critical path to "user sees something." Pool fails over
-to Groq if Cerebras is down.
+SPEED MATTERS HERE: the summary is on the critical path to "user sees something."
+This agent was pinned to Cerebras for that reason until Cerebras started returning
+402 Payment Required (2026-08-19) — after which the pin COST time rather than saved
+it, since every call retried a dead provider before failing over. It now uses the
+pool default (groq → mistral → openrouter). See FEATURES_LLM_FIX.md.
 
-Provider: Cerebras (gpt-oss-120b) | max_tokens: 600 (MAX_TOKENS_SUMMARY ≈ 300 words).
+Provider: pool default | max_tokens: 600 (MAX_TOKENS_SUMMARY ≈ 300 words) — UNCHANGED.
 """
 
 from __future__ import annotations
@@ -42,10 +44,9 @@ _SYSTEM_PROMPT = (
 class SummaryGeneratorAgent(BaseAgent):
     agent_name = AgentName.SUMMARY_GENERATOR
     # Fast provider — this is the first thing the user reads.
-    model_provider = "cerebras"
-    model_name = (
-        "gpt-oss-120b"  # Cerebras free production model (Llama retired from public)
-    )
+    # Un-pinned from Cerebras (dead since 2026-08-19); groq is now the fastest live one.
+    model_provider = "groq"
+    model_name = "openai/gpt-oss-120b"
     max_tokens = MAX_TOKENS_SUMMARY
 
     def execute(self, state: ResearchState) -> tuple[dict, int]:

@@ -33,8 +33,12 @@ from engines.research_agent.constants import (
 logger = structlog.get_logger(__name__)
 
 _GROQ = "groq"
-_CEREBRAS = "cerebras"
 _GROQ_MODEL = "openai/gpt-oss-120b"
+
+# RETAINED for a one-line re-enable. Cerebras returned 402 Payment Required on
+# every key from 2026-08-19, so no agent is routed to it any more. Do not delete:
+# restoring the provider means putting these back in the map below.
+_CEREBRAS = "cerebras"
 _CEREBRAS_MODEL = "gpt-oss-120b"
 
 # Per-agent model assignment (mirrors each agent's class attributes).
@@ -59,14 +63,17 @@ _AGENT_MODEL_MAP: dict[str, dict] = {
         "model": _GROQ_MODEL,
         "max_tokens": MAX_TOKENS_RESEARCH,
     },
+    # Verification / Summary / Reflection previously ran on Cerebras for speed.
+    # Cerebras is dead (402), so they route to Groq like every other agent and
+    # fail over through the shared pool. Token budgets are UNCHANGED.
     AgentName.VERIFICATION: {
-        "provider": _CEREBRAS,
-        "model": _CEREBRAS_MODEL,
+        "provider": _GROQ,
+        "model": _GROQ_MODEL,
         "max_tokens": MAX_TOKENS_VERIFICATION,
     },
     AgentName.SUMMARY_GENERATOR: {
-        "provider": _CEREBRAS,
-        "model": _CEREBRAS_MODEL,
+        "provider": _GROQ,
+        "model": _GROQ_MODEL,
         "max_tokens": MAX_TOKENS_SUMMARY,
     },
     AgentName.REPORT_GENERATOR: {
@@ -75,8 +82,8 @@ _AGENT_MODEL_MAP: dict[str, dict] = {
         "max_tokens": MAX_TOKENS_REPORT_GENERATOR,
     },
     AgentName.REFLECTION: {
-        "provider": _CEREBRAS,
-        "model": _CEREBRAS_MODEL,
+        "provider": _GROQ,
+        "model": _GROQ_MODEL,
         "max_tokens": MAX_TOKENS_REFLECTION,
     },
 }

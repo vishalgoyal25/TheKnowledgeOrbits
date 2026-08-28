@@ -20,11 +20,13 @@ prevented):
       fail #2 → retry_count=2 → router: 2 <= 1 → GIVE UP (best-effort)
   Exactly one retry. No infinite loop.
 
-SPEED CHOICE (Opt #1): runs on CEREBRAS, not Groq. Verification is a simple
-yes/no judgement — Cerebras is ~10x faster, saving ~12s per pipeline run.
-The multi-provider pool still fails over to Groq/Gemini if Cerebras is down.
+PROVIDER: Groq, via the shared pool (groq → mistral → openrouter).
+Historically this agent was pinned to Cerebras for speed. Cerebras began returning
+402 Payment Required on 2026-08-19, so the pin only bought a wasted retry-and-
+failover on every run. Verification is a simple yes/no judgement and Groq serves it
+well. See FEATURES_LLM_FIX.md.
 
-Provider: Cerebras | max_tokens: 1024 (MAX_TOKENS_VERIFICATION).
+Provider: pool default | max_tokens: 1024 (MAX_TOKENS_VERIFICATION) — UNCHANGED.
 """
 
 from __future__ import annotations
@@ -66,11 +68,10 @@ _SYSTEM_PROMPT = (
 
 class VerificationAgent(BaseAgent):
     agent_name = AgentName.VERIFICATION
-    # Opt #1 — Cerebras for speed. Pool fails over to groq/gemini if it's down.
-    model_provider = "cerebras"
-    model_name = (
-        "gpt-oss-120b"  # Cerebras free production model (Llama retired from public)
-    )
+    # Un-pinned from Cerebras (dead since 2026-08-19). Uses the pool default so
+    # failover is groq → mistral → openrouter with no wasted first attempt.
+    model_provider = "groq"
+    model_name = "openai/gpt-oss-120b"
     max_tokens = MAX_TOKENS_VERIFICATION
 
     def execute(self, state: ResearchState) -> tuple[dict, int]:
@@ -95,7 +96,7 @@ class VerificationAgent(BaseAgent):
                 0,
             )
 
-        # ── LLM judge (Cerebras) ──────────────────────────────────────────────
+        # ── LLM judge (pool default) ──────────────────────────────────────────
         user_prompt = self._build_prompt(synthesized, findings, sources)
         text, tokens = self._call_llm(
             prompt=user_prompt,

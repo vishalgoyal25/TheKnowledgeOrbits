@@ -49,8 +49,10 @@ class BaseAgent:
     """
     Subclasses MUST set these 4 class attributes and override execute().
 
-    Defaults below are the Groq openai/gpt-oss-120b config. Fast agents
-    (Verification, Reflection) override provider="cerebras".
+    Defaults below are the Groq openai/gpt-oss-120b config. Every agent now uses
+    them: the Cerebras pins on Verification / Reflection / Summary were removed
+    when Cerebras went 402 (FEATURES_LLM_FIX.md). An agent may still override
+    model_provider, but the pool will fail over regardless of what it asks for.
     """
 
     agent_name: str = "base"

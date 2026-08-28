@@ -31,6 +31,29 @@ from django.test import TestCase
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _fake_spec():
+    """
+    A real-shaped ProviderSpec stand-in for mocked pool entries.
+
+    llm_service routes on CAPABILITY (`spec.max_request_tokens >= est_tokens`),
+    which is what prevents the Groq 413 that broke Daily CA generation. A bare
+    MagicMock attribute raises `TypeError: '>=' not supported between MagicMock
+    and int`, so mocked entries must carry a spec with real values.
+
+    max_request_tokens is deliberately huge so capability routing never filters
+    the mock out — these tests are about temperature/retry/return behaviour.
+    """
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        name="groq",
+        model_setting="GROQ_MODEL",
+        default_model="openai/gpt-oss-120b",
+        max_request_tokens=1_000_000,
+        supports_json_mode=True,
+    )
+
+
 class TestLlmService(unittest.TestCase):
     """Tests for engines.book_content.services.llm_service.llm_call"""
 
@@ -46,8 +69,8 @@ class TestLlmService(unittest.TestCase):
         mock_client.chat.completions.create.return_value = mock_response
         entry = MagicMock()
         entry.client = mock_client
-        entry.model = "openai/gpt-oss-120b"
         entry.provider = "groq"
+        entry.spec = _fake_spec()
         return entry
 
     def _make_failing_pool_entry(self, exc: Exception) -> MagicMock:
@@ -56,8 +79,8 @@ class TestLlmService(unittest.TestCase):
         mock_client.chat.completions.create.side_effect = exc
         entry = MagicMock()
         entry.client = mock_client
-        entry.model = "openai/gpt-oss-120b"
         entry.provider = "groq"
+        entry.spec = _fake_spec()
         return entry
 
     @patch("engines.book_content.services.llm_service.time.sleep", return_value=None)
