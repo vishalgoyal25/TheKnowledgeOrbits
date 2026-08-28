@@ -61,11 +61,18 @@ from django.utils import timezone
 
 from engines.assessment.models import Quiz
 from engines.current_affairs.models import CAArticle
-from engines.daily_ca.models import CaDailyProposal
+from engines.daily_ca.models import CaDailyProposal, DailyCaArticle
 
 logger = structlog.get_logger(__name__)
 
 _DIVIDER = "━" * 60
+
+# Output guard (FEATURES_LLM_FIX.md L6).
+# Below this many published articles, the run is treated as degraded and alerts.
+# The 2026-08-19 outage produced 0/10 for three days while the process exited 0
+# and Render showed a green tick — exit status can never be the signal here,
+# because per-cycle failures are caught by design.
+_MIN_EXPECTED_ARTICLES = 5
 
 
 class Command(BaseCommand):
@@ -265,6 +272,9 @@ class Command(BaseCommand):
                 )
             )
 
+        # ── OUTPUT GUARD — the run must never fail silently ──────────────────
+        self._verify_output(target_date, db_alias)
+
         # ── Final summary ─────────────────────────────────────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
@@ -282,6 +292,77 @@ class Command(BaseCommand):
             db_alias=db_alias,
             top_n=top_n,
         )
+
+    # ── Output guard ──────────────────────────────────────────────────────────
+
+    def _verify_output(self, target_date, db_alias: str) -> None:
+        """
+        Confirm the run actually produced published articles — and be LOUD if not.
+
+        WHY THIS EXISTS
+        The 2026-08-19 LLM outage ran for three days undetected. Each cycle failed,
+        was caught by design (`generator_service` deliberately does NOT break on a
+        failed cycle), the command printed `failed=10 generated=0`, the process
+        exited 0, and Render reported success. The data to notice it existed in
+        Sentry and in the logs the whole time; nothing asserted on it.
+
+        So this checks OUTPUT, not exit status, using the SAME query the public
+        API uses (`published_date` + `is_published`) — i.e. what a visitor to
+        /news would actually see.
+
+        Never raises: a monitoring check must not be able to fail the pipeline.
+        """
+        try:
+            published = (
+                DailyCaArticle.objects.using(db_alias)
+                .filter(published_date=target_date, is_published=True)
+                .count()
+            )
+        except Exception as exc:
+            sentry_sdk.capture_exception(exc)
+            logger.error("pipeline_output_check_failed", error=str(exc))
+            return
+
+        if published == 0:
+            message = (
+                f"Daily CA pipeline produced ZERO published articles for {target_date}. "
+                f"The site will show no new content today. Check LLM provider health "
+                f"(llm_permanently_failed / llm_provider_parked in logs)."
+            )
+            sentry_sdk.capture_message(message, level="error")
+            logger.error(
+                "pipeline_zero_articles",
+                date=str(target_date),
+                db_alias=db_alias,
+                published=0,
+            )
+            self.stderr.write(self.style.ERROR(f"\n  ✗✗ {message}"))
+
+        elif published < _MIN_EXPECTED_ARTICLES:
+            message = (
+                f"Daily CA pipeline degraded for {target_date}: only {published} "
+                f"published article(s), expected >= {_MIN_EXPECTED_ARTICLES}."
+            )
+            sentry_sdk.capture_message(message, level="warning")
+            logger.warning(
+                "pipeline_low_article_count",
+                date=str(target_date),
+                published=published,
+                expected_min=_MIN_EXPECTED_ARTICLES,
+            )
+            self.stderr.write(self.style.WARNING(f"\n  ⚠ {message}"))
+
+        else:
+            logger.info(
+                "pipeline_output_verified",
+                date=str(target_date),
+                published=published,
+            )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"\n  ✓ Output verified: {published} published article(s)."
+                )
+            )
 
     # ── Step 2 helper ─────────────────────────────────────────────────────────
 

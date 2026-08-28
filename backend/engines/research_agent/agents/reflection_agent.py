@@ -21,9 +21,11 @@ THE retry_count CONTRACT (mirrors VerificationAgent):
       low score #2 → retry_count +1 → router: budget spent  → END
   Without this increment, a report that keeps scoring low would re-plan forever.
 
-SPEED CHOICE: Cerebras. Scoring is a quick judgement; fast model, low cost.
+SPEED: scoring is a quick judgement, so a fast provider matters. This agent was
+pinned to Cerebras until it began returning 402 Payment Required (2026-08-19);
+it now uses the pool default (groq → mistral → openrouter). See FEATURES_LLM_FIX.md.
 
-Provider: Cerebras | max_tokens: 512 (MAX_TOKENS_REFLECTION).
+Provider: pool default | max_tokens: 512 (MAX_TOKENS_REFLECTION) — UNCHANGED.
 """
 
 from __future__ import annotations
@@ -71,10 +73,10 @@ _SYSTEM_PROMPT = (
 
 class ReflectionAgent(BaseAgent):
     agent_name = AgentName.REFLECTION
-    model_provider = "cerebras"
-    model_name = (
-        "gpt-oss-120b"  # Cerebras free production model (Llama retired from public)
-    )
+    # Un-pinned from Cerebras (402 since 2026-08-19). Uses the pool default so the
+    # failover chain is groq → mistral → openrouter with no wasted first attempt.
+    model_provider = "groq"
+    model_name = "openai/gpt-oss-120b"
     max_tokens = MAX_TOKENS_REFLECTION
 
     def execute(self, state: ResearchState) -> tuple[dict, int]:
@@ -97,7 +99,7 @@ class ReflectionAgent(BaseAgent):
                 0,
             )
 
-        # ── LLM self-critique (Cerebras) ──────────────────────────────────────
+        # ── LLM self-critique (pool default) ──────────────────────────────────
         user_prompt = self._build_prompt(query, report)
         text, tokens = self._call_llm(
             prompt=user_prompt,

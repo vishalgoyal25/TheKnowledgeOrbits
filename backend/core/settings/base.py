@@ -319,22 +319,45 @@ LOGGING: Dict[str, Any] = {
 # Sentry Configuration
 SENTRY_DSN = env("SENTRY_DSN", default="")
 if SENTRY_DSN:
-    import sentry_sdk
-    from sentry_sdk.integrations.celery import CeleryIntegration
-    from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk.integrations.logging import LoggingIntegration
+    # MONITORING MUST NEVER BE ABLE TO TAKE THE SITE DOWN.
+    #
+    # sentry_sdk.init() RAISES on a malformed, revoked or expired DSN (BadDsn).
+    # Unguarded, that means: Sentry closes the account / the trial lapses / the
+    # project is deleted → this line raises → Django refuses to boot → the whole
+    # backend is down because of an OPTIONAL observability tool.
+    #
+    # Wrapped, the worst case is: no error reporting, site fully operational.
+    # That is the correct trade in every direction.
+    #
+    # Runtime is already safe by design: capture_message()/capture_exception()
+    # are no-ops when the SDK is uninitialised, and the SDK's background
+    # transport drops events silently if Sentry is unreachable — it never raises
+    # into application code and never blocks a request.
+    #
+    # NOTE: CeleryIntegration was removed here — Celery is not a dependency of
+    # this project (see CLAUDE.md: "Celery was removed; never reintroduce it").
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
 
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        integrations=[
-            DjangoIntegration(),
-            CeleryIntegration(),
-            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
-        ],
-        environment=env("SENTRY_ENVIRONMENT", default="development"),
-        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
-        send_default_pii=True,
-    )
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[
+                DjangoIntegration(),
+                LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+            ],
+            environment=env("SENTRY_ENVIRONMENT", default="development"),
+            traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.1),
+            send_default_pii=True,
+        )
+    except Exception as _sentry_exc:  # noqa: BLE001 — deliberately broad
+        # structlog is not configured this early in settings; stdlib logging is
+        # already imported here and falls back to stderr. The service continues
+        # without error reporting, which is the whole point of this guard.
+        logging.getLogger(__name__).warning(
+            "Sentry disabled — sentry_sdk.init() failed: %s", _sentry_exc
+        )
 
 
 # GROQ Configuration
@@ -344,11 +367,33 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "dummy-key-for-build")
 if not GROQ_API_KEY and not os.getenv("RENDER"):
     raise ImproperlyConfigured("GROQ_API_KEY environment variable is not set")
 
-# ── Additional LLM Providers (optional — add keys to unlock more capacity) ───
-# Cerebras: free tier, gpt-oss-120b, api.cerebras.ai/v1
-# Comma-separated if multiple keys from same provider.
+GROQ_MODEL = os.getenv("GROQ_MODEL", "")  # blank → registry default
+
+# ── Additional LLM Providers ─────────────────────────────────────────────────
+# All keys are COMMA-SEPARATED when several accounts are pooled.
+# The active pool + per-provider capabilities live in the registry:
+#   engines/book_content/services/llm_service.py  →  PROVIDERS
+#
+# DISABLED but deliberately RETAINED (FEATURES_LLM_FIX.md decisions #1/#2, #5):
+#   Cerebras — every key returned 402 Payment Required from 2026-08-19.
+#              Keys and config stay; the provider is switched off in the registry.
+#   Gemini   — free-tier RPM too tight for a rotating pool.
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
+CEREBRAS_MODEL = os.getenv("CEREBRAS_MODEL", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# ── Active free providers (verified L0/L0b, FEATURES_LLM_FIX.md §5) ──────────
+# Mistral — large-prompt workhorse. Groq cannot serve the ~9k-token article prompt
+# (free tier ≈ 6k TPM → 413), so Mistral is what actually generates Daily CA.
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
+MISTRAL_MODEL = os.getenv("MISTRAL_MODEL", "")  # blank → mistral-medium-2508
+
+# OpenRouter — emergency fallback only (free tier ~50 req/day/account and highly
+# variable latency). Leave OPENROUTER_MODEL BLANK so the pool resolves the current
+# free model live every 24 h — OpenRouter retires free models without notice.
+# Set it only to pin one model in an emergency (takes effect without a deploy).
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "")
 
 # Research Agent — search API keys
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")

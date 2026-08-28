@@ -89,9 +89,18 @@ class AgentExecutionLog(models.Model):
     tokens_used = models.IntegerField(default=0)
 
     # Which LLM provider handled this agent's call.
+    # Historical values ("cerebras") MUST stay in choices — old rows reference them
+    # and dropping a choice would invalidate them in admin/forms. Cerebras is no
+    # longer routed to (402 since 2026-08-19); the label is kept for history only.
     model_provider = models.CharField(
         max_length=32,
-        choices=[("groq", "Groq"), ("cerebras", "Cerebras")],
+        choices=[
+            ("groq", "Groq"),
+            ("mistral", "Mistral"),
+            ("openrouter", "OpenRouter"),
+            ("cerebras", "Cerebras"),  # historical / disabled
+            ("gemini", "Gemini"),  # reserved / disabled
+        ],
     )
 
     model_name = models.CharField(max_length=64)

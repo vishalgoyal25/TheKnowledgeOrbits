@@ -7,9 +7,19 @@ Despite the file name, this is a MULTI-PROVIDER POOL with automatic failover.
 ALL LLM calls MUST route through here (Hard Rule, Risk #3).
 
 THE POOL (free-tier providers, in failover priority order):
-    1. groq      → openai/gpt-oss-120b       (primary: fast + high quality)
-    2. cerebras  → gpt-oss-120b              (free public model: Verification/Reflection/Summary)
-    3. gemini    → gemini-2.0-flash          (last-resort fallback)
+    1. groq       → openai/gpt-oss-120b     (primary — fastest; serves all small agent calls)
+    2. mistral    → mistral-medium-2508     (fast, and the only large-prompt-capable provider)
+    3. openrouter → resolved live per model (EMERGENCY ONLY — see latency note below)
+
+DISABLED but config RETAINED (FEATURES_LLM_FIX.md):
+    • cerebras — every key returned 402 Payment Required from 2026-08-19
+    • gemini   — free-tier RPM too tight for a rotating pool
+
+ORDERING MATTERS HERE, unlike the batch pool. A user is waiting on every call in
+this engine, and OpenRouter's free tier was measured at up to 63 s for a trivial
+"reply OK" (queueing, not compute). It is therefore LAST: it only ever runs when
+both groq and mistral are down. Agent calls are small (512–2048 tokens), so in
+practice they stay on groq and interactive latency is unchanged.
 
 TWO LAYERS OF RESILIENCE (same idea as the Tavily→Exa→Wikipedia search chain):
 
@@ -37,46 +47,126 @@ from typing import Any
 
 import structlog
 from django.conf import settings
+from django.core.cache import cache
 from tenacity import (
     Retrying,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
+    retry_if_exception,
 )
 
 logger = structlog.get_logger(__name__)
 
 # ── Pool configuration ────────────────────────────────────────────────────────
-# Global failover priority. The agent's preferred provider is tried FIRST,
-# then the remaining enabled providers in this order.
-# Gemini is intentionally OUT of the pool (its free tier is unusable: quota 0).
-# Focus: Groq + Cerebras. So every agent ultimately falls back between these two.
-POOL_PRIORITY = ["groq", "cerebras"]
+# Global failover priority. The agent's preferred provider is tried FIRST, then
+# the remaining enabled providers in this order. Cerebras and Gemini are
+# deliberately absent — their entries below are kept for a one-line re-enable.
+POOL_PRIORITY = ["groq", "mistral", "openrouter"]
 
 # Each provider's default model — used when failing over to a provider the
 # agent didn't originally request (the requested model name is provider-specific
 # and won't exist on a different provider).
 PROVIDER_DEFAULT_MODEL = {
     "groq": "openai/gpt-oss-120b",
-    "cerebras": "gpt-oss-120b",  # Cerebras retired Llama on public endpoints; this is the free production model
-    "gemini": "gemini-2.0-flash",  # kept for easy re-enable, but not in POOL_PRIORITY
+    "mistral": "mistral-medium-2508",  # L0b winner: fast, clean markdown
+    "openrouter": "minimax/minimax-m3:free",  # seed; free line-up rotates
+    # ── retained, not in POOL_PRIORITY ──
+    "cerebras": "gpt-oss-120b",
+    "gemini": "gemini-2.0-flash",
+}
+
+# OpenAI-compatible providers only need a base_url; the SDK is shared.
+PROVIDER_BASE_URL = {
+    "mistral": "https://api.mistral.ai/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
+}
+
+# Django settings attribute holding each provider's comma-separated key pool.
+PROVIDER_SETTINGS_KEY = {
+    "groq": "GROQ_API_KEY",
+    "mistral": "MISTRAL_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "cerebras": "CEREBRAS_API_KEY",
+    "gemini": "GEMINI_API_KEY",
 }
 
 # Retry policy PER PROVIDER (Layer 1). Kept small so a fully-dead provider
-# fails fast and we move on — worst case across 3 providers stays well under
-# the Celery soft time limit.
+# fails fast and we move on.
 MAX_RETRIES_PER_PROVIDER = 2
 RETRY_WAIT_MIN = 1  # seconds
 RETRY_WAIT_MAX = 4  # seconds
 
+# Circuit breaker: how long a provider stays parked after a credentials failure.
+# TTL'd, never permanent — the web dyno is long-lived and must self-heal.
+UNHEALTHY_TTL_SECONDS = 30 * 60
+
 # Sentinel values that mean "this key is not really configured".
 _DISABLED_KEY_VALUES = {"", "dummy-key-for-build", None}
+
+# ── Error classification ──────────────────────────────────────────────────────
+# Previously EVERY exception was retried, then failed over. That made the three
+# Cerebras-pinned agents burn ~3–5 s each on tenacity backoff against a provider
+# returning 402 — on every single research query. Classification removes that.
+_RETRY = "retry"  # transient: rate limit, 5xx, timeout
+_SKIP_PROVIDER = "skip_provider"  # this provider cannot serve this request, ever
+_DISABLE_PROVIDER = "disable_provider"  # credentials dead — park it
+
+
+def classify_error(exc: BaseException) -> str:
+    """
+    Map a provider exception to a recovery action. Mirrors book_content's pool.
+
+    Takes BaseException, not Exception: tenacity's retry predicate is typed that
+    way, and this is also called directly on caught exceptions.
+    """
+    status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    text = str(exc).lower()
+
+    def has(code: int) -> bool:
+        return status == code or f"error code: {code}" in text or f" {code} " in text
+
+    if has(413) or "request too large" in text or "context length" in text:
+        return _SKIP_PROVIDER
+    if has(401) or has(402) or has(403) or "payment required" in text:
+        return _DISABLE_PROVIDER
+    if has(404) or "model not found" in text or "unavailable for free" in text:
+        return _SKIP_PROVIDER
+    return _RETRY
 
 
 class LLMError(Exception):
     """Raised only when EVERY provider in the pool has failed."""
 
     pass
+
+
+# ── Circuit breaker (TTL'd, shared across Render workers via the Redis cache) ──
+_local_unhealthy: dict[str, float] = {}
+
+
+def _mark_unhealthy(provider: str, reason: str) -> None:
+    """Park a provider whose credentials are dead. Expires on its own."""
+    try:
+        cache.set(f"llm:unhealthy:{provider}", reason[:200], UNHEALTHY_TTL_SECONDS)
+    except Exception:
+        _local_unhealthy[provider] = time.time() + UNHEALTHY_TTL_SECONDS
+    logger.warning(
+        "research_agent.llm.provider_parked",
+        provider=provider,
+        ttl_seconds=UNHEALTHY_TTL_SECONDS,
+        reason=reason[:120],
+    )
+
+
+def _is_unhealthy(provider: str) -> bool:
+    try:
+        if cache.get(f"llm:unhealthy:{provider}") is not None:
+            return True
+    except Exception:
+        pass
+    until = _local_unhealthy.get(provider)
+    return until is not None and until > time.time()
 
 
 class LLMClient:
@@ -139,6 +229,19 @@ class LLMClient:
                     prov, messages, prov_model, max_tokens, response_format
                 )
                 duration_ms = int((time.perf_counter() - t0) * 1000)
+
+                # An empty body is a FAILURE, not a success. Some free models
+                # return HTTP 200 with nothing in it; accepting that is how a
+                # silent outage begins.
+                if not (text or "").strip():
+                    logger.warning(
+                        "research_agent.llm.empty_response",
+                        provider=prov,
+                        model=prov_model,
+                    )
+                    last_error = LLMError(f"{prov} returned an empty completion")
+                    continue
+
                 failed_over = prov != provider
                 logger.info(
                     "research_agent.llm.call_ok",
@@ -152,10 +255,14 @@ class LLMClient:
 
             except Exception as exc:
                 last_error = exc
+                action = classify_error(exc)
+                if action == _DISABLE_PROVIDER:
+                    _mark_unhealthy(prov, str(exc))
                 logger.warning(
                     "research_agent.llm.provider_failed",
                     provider=prov,
-                    error=str(exc),
+                    action=action,
+                    error=str(exc)[:200],
                 )
                 continue  # → try next provider in the pool
 
@@ -217,10 +324,14 @@ class LLMClient:
 
             except Exception as exc:
                 last_error = exc
+                action = classify_error(exc)
+                if action == _DISABLE_PROVIDER:
+                    _mark_unhealthy(prov, str(exc))
                 logger.warning(
                     "research_agent.llm.stream_provider_failed",
                     provider=prov,
-                    error=str(exc),
+                    action=action,
+                    error=str(exc)[:200],
                 )
                 continue
 
@@ -242,11 +353,19 @@ class LLMClient:
         ordered = [preferred] + [p for p in POOL_PRIORITY if p != preferred]
         enabled = [p for p in ordered if self._is_enabled(p)]
 
+        # Drop providers currently parked by the circuit breaker. If EVERY
+        # provider is parked we ignore the breaker rather than fail the query —
+        # a stale park must never take the engine down.
+        live = [p for p in enabled if not _is_unhealthy(p)]
+        if live:
+            return live
+
         if not enabled:
             raise LLMError(
-                "No LLM providers are configured. Set at least one of "
-                "GROQ_API_KEY / CEREBRAS_API_KEY / GEMINI_API_KEY."
+                "No LLM providers are configured. Set at least one of: "
+                + " / ".join(PROVIDER_SETTINGS_KEY[p] for p in POOL_PRIORITY)
             )
+        logger.warning("research_agent.llm.all_providers_parked", providers=enabled)
         return enabled
 
     def _is_enabled(self, provider: str) -> bool:
@@ -261,11 +380,8 @@ class LLMClient:
         multi-key pools, e.g. "gsk_aaa,gsk_bbb,gsk_ccc"). We split, strip, and
         drop blanks/placeholders. A single key just yields a 1-element list.
         """
-        raw = {
-            "groq": getattr(settings, "GROQ_API_KEY", ""),
-            "cerebras": getattr(settings, "CEREBRAS_API_KEY", ""),
-            "gemini": getattr(settings, "GEMINI_API_KEY", ""),
-        }.get(provider, "") or ""
+        settings_attr = PROVIDER_SETTINGS_KEY.get(provider, "")
+        raw = (getattr(settings, settings_attr, "") if settings_attr else "") or ""
 
         return [
             k.strip()
@@ -299,10 +415,13 @@ class LLMClient:
         Layer 1 — retry the SAME provider a few times with exponential backoff
         before giving up and letting the caller fail over.
         """
+        # Only RETRY-class errors are worth a second attempt. A 402/413/404 is
+        # deterministic — retrying it just burns wall-clock before the failover
+        # that was always going to happen.
         retryer = Retrying(
             stop=stop_after_attempt(MAX_RETRIES_PER_PROVIDER),
             wait=wait_exponential(multiplier=1, min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX),
-            retry=retry_if_exception_type(Exception),
+            retry=retry_if_exception(lambda exc: classify_error(exc) == _RETRY),
             reraise=True,
         )
         return retryer(
@@ -353,17 +472,16 @@ class LLMClient:
 
             client = Groq(api_key=key)
         elif provider == "cerebras":
+            # Native SDK: the groq SDK hardcodes an /openai/v1/ prefix that 404s here.
             from cerebras.cloud.sdk import Cerebras
 
             client = Cerebras(api_key=key)
-        elif provider == "gemini":
-            # Gemini exposes an OpenAI-compatible endpoint.
+        elif provider in PROVIDER_BASE_URL:
+            # Every remaining provider (mistral, openrouter, gemini) is
+            # OpenAI-compatible — base_url is the only difference between them.
             from openai import OpenAI
 
-            client = OpenAI(
-                api_key=key,
-                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-            )
+            client = OpenAI(api_key=key, base_url=PROVIDER_BASE_URL[provider])
         else:
             raise LLMError(f"Unknown provider: {provider}")
 

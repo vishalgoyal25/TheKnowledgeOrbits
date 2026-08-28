@@ -79,9 +79,35 @@ services:
       - key: DB_PORT
         value: "6543"
 
-      # ── AI & Embeddings ───────────────────────────────────────────────────
+      # ── LLM Pool ──────────────────────────────────────────────────────────
+      # Multi-provider pool with capability routing + failover. Registry:
+      #   engines/book_content/services/llm_service.py → PROVIDERS
+      # All *_API_KEY values may be COMMA-SEPARATED to pool several accounts.
+      # All *_MODEL values are OPTIONAL — blank uses the registry default.
+      #
+      # Groq handles small prompts only: its free tier is ~6k tokens/minute, so
+      # the ~9k-token Daily CA article prompt is rejected with 413 no matter how
+      # many keys exist (a single request cannot be split). Mistral serves those.
       - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_MODEL
+        sync: false
+
+      # Mistral — large-prompt workhorse. THIS is what generates Daily CA articles.
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MISTRAL_MODEL
+        sync: false
+
+      # OpenRouter — emergency fallback only (~50 req/day/account, erratic latency).
+      # Leave OPENROUTER_MODEL UNSET: OpenRouter retires free models without notice,
+      # so the pool re-resolves the current free model every 24 h. Set it only to
+      # pin a model in an emergency — it takes effect without a redeploy.
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        sync: false
+
       - key: HF_API_TOKEN
         sync: false
       - key: USE_EMBEDDING_API
@@ -92,6 +118,10 @@ services:
       # query cache, user memory. Use a free Upstash rediss:// URL.
       - key: REDIS_URL
         sync: false
+      # DISABLED but RETAINED — every Cerebras key returned 402 Payment Required
+      # from 2026-08-19. The provider is switched off in the registry
+      # (enabled=False), NOT removed. Keep this var set: restoring Cerebras is a
+      # one-boolean change if free access ever returns.
       - key: CEREBRAS_API_KEY
         sync: false
       - key: TAVILY_API_KEY

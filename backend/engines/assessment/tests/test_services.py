@@ -67,8 +67,18 @@ class TestQuizGeneratorService:
         mock_client.chat.completions.create.return_value = mock_response
         mock_entry = MagicMock()
         mock_entry.client = mock_client
-        mock_entry.model = "openai/gpt-oss-120b"
         mock_entry.provider = "groq"
+        # llm_service routes on capability (spec.max_request_tokens >= est_tokens),
+        # so a mocked pool entry needs a spec with real numeric values.
+        from types import SimpleNamespace
+
+        mock_entry.spec = SimpleNamespace(
+            name="groq",
+            model_setting="GROQ_MODEL",
+            default_model="openai/gpt-oss-120b",
+            max_request_tokens=1_000_000,
+            supports_json_mode=True,
+        )
 
         with (
             patch("engines.book_content.services.llm_service._pool", [mock_entry]),

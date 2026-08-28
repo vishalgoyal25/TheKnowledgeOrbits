@@ -7,8 +7,13 @@ All magic numbers / strings live here — never inline.
 
 # ── Rate Limits ────────────────────────────────────────────────────────────────
 PUBLIC_DAILY_LIMIT = 3  # anonymous users: 3 queries/day
-GROQ_REQUESTS_PER_MINUTE = 30  # global Groq RPM cap (Redis-backed, not per-user)
-CEREBRAS_REQUESTS_PER_MINUTE = 60
+# Global per-provider RPM caps (Redis-backed, pool-wide — NOT per user, NOT per key).
+# These are pre-emptive: hitting the cap makes the pool fail over to the next
+# provider instead of earning an upstream 429.
+GROQ_REQUESTS_PER_MINUTE = 30
+MISTRAL_REQUESTS_PER_MINUTE = 4  # free tier ≈ 2 RPM per key; deliberately conservative
+OPENROUTER_REQUESTS_PER_MINUTE = 15  # free tier ≈ 20 RPM, but only ~50 req/day/account
+CEREBRAS_REQUESTS_PER_MINUTE = 60  # retained — provider disabled since 2026-08-19 (402)
 
 # ── LangGraph ─────────────────────────────────────────────────────────────────
 MAX_SEARCH_QUERIES = 3  # Planner generates max 3 sub-queries
