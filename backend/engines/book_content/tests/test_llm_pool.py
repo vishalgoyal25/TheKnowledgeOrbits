@@ -95,7 +95,10 @@ class TestClassify(_PoolTestCase):
     def test_413_skips_provider_and_is_never_retried(self) -> None:
         """413 is deterministic — retrying it burned 10 minutes per article."""
         assert llm._classify(_HTTPError(413)) == llm._SKIP_PROVIDER
-        assert llm._classify(Exception("Request too large for model")) == llm._SKIP_PROVIDER
+        assert (
+            llm._classify(Exception("Request too large for model"))
+            == llm._SKIP_PROVIDER
+        )
 
     def test_402_disables_provider(self) -> None:
         """The exact Cerebras failure: park it, don't retry 5 dead keys forever."""
@@ -200,7 +203,9 @@ class TestDispatch(_PoolTestCase):
         good = _entry("mistral", content="recovered")
 
         assert self._dispatch([bad, good]) == "recovered"
-        assert len(bad.client.calls) == 1, "413 must not be retried — it is deterministic"
+        assert (
+            len(bad.client.calls) == 1
+        ), "413 must not be retried — it is deterministic"
 
     def test_402_parks_provider_for_later_calls(self) -> None:
         dead = _entry("groq", exc=_HTTPError(402))
@@ -219,7 +224,10 @@ class TestDispatch(_PoolTestCase):
 
     def test_all_providers_failing_returns_empty_string(self) -> None:
         """Callers rely on '' meaning failure (generator_service raises on it)."""
-        pool = [_entry("groq", exc=_HTTPError(413)), _entry("mistral", exc=_HTTPError(413))]
+        pool = [
+            _entry("groq", exc=_HTTPError(413)),
+            _entry("mistral", exc=_HTTPError(413)),
+        ]
         with patch.object(llm.sentry_sdk, "capture_message"):
             assert self._dispatch(pool) == ""
 

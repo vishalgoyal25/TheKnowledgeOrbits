@@ -47,8 +47,21 @@ OUTPUT_TOKENS = 900
 
 # Substrings that mark a model as NOT a general chat model.
 _NON_CHAT = (
-    "lyria", "whisper", "tts", "embed", "rerank", "image", "vision-only",
-    "video", "audio", "sora", "veo", "imagen", "dall-e", "flux", "stable-diffusion",
+    "lyria",
+    "whisper",
+    "tts",
+    "embed",
+    "rerank",
+    "image",
+    "vision-only",
+    "video",
+    "audio",
+    "sora",
+    "veo",
+    "imagen",
+    "dall-e",
+    "flux",
+    "stable-diffusion",
 )
 # Models that authenticate but refuse normal API use.
 _HARNESS_ONLY = ("inkling",)
@@ -97,7 +110,10 @@ def openrouter_candidates(limit: int = 5) -> list[str]:
         if not is_chat_model(mid):
             continue
         try:
-            if float(pricing.get("prompt", 1)) == 0.0 and float(pricing.get("completion", 1)) == 0.0:
+            if (
+                float(pricing.get("prompt", 1)) == 0.0
+                and float(pricing.get("completion", 1)) == 0.0
+            ):
                 free.append((int(m.get("context_length") or 0), mid))
         except (TypeError, ValueError):
             continue
@@ -164,7 +180,9 @@ def bench(label: str, client: OpenAI, model: str) -> tuple | None:
 def main() -> None:
     p("=" * 76)
     p("  L0b — BEST-MODEL SELECTION")
-    p(f"  Prompt {len(PROMPT):,} chars (~{len(PROMPT)//4:,} tok) → {OUTPUT_TOKENS} output tokens")
+    p(
+        f"  Prompt {len(PROMPT):,} chars (~{len(PROMPT)//4:,} tok) → {OUTPUT_TOKENS} output tokens"
+    )
     p("=" * 76)
 
     results: list[tuple] = []
@@ -173,7 +191,9 @@ def main() -> None:
     key = first_key("MISTRAL_API_KEY")
     p(f"\n{'─' * 76}\n▶ MISTRAL  [{mask(key) if key else 'NO KEY'}]\n{'─' * 76}")
     if key:
-        client = OpenAI(api_key=key, base_url="https://api.mistral.ai/v1", timeout=TIMEOUT)
+        client = OpenAI(
+            api_key=key, base_url="https://api.mistral.ai/v1", timeout=TIMEOUT
+        )
         for model in MISTRAL_CANDIDATES:
             r = bench("mistral", client, model)
             if r:
@@ -184,7 +204,9 @@ def main() -> None:
     p(f"\n{'─' * 76}\n▶ OPENROUTER  [{mask(key) if key else 'NO KEY'}]\n{'─' * 76}")
     if key:
         cands = openrouter_candidates()
-        client = OpenAI(api_key=key, base_url="https://openrouter.ai/api/v1", timeout=TIMEOUT)
+        client = OpenAI(
+            api_key=key, base_url="https://openrouter.ai/api/v1", timeout=TIMEOUT
+        )
         for model in cands:
             r = bench("openrouter", client, model)
             if r:
@@ -196,7 +218,9 @@ def main() -> None:
     p("=" * 76)
     p(f"  {'provider':<12}{'words':<8}{'secs':<8}{'tok/s':<8}model")
     p("  " + "-" * 72)
-    for label, model, words, elapsed, tps in sorted(results, key=lambda r: (r[0], r[3])):
+    for label, model, words, elapsed, tps in sorted(
+        results, key=lambda r: (r[0], r[3])
+    ):
         p(f"  {label:<12}{words:<8}{elapsed:<8.1f}{tps:<8.0f}{model}")
     p("=" * 76)
     p("  Target: ~600 words, coherent markdown, UPSC-analytical tone.")

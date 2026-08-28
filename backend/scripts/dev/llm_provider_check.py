@@ -61,7 +61,9 @@ _FILLER = (
     "remedies under Articles 32 and 226, enabling courts to address systemic "
     "governance failures affecting disadvantaged groups across many states. "
 )
-LARGE_PROMPT = ("Summarise the following in one short sentence.\n\n" + _FILLER * 460)[:36000]
+LARGE_PROMPT = ("Summarise the following in one short sentence.\n\n" + _FILLER * 460)[
+    :36000
+]
 SMALL_PROMPT = "Reply with exactly: OK"
 JSON_PROMPT = 'Return a JSON object with a single key "status" whose value is "ok".'
 
@@ -100,7 +102,10 @@ def openrouter_free_models() -> list[str]:
     for m in rows:
         pricing = m.get("pricing") or {}
         try:
-            if float(pricing.get("prompt", 1)) == 0.0 and float(pricing.get("completion", 1)) == 0.0:
+            if (
+                float(pricing.get("prompt", 1)) == 0.0
+                and float(pricing.get("completion", 1)) == 0.0
+            ):
                 free.append((int(m.get("context_length") or 0), m.get("id")))
         except (TypeError, ValueError):
             continue
@@ -126,7 +131,11 @@ def sdk_models(client: OpenAI) -> list[str]:
 
 
 def call(
-    client: OpenAI, model: str, prompt: str, json_mode: bool = False, max_tokens: int = 64
+    client: OpenAI,
+    model: str,
+    prompt: str,
+    json_mode: bool = False,
+    max_tokens: int = 64,
 ) -> tuple[str, float]:
     """Returns (text, elapsed_seconds)."""
     kwargs: dict = {
@@ -145,7 +154,9 @@ def call(
 def main() -> None:
     p("=" * 74)
     p("  L0 — LLM PROVIDER VERIFICATION  (v2, live model discovery)")
-    p(f"  Large-prompt gate: {len(LARGE_PROMPT):,} chars (~{len(LARGE_PROMPT)//4:,} tokens)")
+    p(
+        f"  Large-prompt gate: {len(LARGE_PROMPT):,} chars (~{len(LARGE_PROMPT)//4:,} tokens)"
+    )
     p("=" * 74)
 
     large_ok: list[str] = []
@@ -230,7 +241,9 @@ def main() -> None:
                     max_tokens=600,
                 )
                 tps = len(out) / 4 / t4_secs if t4_secs else 0
-                p(f"    T4 speed  ✓ {len(out):,} chars in {t4_secs:.1f}s  (~{tps:.0f} tok/s)")
+                p(
+                    f"    T4 speed  ✓ {len(out):,} chars in {t4_secs:.1f}s  (~{tps:.0f} tok/s)"
+                )
             except Exception as exc:
                 t4_secs = 0.0
                 p(f"    T4 speed  ✗ {short(exc)}")
@@ -240,7 +253,9 @@ def main() -> None:
     p("\n" + "=" * 74)
     p("  SUMMARY")
     p("=" * 74)
-    p(f"  {'provider':<12}{'key':<4}{'small':<10}{'large':<7}{'json':<7}{'9k s':<8}{'gen s':<8}model")
+    p(
+        f"  {'provider':<12}{'key':<4}{'small':<10}{'large':<7}{'json':<7}{'9k s':<8}{'gen s':<8}model"
+    )
     p("  " + "-" * 78)
     for name, idx, t1, model, t2, t3, t2s, t4s in summary:
         p(
