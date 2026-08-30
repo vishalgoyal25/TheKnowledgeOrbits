@@ -57,6 +57,21 @@ def _fake_spec():
 class TestLlmService(unittest.TestCase):
     """Tests for engines.book_content.services.llm_service.llm_call"""
 
+    def setUp(self) -> None:
+        # The pool's circuit breaker parks a failed provider in the Django cache
+        # (and a process-local dict). Under pytest-xdist, a 402-disable test in
+        # another module can leave "groq" parked in this worker, which then makes
+        # _usable_entries() filter out these mocks → llm_no_capable_provider →
+        # llm_call() returns "". Reset the breaker so each test starts clean.
+        import engines.book_content.services.llm_service as llm_mod
+        from django.core.cache import cache
+
+        try:
+            cache.clear()
+        except Exception:
+            pass
+        llm_mod._local_unhealthy.clear()
+
     def _make_pool_entry(self, content: str) -> MagicMock:
         """Build a mock _LLMEntry whose client returns the given content string."""
         mock_message = MagicMock()

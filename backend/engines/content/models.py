@@ -216,10 +216,18 @@ class Embedding(models.Model):
 
     content_type = models.CharField(
         max_length=50,
+        # These are the labels ACTUALLY written to content_embedding, verified
+        # against the live DB (FEATURES_SUPABASE_CLEANUP.md S6). The old choices
+        # (chunk/article/question) were fiction — no such rows ever existed, and
+        # the mismatch is what made the cleanup dangerous to reason about. Django
+        # choices are validation metadata only (not a DB constraint), so this is
+        # additive and rejects no existing row.
         choices=[
-            ("chunk", "Chunk Embedding"),
-            ("article", "Article Embedding (future)"),
-            ("question", "Question Embedding (future)"),
+            ("book_chunk", "Static book chunk"),
+            ("book_article", "Static book article summary"),
+            ("ca_chunk", "Current-affairs chunk"),
+            ("daily_ca_article", "Daily CA article"),
+            ("topic", "Knowledge topic"),
         ],
         help_text="Type of content being embedded",
     )

@@ -55,8 +55,11 @@ import sentry_sdk
 import structlog
 from datetime import datetime
 
+from datetime import timedelta
+
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
 from engines.assessment.models import Quiz
@@ -73,6 +76,13 @@ _DIVIDER = "━" * 60
 # and Render showed a green tick — exit status can never be the signal here,
 # because per-cycle failures are caught by design.
 _MIN_EXPECTED_ARTICLES = 5
+
+# Retention: raw scraped CA older than this is pruned each day so
+# content_embedding cannot grow back to the Supabase quota
+# (FEATURES_SUPABASE_CLEANUP.md S7). The daily pipeline only uses the last 24h of
+# CA for proposals, so 30 days is a generous RAG buffer. Runs inside THIS pipeline
+# — no separate cron. Does NOT touch daily_ca_article (kept forever).
+_CA_RETENTION_DAYS = 30
 
 
 class Command(BaseCommand):
@@ -272,6 +282,9 @@ class Command(BaseCommand):
                 )
             )
 
+        # ── RETENTION — prune raw CA older than the window (S7) ──────────────
+        self._prune_old_ca(db_alias)
+
         # ── OUTPUT GUARD — the run must never fail silently ──────────────────
         self._verify_output(target_date, db_alias)
 
@@ -292,6 +305,76 @@ class Command(BaseCommand):
             db_alias=db_alias,
             top_n=top_n,
         )
+
+    # ── Retention (S7) ────────────────────────────────────────────────────────
+
+    def _prune_old_ca(self, db_alias: str) -> None:
+        """
+        Delete raw CA content + its embeddings older than _CA_RETENTION_DAYS.
+
+        Runs inside the daily pipeline (no separate cron). NON-FATAL: a prune
+        failure must never block content generation. Deletes through the ORM so
+        on_delete=CASCADE actually fires — raw SQL would NOT cascade
+        (FEATURES_SUPABASE_CLEANUP.md S4) — and removes the chunk embeddings
+        explicitly because content_embedding has no FK (the original leak, S6).
+
+        daily_ca_article is never touched: it has no FK to CA and is kept forever.
+        """
+        from engines.content.services.embedding_service import EmbeddingService
+        from engines.current_affairs.models import CAArticle, CAChunk
+
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(
+                f"\n▶ Retention — pruning CA older than {_CA_RETENTION_DAYS} days..."
+            )
+        )
+        cutoff = timezone.now() - timedelta(days=_CA_RETENTION_DAYS)
+        try:
+            old_articles = CAArticle.objects.using(db_alias).filter(
+                created_at__lt=cutoff
+            )
+            article_count = old_articles.count()
+            if not article_count:
+                self.stdout.write("  Nothing older than the retention window.")
+                return
+
+            chunk_ids = [
+                str(cid)
+                for cid in CAChunk.objects.using(db_alias)
+                .filter(ca_article__in=old_articles)
+                .values_list("id", flat=True)
+            ]
+
+            with transaction.atomic(using=db_alias):
+                emb_deleted = EmbeddingService.delete_embeddings_for(
+                    "ca_chunk", chunk_ids, using=db_alias
+                )
+                # ORM delete → cascades to ca_chunk, ca_topic_link and the quiz M2M.
+                old_articles.delete()
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"  ✓ Pruned {article_count} CA article(s) "
+                    f"+ {len(chunk_ids)} chunks + {emb_deleted} embeddings"
+                )
+            )
+            logger.info(
+                "pipeline_ca_pruned",
+                articles=article_count,
+                chunks=len(chunk_ids),
+                embeddings=emb_deleted,
+                retention_days=_CA_RETENTION_DAYS,
+                db_alias=db_alias,
+            )
+        except Exception as exc:
+            sentry_sdk.capture_exception(exc)
+            logger.error("pipeline_prune_failed", error=str(exc))
+            self.stderr.write(
+                self.style.ERROR(
+                    f"\n✗ CA prune failed: {exc}\n"
+                    "  (content generation unaffected — retention is independent)"
+                )
+            )
 
     # ── Output guard ──────────────────────────────────────────────────────────
 

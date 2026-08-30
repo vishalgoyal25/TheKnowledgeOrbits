@@ -443,24 +443,31 @@ def _get_topic_embeddings() -> dict:
         embeddings: dict = {}
 
         for topic in topics:
-            # Topics may have embeddings stored, or we encode the name on the fly
+            # Use a stored topic embedding if one exists.
+            # FIX (FEATURES_SUPABASE_CLEANUP.md S6): the field is `content_id`,
+            # not `object_id`. The wrong name raised FieldError, was swallowed by
+            # the bare except below, and forced the crash-prone fallback on every
+            # call — the live Sentry AttributeError at model.encode(None).
             try:
                 emb_record = Embedding.objects.filter(
-                    content_type="topic", object_id=str(topic.id)
+                    content_type="topic", content_id=str(topic.id)
                 ).first()
                 if emb_record and emb_record.vector:
                     embeddings[topic.name] = np.array(emb_record.vector)
             except Exception:
                 pass
 
-        if not embeddings:
-            # Fallback: encode topic names directly
-            model = _get_embedding_model()
-            topic_names = [t.name for t in topics]
-            if topic_names:
-                vectors = model.encode(topic_names, convert_to_numpy=True)
-                for name, vec in zip(topic_names, vectors):
-                    embeddings[name] = vec
+        # Topics without a stored embedding (currently all of them) are encoded
+        # through EmbeddingService — API-first, so this never loads the local
+        # sentence-transformers model into the 512 MB Render dyno and never
+        # crashes on a missing model. (See FEATURES_RENDER_FIVE_SEC.md.)
+        missing_names = [t.name for t in topics if t.name not in embeddings]
+        if missing_names:
+            from engines.content.services.embedding_service import EmbeddingService
+
+            vectors = EmbeddingService.generate_embeddings_batch(missing_names)
+            for name, vec in zip(missing_names, vectors):
+                embeddings[name] = np.array(vec)
 
         _topic_embeddings_cache = embeddings
         logger.info("relevance_scorer_topic_cache_loaded", count=len(embeddings))
@@ -499,9 +506,11 @@ def _score_topic_similarity(title: str, content: str) -> float:
         if not topic_embeddings:
             return 0.0
 
-        model = _get_embedding_model()
+        # API-first via EmbeddingService — no local model load, no None crash.
+        from engines.content.services.embedding_service import EmbeddingService
+
         text = f"{title}. {content[:500]}"
-        article_vec = model.encode([text], convert_to_numpy=True)[0]
+        article_vec = np.array(EmbeddingService.generate_embedding(text))
         article_norm = article_vec / (np.linalg.norm(article_vec) + 1e-10)
 
         best_similarity = 0.0

@@ -6,7 +6,8 @@ or HuggingFace Inference API (cloud).
 """
 
 import os
-from typing import Any, Dict, List
+import uuid
+from typing import Any, Dict, List, Sequence, Union
 
 import requests
 import structlog
@@ -175,3 +176,43 @@ class EmbeddingService:
             "vector": vector,
             "model_name": cls.MODEL_NAME,
         }
+
+    @classmethod
+    def delete_embeddings_for(
+        cls,
+        content_type: str,
+        content_ids: Sequence[Union[str, uuid.UUID]],
+        using: str = "default",
+    ) -> int:
+        """
+        Delete embedding rows for the given content ids of one content_type.
+
+        WHY THIS EXISTS
+        `content_embedding.content_id` is a plain UUID, NOT a ForeignKey — there is
+        no cascade. Deleting a chunk/article does NOT remove its embedding, so every
+        content deletion that skips this call leaks an orphaned 384-dim vector. That
+        leak grew the table to 610 MB / 232k rows (96.5% orphans) and tripped the
+        Supabase quota (FEATURES_SUPABASE_CLEANUP.md). Every deletion site MUST call
+        this in the same transaction that removes the content.
+
+        Returns the number of embedding rows deleted.
+        """
+        if not content_ids:
+            return 0
+
+        from engines.content.models import Embedding
+
+        ids = [str(cid) for cid in content_ids]
+        deleted, _ = (
+            Embedding.objects.using(using)
+            .filter(content_type=content_type, content_id__in=ids)
+            .delete()
+        )
+        logger.info(
+            "embeddings_deleted",
+            content_type=content_type,
+            requested=len(ids),
+            deleted=deleted,
+            db=using,
+        )
+        return deleted

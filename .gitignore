@@ -36,6 +36,10 @@ pip-delete-this-directory.txt
 # --- Django ---
 *.log
 local_settings.py
+
+# Database backups (FEATURES_SUPABASE_CLEANUP.md S2).
+# These CSVs contain REAL production content. THE REPO IS PUBLIC — never commit them.
+backups/
 db.sqlite3
 db.sqlite3-journal
 media/
