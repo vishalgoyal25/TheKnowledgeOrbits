@@ -119,6 +119,8 @@ TheKnowledgeOrbits_Research_Agent.pdf
 *.md
 !README.md
 !SECURITY.md
+# Public incident write-up (DB cleanup + infra) — tracked like a normal file,
+!FEATURES_SUPABASE_CLEANUP.md
 
 # Interview prep — private assets
 INTERVIEW_PREP/

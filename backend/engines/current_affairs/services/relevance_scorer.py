@@ -34,31 +34,9 @@ from ..models import CAArticle, CATopicLink
 
 logger = structlog.get_logger(__name__)
 
-# ── Lazy-loaded embedding model (same as topic_linker.py) ────────────────────
-_embedding_model = None
-_embedding_model_unavailable = (
-    False  # Cached after first ImportError — prevents retrying
-)
-
-
-def _get_embedding_model():
-    global _embedding_model, _embedding_model_unavailable
-    if _embedding_model_unavailable:
-        return None  # Fast path — already failed once, don't retry
-    if _embedding_model is None:
-        logger.info("relevance_scorer_loading_model")
-        try:
-            from sentence_transformers import SentenceTransformer
-
-            _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-        except ImportError:
-            _embedding_model_unavailable = True
-            logger.warning(
-                "relevance_scorer_model_unavailable",
-                reason="sentence_transformers not installed — similarity fallback disabled",
-            )
-            return None
-    return _embedding_model
+# The local SentenceTransformer loader was removed here (2026-08-30). Both callers
+# now route through EmbeddingService (API-first, S6) so this service never loads a
+# local model into the 512 MB web dyno. See FEATURES_SUPABASE_CLEANUP.md Part D.
 
 
 # ── UPSC Keyword list (200+ terms) ───────────────────────────────────────────

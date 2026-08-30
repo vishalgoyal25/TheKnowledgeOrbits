@@ -20,18 +20,12 @@ from collections import defaultdict
 
 logger = structlog.get_logger(__name__)
 
-_embedding_model = None
-
-
-def get_embedding_model():
-    """Lazy load SentenceTransformer so it doesn't boot during Django startup."""
-    global _embedding_model
-    if _embedding_model is None:
-        logger.info("lazy_loading_sentence_transformer")
-        from sentence_transformers import SentenceTransformer  # type: ignore
-
-        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _embedding_model
+# NOTE: the local SentenceTransformer loader was removed here (2026-08-30).
+# link_unlinked_chunks() runs in the `process_tasks` worker INSIDE the 512 MB web
+# dyno (via auto_scrape_and_process_ca). Loading torch + weights there OOM-killed
+# the dyno → Render "health check timed out after 5 s" alerts since February.
+# Topic encoding now goes through EmbeddingService (API-first, no local model).
+# See FEATURES_SUPABASE_CLEANUP.md Part D.
 
 
 class TopicLinkerService:
@@ -229,12 +223,15 @@ class TopicLinkerService:
                     text += f" Keywords: {', '.join(topic.keywords)}"
                 encoding_texts.append(text)
 
-            # Bulk encode using the model
-            model = get_embedding_model()
-            vectors = model.encode(encoding_texts, convert_to_numpy=True)
+            # Bulk encode via EmbeddingService — API-first, so this NEVER loads a
+            # local SentenceTransformer into the 512 MB web dyno (the cause of the
+            # OOM / 5 s health-check alerts). Same model (all-MiniLM-L6-v2, 384-dim),
+            # so vectors stay in the same space as the stored embeddings.
+            from engines.content.services.embedding_service import EmbeddingService
 
+            raw_vectors = EmbeddingService.generate_embeddings_batch(encoding_texts)
             for i, topic in enumerate(topics_needing_encoding):
-                topic_embeddings[str(topic.id)] = vectors[i]
+                topic_embeddings[str(topic.id)] = np.array(raw_vectors[i])
 
         logger.info(f"Successfully loaded {len(topic_embeddings)} topic embeddings")
         return topic_embeddings

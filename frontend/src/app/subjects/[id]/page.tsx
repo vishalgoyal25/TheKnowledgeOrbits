@@ -3,7 +3,9 @@ import { BookOpen } from "lucide-react";
 import ModuleCard from "@/components/modules/module-card";
 import { Module, Subject } from "@/lib/types";
 
-export const revalidate = 3600;
+// Revalidate daily — syllabus subjects rarely change; hourly rebuilds across
+// many dynamic pages wasted Vercel ISR-write quota.
+export const revalidate = 86400;
 
 export default async function SubjectPage(props: {
   params: Promise<{ id: string }>;

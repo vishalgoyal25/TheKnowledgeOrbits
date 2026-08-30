@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import CurrentAffairsClient from "./ca-client";
 import { CAArticle, CASource } from "@/lib/types";
 
-// Revalidate every 10 minutes to catch new Ghost worker updates
-export const revalidate = 600;
+// Revalidate hourly — the Ghost worker publishes at most a few times/day, and
+// on-demand revalidation (/api/revalidate) refreshes this list instantly on
+// publish. 10-min rebuilds were burning Vercel free-tier ISR-write quota.
+export const revalidate = 3600;
 
 export default async function CurrentAffairsPage() {
   let initialArticles: CAArticle[] = [];

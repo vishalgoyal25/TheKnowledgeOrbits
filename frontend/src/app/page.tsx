@@ -38,13 +38,15 @@ export default async function Page() {
   // Parallel ISR fetches — neither blocks the other
   const [caResult, quizResult] = await Promise.allSettled([
     fetch(`${BACKEND_URL}/daily-ca/today/`, {
-      // Cache this response for 5 minutes (matches the page revalidate window).
-      next: { revalidate: 300 },
-      // 45 s timeout — Render free tier cold-starts can take 10–30 s.
+      // Cache for 30 min — matches the page revalidate window. On-demand
+      // revalidation (/api/revalidate) refreshes instantly on publish, so this
+      // window is only a fallback, not the freshness guarantee.
+      next: { revalidate: 1800 },
+      // 45 s timeout — defensive guard against a slow backend response.
       signal: AbortSignal.timeout(45_000),
     }),
     fetch(`${BACKEND_URL}/assessment/public/daily/`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 1800 },
       signal: AbortSignal.timeout(45_000),
     }),
   ]);

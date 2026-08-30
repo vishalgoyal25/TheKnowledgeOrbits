@@ -4,7 +4,9 @@ import { Layers } from "lucide-react";
 import TopicCard from "@/components/topics/topic-card";
 import { Topic, Module } from "@/lib/types";
 
-export const revalidate = 3600;
+// Revalidate daily — module structure rarely changes; hourly rebuilds across
+// many dynamic pages wasted Vercel ISR-write quota.
+export const revalidate = 86400;
 
 export default async function ModulePage(props: {
   params: Promise<{ id: string }>;

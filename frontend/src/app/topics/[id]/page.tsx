@@ -12,8 +12,10 @@ import { ArrowLeft, BookOpen, Hash, Layers } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-// Revalidate every hour
-export const revalidate = 3600;
+// Revalidate daily — topic content changes at most once/day, and there are
+// ~1,462 topic pages; hourly rebuilds × that many pages was the dominant
+// Vercel ISR-write cost. On-demand revalidation refreshes edits instantly.
+export const revalidate = 86400;
 
 // Pre-render topics for stability during build
 export async function generateStaticParams() {

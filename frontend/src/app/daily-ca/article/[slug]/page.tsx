@@ -33,8 +33,10 @@ import { ArticleTopBar } from "./_components/article-top-bar";
 import { SocialBar } from "@/components/social/social-bar";
 import { preprocessArticleBody } from "@/lib/daily-ca-preprocess";
 
-// ── ISR — rebuild CDN cache every hour; articles are immutable after publish ──
-export const revalidate = 3600;
+// ── ISR — rebuild daily; articles are immutable after publish, so a longer
+// window is safe and cuts Vercel ISR writes across ~1,259 article pages.
+// On-demand revalidation (/api/revalidate) still refreshes instantly on publish.
+export const revalidate = 86400;
 
 // ── Server-side fetch (uses native fetch, not axios) ─────────────────────────
 
@@ -47,8 +49,8 @@ async function fetchArticle(
 
   try {
     const res = await fetch(`${apiBase}/daily-ca/article/${slug}/`, {
-      next: { revalidate: 3600 },
-      // 45 s timeout — Render free tier cold-starts can take 10–30 s.
+      next: { revalidate: 86400 },
+      // 45 s timeout — defensive guard against a slow backend response.
       signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) return null;

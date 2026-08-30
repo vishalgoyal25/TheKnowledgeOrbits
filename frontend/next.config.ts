@@ -17,6 +17,17 @@ const nextConfig: NextConfig = {
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1",
   },
   images: {
+    // V2 (Vercel quota fix): route resizing to Cloudinary's CDN instead of
+    // Vercel's optimizer. Hero images are already f_auto/q_auto/≤1200px from
+    // upload (backend image_service.py); re-optimizing on Vercel was redundant
+    // and burned the Image-Optimization + Fast-Origin-Transfer free quotas.
+    // A custom loader bypasses Vercel optimization globally (→ 0 transformations)
+    // while keeping responsive srcset via Cloudinary URL transforms.
+    // See src/lib/cloudinary-loader.ts and FEATURES_SUPABASE_CLEANUP.md Part E (V2).
+    loader: "custom",
+    loaderFile: "./src/lib/cloudinary-loader.ts",
+    // remotePatterns is unused under a custom loader (Vercel no longer fetches
+    // these hosts) but kept as documentation of the two hero-image sources.
     remotePatterns: [
       {
         protocol: "https",
