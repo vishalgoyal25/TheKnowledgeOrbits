@@ -318,7 +318,12 @@ class TestDailyCaGeneratorService:
         from engines.daily_ca.services.generator_service import DailyCaGeneratorService
 
         proposal = self._make_proposal("Long Article")
-        long_body = "word " * 1200  # 1200 words — exceeds 800 cap
+        # 30 paragraphs × 40 words = 1200 words, exceeding the 800 cap.
+        # Paragraph breaks matter: a body with NO newlines is rejected as
+        # malformed (the 2026-09-01 wall-of-text bug), and _truncate_body()
+        # cuts on paragraph boundaries, so a single unbroken line never
+        # exercised the real truncation path.
+        long_body = "\n\n".join(["word " * 40] * 30)
 
         with patch(
             "engines.daily_ca.services.generator_service.llm_call",

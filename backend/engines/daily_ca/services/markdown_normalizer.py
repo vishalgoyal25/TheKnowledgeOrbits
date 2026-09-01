@@ -117,18 +117,22 @@ def is_structurally_broken(text: str) -> bool:
     """
     True when a body will not render as readable markdown.
 
-    Three independent signatures:
-      1. A heading or callout fence stranded mid-line.
-      2. A heading line that has swallowed a paragraph.
-      3. A substantial body containing NO newline at all.
+    This gate REJECTS a generation, so it is deliberately narrow: only the two
+    signatures that make an article unreadable as a whole.
 
-    Signatures 1 and 2 are misplaced markers — unambiguous damage at ANY
-    length. Only signature 3 needs the length gate, because a genuinely short
-    body (a stub, a two-sentence note) has no newline quite legitimately.
+      1. A heading line that has swallowed a paragraph — renders as a giant
+         <h2>. Unambiguous at any length; a section title is a short phrase.
+      2. A substantial body containing NO newline at all — renders as one <p>.
+         Length-gated, because a short stub legitimately has no newline.
+
+    Deliberately NOT rejected: a single marker stranded mid-line (e.g. an
+    inline ``:::callout``). That degrades ONE element, not the article, and
+    treating it as fatal would throw away otherwise good content. Use
+    :func:`has_inline_block_markers` if you want to report those separately.
     """
     if not text:
         return False
-    if has_inline_block_markers(text) or has_overlong_heading(text):
+    if has_overlong_heading(text):
         return True
     return len(text) >= _MIN_BODY_CHARS and "\n" not in text
 
