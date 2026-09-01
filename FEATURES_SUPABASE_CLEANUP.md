@@ -1,16 +1,23 @@
 # FEATURES_SUPABASE_CLEANUP.md — Database Quota Recovery + Infra Hardening
 
 **Status:** ✅ **ALL CLOSED** — SUPABASE · RENDER · VERCEL all shipped & deployed. Blueprint
-IaC live (3 services adopted, crons auto-deploy wired). Only passive metric-watching remains.
-**Opened:** 2026-08-29 · **Closed:** 2026-09-01 · **Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅ (774c7f8), `R4`/`R5` ✅ (43f9e84 + Blueprint synced), `R3` metric-watch · **Vercel:** `V0`–`V3` ✅ (774c7f8), `V4` metric-watch
+IaC live (3 services adopted, all three CI-gated and auto-deploying). Part F closes the
+Daily-CA markdown regression that the LLM provider switch caused. Only passive
+metric-watching remains, and the developer owns that.
+**Opened:** 2026-08-29 · **Closed:** 2026-09-01
+**Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅ (774c7f8), `R4`/`R5` ✅ (43f9e84 +
+Blueprint), `R3` metric-watch · **Vercel:** `V0`–`V3` ✅ (774c7f8), `V4` metric-watch ·
+**Daily-CA markdown:** `F0`–`F4` ✅ (6059fda → 71c7c24 → 9406ffd)
 **Result:** database **1214 MB → 282 MB**, `402` restrictions lifted, leak fixed, retention live.
-**Next single commit to `main`:** Render + Vercel code changes bundled together (Part D/E), one push.
+**All work is shipped to `main` and deployed.** Nothing is blocking; nothing is in progress.
 
 > This document is both the incident record **and** a learning log. Part A is the
 > Supabase cleanup. Parts B and C reproduce **every SQL query** (annotated for
 > PostgreSQL learning) and **every local command** used to execute and verify each
-> phase. Part D/E carry the still-pending Render + Vercel work (merged in from the
-> former `FEATURES_RENDER_FIVE_SEC.md`, now deleted).
+> phase. Parts D/E carry the Render + Vercel work (merged in from the
+> former `FEATURES_RENDER_FIVE_SEC.md`, now deleted). Part F records the Daily-CA
+> markdown regression caused by the LLM provider switch — including a fix that
+> failed and why, which is the most transferable lesson in this document.
 >
 > **No secrets:** no connection strings, service IDs, org/project IDs, or keys appear
 > anywhere below — only SQL, table names, and commands.
@@ -524,6 +531,11 @@ via `--database=supabase`). Also reconciled the web service to remove drift:
 - **`fromGroup: TheKnowledgeOrbits`** on all three services — single source of truth for
   secrets; only the group NAME is in git, never values.
 
+**CI GATE (2026-09-01):** the Blueprint initially set both crons to deploy on raw `commit`, so a
+push that failed CI still reached the daily pipeline (the web service was gated, the crons were
+not). Fixed by pinning `autoDeployTrigger: checksPass` on all three services in `render.yaml`.
+Verified live: the next push made the web service **and both crons** wait for GitHub Actions.
+
 **DONE (2026-09-01):** created the Blueprint instance `TheKnowledgeOrbits` (repo + `main`) and
 chose **"Associate existing services"** — Render adopted all **3** services by name, **no
 duplicates**. The plan applied exactly as designed: crons' auto-deploy-trigger → `commit`,
@@ -677,6 +689,113 @@ watch the Vercel usage dashboard for one full cycle to confirm ISR Writes fall b
 - [ ] Metric-watch — **PASSIVE, owner-observed.** ISR Writes back under 200K/cycle,
       Image Optimization flat, no "Exceeded free resources" email. The developer is
       watching this over the next month; no action or reporting needed unless raised.
+
+---
+
+# PART F — DAILY-CA MARKDOWN REGRESSION ✅ CLOSED (2026-09-01)
+
+Downstream of the LLM pool fix: Cerebras returned `402`, so article generation moved to
+**Mistral**, which intermittently returns a body with no line breaks. Same engine, new
+provider, new failure mode.
+
+## F1. Symptom
+
+On `/daily-ca`, **some** articles rendered as one undifferentiated wall of text while the
+rest were perfect. Measured across the 10 articles of 2026-09-01:
+
+| Signal       | 8 healthy | 2 broken    |
+| ------------ | --------- | ----------- |
+| `newlines`   | 27–50     | **0**       |
+| blank lines  | 10–22     | **0**       |
+| `##` markers | 2–6       | 5           |
+| chars        | 2.8k–7k   | 6.8k / 7.1k |
+
+`quality_score` was 8.0 for both broken articles — the existing scorer is blind to layout.
+
+## F2. Root cause
+
+`prompt_builder` asks for `## headings` and a blank line between paragraphs, but that is a
+**soft instruction to a model**, enforced by nothing. Mistral emitted the `##` markers
+(h2=5) while omitting every newline. Two CommonMark rules make that fatal:
+
+- A single `\n` is **not** a paragraph break — it is a soft break, rendered as a space.
+  Only a **blank line** starts a new paragraph.
+- An ATX heading is a heading **only when it starts a line**. Mid-line, `##` is literal text.
+
+So the entire article collapsed into a single `<p>`.
+
+## F3. The failed first attempt — recorded because the lesson is the value
+
+The first fix re-inserted a break **before** each `##`. It shipped, and it made the two live
+articles **worse**:
+
+```
+## What Happened on August 31 The Supreme Court found no "compelling circumstance"…
+```
+
+The heading now started a line — but **an ATX heading runs to the END of its line**, and in
+a collapsed body there is no newline after the heading TITLE either. Each heading swallowed
+its whole paragraph and rendered it as a giant `<h2>`. One wall of plain text became five
+walls of huge bold text.
+
+**Why it could not work at all:** the newlines that marked where each title ended are gone,
+and `prompt_builder` lets the model choose its own headings, so there is nothing to split
+against. In `## Key Provisions Section 482 of the CrPC allows…` nothing says whether the
+title is "Key Provisions" or "Key Provisions Section 482". **Any split is a guess.**
+
+**Why the tests missed it:** they asserted that a heading _starts_ a line and never that it
+_ends_ — the code and the tests shared the same wrong assumption. The regexes were written
+against production content that had never been read. **Read the real data before writing
+transformation logic against it.**
+
+## F4. Phases
+
+### F0 — Diagnose ✅
+
+Queried newline/blank/h2/char counts across all 10 articles; the two broken ones had
+`newlines=0`. Then dumped the raw body and confirmed the exact stored shape.
+
+### F1 — Normalizer, first attempt ❌ WITHDRAWN
+
+Reconstructed block structure. Damaged 2 live articles (F3). Shipped in `6059fda`.
+
+### F2 — Correct fix: reject, never repair ✅ (`71c7c24`)
+
+`markdown_normalizer` now only **detects**, plus lossless clean-up (line endings, escaped
+`\n`, blank-line runs). `generator_service` STEP 4c raises `RuntimeError` on a malformed
+body — the same path an empty LLM response already takes, so the proposal is marked
+`failed` and retried, and the pool serves the retry from a provider that returns
+well-formed markdown. **Nothing broken can reach the DB.**
+
+### F3 — Narrow the gate ✅ (`9406ffd`)
+
+The gate as first written was too broad and rejected valid articles — it went live and
+would have starved the 02:00 UTC run. An inline `:::callout` degrades one element, not the
+article. Final rejection criteria, both unambiguous:
+
+1. A heading line that swallowed its paragraph (any length).
+2. A substantial body (≥400 chars) with **no newline at all**.
+
+### F4 — Revert the damage ✅
+
+`scripts/dev/repair_daily_ca_markdown.py` became audit-by-default with `--revert`. The two
+damaged rows had **zero** newlines before the withdrawn pass, so every newline present was
+inserted by it — removing them restores the original exactly. Proven by byte counts
+returning to their pre-damage values: **7084→7072** and **6840→6832**.
+
+## F5. End state
+
+- 17 normalizer tests + 128 `daily_ca` tests green; mypy and ruff clean.
+- Regression lock: `test_normalize_never_produces_an_overlong_heading`.
+- The 2 articles of 2026-09-01 are back to their original prose. Their structure is
+  **unrecoverable** — only regeneration would fix them, which would change their slugs and
+  break live URLs, so it was deliberately **not** done.
+- **Permanent audit** (expected result: `broken=2`, those two only — a third entry means
+  the gate failed):
+
+```bash
+python scripts/dev/repair_daily_ca_markdown.py --database=supabase --limit 12
+```
 
 ---
 
