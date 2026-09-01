@@ -559,7 +559,9 @@ The free fix above removes the memory OOMs, which is the actual root.
 - [x] Deployed to `main` (774c7f8) + crons under Blueprint (43f9e84 + sync)
 - [x] Both DBs unaffected; CI green; 3 services adopted, no duplicates
 - [x] Render bill unchanged (associated existing services — no new billable resource)
-- [ ] `R3` metric-watch: alert frequency over ~2 weeks (passive confirmation)
+- [ ] `R3` metric-watch — **PASSIVE, owner-observed.** The developer is watching Render
+      alert frequency over the next month. No action, no reporting, no follow-up needed
+      unless they raise it.
 
 **R-later (follow-up, non-blocking):** cache topic embeddings so scrapes stop re-encoding
 ~1,462 topics every run — the single biggest lever on HF API load.
@@ -672,8 +674,9 @@ watch the Vercel usage dashboard for one full cycle to confirm ISR Writes fall b
 - [x] V1–V3 shipped (774c7f8) and auto-deployed by Vercel
 - [x] Node 24 pinned; builds green
 - [x] Still on the free (Hobby) tier — no new bill
-- [ ] Metric-watch: ISR Writes back under 200K / cycle, Image Optimization flat, no
-      "Exceeded free resources" email for a full cycle (passive confirmation)
+- [ ] Metric-watch — **PASSIVE, owner-observed.** ISR Writes back under 200K/cycle,
+      Image Optimization flat, no "Exceeded free resources" email. The developer is
+      watching this over the next month; no action or reporting needed unless raised.
 
 ---
 

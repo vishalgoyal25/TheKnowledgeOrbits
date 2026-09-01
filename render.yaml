@@ -32,6 +32,10 @@ services:
 
     healthCheckPath: /api/v1/health/
 
+    # Deploy only after GitHub Actions passes. Declared explicitly so a future
+    # Blueprint sync cannot silently reset it to plain `commit`.
+    autoDeployTrigger: checksPass
+
     # Environment variables — set actual secret values in the Render dashboard
     # (Never commit real secrets to this file!)
     envVars:
@@ -188,6 +192,9 @@ services:
     runtime: python
     region: oregon
     schedule: "0 2 * * *" # 02:00 UTC daily
+    # Wait for GitHub Actions to pass before deploying. Without this the crons
+    # deploy on the raw commit and would pick up code CI is about to reject.
+    autoDeployTrigger: checksPass
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
     startCommand: "cd backend && python manage.py run_daily_pipeline --database=supabase"
     envVars:
@@ -198,6 +205,8 @@ services:
     runtime: python
     region: oregon
     schedule: "30 3 * * *" # 03:30 UTC daily
+    # Same CI gate as the other cron and the web service — see above.
+    autoDeployTrigger: checksPass
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
     startCommand: "cd backend && python manage.py generate_static_content --max-articles 3 --database=supabase"
     envVars:

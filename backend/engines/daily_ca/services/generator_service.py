@@ -825,14 +825,31 @@ class DailyCaGeneratorService:
             # ── STEP 4b: Title quality guard ──────────────────────────────────
             title = _validate_title(title, fallback_title=proposal.title)
 
-            # ── STEP 4c: Markdown structure repair (provider-agnostic) ────────
-            # The prompt asks for "## headings" and blank lines between
-            # paragraphs, but that is a soft instruction. Measured 2026-09-01:
-            # 2 of 10 bodies arrived with ZERO newlines in ~7k chars — markers
-            # stranded mid-line, which CommonMark renders as a single <p>
-            # ("wall of text"). Repair BEFORE truncation: _truncate_body() is
-            # line-based and needs real line structure to find its boundaries.
+            # ── STEP 4c: Markdown hygiene + structure gate ────────────────────
+            # Lossless clean-up only (line endings, escaped \n, blank runs).
             body_md = normalize_markdown(body_md, log_context=proposal.title[:60])
+
+            # The prompt asks for "## headings" and blank lines between
+            # paragraphs, but that is a soft instruction to a model. Measured
+            # 2026-09-01: 2 of 10 bodies arrived with ZERO newlines in ~7k
+            # chars, so CommonMark rendered the whole article as one <p>.
+            #
+            # Such a body CANNOT be repaired: the newlines that marked where
+            # each heading TITLE ended are gone, and headings here are
+            # free-form, so there is nothing to split against. Guessing makes
+            # it worse — an over-long heading swallows its paragraph and
+            # renders it as a giant <h2>.
+            #
+            # So treat malformed markdown exactly like an empty response:
+            # abort the cycle. The proposal is marked 'failed' and retried,
+            # and the pool serves the retry from a provider that returns
+            # well-formed markdown. Nothing broken ever reaches the DB.
+            if is_structurally_broken(body_md):
+                raise RuntimeError(
+                    f"Malformed markdown for '{proposal.title[:60]}' — "
+                    f"{body_md.count(chr(10))} newlines in {len(body_md)} chars "
+                    "(headings stranded mid-line). Cycle aborted, no article saved."
+                )
 
             # ── STEP 4d: Language simplification (post-processing, no LLM call) ─
             body_md = _simplify_text(body_md)
@@ -844,24 +861,9 @@ class DailyCaGeneratorService:
                 body_md = _truncate_body(body_md, cls.MAX_WORDS)
                 word_count = len(body_md.split())
 
-            # ── STEP 5b: Structure gate ───────────────────────────────────────
-            # If markers are STILL stranded after repair the article will render
-            # as a wall of text. Publishing is not blocked — the content itself
-            # is correct, only its layout is degraded — but it must never pass
-            # silently again: flag it and record the verdict in metadata.
-            structure_ok = not is_structurally_broken(body_md)
-            if not structure_ok:
-                logger.error(
-                    "daily_ca_body_structurally_broken",
-                    title=proposal.title[:80],
-                    newlines=body_md.count("\n"),
-                    chars=len(body_md),
-                )
-                sentry_sdk.capture_message(
-                    "Daily CA body still unstructured after repair: "
-                    f"'{proposal.title[:60]}'",
-                    level="warning",
-                )
+            # NOTE: no post-truncation structure check is needed — a malformed
+            # body was already rejected at STEP 4c, and _truncate_body() cuts on
+            # paragraph boundaries so it cannot introduce the defect.
 
             # ── STEP 6: Save DailyCaArticle ───────────────────────────────────
             slug = _generate_slug(title, proposal.date, db_alias=db_alias)
@@ -891,7 +893,7 @@ class DailyCaGeneratorService:
                     # llm_service. This key is retained for backwards
                     # compatibility with rows written before the pool existed.
                     "groq_model": "openai/gpt-oss-120b",
-                    "structure_ok": structure_ok,
+                    # Cheap diagnostic: a healthy body has dozens of newlines.
                     "body_newlines": body_md.count("\n"),
                     "word_count": word_count,
                     "subject": proposal.subject_name or "",

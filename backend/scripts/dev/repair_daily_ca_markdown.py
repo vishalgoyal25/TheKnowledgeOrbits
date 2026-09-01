@@ -1,33 +1,48 @@
 """
 scripts/dev/repair_daily_ca_markdown.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Audit and repair Daily CA article bodies whose markdown structure collapsed.
+Audit Daily CA article bodies for collapsed markdown, and revert bodies damaged
+by the withdrawn heading-reconstruction pass.
 
 WHY
-  After article generation moved off Cerebras (402) to Mistral, some bodies
-  were stored with block markers stranded mid-line — measured 2026-09-01:
-  2 of 10 articles had ZERO newlines in ~7,000 chars, so react-markdown
-  rendered the whole article as one <p> ("wall of text").
+  2026-09-01: after generation moved off Cerebras (402) to Mistral, 2 of 10
+  published bodies arrived with ZERO newlines in ~7,000 chars — `##` markers
+  stranded mid-line — so the article rendered as one <p> ("wall of text").
 
-  generator_service now repairs this at write time (STEP 4c). This script
-  fixes rows written BEFORE that guard existed, and doubles as the permanent
-  audit: run it any time to prove no published article is structurally broken.
+  An earlier version of this script "repaired" them by inserting a break before
+  each `##`. That made it worse: an ATX heading runs to the END of its line, and
+  with no newline after the heading TITLE either, the heading swallowed the
+  whole paragraph and rendered it as a giant <h2>.
+
+  Structure cannot be rebuilt: the newlines that marked where each title ended
+  are gone, and headings are free-form, so there is nothing to split against.
+  generator_service now REJECTS such a body at generation time (STEP 4c) and
+  regenerates it, so no new article can be affected.
+
+WHAT THIS DOES NOW
+  --audit   (default) report any article whose body is structurally broken.
+            This is the permanent regression check — it should print 0.
+  --revert  undo the damage from the withdrawn repair, restoring the body to
+            the single continuous line it was before. Deterministic, not a
+            guess: those bodies had ZERO newlines beforehand, so every newline
+            present now was inserted by that pass.
+
+            Reverted articles read as one long paragraph — poor, but honest,
+            and far better than paragraphs rendered as giant headings. To make
+            them render properly they must be REGENERATED; the text alone
+            cannot say where the breaks belonged.
 
 USAGE (from backend/, venv active)
-  Audit only — never writes:
       python scripts/dev/repair_daily_ca_markdown.py --database=supabase
-  Apply the repair:
-      python scripts/dev/repair_daily_ca_markdown.py --database=supabase --apply
-
-  --limit N restricts how many recent articles are examined (default 50).
+      python scripts/dev/repair_daily_ca_markdown.py --database=supabase --revert
 
 SAFETY
-  - Dry-run by DEFAULT. Nothing is written without --apply.
-  - Only body_md_processed and body_md are touched, and only for rows the
-    normalizer actually changes. Every other column is left alone.
-  - The repair only INSERTS newlines; it never rewrites or drops prose. The
-    script asserts the word count is unchanged before saving a row, and skips
-    the row if that ever fails.
+  - Read-only by DEFAULT. Nothing is written without --revert.
+  - --revert only touches rows whose heading has swallowed a paragraph, i.e.
+    exactly the rows the withdrawn pass damaged.
+  - Only body_md_processed and body_md are written.
+  - The word count must be unchanged, or the row is skipped: reverting removes
+    newlines only and must never alter prose.
 """
 
 import argparse
@@ -43,18 +58,14 @@ django.setup()
 
 from engines.daily_ca.models import DailyCaArticle  # noqa: E402
 from engines.daily_ca.services.markdown_normalizer import (  # noqa: E402
+    collapse_to_single_line,
+    has_overlong_heading,
     is_structurally_broken,
-    normalize_markdown,
 )
 
 
 def _stats(md: str) -> str:
-    return (
-        f"newlines={md.count(chr(10))} "
-        f"blank={md.count(chr(10) + chr(10))} "
-        f"h2={md.count('##')} "
-        f"chars={len(md)}"
-    )
+    return f"newlines={md.count(chr(10))} " f"h2={md.count('##')} " f"chars={len(md)}"
 
 
 def main() -> int:
@@ -62,9 +73,9 @@ def main() -> int:
     parser.add_argument("--database", default="default", help="DB alias")
     parser.add_argument("--limit", type=int, default=50)
     parser.add_argument(
-        "--apply",
+        "--revert",
         action="store_true",
-        help="write the repair (default is a dry run)",
+        help="undo the withdrawn heading repair (default is audit only)",
     )
     args = parser.parse_args()
 
@@ -75,54 +86,46 @@ def main() -> int:
         ]
     )
 
-    print(
-        f"\nScanning {len(articles)} article(s) on '{db}' "
-        f"({'APPLY' if args.apply else 'DRY RUN'})\n"
-    )
+    mode = "REVERT" if args.revert else "AUDIT (read-only)"
+    print(f"\nScanning {len(articles)} article(s) on '{db}' — {mode}\n")
 
-    broken = repaired = skipped = 0
+    broken = reverted = skipped = 0
 
     for a in articles:
-        source = a.body_md_processed or ""
-        if not is_structurally_broken(source):
+        body = a.body_md_processed or ""
+        if not is_structurally_broken(body):
             continue
 
         broken += 1
-        fixed = normalize_markdown(source, log_context=a.slug)
-        print(f"BROKEN  {a.slug[:60]}")
-        print(f"        before: {_stats(source)}")
-        print(f"        after : {_stats(fixed)}")
+        swallowed = has_overlong_heading(body)
+        kind = "heading swallowed paragraph" if swallowed else "collapsed body"
+        print(f"BROKEN  {a.slug[:60]}\n        {kind} — {_stats(body)}")
 
-        # Repair inserts newlines only — a changed word count means something
-        # went wrong, so refuse to write that row.
-        if len(fixed.split()) != len(source.split()):
+        if not args.revert:
+            print("        (audit only)\n")
+            continue
+
+        if not swallowed:
+            print("        SKIPPED — not damage from the withdrawn repair\n")
+            skipped += 1
+            continue
+
+        fixed = collapse_to_single_line(body)
+        if len(fixed.split()) != len(body.split()):
             print("        SKIPPED — word count changed, refusing to write\n")
             skipped += 1
             continue
 
-        if fixed == source:
-            print("        SKIPPED — normalizer made no change\n")
-            skipped += 1
-            continue
+        fields = ["body_md_processed"]
+        a.body_md_processed = fixed
+        if has_overlong_heading(a.body_md or ""):
+            a.body_md = collapse_to_single_line(a.body_md)
+            fields.append("body_md")
+        a.save(using=db, update_fields=fields)
+        print(f"        REVERTED ({', '.join(fields)}) — {_stats(fixed)}\n")
+        reverted += 1
 
-        if args.apply:
-            fields = ["body_md_processed"]
-            a.body_md_processed = fixed
-            # Keep the raw body consistent when it shares the same defect.
-            if is_structurally_broken(a.body_md or ""):
-                a.body_md = normalize_markdown(a.body_md, log_context=a.slug)
-                fields.append("body_md")
-            a.save(using=db, update_fields=fields)
-            print(f"        REPAIRED ({', '.join(fields)})\n")
-        else:
-            print("        would repair (re-run with --apply)\n")
-        repaired += 1
-
-    print(
-        f"\nDone. broken={broken} "
-        f"{'repaired' if args.apply else 'repairable'}={repaired} "
-        f"skipped={skipped}\n"
-    )
+    print(f"\nDone. broken={broken} reverted={reverted} skipped={skipped}\n")
     return 0
 
 
