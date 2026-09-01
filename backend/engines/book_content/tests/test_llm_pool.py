@@ -23,8 +23,22 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.cache import cache
+from django.test import override_settings
 
 import engines.book_content.services.llm_service as llm
+
+# Hermetic, per-process cache for the TTL circuit breaker. The project's real
+# cache is Redis-backed and SHARED across pytest-xdist workers, so a provider
+# parked by one test (or a parallel worker) leaked into another → flaky
+# "no capable provider" failures locally. LocMemCache is per-process, so each
+# worker is isolated and setUp's clear() fully resets it. (CI's pytest-split
+# sharding dodged the race, which is why it was green there.)
+_ISOLATED_CACHE = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "llm-pool-tests",
+    }
+}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -79,13 +93,26 @@ def _entry(provider="groq", content=None, exc=None, max_tokens=1_000_000, json_o
 
 class _PoolTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        # The circuit breaker is cache-backed; a park from one test must never
-        # leak into the next.
+        # Swap the (shared, Redis-backed) cache for a per-process in-memory one
+        # so the circuit breaker can never leak a park across tests OR across
+        # parallel xdist workers.
+        override = override_settings(CACHES=_ISOLATED_CACHE)
+        override.enable()
+        self.addCleanup(override.disable)
+        # A park from one test must never leak into the next.
         try:
             cache.clear()
         except Exception:
             pass
         llm._local_unhealthy.clear()
+
+        # Never let a pool test phone home to real Sentry. Local dev has
+        # SENTRY_DSN set, so the failure-path tests (and any accidental failure)
+        # would otherwise emit a live "LLM permanently failed" event.
+        for _fn in ("capture_message", "capture_exception"):
+            _p = patch.object(llm.sentry_sdk, _fn)
+            _p.start()
+            self.addCleanup(_p.stop)
 
 
 # ── Error classification ──────────────────────────────────────────────────────

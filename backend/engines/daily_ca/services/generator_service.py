@@ -45,6 +45,10 @@ from engines.book_content.services.retrieval_service import (
     retrieve_grounding,
 )
 from engines.daily_ca.models import CaDailyProposal, DailyCaArticle, DailyCaStaticLink
+from engines.daily_ca.services.markdown_normalizer import (
+    is_structurally_broken,
+    normalize_markdown,
+)
 from engines.daily_ca.services.prompt_builder import (
     build_ca_prompt,
 )
@@ -821,7 +825,16 @@ class DailyCaGeneratorService:
             # ── STEP 4b: Title quality guard ──────────────────────────────────
             title = _validate_title(title, fallback_title=proposal.title)
 
-            # ── STEP 4c: Language simplification (post-processing, no LLM call) ─
+            # ── STEP 4c: Markdown structure repair (provider-agnostic) ────────
+            # The prompt asks for "## headings" and blank lines between
+            # paragraphs, but that is a soft instruction. Measured 2026-09-01:
+            # 2 of 10 bodies arrived with ZERO newlines in ~7k chars — markers
+            # stranded mid-line, which CommonMark renders as a single <p>
+            # ("wall of text"). Repair BEFORE truncation: _truncate_body() is
+            # line-based and needs real line structure to find its boundaries.
+            body_md = normalize_markdown(body_md, log_context=proposal.title[:60])
+
+            # ── STEP 4d: Language simplification (post-processing, no LLM call) ─
             body_md = _simplify_text(body_md)
 
             # ── STEP 5: Word count enforcement ────────────────────────────────
@@ -830,6 +843,25 @@ class DailyCaGeneratorService:
                 # Truncate at paragraph boundary — preserves headings, bullets, callouts
                 body_md = _truncate_body(body_md, cls.MAX_WORDS)
                 word_count = len(body_md.split())
+
+            # ── STEP 5b: Structure gate ───────────────────────────────────────
+            # If markers are STILL stranded after repair the article will render
+            # as a wall of text. Publishing is not blocked — the content itself
+            # is correct, only its layout is degraded — but it must never pass
+            # silently again: flag it and record the verdict in metadata.
+            structure_ok = not is_structurally_broken(body_md)
+            if not structure_ok:
+                logger.error(
+                    "daily_ca_body_structurally_broken",
+                    title=proposal.title[:80],
+                    newlines=body_md.count("\n"),
+                    chars=len(body_md),
+                )
+                sentry_sdk.capture_message(
+                    "Daily CA body still unstructured after repair: "
+                    f"'{proposal.title[:60]}'",
+                    level="warning",
+                )
 
             # ── STEP 6: Save DailyCaArticle ───────────────────────────────────
             slug = _generate_slug(title, proposal.date, db_alias=db_alias)
@@ -852,7 +884,15 @@ class DailyCaGeneratorService:
                 quality_score=_score_quality(body_md),
                 is_published=False,
                 generation_metadata={
+                    # NOTE: the pool picks the provider at call time (Mistral
+                    # serves this prompt today; Groq cannot — 413). llm_call()
+                    # returns only a string, so the real provider is not
+                    # observable here yet — recording it is a follow-up in
+                    # llm_service. This key is retained for backwards
+                    # compatibility with rows written before the pool existed.
                     "groq_model": "openai/gpt-oss-120b",
+                    "structure_ok": structure_ok,
+                    "body_newlines": body_md.count("\n"),
                     "word_count": word_count,
                     "subject": proposal.subject_name or "",
                     # Phase 3 — RAG grounding is now the PRIMARY theory anchor.
