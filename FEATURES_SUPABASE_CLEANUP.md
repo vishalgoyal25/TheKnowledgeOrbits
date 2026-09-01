@@ -1,7 +1,8 @@
 # FEATURES_SUPABASE_CLEANUP.md — Database Quota Recovery + Infra Hardening
 
-**Status:** ✅ **SUPABASE CLOSED** · 🟢 **RENDER code-complete (deploy pending)** · 🟡 **VERCEL diagnosed (fix pending)**
-**Opened:** 2026-08-29 · **Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅ (shipped 774c7f8), `R4`/`R5` code-complete (Blueprint sync pending), `R3` watch · **Vercel:** `V0`–`V3` ✅ (shipped 774c7f8), `V4` watch
+**Status:** ✅ **ALL CLOSED** — SUPABASE · RENDER · VERCEL all shipped & deployed. Blueprint
+IaC live (3 services adopted, crons auto-deploy wired). Only passive metric-watching remains.
+**Opened:** 2026-08-29 · **Closed:** 2026-09-01 · **Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅ (774c7f8), `R4`/`R5` ✅ (43f9e84 + Blueprint synced), `R3` metric-watch · **Vercel:** `V0`–`V3` ✅ (774c7f8), `V4` metric-watch
 **Result:** database **1214 MB → 282 MB**, `402` restrictions lifted, leak fixed, retention live.
 **Next single commit to `main`:** Render + Vercel code changes bundled together (Part D/E), one push.
 
@@ -508,7 +509,7 @@ can now load in the web dyno — the OOM/crash mechanism is deleted (determinist
 R1+R2 shipped in commit `774c7f8` (with the Vercel V1-V3 work). Watch Render memory
 metrics + alert frequency for ~2 weeks to confirm the OOM is gone.
 
-### R4 — Cron jobs + env under IaC (Blueprint) — code-complete, sync pending
+### R4 — Cron jobs + env under IaC (Blueprint) ✅
 
 The two cron jobs (`tko-generate-daily-ca` 02:00 UTC, `generate-static-content` 03:30 UTC)
 were dashboard-only, so a push auto-deployed the web service but never them. Added both to
@@ -523,10 +524,13 @@ via `--database=supabase`). Also reconciled the web service to remove drift:
 - **`fromGroup: TheKnowledgeOrbits`** on all three services — single source of truth for
   secrets; only the group NAME is in git, never values.
 
-**Manual step (Render dashboard):** connect/sync the Blueprint so the crons are created or
-adopted. **Then do the adopt-vs-duplicate check** — if Render made duplicates, delete the two
-old manual crons (the Terraform-import problem). Syncing also reconciles the live web service
-(build/preDeploy/SECRET_KEY) — watch that deploy.
+**DONE (2026-09-01):** created the Blueprint instance `TheKnowledgeOrbits` (repo + `main`) and
+chose **"Associate existing services"** — Render adopted all **3** services by name, **no
+duplicates**. The plan applied exactly as designed: crons' auto-deploy-trigger → `commit`,
+build filters removed, web `buildCommand`/`preDeployCommand` reconciled, config env vars
+created, **no `SECRET_KEY` regeneration** (landmine confirmed gone). Web redeployed healthy;
+both crons manually deployed once to the latest commit (green) so the daily pipeline now runs
+the Supabase-retention code. **Future pushes auto-deploy all three** — the automation is live.
 
 ### R5 — `.env.example` hygiene + relocation ✅
 
@@ -552,17 +556,17 @@ The free fix above removes the memory OOMs, which is the actual root.
 - [x] `relevance_scorer.py` API-routed; dead loaders removed (R1)
 - [x] `topic_linker.py` API-routed; dead loader removed (R2)
 - [x] mypy green, ruff clean, topic-linker tests pass
-- [ ] Deployed to `main` (R3 — bundled with Vercel)
-- [ ] Both DBs unaffected; full suite green in CI
-- [ ] Alert frequency watched for 2 weeks after deploy
-- [ ] Render bill unchanged
+- [x] Deployed to `main` (774c7f8) + crons under Blueprint (43f9e84 + sync)
+- [x] Both DBs unaffected; CI green; 3 services adopted, no duplicates
+- [x] Render bill unchanged (associated existing services — no new billable resource)
+- [ ] `R3` metric-watch: alert frequency over ~2 weeks (passive confirmation)
 
 **R-later (follow-up, non-blocking):** cache topic embeddings so scrapes stop re-encoding
 ~1,462 topics every run — the single biggest lever on HF API load.
 
 ---
 
-# PART E — VERCEL "Exceeded free resources" 🟡 DIAGNOSED (fix pending)
+# PART E — VERCEL "Exceeded free resources" ✅ FIXED (V1–V3 shipped 774c7f8)
 
 Different system from everything above — the **Next.js frontend on Vercel** (`frontend/`),
 not the Django backend. Warning emails **weekly since May 2026**. **Constraint: fix must
@@ -657,18 +661,19 @@ Next.js 16 supports Node 24. `@types/node` left at 20 — it types the local dev
 unrelated to the Vercel deprecation, and bumping it risks new `tsc` errors for zero benefit
 here. (Optional future alignment, non-blocking.)
 
-### V4 — Deploy + watch — pending
+### V4 — Deploy + watch ✅ shipped, metric-watch ongoing
 
-Ship V1–V3, then watch the Vercel usage dashboard for a full cycle to confirm ISR Writes
-fall back under 200K and Image Optimization stops climbing.
+V1–V3 shipped in `774c7f8`; Vercel auto-deploys the frontend on push. Remaining is passive:
+watch the Vercel usage dashboard for one full cycle to confirm ISR Writes fall back under
+200K and Image Optimization stops climbing.
 
-## E4. Exit criteria (pending)
+## E4. Exit criteria
 
-- [ ] ISR Writes back under 200K / cycle (V1)
-- [ ] Image Optimization Transformations flat / near-zero (V2)
-- [ ] Node 24; builds green (V3)
-- [ ] No "Exceeded free resources" email for a full cycle after deploy
-- [ ] Still on the free (Hobby) tier — no new bill
+- [x] V1–V3 shipped (774c7f8) and auto-deployed by Vercel
+- [x] Node 24 pinned; builds green
+- [x] Still on the free (Hobby) tier — no new bill
+- [ ] Metric-watch: ISR Writes back under 200K / cycle, Image Optimization flat, no
+      "Exceeded free resources" email for a full cycle (passive confirmation)
 
 ---
 
