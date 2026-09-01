@@ -1,7 +1,7 @@
 # FEATURES_SUPABASE_CLEANUP.md — Database Quota Recovery + Infra Hardening
 
 **Status:** ✅ **SUPABASE CLOSED** · 🟢 **RENDER code-complete (deploy pending)** · 🟡 **VERCEL diagnosed (fix pending)**
-**Opened:** 2026-08-29 · **Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅, `R3` pending · **Vercel:** `V0`–`V3` ✅, `V4` (deploy + watch) pending
+**Opened:** 2026-08-29 · **Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅ (shipped 774c7f8), `R4`/`R5` code-complete (Blueprint sync pending), `R3` watch · **Vercel:** `V0`–`V3` ✅ (shipped 774c7f8), `V4` watch
 **Result:** database **1214 MB → 282 MB**, `402` restrictions lifted, leak fixed, retention live.
 **Next single commit to `main`:** Render + Vercel code changes bundled together (Part D/E), one push.
 
@@ -503,9 +503,45 @@ can now load in the web dyno — the OOM/crash mechanism is deleted (determinist
 > HF API, no crash) but HF-heavy. Caching topic vectors is a **follow-up optimization**, not
 > a blocker for the crash fix. Tracked as R-later below.
 
-### R3 — Deploy + watch (pending, part of the single Render+Vercel commit)
+### R3 — Deploy + watch (pending)
 
-Ship R1+R2 to `main`, then watch Render memory metrics + alert frequency for ~2 weeks.
+R1+R2 shipped in commit `774c7f8` (with the Vercel V1-V3 work). Watch Render memory
+metrics + alert frequency for ~2 weeks to confirm the OOM is gone.
+
+### R4 — Cron jobs + env under IaC (Blueprint) — code-complete, sync pending
+
+The two cron jobs (`tko-generate-daily-ca` 02:00 UTC, `generate-static-content` 03:30 UTC)
+were dashboard-only, so a push auto-deployed the web service but never them. Added both to
+`render.yaml` as `type: cron` (deps-only build, no `render-build.sh`; DB writes at runtime
+via `--database=supabase`). Also reconciled the web service to remove drift:
+
+- **`buildCommand`/`preDeployCommand`:** yaml is the source of truth — collectstatic runs
+  with the `IS_BUILD_PHASE` shield, migrations run in `preDeployCommand` on direct port 5432
+  (safer than the pooler). The drifted dashboard `buildCommand` will be overwritten on sync.
+- **`SECRET_KEY` landmine removed:** dropped `generateValue: true` — the real key comes from
+  the env group; a sync could otherwise regenerate it and log every user out.
+- **`fromGroup: TheKnowledgeOrbits`** on all three services — single source of truth for
+  secrets; only the group NAME is in git, never values.
+
+**Manual step (Render dashboard):** connect/sync the Blueprint so the crons are created or
+adopted. **Then do the adopt-vs-duplicate check** — if Render made duplicates, delete the two
+old manual crons (the Terraform-import problem). Syncing also reconciles the live web service
+(build/preDeploy/SECRET_KEY) — watch that deploy.
+
+### R5 — `.env.example` hygiene + relocation ✅
+
+Rewrote every tracked example file to the real variable names (verified against
+`core/settings/*` and frontend `process.env.*`), placeholders only, and moved them to a
+symmetric per-service layout:
+
+- `backend/.env.example` — local backend (the file the README copies to `backend/.env`)
+- `backend/.env.production.example` — Render/prod backend (mirrors the env group)
+- `frontend/.env.local.example` — local frontend
+- `frontend/.env.production.example` — Vercel frontend
+
+The two **root** files (`.env.example`, `.env.production.example`) were misplaced (backend
+vars at repo root) and unreferenced except here — **removed**. Scanned all files: zero
+real-secret fragments.
 
 **Deliberately NOT doing** (costs money): a separate Render Background Worker or a bigger
 instance — the architecturally-correct fix, but ruled out by the no-extra-bill constraint.

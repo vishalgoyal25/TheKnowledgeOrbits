@@ -35,6 +35,11 @@ services:
     # Environment variables — set actual secret values in the Render dashboard
     # (Never commit real secrets to this file!)
     envVars:
+      # Shared secret group (DB_*, LLM keys, HF token, Sentry, …). Declared so a
+      # Blueprint sync can never drop the dashboard link. Only the NAME is here —
+      # values stay in Render. Explicit entries below OVERRIDE the group where a
+      # key appears in both (service-level env wins), so pinned config is kept.
+      - fromGroup: TheKnowledgeOrbits
       - key: DJANGO_SETTINGS_MODULE
         value: core.settings.prod
       - key: PYTHONPATH
@@ -46,8 +51,9 @@ services:
 
       # ── Secrets (set in Render Dashboard → Environment) ────────────────────
       # These are placeholders — override in the Render dashboard UI
-      - key: SECRET_KEY
-        generateValue: true # Render auto-generates a secure key on first deploy
+      # SECRET_KEY intentionally NOT declared here — the real value lives in the
+      # env group. `generateValue` on a Blueprint sync could overwrite the live
+      # key and invalidate every session/token, so it must not appear here.
 
       - key: DEBUG
         value: "False"
@@ -158,3 +164,41 @@ services:
         sync: false
       - key: SENTRY_ENVIRONMENT
         value: production
+
+  # ── Cron Jobs ────────────────────────────────────────────────────────────
+  # Brought under the Blueprint so a push auto-deploys them alongside the web
+  # service (they were dashboard-only → had to be built manually each time).
+  #
+  # NO render-build.sh here: crons don't serve static files, so no collectstatic
+  # and no Build Shield — they only need dependencies installed. DB access
+  # happens at RUNTIME (--database=supabase), not at build time.
+  #
+  # ADOPTION NOTE: both crons already exist as manually-created services with
+  # these EXACT names. On first Blueprint sync Render should adopt them by name;
+  # if it creates DUPLICATES instead, delete the two old manual crons afterwards
+  # (the Terraform-import problem — see FEATURES_SUPABASE_CLEANUP.md Part D).
+  #
+  # ENV: both crons inherit every secret from the shared Render env group
+  # "TheKnowledgeOrbits" (DB_*, LLM keys, HF_API_TOKEN, SENTRY_DSN, …) — the
+  # same group already linked to all three services in the dashboard. Only the
+  # group NAME lives here; the secret VALUES stay in Render and are never in git.
+
+  - type: cron
+    name: tko-generate-daily-ca
+    runtime: python
+    region: oregon
+    schedule: "0 2 * * *" # 02:00 UTC daily
+    buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
+    startCommand: "cd backend && python manage.py run_daily_pipeline --database=supabase"
+    envVars:
+      - fromGroup: TheKnowledgeOrbits
+
+  - type: cron
+    name: generate-static-content
+    runtime: python
+    region: oregon
+    schedule: "30 3 * * *" # 03:30 UTC daily
+    buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
+    startCommand: "cd backend && python manage.py generate_static_content --max-articles 3 --database=supabase"
+    envVars:
+      - fromGroup: TheKnowledgeOrbits
