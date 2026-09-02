@@ -7,7 +7,9 @@ metric-watching remains, and the developer owns that.
 **Opened:** 2026-08-29 · **Closed:** 2026-09-02 (day-2 verification + cron rebuild fix)
 **Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅ (774c7f8), `R4`/`R5` ✅ (43f9e84 +
 Blueprint), `R3` metric-watch · **Vercel:** `V0`–`V3` ✅ (774c7f8), `V4` metric-watch ·
-**Daily-CA markdown:** `F0`–`F4` ✅ (6059fda → 71c7c24 → 9406ffd)
+**Daily-CA markdown:** `F0`–`F4` ✅ (6059fda → 71c7c24 → 9406ffd) · **Day 2 (09-02):** `R6`
+cron rebuild loop fixed · `F5` day-2 verification + article-length investigation · LLM
+provider now recorded per article
 **Result:** database **1214 MB → 282 MB**, `402` restrictions lifted, leak fixed, retention live.
 **All work is shipped to `main` and deployed.** Nothing is blocking; nothing is in progress.
 
@@ -859,9 +861,34 @@ input, 35% less output ⇒ the cause is generation-side, most likely **provider 
 LLM pool** (OpenRouter is markedly terser than Mistral).
 
 **Open, parked deliberately.** Nothing is broken: quality scores are the highest in the window
-(9.4) and 603 words is a serviceable article. It cannot be confirmed from the database because
-`generation_metadata` still hardcodes `"groq_model"` and never records the provider that
-actually served the call — the deferred follow-up that would make this a one-query answer.
+(9.4) and 603 words is a serviceable article.
+
+**Instrumented on 2026-09-02 so it is answerable next time.** The cause could not be confirmed
+because `generation_metadata` hardcoded `"groq_model"` and never recorded who actually served
+the call. Now fixed:
+
+- `llm_service` keeps a **thread-local** record of the provider/model that served each
+  successful call, exposed via `last_call_provider()` / `last_call_model()`. Thread-local, not
+  a module global — gunicorn runs 8 threads beside `process_tasks`, so concurrent generations
+  would otherwise overwrite each other. No call signature changed, so every existing caller is
+  untouched.
+- `generator_service` captures both **immediately after the article call** (later concept-stub
+  and tag calls would overwrite the record) and stores them as `llm_provider` / `llm_model`.
+- `"groq_model"` is retained but marked legacy-and-wrong; read `llm_provider` instead.
+
+**Forward-only.** It cannot explain 08-29 → 09-02, because those rows predate the field. From
+the 2026-09-03 run onward, attributing an output change to a provider is one query:
+
+```bash
+python manage.py shell -c "from collections import defaultdict; from engines.daily_ca.models import DailyCaArticle; d=defaultdict(list); [d[(a.generation_metadata or {}).get('llm_provider','?')].append(len((a.body_md_processed or '').split())) for a in DailyCaArticle.objects.using('supabase').order_by('-published_date')[:30]]; [print(f'{k:12s} n={len(v):2d} avg_words={sum(v)//len(v)}') for k,v in d.items()]"
+```
+
+**Side finding — third state-leak in the LLM test suite.** `_current_key_idx`, the round-robin
+key counter, is a module global advanced by _every_ successful dispatch, including those in
+other tests. Pool tests asserting "the first provider was tried" therefore passed or failed on
+collection order. `setUp` now resets it alongside the cache and `_local_unhealthy`. Pattern
+worth remembering: **module-level mutable state in `llm_service` leaks across tests** — three
+instances found so far.
 
 ## F6. End state
 
