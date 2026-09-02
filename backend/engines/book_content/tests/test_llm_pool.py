@@ -106,6 +106,13 @@ class _PoolTestCase(unittest.TestCase):
             pass
         llm._local_unhealthy.clear()
 
+        # _current_key_idx is a module-level round-robin counter that advances on
+        # EVERY successful dispatch, including those in other tests. Left alone,
+        # the pool starts at a different entry depending on how many tests ran
+        # first, so a test asserting "the first provider was tried" passes or
+        # fails purely on collection order. Reset it so entry 0 is always first.
+        llm._current_key_idx = 0
+
         # Never let a pool test phone home to real Sentry. Local dev has
         # SENTRY_DSN set, so the failure-path tests (and any accidental failure)
         # would otherwise emit a live "LLM permanently failed" event.

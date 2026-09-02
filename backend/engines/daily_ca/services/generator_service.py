@@ -39,7 +39,12 @@ import structlog
 from django.db import transaction
 from django.utils.text import slugify
 
-from engines.book_content.services.llm_service import INTER_CALL_SLEEP, llm_call
+from engines.book_content.services.llm_service import (
+    INTER_CALL_SLEEP,
+    last_call_model,
+    last_call_provider,
+    llm_call,
+)
 from engines.book_content.services.retrieval_service import (
     as_static_facts,
     retrieve_grounding,
@@ -804,6 +809,10 @@ class DailyCaGeneratorService:
             )
 
             raw_response = llm_call(prompt, mode="writer")
+            # Capture immediately: any later llm_call (concept stubs, tags)
+            # overwrites the thread-local record.
+            article_provider = last_call_provider()
+            article_model = last_call_model()
             calls_used += 1
             time.sleep(INTER_CALL_SLEEP)
 
@@ -886,12 +895,15 @@ class DailyCaGeneratorService:
                 quality_score=_score_quality(body_md),
                 is_published=False,
                 generation_metadata={
-                    # NOTE: the pool picks the provider at call time (Mistral
-                    # serves this prompt today; Groq cannot — 413). llm_call()
-                    # returns only a string, so the real provider is not
-                    # observable here yet — recording it is a follow-up in
-                    # llm_service. This key is retained for backwards
-                    # compatibility with rows written before the pool existed.
+                    # Who actually wrote this article. The pool picks a provider
+                    # at call time, so without these two keys a change in output
+                    # (length, tone, quality) cannot be attributed after the fact.
+                    "llm_provider": article_provider,
+                    "llm_model": article_model,
+                    # Legacy key: hardcoded and WRONG since the pool landed.
+                    # Retained only for rows written before llm_provider existed;
+                    # read llm_provider instead. Safe to drop once no dashboard
+                    # or query references it.
                     "groq_model": "openai/gpt-oss-120b",
                     # Cheap diagnostic: a healthy body has dozens of newlines.
                     "body_newlines": body_md.count("\n"),

@@ -50,6 +50,7 @@ PUBLIC API — unchanged, no caller edits required:
 Adding a provider: append one ProviderSpec below + the key in settings. Nothing else.
 """
 
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -249,6 +250,27 @@ class _LLMEntry:
 # Render workers. It degrades to a per-process dict if the cache is unavailable
 # (e.g. the lean scraper environment), which is still better than no breaker.
 _local_unhealthy: dict[str, float] = {}
+
+# ── Which provider actually served the last call ─────────────────────────────
+# The pool chooses a provider at call time, so a caller has no way to know who
+# answered. Without this, a change in output quality or length is undiagnosable
+# after the fact — exactly the dead end hit on 2026-09-02 when Daily CA article
+# length fell 937 → 603 words with the RAG input held flat.
+#
+# Thread-local, not a module global: gunicorn runs 8 threads alongside
+# process_tasks, so concurrent generations would otherwise overwrite each
+# other's record.
+_last_call = threading.local()
+
+
+def last_call_provider() -> str:
+    """Provider that served this thread's most recent successful call ('' if none)."""
+    return getattr(_last_call, "provider", "")
+
+
+def last_call_model() -> str:
+    """Model id that served this thread's most recent successful call ('' if none)."""
+    return getattr(_last_call, "model", "")
 
 
 def _unhealthy_key(provider: str) -> str:
@@ -520,6 +542,10 @@ def _dispatch(
                     model=model,
                     est_tokens=est_tokens,
                 )
+                # Record who answered so callers can attribute output to a
+                # provider (see last_call_provider()).
+                _last_call.provider = entry.provider
+                _last_call.model = model
                 _current_key_idx = (_current_key_idx + offset + 1) % max(
                     len(entries), 1
                 )
