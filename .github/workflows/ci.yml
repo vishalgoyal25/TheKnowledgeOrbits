@@ -144,10 +144,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js 20
+      # Node 24 — must match frontend/package.json "engines": { "node": "24.x" }
+      # and the runtime Vercel builds on. This was "20", so CI validated a
+      # runtime production does not use; Node 20 also stops working on Vercel
+      # after 2026-10-01. If engines.node changes, change this in the same commit.
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 

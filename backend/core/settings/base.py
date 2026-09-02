@@ -60,6 +60,9 @@ INSTALLED_APPS = [
     # Feature 6 — Social Interaction Engine
     "engines.social",
     "engines.research_agent",
+    # Growth Stack G1 — site-wide visitor telemetry (NOT engines.analytics,
+    # which is the learner-facing study feature)
+    "engines.telemetry",
 ]
 
 # Custom User Model
@@ -73,6 +76,12 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "engines.authorization.middleware.RBACMiddleware",
+    # Growth Stack G1 — site-wide request telemetry.
+    # MUST stay after AuthenticationMiddleware: it reads request.user to record
+    # is_authenticated, and before that middleware runs there is no request.user
+    # at all, so every row would be recorded as anonymous.
+    # ⚠️ prod.py redefines MIDDLEWARE wholesale — this entry must exist there too.
+    "engines.telemetry.middleware.TelemetryMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

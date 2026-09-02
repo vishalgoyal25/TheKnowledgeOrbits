@@ -11,8 +11,26 @@ schemathesis>=3.39.6,<4.0.0  # 4.0+ requires tenacity>=9.1.2 which conflicts wit
 numpy>=1.26.0  # also declared in base.txt (real runtime dep, relevance_scorer.py) — kept here too since conftest.py's test fixtures need it whenever dev.txt installs without base.txt
 
 # Code Quality
-black>=24.10.0
-flake8>=7.1.1
+#
+# ruff — PINNED EXACTLY, and it MUST stay in lockstep with two other places:
+#   .github/workflows/ci.yml   -> pip install ruff==0.4.4  (blocking gate)
+#   .pre-commit-config.yaml    -> ruff-pre-commit v0.4.4
+# Previously ruff was absent from this file entirely, so a developer's machine
+# ran whatever `pip install ruff` had fetched, while CI ran 0.4.4. Formatting
+# differs between ruff minors, so that gap could turn a green local run red in
+# CI on identical code — the same failure mode the mypy pins below describe.
+# The write-time formatter hook (.claude/hooks/format-on-write.ps1) uses this
+# venv's ruff, which is exactly why it has to be pinned here.
+ruff==0.4.4
+#
+# REMOVED 2026-09-02: black, flake8, isort.
+# ruff replaced all three. Leaving them installed was actively dangerous, not
+# merely redundant: black and `ruff format` disagree on edge cases, so running
+# black (e.g. via the stale `just format-backend` recipe) would reformat the
+# tree into a state `ruff format --check .` rejects in CI. A dead tool that can
+# still be invoked is a landmine. NOTE: Justfile's format-backend/lint-backend
+# recipes still reference them and need updating.
+#
 # Type checking — PINNED EXACTLY, deliberately.
 #
 # These were `>=`, so CI installed whatever had shipped that morning while a
@@ -33,5 +51,4 @@ django-stubs==6.0.2
 djangorestframework-stubs==3.16.9
 types-requests>=2.32.0.20241016
 bandit>=1.8.0
-isort>=5.13.2
 pre-commit>=3.7.1

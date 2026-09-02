@@ -1,4 +1,29 @@
+# ── Secret scanner — THE REPO IS PUBLIC ──────────────────────────────────────
+# Runs FIRST so a credential is caught before anything else spends time.
+#
+# It used to be chained through pre-commit's "migration mode" as
+# .git/hooks/pre-commit.legacy. That does NOT work on native Windows:
+# pre-commit exec's the legacy file directly, its `#!/bin/sh` shebang resolves
+# to a path that does not exist on nt, and EVERY commit died with
+# `ExecutableNotFoundError: Executable /bin/sh not found`. The scanner never
+# ran and no commit could be made at all.
+#
+# Running it as a real hook fixes both halves: commits work, and the guard is
+# now tracked in the repo instead of surviving only in an untracked .git/hooks
+# file that no fresh clone would ever get.
+#
+# `exit $LASTEXITCODE` is load-bearing — without it PowerShell returns its own
+# exit status and a BLOCKED commit would be reported as passing.
 repos:
+  - repo: local
+    hooks:
+      - id: secret-scanner
+        name: Secret Scanner (public repo guard)
+        entry: powershell -Command "bash backend/scripts/dev/secret-scanner.sh; exit $LASTEXITCODE"
+        language: system
+        pass_filenames: false
+        always_run: true
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
@@ -17,19 +42,36 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+  # Prettier — deliberately NOT pre-commit's mirrors-prettier.
+  #
+  # That mirror pinned its own copy at v3.1.0 while frontend/package.json
+  # declares ^3.8.1, so two different prettiers formatted the same files: the
+  # write-time formatter hook used 3.8.1 from node_modules, this hook then
+  # reformatted with 3.1.0 at commit. Files churned between two styles.
+  # mirrors-prettier is archived upstream, so bumping it is not an option.
+  #
+  # Running the project's own prettier makes package-lock.json the single
+  # source of truth for the version — one place to change, nothing to drift.
+  #
+  # Scope note: this formats frontend/ only. Root markdown (CLAUDE.md,
+  # FEATURES_*.md) is deliberately no longer prettier-formatted — it reflows
+  # tables and long lines, burying real edits in whitespace churn.
+  - repo: local
     hooks:
       - id: prettier
-        types_or: [javascript, jsx, ts, tsx, css, scss, markdown, json]
-        exclude: |
-          (?x)^(
-            frontend/\.next/|
-            frontend/node_modules/|
-            backend/staticfiles/|
-            backend/media/
-          )
+        name: Prettier (frontend/node_modules)
+        entry: powershell -Command "cd frontend; npm run format"
+        language: system
+        files: ^frontend/
+        pass_filenames: false
 
+  # ── Heavy checks: pre-PUSH only ─────────────────────────────────────────────
+  # These take 1-3 minutes. Running them on every commit punishes small, logical
+  # commits — which is exactly the commit style this project wants. They run once
+  # before code leaves the machine instead, which is the same gate CI applies.
+  #
+  # Requires the pre-push hook to be installed as well as pre-commit:
+  #     pre-commit install --hook-type pre-push
   - repo: local
     hooks:
       - id: backend-mypy
@@ -38,6 +80,7 @@ repos:
         language: system
         files: ^backend/
         pass_filenames: false
+        stages: [pre-push]
 
       - id: backend-pytest
         name: Backend Laboratory (Pytest)
@@ -45,6 +88,7 @@ repos:
         language: system
         files: ^backend/
         pass_filenames: false
+        stages: [pre-push]
 
       - id: frontend-jest
         name: Frontend Laboratory (Jest)
@@ -52,3 +96,4 @@ repos:
         language: system
         files: ^frontend/
         pass_filenames: false
+        stages: [pre-push]
