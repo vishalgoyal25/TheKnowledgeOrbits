@@ -4,7 +4,7 @@
 IaC live (3 services adopted, all three CI-gated and auto-deploying). Part F closes the
 Daily-CA markdown regression that the LLM provider switch caused. Only passive
 metric-watching remains, and the developer owns that.
-**Opened:** 2026-08-29 · **Closed:** 2026-09-01
+**Opened:** 2026-08-29 · **Closed:** 2026-09-02 (day-2 verification + cron rebuild fix)
 **Supabase:** `S0`–`S8` ✅ · **Render:** `R0`–`R2` ✅ (774c7f8), `R4`/`R5` ✅ (43f9e84 +
 Blueprint), `R3` metric-watch · **Vercel:** `V0`–`V3` ✅ (774c7f8), `V4` metric-watch ·
 **Daily-CA markdown:** `F0`–`F4` ✅ (6059fda → 71c7c24 → 9406ffd)
@@ -559,6 +559,51 @@ The two **root** files (`.env.example`, `.env.production.example`) were misplace
 vars at repo root) and unreferenced except here — **removed**. Scanned all files: zero
 real-secret fragments.
 
+### R6 — Spurious cron rebuilds: `checksPass` needs a build filter ✅ (2026-09-02)
+
+**Symptom:** both cron jobs rebuilt repeatedly for the **same commit** (`fb83dd7`), each event
+labelled "New commit via Auto-Deploy", while the web service did not.
+
+**Root cause — a mismatch introduced by R4 itself.** `autoDeployTrigger: checksPass` does not
+mean "deploy once when CI passes". It means **"deploy whenever this commit's checks are
+green."** Any workflow that posts checks _later_ re-satisfies that condition. The scheduled
+`.github/workflows/ca_automation.yml` ("Current Affairs Ghost Worker", `cron: "0 */12 * * *"`)
+runs against the **latest commit** every 12 h and posts a fresh set of green checks on it — so
+Render rebuilt that commit twice a day, forever.
+
+Confirmed by timestamp, not inference:
+
+| Render cron build | GitHub Actions run finishing       | Verdict                  |
+| ----------------- | ---------------------------------- | ------------------------ |
+| 2026-09-01 19:12  | CI #186 `fb83dd7` (19:05 + 7m07s)  | legitimate — a real push |
+| 2026-09-01 21:49  | Ghost Worker #380 (21:37 + 12m13s) | 🔴 spurious              |
+| 2026-09-02 08:47  | Ghost Worker #381 (08:35 + 12m48s) | 🔴 spurious              |
+
+**Why only the crons:** the Blueprint adoption plan (R4) included the lines _"Remove build
+filter from cron job …"_ for both crons and nothing for the web service. The web service kept
+its filter and was therefore immune — that asymmetry was the diagnostic clue.
+
+**Fix:** restore a `buildFilter` on both crons, so a deploy trigger only becomes a build when
+backend code actually changed:
+
+```yaml
+buildFilter:
+  paths:
+    - backend/**
+  ignoredPaths:
+    - "**/*.md"
+```
+
+The CI gate is kept. Docs-only commits and Ghost Worker completions no longer rebuild anything.
+
+> **Rule worth carrying:** on a repo with **scheduled** GitHub Actions, `checksPass` without a
+> `buildFilter` is a rebuild loop. The two settings are only safe together.
+
+**Residual (accepted, not fixed):** if the newest commit _does_ touch `backend/**`, a Ghost
+Worker completion 12 h later can still re-trigger one build. Rare and harmless; the only
+remaining lever would be reverting the crons to `autoDeployTrigger: commit`, which would give
+up the CI gate. Watch rather than pre-emptively trade it away.
+
 **Deliberately NOT doing** (costs money): a separate Render Background Worker or a bigger
 instance — the architecturally-correct fix, but ruled out by the no-extra-bill constraint.
 The free fix above removes the memory OOMs, which is the actual root.
@@ -783,7 +828,42 @@ damaged rows had **zero** newlines before the withdrawn pass, so every newline p
 inserted by it — removing them restores the original exactly. Proven by byte counts
 returning to their pre-damage values: **7084→7072** and **6840→6832**.
 
-## F5. End state
+## F5. Day-2 verification (2026-09-02) ✅
+
+The first full generation run under the new gate produced **10/10 articles, all rendering
+correctly**. No rejections fired, so the gate cost nothing in volume.
+
+**Separately investigated and cleared:** article word count had been declining
+(937 → 924 → 889 → 764 → 603 across 08-29 → 09-02) and the concern was that the markdown work
+had degraded content. It had not, on two independent grounds:
+
+1. **Mechanically impossible** — `normalize_markdown` only normalises line endings, unescapes
+   `\n` and collapses blank-line runs; the gate either passes a body through untouched or
+   aborts the cycle. Nothing removes words.
+2. **The decline predates it** — 08-31 and 09-01 were generated before the markdown work
+   existed.
+
+The RAG input was then measured directly from `generation_metadata`:
+
+| Date       | `ca_context_chars` | `chunk_word_count` | RAG grounded | words   |
+| ---------- | ------------------ | ------------------ | ------------ | ------- |
+| 2026-09-02 | 5682               | 485                | 10/10        | **603** |
+| 2026-09-01 | 5364               | 443                | 10/10        | 764     |
+| 2026-08-31 | 5907               | 484                | 10/10        | 889     |
+| 2026-08-30 | 5773               | 446                | 10/10        | 924     |
+| 2026-08-29 | 5753               | 477                | 10/10        | **937** |
+
+**Context is flat; output is not.** This also refutes the intuitive theory that the S4 corpus
+purge starved the generator — `ca_chunk` repopulated fine and grounding never failed. Same
+input, 35% less output ⇒ the cause is generation-side, most likely **provider drift inside the
+LLM pool** (OpenRouter is markedly terser than Mistral).
+
+**Open, parked deliberately.** Nothing is broken: quality scores are the highest in the window
+(9.4) and 603 words is a serviceable article. It cannot be confirmed from the database because
+`generation_metadata` still hardcodes `"groq_model"` and never records the provider that
+actually served the call — the deferred follow-up that would make this a one-query answer.
+
+## F6. End state
 
 - 17 normalizer tests + 128 `daily_ca` tests green; mypy and ruff clean.
 - Regression lock: `test_normalize_never_produces_an_overlong_heading`.
