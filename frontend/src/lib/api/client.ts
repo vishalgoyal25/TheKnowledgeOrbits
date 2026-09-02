@@ -129,8 +129,9 @@ apiClient.interceptors.response.use(
     if (!error.response) {
       // Pure network error — no response received (backend down, CORS, timeout)
       logger.warn(
-        `Network error (no response) for ${error.config?.method?.toUpperCase()} ${error
-          .config?.url}: ${error.message}`,
+        `Network error (no response) for ${error.config?.method?.toUpperCase()} ${
+          error.config?.url
+        }: ${error.message}`,
       );
     } else if (error.response.status === 404) {
       logger.warn(`Resource not found [404] for URL: ${error.config?.url}`);

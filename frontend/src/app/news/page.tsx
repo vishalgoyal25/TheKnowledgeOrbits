@@ -158,7 +158,7 @@ function NewsPageInner() {
   const activeCategoryLabel =
     activeCategory === "all"
       ? "All News"
-      : CATEGORY_LABELS[activeCategory] ?? activeCategory;
+      : (CATEGORY_LABELS[activeCategory] ?? activeCategory);
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -80,6 +80,11 @@ MIDDLEWARE = [  # noqa: F811
     "django.middleware.csrf.CsrfViewMiddleware",  # Critical security
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "engines.authorization.middleware.RBACMiddleware",  # After Auth/Identity is established
+    # Growth Stack G1 — site-wide request telemetry. Same position as base.py:
+    # after Auth so request.user exists. This list is a WHOLESALE redefinition
+    # (# noqa: F811), not an extension of base.py — an entry added there alone
+    # works locally and records nothing on Render. Both files, always, together.
+    "engines.telemetry.middleware.TelemetryMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

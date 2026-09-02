@@ -13,26 +13,24 @@ export const contentType = "image/png";
 
 export default function Icon() {
   return new ImageResponse(
-    (
-      <div
-        style={{
-          fontSize: 14,
-          background: "linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)",
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "white",
-          fontWeight: 700,
-          fontFamily: "sans-serif",
-          borderRadius: "6px",
-          letterSpacing: "-0.5px",
-        }}
-      >
-        TK
-      </div>
-    ),
+    <div
+      style={{
+        fontSize: 14,
+        background: "linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "white",
+        fontWeight: 700,
+        fontFamily: "sans-serif",
+        borderRadius: "6px",
+        letterSpacing: "-0.5px",
+      }}
+    >
+      TK
+    </div>,
     { ...size },
   );
 }

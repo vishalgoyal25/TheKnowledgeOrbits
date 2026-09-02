@@ -106,6 +106,10 @@ urlpatterns = [
     path("api/v1/social/", include("engines.social.urls")),
     # AgenticAI — Research Agent Engine
     path("api/v1/research/", include("engines.research_agent.urls")),
+    # Growth Stack G1 — site-wide visitor telemetry (read beacon).
+    # This prefix is also in the telemetry middleware's SKIP_PATH_PREFIXES, so
+    # the beacon does not log a visit for itself on every read.
+    path("api/v1/telemetry/", include("engines.telemetry.urls")),
 ]
 
 # Conditionally add the admin path (not disabled in production)

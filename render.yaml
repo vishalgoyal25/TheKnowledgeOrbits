@@ -209,7 +209,15 @@ services:
       ignoredPaths:
         - "**/*.md"
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
-    startCommand: "cd backend && python manage.py run_daily_pipeline --database=supabase"
+    # Telemetry retention is CHAINED here rather than given its own cron
+    # service: no new service, no new build, no extra Blueprint surface.
+    #
+    # Separated by ";" and NOT "&&", deliberately. With "&&" the prune would be
+    # skipped on any day the pipeline failed — exactly the days you least want
+    # retention to stop, since a stalled prune fills the Supabase ceiling and
+    # then breaks API writes, not just analytics. prune_telemetry exits 0 even
+    # on its own failure, so it can never mark this run red either.
+    startCommand: "cd backend && python manage.py run_daily_pipeline --database=supabase; python manage.py prune_telemetry --database=supabase"
     envVars:
       - fromGroup: TheKnowledgeOrbits
 

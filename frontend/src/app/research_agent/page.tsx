@@ -171,7 +171,7 @@ export default function ResearchAgentPage() {
   // Prefer API-fetched summary over SSE (SSE may have gaps if connection was unstable).
   const displaySummary = cachedReport
     ? cachedReport.executive_summary
-    : fetchedSummary ?? executiveSummary;
+    : (fetchedSummary ?? executiveSummary);
   const displayTokens = cachedReport ? cachedReport.full_report : reportTokens;
   const isActiveSession = !!sessionId || !!cachedReport;
   const isStreaming = !!sessionId && !isComplete;

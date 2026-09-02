@@ -271,8 +271,8 @@ export default function Header({ initialHierarchy }: HeaderProps) {
         activeModule = matchedModule.id;
         break;
       }
-      const matchedTopic = subject.modules?.find(
-        (m) => m.topics?.some((t) => pathname.includes(`/topics/${t.id}`)),
+      const matchedTopic = subject.modules?.find((m) =>
+        m.topics?.some((t) => pathname.includes(`/topics/${t.id}`)),
       );
       if (matchedTopic) {
         activeSubject = subject.id;
