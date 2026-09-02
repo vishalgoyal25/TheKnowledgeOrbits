@@ -49,10 +49,11 @@ jobs:
   # JOB 2: Backend Logic — 3 Parallel Shards
   # Runs concurrently with backend-lint (no needs).
   # Each shard gets its own VM + 2 CPUs.
-  # 732 tests total (incl. research_agent's 120 and the 18 LLM-pool regression
-  # tests added 2026-08-28). pytest-split distributes by timing, so this stays
-  # balanced automatically — no per-shard edits needed when tests are added.
-  # Shard 1: tests 1–~244 | Shard 2: ~245–~488 | Shard 3: ~489–732
+  # 775 tests total (incl. research_agent's 120, the 18 LLM-pool regression
+  # tests added 2026-08-28, and telemetry's 22 added 2026-09-02).
+  # pytest-split distributes by timing, so this stays balanced automatically —
+  # no per-shard edits needed when tests are added.
+  # Shard 1: tests 1–~258 | Shard 2: ~259–~516 | Shard 3: ~517–775
   # Combined wall-clock: ~5 min instead of ~12 min.
   # ============================================
   backend-tests:
