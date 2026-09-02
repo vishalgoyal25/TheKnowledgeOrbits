@@ -293,7 +293,36 @@ class TestBeaconValidation:
 
 @pytest.mark.django_db
 class TestBeaconRateLimit:
-    """The public write surface is throttled, but never at the cost of uptime."""
+    """
+    The public write surface is throttled, but never at the cost of uptime.
+
+    These tests supply their OWN cache backend rather than borrowing whatever
+    the environment happens to configure. Without that they are not really
+    testing the limiter: if the ambient cache is a dummy or an unreachable
+    Redis, `cache.add()` always succeeds, the counter never increments, and the
+    limiter correctly fails open — so the "over the limit" case silently
+    returns 204 and the assertion fails for a reason that has nothing to do
+    with the logic under test. That is exactly how this first failed: green in
+    isolation, red in the full suite.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _locmem_cache(self, settings):
+        """
+        pytest-django's `settings` fixture, not django.test.override_settings.
+
+        override_settings only decorates SimpleTestCase subclasses; on a plain
+        pytest class it raises at collection time. This fixture reaches the same
+        end through the same machinery — assigning to `settings` fires Django's
+        setting_changed signal, which is what resets the cache handler so the
+        limiter picks up the new backend.
+        """
+        settings.CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "telemetry-rate-limit-tests",
+            }
+        }
 
     def test_requests_beyond_the_limit_are_rejected(
         self, api_client, telemetry_on, monkeypatch
