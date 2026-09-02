@@ -195,6 +195,19 @@ services:
     # Wait for GitHub Actions to pass before deploying. Without this the crons
     # deploy on the raw commit and would pick up code CI is about to reject.
     autoDeployTrigger: checksPass
+
+    # REQUIRED alongside checksPass. The scheduled "Current Affairs Ghost
+    # Worker" workflow (.github/workflows/ca_automation.yml, every 12 h) runs
+    # against the LATEST commit and posts a fresh set of green checks on it.
+    # Render reads that as "checks now pass" and rebuilds the SAME commit —
+    # measured twice in 24 h on fb83dd7. The web service was immune only
+    # because it kept its build filter; the Blueprint stripped the crons'.
+    # Restoring it: rebuild only when backend code actually changes.
+    buildFilter:
+      paths:
+        - backend/**
+      ignoredPaths:
+        - "**/*.md"
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
     startCommand: "cd backend && python manage.py run_daily_pipeline --database=supabase"
     envVars:
@@ -205,8 +218,14 @@ services:
     runtime: python
     region: oregon
     schedule: "30 3 * * *" # 03:30 UTC daily
-    # Same CI gate as the other cron and the web service — see above.
+    # Same CI gate and build filter as the other cron — see above for why the
+    # filter is mandatory when autoDeployTrigger is checksPass.
     autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - backend/**
+      ignoredPaths:
+        - "**/*.md"
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
     startCommand: "cd backend && python manage.py generate_static_content --max-articles 3 --database=supabase"
     envVars:
