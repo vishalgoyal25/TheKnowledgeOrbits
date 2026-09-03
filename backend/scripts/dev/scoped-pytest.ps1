@@ -76,8 +76,21 @@ $GlobalPaths = @(
     'backend/pyproject.toml',
     'backend/manage.py',
     'backend/requirements/',
-    'backend/scripts/',
     'backend/engines/shared/'
+)
+
+# Paths under backend/ that can affect NO test, so they neither scope the run
+# nor widen it. backend/scripts/dev/ holds standalone diagnostic and tooling
+# scripts -- the secret scanner, the telemetry report, this file. Nothing
+# imports them, so changing one cannot break a Django test.
+#
+# Both halves of this are needed. Simply removing the folder from $GlobalPaths
+# is not enough: the fail-safe below treats any backend file that is neither
+# global nor inside an engine as "unrecognised" and widens to the full suite.
+# Without an explicit ignore list, editing this very script would still cost
+# eight minutes.
+$IgnorePaths = @(
+    'backend/scripts/dev/'
 )
 
 function Run-Pytest {
@@ -116,14 +129,21 @@ try {
 
     $backendFiles = @()
     foreach ($f in $changed) {
-        if ($f.StartsWith('backend/')) { $backendFiles += $f }
+        if ($f.StartsWith('backend/')) {
+            $ignored = $false
+            foreach ($i in $IgnorePaths) {
+                if ($f.StartsWith($i)) { $ignored = $true }
+            }
+            if (-not $ignored) { $backendFiles += $f }
+        }
     }
 
-    # Nothing under backend/: a frontend-only or docs-only push. Django tests
-    # cannot be affected, so run none. jest still runs via its own hook.
+    # Nothing testable under backend/: a frontend-only, docs-only, or
+    # tooling-only push. Django tests cannot be affected, so run none. jest
+    # still runs via its own hook.
     if ($backendFiles.Count -eq 0) {
         Write-Host ""
-        Write-Host "  pytest skipped: this push changes no backend files." -ForegroundColor Cyan
+        Write-Host "  pytest skipped: this push changes no testable backend files." -ForegroundColor Cyan
         Write-Host ""
         exit 0
     }
