@@ -21,18 +21,37 @@
     push that tested nothing -- that is worse than no gate, because it looks
     like it passed.
 
-    WHY IT IS FAST
-    Two separate costs, two separate fixes:
+    WHY IT IS FAST, AND WHERE THE FLOOR IS
+    Scoping attacks the variable cost: 775 tests -> only the engines touched.
+    That is the whole win, measured at 476s -> ~31s for a telemetry-only run.
 
-      variable cost   running 775 tests            -> scope to changed engines
-      fixed cost      one test database per xdist  -> --reuse-db
-                      worker, each replaying
-                      ~60 migrations
+    Measured on 2026-09-03, telemetry only (22 tests):
 
-    Scoping alone leaves the fixed cost. A telemetry-only run took 37s for 22
-    tests, nearly all of it database construction. --reuse-db removes that
-    floor. Worker count is also lowered for scoped runs: spinning up 12 workers
-    to run 20 tests costs more setup than parallelism returns.
+      full suite, -n auto                 476.5s
+      scoped, -n 2, first run (db built)   31.8s
+      scoped, -n 2, second run (db reused) 39.9s
+      scoped, -n 0, db reused              30.8s
+
+    Two things that data says, both against my first assumption:
+
+    1. --reuse-db does NOT remove the floor. I expected database construction
+       to dominate; it does not. The flag is kept because it is theoretically
+       right and should help on larger scoped runs, but do not expect it to
+       show up in a 22-test run.
+
+    2. xdist HURTS at this size. -n 2 was ~9s SLOWER than -n 0, because each
+       worker is a separate process that imports Django and all 15 engines
+       before running anything. Hence -n 0 for scoped runs; the full-suite
+       paths still use -n auto, where parallelism does pay.
+
+    The remaining ~30s is Python import time: Django app loading plus
+    langchain, pgvector, sentence-transformers and deepeval. No hook flag
+    fixes that; it would take reducing what gets imported at startup.
+
+    --reuse-db is only safe while the schema is unchanged, so a push containing
+    anything under migrations/ switches to --create-db. Without that check a
+    schema change would be tested against a stale database and pass for the
+    wrong reason.
 
     --reuse-db is only safe while the schema is unchanged, so a push containing
     anything under migrations/ switches to --create-db. Without that check a
@@ -153,7 +172,9 @@ try {
     $targets = @()
     foreach ($e in $engines) { $targets += "engines/$e" }
 
-    Run-Pytest -Targets $targets -Workers '2' -DbFlag $dbFlag `
+    # -n 0 (no xdist) deliberately: measured 9s FASTER than -n 2 at this size,
+    # because each worker re-imports Django and every engine. See the header.
+    Run-Pytest -Targets $targets -Workers '0' -DbFlag $dbFlag `
         -Reason ($engines -join ', ')
 }
 catch {
