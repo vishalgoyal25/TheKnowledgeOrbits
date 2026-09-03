@@ -82,12 +82,20 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
+      # Scoped to the engines this push actually touches — see the script's
+      # header for the safety rules. Deliberately NOT filtered by `files:`:
+      # the script needs to see EVERY changed path to decide, including
+      # non-backend ones, and it skips pytest entirely when nothing under
+      # backend/ changed.
+      #
+      # pass_filenames: true because pre-commit already computes "what is in
+      # this push" correctly for new branches, multi-commit pushes and force
+      # pushes — deriving that from git by hand is where this goes wrong.
       - id: backend-pytest
-        name: Backend Laboratory (Pytest)
-        entry: powershell -Command "cd backend; $env:PYTHONDONTWRITEBYTECODE=1; ..\myvenv\Scripts\pytest engines/ -q --tb=short -p no:cacheprovider -n auto"
+        name: Backend Laboratory (Pytest, scoped)
+        entry: powershell -NoProfile -ExecutionPolicy Bypass -File backend/scripts/dev/scoped-pytest.ps1
         language: system
-        files: ^backend/
-        pass_filenames: false
+        pass_filenames: true
         stages: [pre-push]
 
       - id: frontend-jest
