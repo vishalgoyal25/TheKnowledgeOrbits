@@ -192,17 +192,28 @@ services:
     runtime: python
     region: oregon
     schedule: "0 2 * * *" # 02:00 UTC daily
-    # Wait for GitHub Actions to pass before deploying. Without this the crons
-    # deploy on the raw commit and would pick up code CI is about to reject.
-    autoDeployTrigger: checksPass
+    # `commit`, NOT `checksPass` — changed 2026-09-03 after observing this cron
+    # redeploy every time the scheduled scraper ran.
+    #
+    # checksPass does not mean "deploy once when CI first passes". It means
+    # "deploy whenever this commit's checks are green". The Ghost Worker
+    # (.github/workflows/ca_automation.yml, every 12 h) runs against the LATEST
+    # commit on main and posts a FRESH green check-suite onto it, so Render saw
+    # green again and rebuilt the same commit — twice a day, indefinitely.
+    #
+    # buildFilter cannot prevent that: it filters on which PATHS the commit
+    # changed, not on what caused the check. While HEAD is a commit touching
+    # backend/**, every re-green passes the filter.
+    #
+    # The risk this trades back is small and specific to crons: a cron service
+    # HOLDS code rather than serving it. If CI later fails, nothing executes
+    # until 02:00 UTC, which is hours of warning — unlike the web service,
+    # where bad code would serve traffic immediately. That asymmetry is why the
+    # web service KEEPS checksPass and these do not.
+    autoDeployTrigger: commit
 
-    # REQUIRED alongside checksPass. The scheduled "Current Affairs Ghost
-    # Worker" workflow (.github/workflows/ca_automation.yml, every 12 h) runs
-    # against the LATEST commit and posts a fresh set of green checks on it.
-    # Render reads that as "checks now pass" and rebuilds the SAME commit —
-    # measured twice in 24 h on fb83dd7. The web service was immune only
-    # because it kept its build filter; the Blueprint stripped the crons'.
-    # Restoring it: rebuild only when backend code actually changes.
+    # Still required: rebuild only when backend code actually changes, so a
+    # frontend-only or docs-only commit does not churn the crons.
     buildFilter:
       paths:
         - backend/**
@@ -226,9 +237,9 @@ services:
     runtime: python
     region: oregon
     schedule: "30 3 * * *" # 03:30 UTC daily
-    # Same CI gate and build filter as the other cron — see above for why the
-    # filter is mandatory when autoDeployTrigger is checksPass.
-    autoDeployTrigger: checksPass
+    # `commit`, same as the other cron and for the same reason — see the long
+    # note above. The scheduled scraper re-greening HEAD must not redeploy this.
+    autoDeployTrigger: commit
     buildFilter:
       paths:
         - backend/**
