@@ -65,7 +65,11 @@ class Command(BaseCommand):
         total = visits.count()
         visitors = visits.values("ip_hash").distinct().count()
 
-        self.stdout.write(f"\nVisitLog: {total} rows, {visitors} distinct visitors")
+        # "distinct ip_hash", NOT "distinct visitors". Most rows are Vercel's
+        # own ISR regenerations, and Vercel egresses from a rotating pool of
+        # IPs — so this number counts our infrastructure far more than it counts
+        # people. See the segmentation below before quoting it as an audience.
+        self.stdout.write(f"\nVisitLog: {total} rows, {visitors} distinct source IPs")
 
         if total == 0:
             self.stdout.write(
@@ -77,6 +81,8 @@ class Command(BaseCommand):
             self._breakdown(visits, "path", "Top paths", top)
             self._breakdown(visits, "status_code", "Status codes", top)
             self._breakdown(visits, "user_agent", "User agents (refine bot list)", top)
+
+            self._server_vs_browser(visits, total, visitors)
 
             authed = visits.filter(is_authenticated=True).count()
             self.stdout.write(f"\n  Authenticated: {authed} / {total}")
@@ -104,6 +110,50 @@ class Command(BaseCommand):
     def _header(self, text: str) -> None:
         self.stdout.write(self.style.MIGRATE_HEADING(f"\n{text}"))
         self.stdout.write("=" * len(text))
+
+    def _server_vs_browser(self, visits: Any, total: int, visitors: int) -> None:
+        """
+        Split rows and distinct IPs by server-side vs browser traffic.
+
+        This is the segmentation FEATURES_GROWTH_STACK §5.11 requires BEFORE
+        anyone adds `node` to BOT_USER_AGENT_MARKERS. The decision it informs:
+
+          few distinct IPs among node rows  -> a small set of machines. It is
+              infrastructure, and filtering it is safe.
+          many distinct IPs among node rows -> either Vercel's rotating egress
+              pool or something unexpected. Filtering on the assumption would
+              discard the majority of the dataset.
+
+        It also exists because "distinct visitors" was a lying label: the raw
+        distinct-ip_hash count is dominated by our own ISR regenerations, so
+        reading it as an audience size overstates real readership by an order
+        of magnitude.
+        """
+        server = visits.filter(user_agent__startswith="node")
+        browser = visits.exclude(user_agent__startswith="node")
+
+        server_rows = server.count()
+        browser_rows = browser.count()
+        server_ips = server.values("ip_hash").distinct().count()
+        browser_ips = browser.values("ip_hash").distinct().count()
+
+        self.stdout.write("\n  Server-side vs browser (see §5.11):")
+        self.stdout.write(
+            f"    node (ISR/build): {server_rows} rows, {server_ips} distinct IPs"
+        )
+        self.stdout.write(
+            f"    browser:          {browser_rows} rows, {browser_ips} distinct IPs"
+        )
+
+        if total:
+            share = round(100 * server_rows / total, 1)
+            self.stdout.write(f"    node share:       {share}% of all rows")
+
+        self.stdout.write(
+            f"    Real human traffic is closer to the {browser_ips} browser IPs "
+            f"than to the {visitors} headline figure — and even that "
+            "overcounts, since mobile networks rotate IPs per device."
+        )
 
     def _forwarded_header_verdict(self, total: int, visitors: int) -> None:
         """
