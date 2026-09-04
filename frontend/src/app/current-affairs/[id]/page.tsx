@@ -12,10 +12,11 @@ import {
   Calendar,
   User,
   FileText,
-  Loader2,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { abortIfApiUnreachable } from "@/lib/isr-guard";
 
 // Revalidate once a day (CA articles don't change once published)
 export const revalidate = 86400;
@@ -34,8 +35,15 @@ export async function generateStaticParams() {
     });
     return (list.results || []).map((article) => ({ id: article.id }));
   } catch (error) {
+    // Returning [] used to be silent: the build stayed green and simply
+    // prerendered NOTHING for this route. That is how the prerendered page
+    // count moved 158 -> 238 between two builds a day apart with no signal
+    // anywhere in the output (§5A.2). An outage now fails the build; a 4xx
+    // still yields an empty list, because that is a real answer.
+    abortIfApiUnreachable(error, "Current Affairs list (generateStaticParams)");
+
     console.error(
-      "BUILD WARNING: generateStaticParams for Current Affairs failed (likely Render timeout). Skipping pre-build.",
+      "BUILD WARNING: generateStaticParams for Current Affairs returned no ids.",
       error,
     );
     return [];
@@ -45,8 +53,6 @@ export async function generateStaticParams() {
 interface PageProps {
   params: Promise<{ id: string }>;
 }
-
-import ArticleSkeleton from "@/components/articles/article-skeleton";
 
 export default async function CAArticleDetailPage({ params }: PageProps) {
   const { id: articleId } = await params;
@@ -191,34 +197,19 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
       </div>
     );
   } catch (error) {
-    console.warn(
-      "Error loading CA article in Server Component:",
-      error instanceof Error ? error.message : String(error),
-    );
+    // An outage (no response / 5xx) aborts rather than caching an error page.
+    //
+    // The fallback that used to live here rendered a "Sync in Progress" spinner
+    // AND injected `setTimeout(() => window.location.reload(), 10000)`. With
+    // revalidate = 86400 that fallback is cached for 24 h, so every visitor to
+    // an affected article reloaded every 10 s and was served the same cached
+    // page again — a self-inflicted request amplifier on a quota already over
+    // budget. Throwing instead means Next never caches the failure and the next
+    // request retries cleanly (§5A.4a).
+    abortIfApiUnreachable(error, "CA API");
 
-    return (
-      <div className="container mx-auto px-4 py-8 animate-in fade-in duration-700">
-        <div className="mb-8 flex flex-col items-center justify-center p-8 bg-blue-50/50 rounded-3xl border border-blue-100/50 text-center gap-4">
-          <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center animate-bounce">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-black text-blue-900 uppercase tracking-tight">
-              Sync in Progress
-            </h2>
-            <p className="text-blue-700 font-medium text-sm">
-              The News Engine is refining this intelligence for you. Content
-              will appear momentarily.
-            </p>
-          </div>
-        </div>
-        <ArticleSkeleton />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `setTimeout(() => window.location.reload(), 10000)`,
-          }}
-        />
-      </div>
-    );
+    // 4xx: the API answered and this article is gone. Data, not an outage.
+    console.warn(`CA article ${articleId} unavailable — rendering 404.`);
+    notFound();
   }
 }
