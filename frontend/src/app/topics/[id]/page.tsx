@@ -11,6 +11,7 @@ import { Article } from "@/lib/types";
 import { ArrowLeft, BookOpen, Hash, Layers } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { abortIfApiUnreachable } from "@/lib/isr-guard";
 
 // Revalidate daily — topic content changes at most once/day, and there are
 // ~1,462 topic pages; hourly rebuilds × that many pages was the dominant
@@ -23,8 +24,13 @@ export async function generateStaticParams() {
     const topics = await topicsAPI.list({ page_size: 200 });
     return (topics || []).map((topic) => ({ id: topic.id }));
   } catch (error) {
+    // Returning [] used to be silent: the build stayed green and prerendered
+    // NOTHING for this route, with no signal in the output (§5A.2). An outage
+    // now fails the build; a 4xx still yields an empty list, which is an answer.
+    abortIfApiUnreachable(error, "Topics list (generateStaticParams)");
+
     console.error(
-      "BUILD WARNING: generateStaticParams for Topics failed (likely Render timeout). Skipping pre-build.",
+      "BUILD WARNING: generateStaticParams for Topics returned no ids.",
       error,
     );
     return [];
@@ -158,17 +164,15 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
       </div>
     );
   } catch (error) {
-    console.warn(
-      "Error loading topic details in Server Component:",
-      error instanceof Error ? error.message : String(error),
-    );
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center py-12 bg-red-50 text-red-600 rounded-lg border border-red-200">
-          Error retrieving topic. It might not exist or the data service is
-          down.
-        </div>
-      </div>
-    );
+    // An outage (no response / 5xx) aborts rather than caching an error page.
+    // The red "Error retrieving topic" box that used to be returned here was
+    // prerendered and cached for 24 h, so a transient API failure during one
+    // build served a permanent error to every visitor of that topic (§5A.4a).
+    abortIfApiUnreachable(error, "Topics API");
+
+    // 4xx: the API answered and this topic is gone. Data, not an outage — one
+    // missing topic must not fail a build that prerenders ~100 of them.
+    console.warn(`Topic ${topicId} unavailable — rendering 404.`);
+    notFound();
   }
 }
