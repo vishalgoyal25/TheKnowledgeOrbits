@@ -26,8 +26,8 @@ export default async function SubjectPage(props: {
 
   if (!subject) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center text-slate-500">
-        <h1 className="text-3xl font-black uppercase tracking-tight text-slate-300">
+      <div className="container mx-auto px-4 py-16 text-center text-muted-foreground">
+        <h1 className="text-3xl font-semibold uppercase tracking-tight text-muted-foreground">
           Subject Not Found
         </h1>
         <p className="mt-4">
@@ -40,14 +40,14 @@ export default async function SubjectPage(props: {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Header */}
-      <div className="mb-10 pb-6 border-b border-slate-100">
+      <div className="mb-10 pb-6 border-b border-border">
         <div className="flex items-center gap-3 text-blue-600 mb-3">
           <BookOpen className="h-10 w-10" />
-          <h1 className="text-4xl md:text-5xl font-black font-heading tracking-tighter text-slate-900">
+          <h1 className="text-4xl md:text-5xl font-semibold font-heading tracking-tighter text-foreground">
             {subject.name}
           </h1>
         </div>
-        <p className="text-slate-600 text-lg md:text-xl font-medium max-w-3xl">
+        <p className="text-muted-foreground text-lg md:text-xl font-medium max-w-3xl">
           {subject.description ||
             "Browse interconnected modules mapped within this core subject."}
         </p>
@@ -55,8 +55,8 @@ export default async function SubjectPage(props: {
 
       {/* Grid Layout */}
       {modules.length === 0 ? (
-        <div className="text-center py-20 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-          <p className="text-slate-500 font-medium">
+        <div className="text-center py-20 bg-muted/40 rounded-lg border border-dashed border-border">
+          <p className="text-muted-foreground font-medium">
             No modules available for this subject yet.
           </p>
         </div>

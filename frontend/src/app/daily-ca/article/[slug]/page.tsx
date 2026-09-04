@@ -158,19 +158,19 @@ const markdownComponents = {
     return (
       <h2
         id={id}
-        className="text-base font-bold mt-6 mb-2 pb-1.5 border-b scroll-mt-20 text-gray-900 border-gray-100"
+        className="text-base font-bold mt-6 mb-2 pb-1.5 border-b scroll-mt-20 text-foreground border-border"
       >
         {children}
       </h2>
     );
   },
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-sm font-semibold text-gray-800 mt-4 mb-1.5">
+    <h3 className="text-sm font-semibold text-foreground mt-4 mb-1.5">
       {children}
     </h3>
   ),
   p: ({ children }: { children?: React.ReactNode }) => (
-    <p className="text-sm leading-relaxed text-gray-700 mb-3">{children}</p>
+    <p className="text-sm leading-relaxed text-foreground mb-3">{children}</p>
   ),
   ul: ({ children }: { children?: React.ReactNode }) => (
     <ul className="my-3 space-y-2 pl-1 border-l-2 border-blue-100 ml-1">
@@ -178,12 +178,12 @@ const markdownComponents = {
     </ul>
   ),
   ol: ({ children }: { children?: React.ReactNode }) => (
-    <ol className="my-3 space-y-2 pl-5 list-decimal [&>li]:pl-1 [&>li]:text-sm [&>li]:text-gray-700 [&>li]:leading-relaxed marker:text-blue-500 marker:font-semibold">
+    <ol className="my-3 space-y-2 pl-5 list-decimal [&>li]:pl-1 [&>li]:text-sm [&>li]:text-foreground [&>li]:leading-relaxed marker:text-blue-500 marker:font-semibold">
       {children}
     </ol>
   ),
   li: ({ children }: { children?: React.ReactNode }) => (
-    <li className="text-sm text-gray-700 leading-relaxed flex gap-2 pl-3">
+    <li className="text-sm text-foreground leading-relaxed flex gap-2 pl-3">
       <span className="flex-shrink-0 text-blue-500 font-bold mt-0.5 text-xs">
         ▸
       </span>
@@ -191,7 +191,7 @@ const markdownComponents = {
     </li>
   ),
   strong: ({ children }: { children?: React.ReactNode }) => (
-    <strong className="font-semibold text-gray-900">{children}</strong>
+    <strong className="font-semibold text-foreground">{children}</strong>
   ),
   a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
     <a
@@ -208,18 +208,18 @@ const markdownComponents = {
   ),
   table: ({ children }: { children?: React.ReactNode }) => (
     <div className="overflow-x-auto my-3">
-      <table className="min-w-full text-sm border-collapse border border-gray-200 rounded-lg">
+      <table className="min-w-full text-sm border-collapse border border-border rounded-lg">
         {children}
       </table>
     </div>
   ),
   th: ({ children }: { children?: React.ReactNode }) => (
-    <th className="bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-600 border border-gray-200">
+    <th className="bg-muted/40 px-3 py-2 text-left text-xs font-semibold text-gray-600 border border-border">
       {children}
     </th>
   ),
   td: ({ children }: { children?: React.ReactNode }) => (
-    <td className="px-3 py-2 text-xs text-gray-700 border border-gray-100">
+    <td className="px-3 py-2 text-xs text-foreground border border-border">
       {children}
     </td>
   ),
@@ -232,7 +232,7 @@ const GS_COLORS: Record<string, string> = {
   GS2: "bg-blue-100 text-blue-700 border-blue-200",
   GS3: "bg-green-100 text-green-700 border-green-200",
   GS4: "bg-orange-100 text-orange-700 border-orange-200",
-  CSAT: "bg-gray-100 text-gray-600 border-gray-200",
+  CSAT: "bg-gray-100 text-gray-600 border-border",
 };
 
 // ── Page (Server Component) ───────────────────────────────────────────────────
@@ -254,7 +254,7 @@ export default async function ArticleDetailPage({
   const readMin = estimateReadTime(article.body_md_processed ?? "");
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted/40">
       {/* Telemetry — renders null, fires once per mount. Uses article.id (not
           slug) so ContentRead rows key on the same identity SocialBar uses. */}
       <ReadBeacon contentType="daily_ca_article" contentId={article.id} />
@@ -273,7 +273,7 @@ export default async function ArticleDetailPage({
           </div>
 
           {/* Main — Article body (fully server-rendered) */}
-          <article className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <article className="rounded-lg border border-border bg-card shadow-sm">
             {/* Header */}
             <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4">
               <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -284,15 +284,15 @@ export default async function ArticleDetailPage({
                     {article.gs_paper}
                   </span>
                 )}
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted-foreground">
                   {article.subject_name}
                 </span>
                 <span className="text-xs text-gray-300">·</span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-muted-foreground">
                   {formatDate(article.published_date)}
                 </span>
                 <span className="text-xs text-gray-300">·</span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-muted-foreground">
                   {readMin} min read
                 </span>
               </div>
@@ -302,7 +302,7 @@ export default async function ArticleDetailPage({
               </h1>
 
               {article.news_context && (
-                <p className="text-sm text-gray-500 italic leading-relaxed border-l-2 border-gray-200 pl-3 mb-4">
+                <p className="text-sm text-muted-foreground italic leading-relaxed border-l-2 border-border pl-3 mb-4">
                   {article.news_context}
                 </p>
               )}
@@ -351,8 +351,8 @@ export default async function ArticleDetailPage({
 
               {/* Tags */}
               {article.tags.length > 0 && (
-                <div className="mt-5 pt-4 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                <div className="mt-5 pt-4 border-t border-border">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                     Tags
                   </p>
                   <TagChips tags={article.tags} />
@@ -362,7 +362,7 @@ export default async function ArticleDetailPage({
               {/* Concepts — mobile only */}
               {article.concept_links.length > 0 && (
                 <div className="mt-4 xl:hidden">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                     Concepts Mentioned
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -377,7 +377,7 @@ export default async function ArticleDetailPage({
               <SourceAccordion sources={article.sources_used ?? []} />
 
               {/* Social — Like · Comments · Share */}
-              <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="mt-4 pt-4 border-t border-border">
                 <SocialBar
                   contentType="daily_ca_article"
                   contentId={article.id}

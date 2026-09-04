@@ -34,8 +34,8 @@ export default function ConceptPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200 px-4 py-7">
+      <div className="min-h-screen bg-muted/40">
+        <div className="bg-white border-b border-border px-4 py-7">
           <div className="max-w-[1200px] mx-auto space-y-2">
             <div className="h-4 bg-gray-200 rounded animate-pulse w-24" />
             <div className="h-7 bg-gray-200 rounded animate-pulse w-1/2" />
@@ -44,10 +44,10 @@ export default function ConceptPage() {
         <div className="max-w-[1200px] mx-auto px-4 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
             <div className="space-y-4">
-              <div className="h-32 bg-white rounded-2xl border border-gray-200 animate-pulse" />
-              <div className="h-64 bg-white rounded-2xl border border-gray-200 animate-pulse" />
+              <div className="h-32 bg-white rounded-lg border border-border animate-pulse" />
+              <div className="h-64 bg-white rounded-lg border border-border animate-pulse" />
             </div>
-            <div className="hidden lg:block h-48 bg-white rounded-xl border border-gray-200 animate-pulse" />
+            <div className="hidden lg:block h-48 bg-white rounded-xl border border-border animate-pulse" />
           </div>
         </div>
       </div>
@@ -56,10 +56,10 @@ export default function ConceptPage() {
 
   if (error || !concept) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/40 flex items-center justify-center">
         <div className="text-center">
           <p className="text-4xl mb-4">🔷</p>
-          <p className="text-gray-700 font-semibold mb-2">
+          <p className="text-foreground font-semibold mb-2">
             {error ?? "Concept not found"}
           </p>
           <button

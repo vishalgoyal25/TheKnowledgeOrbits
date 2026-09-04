@@ -4,10 +4,10 @@ import Link from "next/link";
 
 export default function TermsOfService() {
   return (
-    <div className="bg-slate-50 min-h-screen py-16">
+    <div className="bg-muted/40 min-h-screen py-16">
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Header */}
-        <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 mb-8 relative overflow-hidden">
+        <div className="bg-white rounded-lg p-8 md:p-12 shadow-sm border border-border mb-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Scale size={160} />
           </div>
@@ -15,10 +15,10 @@ export default function TermsOfService() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold uppercase tracking-wider mb-4">
               <Scale className="h-3.5 w-3.5" /> Legal Framework
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">
+            <h1 className="text-4xl md:text-5xl font-semibold text-foreground mb-4 tracking-tight">
               Terms of Service
             </h1>
-            <p className="text-slate-500 font-medium text-lg max-w-2xl">
+            <p className="text-muted-foreground font-medium text-lg max-w-2xl">
               Last Updated: February 25, 2026. Please read these terms carefully
               before using our platform.
             </p>
@@ -26,7 +26,7 @@ export default function TermsOfService() {
         </div>
 
         {/* Hobby Project Disclaimer */}
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 mb-10 flex flex-col md:flex-row gap-6 items-center">
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-6 mb-10 flex flex-col md:flex-row gap-6 items-center">
           <div className="h-14 w-14 shrink-0 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
             <AlertTriangle className="h-8 w-8" />
           </div>
@@ -46,10 +46,10 @@ export default function TermsOfService() {
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 space-y-12 text-slate-700 leading-relaxed">
+        <div className="bg-white rounded-lg p-8 md:p-12 shadow-sm border border-border space-y-12 text-foreground leading-relaxed">
           {/* Section 1 */}
           <section>
-            <h2 className="text-2xl font-black text-slate-900 mb-4">
+            <h2 className="text-2xl font-semibold text-foreground mb-4">
               1. Project Intent & Scope
             </h2>
             <p className="mb-4">
@@ -66,10 +66,10 @@ export default function TermsOfService() {
 
           {/* Section 2 */}
           <section>
-            <h2 className="text-2xl font-black text-slate-900 mb-4">
+            <h2 className="text-2xl font-semibold text-foreground mb-4">
               2. Intellectual Property & Content Aggregation
             </h2>
-            <p className="mb-4 font-bold text-slate-900 underline">
+            <p className="mb-4 font-bold text-foreground underline">
               Our Commitment to Copyright Integrity:
             </p>
             <p className="mb-4">
@@ -104,10 +104,10 @@ export default function TermsOfService() {
 
           {/* Section 3 */}
           <section>
-            <h2 className="text-2xl font-black text-slate-900 mb-4">
+            <h2 className="text-2xl font-semibold text-foreground mb-4">
               3. User Conduct
             </h2>
-            <p className="mb-4 text-slate-600">
+            <p className="mb-4 text-muted-foreground">
               Users are granted a limited, revocable license to access the site
               for personal, non-commercial preparation for competitive exams.
               You agree not to:
@@ -129,7 +129,7 @@ export default function TermsOfService() {
 
           {/* Section 4 */}
           <section>
-            <h2 className="text-2xl font-black text-slate-900 mb-4">
+            <h2 className="text-2xl font-semibold text-foreground mb-4">
               4. Take-Down Policy (DMCA / Copyright)
             </h2>
             <p className="mb-4">
@@ -139,7 +139,7 @@ export default function TermsOfService() {
               infringement beyond "Fair Use" or "Educational Dissemination,"
               please contact us at:
             </p>
-            <div className="bg-slate-50 p-4 rounded-xl font-mono text-sm border border-slate-100 flex items-center gap-2">
+            <div className="bg-muted/40 p-4 rounded-xl font-mono text-sm border border-slate-100 flex items-center gap-2">
               <Mail className="h-4 w-4 text-blue-500" />{" "}
               support@knowledgeorbits.com
             </div>
@@ -151,7 +151,7 @@ export default function TermsOfService() {
 
           {/* Section 5 */}
           <section>
-            <h2 className="text-2xl font-black text-slate-900 mb-4">
+            <h2 className="text-2xl font-semibold text-foreground mb-4">
               5. Limitation of Liability
             </h2>
             <p>

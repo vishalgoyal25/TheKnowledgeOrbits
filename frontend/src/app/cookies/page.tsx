@@ -4,10 +4,10 @@ import Link from "next/link";
 
 export default function CookiePolicy() {
   return (
-    <div className="bg-slate-50 min-h-screen py-16">
+    <div className="bg-muted/40 min-h-screen py-16">
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Header */}
-        <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 mb-8 relative overflow-hidden text-center md:text-left">
+        <div className="bg-card rounded-lg p-8 md:p-12 shadow-sm border border-border mb-8 relative overflow-hidden text-center md:text-left">
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Cookie size={160} />
           </div>
@@ -15,10 +15,10 @@ export default function CookiePolicy() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-bold uppercase tracking-wider mb-4">
               <Cookie className="h-3.5 w-3.5" /> Browser Interaction
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">
+            <h1 className="text-4xl md:text-5xl font-semibold text-foreground mb-4 tracking-tight">
               Cookie Policy
             </h1>
-            <p className="text-slate-500 font-medium text-lg max-w-2xl">
+            <p className="text-muted-foreground font-medium text-lg max-w-2xl">
               We use only essential technical cookies to keep your study
               sessions smooth. No advertising or tracking cookies are used here.
             </p>
@@ -26,7 +26,7 @@ export default function CookiePolicy() {
         </div>
 
         {/* Hobby Project Awareness */}
-        <div className="bg-amber-50 border-2 border-amber-100 rounded-2xl p-6 mb-10 flex flex-col md:flex-row gap-6 items-center">
+        <div className="bg-amber-50 border-2 border-amber-100 rounded-lg p-6 mb-10 flex flex-col md:flex-row gap-6 items-center">
           <div className="h-14 w-14 shrink-0 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
             <Info className="h-8 w-8 text-amber-600" />
           </div>
@@ -44,11 +44,11 @@ export default function CookiePolicy() {
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 space-y-12 text-slate-700 leading-relaxed">
+        <div className="bg-card rounded-lg p-8 md:p-12 shadow-sm border border-border space-y-12 text-foreground leading-relaxed">
           {/* Section 1 */}
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <h2 className="text-2xl font-black text-slate-900">
+              <h2 className="text-2xl font-semibold text-foreground">
                 What are Cookies?
               </h2>
             </div>
@@ -63,24 +63,24 @@ export default function CookiePolicy() {
           {/* Section 2 */}
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <h2 className="text-2xl font-black text-slate-900">
+              <h2 className="text-2xl font-semibold text-foreground">
                 Types of Cookies We Use
               </h2>
             </div>
             <div className="space-y-6">
               {/* Essential Cookies */}
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col md:flex-row gap-6">
+              <div className="p-6 bg-muted/40 rounded-lg border border-border flex flex-col md:flex-row gap-6">
                 <div className="h-10 w-10 shrink-0 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
                   <Lock className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-1">
+                  <h3 className="text-lg font-bold text-foreground mb-1">
                     Strictly Necessary Cookies (Auth)
                   </h3>
-                  <p className="text-sm text-slate-500 mb-3 underline italic uppercase tracking-widest text-[10px]">
+                  <p className="text-sm text-muted-foreground mb-3 underline italic uppercase tracking-widest text-[10px]">
                     ALWAYS ENABLED
                   </p>
-                  <p className="text-sm text-slate-600 leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     We use these cookies to manage your login session (via
                     Supabase/JWT). Without these, our dashboard and preparation
                     tracking features won&apos;t work.
@@ -89,18 +89,18 @@ export default function CookiePolicy() {
               </div>
 
               {/* Preference Cookies */}
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col md:flex-row gap-6">
+              <div className="p-6 bg-muted/40 rounded-lg border border-border flex flex-col md:flex-row gap-6">
                 <div className="h-10 w-10 shrink-0 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
                   <Zap className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-1">
+                  <h3 className="text-lg font-bold text-foreground mb-1">
                     Functionality Cookies (Study State)
                   </h3>
-                  <p className="text-sm text-slate-500 mb-3 underline italic uppercase tracking-widest text-[10px]">
+                  <p className="text-sm text-muted-foreground mb-3 underline italic uppercase tracking-widest text-[10px]">
                     OPTIONAL
                   </p>
-                  <p className="text-sm text-slate-600 leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     These remember preferences like your theme choice
                     (Light/Dark mode) or which filter you used last on the
                     Current Affairs page.
@@ -113,7 +113,7 @@ export default function CookiePolicy() {
           {/* Section 3 */}
           <section>
             <div className="flex items-center gap-3 mb-6">
-              <h2 className="text-2xl font-black text-slate-900">
+              <h2 className="text-2xl font-semibold text-foreground">
                 Third-Party Cookies
               </h2>
             </div>
@@ -133,7 +133,7 @@ export default function CookiePolicy() {
 
           {/* How to Control Cookies */}
           <section>
-            <h2 className="text-2xl font-black text-slate-900 mb-4">
+            <h2 className="text-2xl font-semibold text-foreground mb-4">
               How to Control Cookies
             </h2>
             <p className="mb-4">
@@ -145,7 +145,7 @@ export default function CookiePolicy() {
           </section>
 
           {/* Contact Developer */}
-          <section className="text-center pt-8 border-t border-slate-100">
+          <section className="text-center pt-8 border-t border-border">
             <Link
               href="/terms"
               className="text-blue-600 font-bold hover:underline"
@@ -156,7 +156,7 @@ export default function CookiePolicy() {
         </div>
 
         {/* Footer */}
-        <div className="mt-12 text-center text-sm font-bold text-slate-400 uppercase tracking-widest">
+        <div className="mt-12 text-center text-sm font-bold text-muted-foreground uppercase tracking-widest">
           <Link href="/" className="hover:text-blue-500 transition-colors">
             Return Home
           </Link>

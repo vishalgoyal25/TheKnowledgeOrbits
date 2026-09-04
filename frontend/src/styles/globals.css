@@ -32,7 +32,21 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
 
-    --radius: 0.5rem;
+    /* G2 decision (2026-09-04): one radius everywhere.
+       Public pages previously mixed rounded-xl / 2xl / 3xl. Tailwind maps
+       rounded-lg to this variable, so the corner style for every card, button
+       and input is decided here and nowhere else. 0.75rem == the old
+       rounded-xl, which read as friendly without being consumer-app soft. */
+    --radius: 0.75rem;
+
+    /* G2 decision: ONE accent beside primary blue, for highlights and badges.
+       Deliberately a new token rather than a change to --accent: shadcn uses
+       --accent for hover states across all 32 ui/ primitives, so repurposing
+       it would silently restyle every hover on the site.
+       Semantic colours are NOT replaced by this — the GS1..GS4/CSAT paper
+       badges encode meaning users learn, and they stay as they are. */
+    --highlight: 38 92% 50%;
+    --highlight-foreground: 26 83% 14%;
   }
 }
 

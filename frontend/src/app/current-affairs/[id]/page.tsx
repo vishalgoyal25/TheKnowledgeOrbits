@@ -76,7 +76,7 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
         {/* Rest of the valid page content... */}
         <div className="mb-10">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
-            <h1 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight tracking-tight">
+            <h1 className="text-4xl md:text-5xl font-semibold text-foreground leading-tight tracking-tight">
               {article.title}
             </h1>
 
@@ -98,36 +98,36 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
           </div>
 
           {/* Metadata Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-gray-50 rounded-xl border border-gray-100 mb-8 items-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-muted/40 rounded-xl border border-border mb-8 items-center">
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-bold uppercase">
                 <Calendar className="h-3.5 w-3.5" /> Published
               </div>
-              <span className="text-sm font-bold text-gray-800">
+              <span className="text-sm font-bold text-foreground">
                 {formatDate(article.published_at)}
               </span>
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-bold uppercase">
                 <User className="h-3.5 w-3.5" /> Source
               </div>
-              <span className="text-sm font-bold text-gray-800">
+              <span className="text-sm font-bold text-foreground">
                 {article.source_name}
               </span>
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-bold uppercase">
                 <FileText className="h-3.5 w-3.5" /> Length
               </div>
-              <span className="text-sm font-bold text-gray-800">
+              <span className="text-sm font-bold text-foreground">
                 {article.word_count} Words
               </span>
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase">
+              <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-bold uppercase">
                 <ExternalLink className="h-3.5 w-3.5" /> Original
               </div>
               <a
@@ -160,7 +160,7 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
         {/* Summary */}
         {article.summary && (
           <div className="mb-10 bg-indigo-50 border-l-4 border-indigo-600 p-8 rounded-r-2xl shadow-sm">
-            <h2 className="text-indigo-900 font-black uppercase text-xs tracking-widest mb-3">
+            <h2 className="text-indigo-900 font-semibold uppercase text-xs tracking-widest mb-3">
               Key Synthesis
             </h2>
             <p className="text-indigo-900 text-lg leading-relaxed font-medium">
@@ -173,10 +173,10 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
         <Card className="border-none shadow-none bg-white">
           <CardContent className="px-0 pt-0">
             <div className="prose prose-lg max-w-none prose-slate">
-              <div className="whitespace-pre-wrap text-gray-800 leading-[1.8] text-xl font-serif">
+              <div className="whitespace-pre-wrap text-foreground leading-[1.8] text-xl font-serif">
                 {article.content?.substring(0, 350)}
                 {(article.content?.length || 0) > 350 && (
-                  <span className="text-gray-500 font-sans text-sm block mt-6 p-4 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                  <span className="text-gray-500 font-sans text-sm block mt-6 p-4 bg-muted/40 rounded-lg border-l-4 border-gray-300">
                     ... [Analysis truncated for legal compliance. To read the
                     full in-depth coverage, please visit the original source:{" "}
                     <a
