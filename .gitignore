@@ -21,6 +21,13 @@ wheels/
 MANIFEST
 venv/
 myvenv/
+
+# Retired work. CLAUDE.md forbids hard-deleting anything: superseded files are
+# moved to trash/<date>/ instead. This entry was missing until 2026-09-04, so
+# that rule would have committed removed files back into a PUBLIC repo rather
+# than removing them.
+trash/
+
 env/
 ENV/
 .venv/
