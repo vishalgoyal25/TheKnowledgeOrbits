@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getConceptDetail, ConceptDetail } from "@/lib/api/tags";
 import { ConceptDetailComponent } from "@/components/concepts/concept-detail";
+import ReadBeacon from "@/components/telemetry/ReadBeacon";
 
 export default function ConceptPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -72,5 +73,14 @@ export default function ConceptPage() {
     );
   }
 
-  return <ConceptDetailComponent concept={concept} />;
+  // Beacon fires only here — in the success branch — so a failed or still-loading
+  // fetch never records a read. Deliberately fires for stubs (is_content_ready
+  // false) too: whether readers land on unfinished concept pages is exactly the
+  // question G0.3 needs answered, and filtering them would hide it.
+  return (
+    <>
+      <ReadBeacon contentType="concept" contentId={concept.id} />
+      <ConceptDetailComponent concept={concept} />
+    </>
+  );
 }

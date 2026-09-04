@@ -31,6 +31,7 @@ import { ConceptCard } from "@/components/daily-ca/concept-card";
 import { ScrollSpyToC, Heading } from "./_components/scroll-spy-toc";
 import { ArticleTopBar } from "./_components/article-top-bar";
 import { SocialBar } from "@/components/social/social-bar";
+import ReadBeacon from "@/components/telemetry/ReadBeacon";
 import { preprocessArticleBody } from "@/lib/daily-ca-preprocess";
 
 // ── ISR — rebuild daily; articles are immutable after publish, so a longer
@@ -254,6 +255,10 @@ export default async function ArticleDetailPage({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Telemetry — renders null, fires once per mount. Uses article.id (not
+          slug) so ContentRead rows key on the same identity SocialBar uses. */}
+      <ReadBeacon contentType="daily_ca_article" contentId={article.id} />
+
       {/* Top bar — client component (back button + share) */}
       <ArticleTopBar title={article.title} />
 
