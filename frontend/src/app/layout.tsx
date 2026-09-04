@@ -13,6 +13,8 @@ import { LayoutContent } from "@/components/layout/layout-content";
 import FeedbackButton from "@/components/support/feedback-button";
 import { GlobalErrorBoundary } from "@/components/shared/GlobalErrorBoundary";
 import { getHierarchyData } from "@/lib/api/server-hierarchy";
+import GoogleAnalytics from "@/components/telemetry/GoogleAnalytics";
+import PageViewTracker from "@/components/telemetry/PageViewTracker";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -33,6 +35,15 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
+        {/*
+          Both render null without NEXT_PUBLIC_GA_ID. PageViewTracker carries its
+          own <Suspense> boundary internally — do NOT unwrap it or mount its inner
+          component directly here: useSearchParams() outside a boundary in this
+          file turns every route on the site dynamic (see FEATURES_GROWTH_STACK
+          §5.4, R1).
+        */}
+        <GoogleAnalytics />
+        <PageViewTracker />
         <GlobalErrorBoundary>
           <QueryProvider>
             <AuthProvider>

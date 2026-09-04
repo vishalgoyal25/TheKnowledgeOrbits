@@ -12,6 +12,7 @@ import { SocialBar } from "@/components/social/social-bar";
 import Link from "next/link";
 import apiClient from "@/lib/api/client";
 import PrivateArticleFallback from "./private-article-fallback";
+import ReadBeacon from "@/components/telemetry/ReadBeacon";
 
 // Force dynamic rendering to exactly mirror localhost behavior and prevent ISR cache crashes
 export const dynamic = "force-dynamic";
@@ -106,6 +107,14 @@ export default async function ArticleDetailPage({
 
     return (
       <div className="container mx-auto px-4 py-8">
+        {/* Telemetry — skipped for ?type=document. That branch renders a Document
+            as an Article, so its id belongs to a different table; recording it
+            under content_type="article" would mix two id spaces in one column
+            and make content_id impossible to join back reliably. */}
+        {type !== "document" && (
+          <ReadBeacon contentType="article" contentId={article.id} />
+        )}
+
         {/* Back button */}
         <div className="mb-8">
           <Link href="/articles">
