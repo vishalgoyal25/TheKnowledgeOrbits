@@ -37,7 +37,7 @@ function NewsArticleRow({ article }: { article: DailyCaArticleList }) {
   return (
     <Link
       href={`/daily-ca/article/${article.slug}`}
-      className="group flex items-start gap-4 px-5 py-4 bg-white hover:bg-blue-50/40 transition-colors border-b border-gray-100 last:border-b-0"
+      className="group flex items-start gap-4 px-5 py-4 bg-white hover:bg-blue-50/40 transition-colors border-b border-border last:border-b-0"
     >
       {/* Left: meta + title + context */}
       <div className="flex-1 min-w-0">
@@ -46,18 +46,18 @@ function NewsArticleRow({ article }: { article: DailyCaArticleList }) {
             {categoryLabel}
           </span>
           {article.gs_paper && (
-            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500 shrink-0">
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-muted-foreground shrink-0">
               {article.gs_paper}
             </span>
           )}
         </div>
 
-        <h3 className="text-sm font-semibold text-gray-900 leading-snug mb-1 group-hover:text-blue-700 transition-colors line-clamp-2">
+        <h3 className="text-sm font-semibold text-foreground leading-snug mb-1 group-hover:text-blue-700 transition-colors line-clamp-2">
           {article.title}
         </h3>
 
         {article.news_context && (
-          <p className="text-xs text-gray-400 line-clamp-1">
+          <p className="text-xs text-muted-foreground line-clamp-1">
             {article.news_context}
           </p>
         )}
@@ -65,7 +65,7 @@ function NewsArticleRow({ article }: { article: DailyCaArticleList }) {
 
       {/* Right: date + read arrow */}
       <div className="shrink-0 flex flex-col items-end gap-2 pt-0.5">
-        <span className="text-[11px] text-gray-400 whitespace-nowrap">
+        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
           {dateLabel}
         </span>
         <span className="text-xs font-semibold text-blue-400 group-hover:text-blue-600 transition-colors">
@@ -161,16 +161,16 @@ function NewsPageInner() {
       : (CATEGORY_LABELS[activeCategory] ?? activeCategory);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted/40">
       {/* Page header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4 max-w-[860px] mx-auto">
+      <div className="bg-white border-b border-border px-4 py-4 max-w-[860px] mx-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-gray-900 tracking-tight">
+            <h1 className="text-lg font-bold text-foreground tracking-tight">
               {activeCategoryLabel}
             </h1>
             {!loading && (
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {filtered.length} article{filtered.length !== 1 ? "s" : ""} —
                 last 30 days
               </p>
@@ -196,7 +196,7 @@ function NewsPageInner() {
 
         {/* Loading skeleton */}
         {loading && (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          <div className="bg-white rounded-lg border border-border overflow-hidden divide-y divide-gray-100">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex gap-4 px-5 py-4 animate-pulse">
                 <div className="flex-1 space-y-2">
@@ -215,7 +215,7 @@ function NewsPageInner() {
         {/* Articles list */}
         {!loading && !error && filtered.length > 0 && (
           <>
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-lg border border-border overflow-hidden">
               {filtered.map((article) => (
                 <NewsArticleRow key={article.id} article={article} />
               ))}
@@ -227,7 +227,7 @@ function NewsPageInner() {
                 <button
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="px-6 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2.5 rounded-xl bg-white border border-border text-sm font-medium text-foreground hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loadingMore ? "Loading…" : "Load 10 more days"}
                 </button>
@@ -240,12 +240,12 @@ function NewsPageInner() {
         {!loading && !error && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <p className="text-4xl mb-4">📰</p>
-            <p className="text-gray-600 font-medium mb-1">
+            <p className="text-muted-foreground font-medium mb-1">
               {activeCategory === "all"
                 ? "No articles in the last 30 days."
                 : `No "${activeCategoryLabel}" articles in the last 30 days.`}
             </p>
-            <p className="text-sm text-gray-400 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {activeCategory !== "all" &&
                 "Try selecting a different category from the navbar above."}
             </p>
@@ -266,7 +266,7 @@ function NewsPageInner() {
 
 export default function NewsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+    <Suspense fallback={<div className="min-h-screen bg-muted/40" />}>
       <NewsPageInner />
     </Suspense>
   );

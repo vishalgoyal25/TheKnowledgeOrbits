@@ -45,7 +45,7 @@ export default function CASourcesPage() {
           <Settings className="h-8 w-8 text-blue-600" />
           <h1 className="text-4xl font-bold">CA Sources</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Monitor RSS feed sources and scraping status
         </p>
       </div>
@@ -53,21 +53,21 @@ export default function CASourcesPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-blue-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Total Sources</div>
+          <div className="text-sm text-muted-foreground">Total Sources</div>
           <div className="text-3xl font-bold text-blue-600">
             {sources.length}
           </div>
         </div>
 
         <div className="bg-green-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Active</div>
+          <div className="text-sm text-muted-foreground">Active</div>
           <div className="text-3xl font-bold text-green-600">
             {sources.filter((s) => s.is_active).length}
           </div>
         </div>
 
         <div className="bg-purple-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Total Articles</div>
+          <div className="text-sm text-muted-foreground">Total Articles</div>
           <div className="text-3xl font-bold text-purple-600">
             {sources.reduce((sum, s) => sum + s.article_count, 0)}
           </div>
@@ -76,9 +76,9 @@ export default function CASourcesPage() {
 
       {/* Sources */}
       {sources.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No sources configured</p>
+        <div className="text-center py-12 bg-muted/40 rounded-lg">
+          <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No sources configured</p>
         </div>
       ) : (
         <CASourceStatus sources={sources} />

@@ -50,29 +50,29 @@ export default function TopicsClient({
     <>
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-blue-50/50 border border-blue-100/50 rounded-2xl p-6 shadow-sm">
+        <div className="bg-blue-50/50 border border-blue-100/50 rounded-lg p-6 shadow-sm">
           <div className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-1">
             Total Topics
           </div>
-          <div className="text-3xl font-black text-blue-600">
+          <div className="text-3xl font-semibold text-blue-600">
             {initialTopics.length}
           </div>
         </div>
 
-        <div className="bg-emerald-50/50 border border-emerald-100/50 rounded-2xl p-6 shadow-sm">
+        <div className="bg-emerald-50/50 border border-emerald-100/50 rounded-lg p-6 shadow-sm">
           <div className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-1">
             Active Subjects
           </div>
-          <div className="text-3xl font-black text-emerald-600">
+          <div className="text-3xl font-semibold text-emerald-600">
             {activeSubjects.length}
           </div>
         </div>
 
-        <div className="bg-purple-50/50 border border-purple-100/50 rounded-2xl p-6 shadow-sm">
+        <div className="bg-purple-50/50 border border-purple-100/50 rounded-lg p-6 shadow-sm">
           <div className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-1">
             Showing
           </div>
-          <div className="text-3xl font-black text-purple-600">
+          <div className="text-3xl font-semibold text-purple-600">
             {isLoading ? (
               <Skeleton className="h-8 w-12 rounded-lg inline-block" />
             ) : (
@@ -85,7 +85,7 @@ export default function TopicsClient({
       {/* Filters */}
       <div className="mb-8 flex gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search topics..."
             value={searchTerm}
@@ -120,7 +120,7 @@ export default function TopicsClient({
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4 shadow-sm"
+                  className="bg-white rounded-lg border border-border p-6 space-y-4 shadow-sm"
                 >
                   <div className="flex gap-2">
                     <Skeleton className="h-5 w-16 rounded-full" />
@@ -135,8 +135,8 @@ export default function TopicsClient({
               ))}
             </div>
           ) : filteredTopics.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
-              <p className="text-gray-600">
+            <div className="text-center py-12 bg-muted/40 rounded-lg border border-dashed">
+              <p className="text-muted-foreground">
                 No topics found matching your search.
               </p>
             </div>
@@ -152,8 +152,8 @@ export default function TopicsClient({
         {/* Tree View */}
         <TabsContent value="tree">
           {filteredTopics.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
-              <p className="text-gray-600">
+            <div className="text-center py-12 bg-muted/40 rounded-lg border border-dashed">
+              <p className="text-muted-foreground">
                 No topics found matching your search.
               </p>
             </div>

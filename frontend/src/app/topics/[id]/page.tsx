@@ -73,7 +73,7 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
         <div className="mb-8 p-8 bg-white rounded-xl border shadow-sm transition-all hover:shadow-md">
           <div className="flex justify-between items-start gap-4 mb-6">
             <div>
-              <div className="flex items-center gap-3 mb-3 text-sm font-medium text-gray-500 uppercase tracking-widest">
+              <div className="flex items-center gap-3 mb-3 text-sm font-medium text-muted-foreground uppercase tracking-widest">
                 <span className="flex items-center gap-1.5 transition-colors hover:text-blue-600 cursor-default">
                   <BookOpen className="h-4 w-4" />
                   {topic.subject_name}
@@ -84,7 +84,7 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
                   {topic.module_name}
                 </span>
               </div>
-              <h1 className="text-4xl font-black text-gray-900 leading-tight">
+              <h1 className="text-4xl font-semibold text-foreground leading-tight">
                 {topic.name}
               </h1>
             </div>
@@ -99,14 +99,14 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
           </div>
 
           {topic.description && (
-            <p className="text-gray-600 text-lg mb-8 leading-relaxed max-w-4xl">
+            <p className="text-muted-foreground text-lg mb-8 leading-relaxed max-w-4xl">
               {topic.description}
             </p>
           )}
 
           {topic.keywords && topic.keywords.length > 0 && (
-            <div className="flex items-start gap-3 border-t pt-6 bg-gray-50/50 p-4 rounded-lg">
-              <Hash className="h-5 w-5 mt-0.5 text-gray-400" />
+            <div className="flex items-start gap-3 border-t pt-6 bg-muted/40/50 p-4 rounded-lg">
+              <Hash className="h-5 w-5 mt-0.5 text-muted-foreground" />
               <div className="flex flex-wrap gap-2.5">
                 {topic.keywords.map((kw, i) => (
                   <Badge
@@ -125,7 +125,7 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
         {/* Articles Section */}
         <div className="space-y-8">
           <div className="flex items-center justify-between border-b pb-4">
-            <h2 className="text-3xl font-black text-gray-800 font-heading">
+            <h2 className="text-3xl font-semibold text-foreground font-heading">
               Study Materials
             </h2>
             {articles.length > 0 && (
@@ -137,9 +137,9 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
           </div>
 
           {articles.length === 0 ? (
-            <div className="text-center py-20 bg-gray-50/50 rounded-xl border border-dashed border-gray-300">
+            <div className="text-center py-20 bg-muted/40/50 rounded-xl border border-dashed border-gray-300">
               <div className="max-w-md mx-auto">
-                <p className="text-gray-500 text-lg mb-6">
+                <p className="text-muted-foreground text-lg mb-6">
                   Our AI engines haven't generated specialized study material
                   for this topic yet.
                 </p>

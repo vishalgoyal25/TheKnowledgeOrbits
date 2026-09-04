@@ -157,7 +157,7 @@ export default function CurrentAffairsClient({
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="bg-blue-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Total Articles</div>
+          <div className="text-sm text-muted-foreground">Total Articles</div>
           <div className="text-3xl font-bold text-blue-600">
             {totalArticles === 0 && (isGridLoading || isTimelineLoading) ? (
               <Loader2 className="h-8 w-8 animate-spin inline-block" />
@@ -168,14 +168,14 @@ export default function CurrentAffairsClient({
         </div>
 
         <div className="bg-green-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Active Sources</div>
+          <div className="text-sm text-muted-foreground">Active Sources</div>
           <div className="text-3xl font-bold text-green-600">
             {sources.filter((s) => s.is_active).length}
           </div>
         </div>
 
         <div className="bg-purple-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600">Showing</div>
+          <div className="text-sm text-muted-foreground">Showing</div>
           <div className="text-3xl font-bold text-purple-600">
             {displayArticles.length === 0 &&
             (isGridLoading || isTimelineLoading) ? (
@@ -257,7 +257,7 @@ export default function CurrentAffairsClient({
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-xl border border-gray-100 p-5 space-y-4 shadow-sm"
+                  className="bg-white rounded-xl border border-border p-5 space-y-4 shadow-sm"
                 >
                   <Skeleton className="h-4 w-1/4 rounded-full" />
                   <Skeleton className="h-24 w-full rounded-lg" />
@@ -272,9 +272,11 @@ export default function CurrentAffairsClient({
               ))}
             </div>
           ) : gridArticles.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Newspaper className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No articles found on this page</p>
+            <div className="text-center py-12 bg-muted/40 rounded-lg">
+              <Newspaper className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                No articles found on this page
+              </p>
             </div>
           ) : (
             <>
@@ -287,7 +289,7 @@ export default function CurrentAffairsClient({
               {/* Standard Page Paginator */}
               {gridTotal > PAGE_SIZE && (
                 <div className="flex items-center justify-between border-t pt-6 mb-12">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-muted-foreground">
                     Showing{" "}
                     <span className="font-semibold">
                       {(gridPage - 1) * PAGE_SIZE + 1}
@@ -315,7 +317,7 @@ export default function CurrentAffairsClient({
                       pageNum === "..." ? (
                         <span
                           key={`ellipsis-${idx}`}
-                          className="px-2 text-gray-500"
+                          className="px-2 text-muted-foreground"
                         >
                           ...
                         </span>
@@ -352,9 +354,9 @@ export default function CurrentAffairsClient({
 
         <TabsContent value="timeline" className="mt-6">
           {timelineArticles.length === 0 && !isTimelineLoading ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No articles found</p>
+            <div className="text-center py-12 bg-muted/40 rounded-lg">
+              <History className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No articles found</p>
             </div>
           ) : (
             <div className="pb-12">
@@ -367,7 +369,7 @@ export default function CurrentAffairsClient({
                   className="flex justify-center mt-10 py-5"
                 >
                   {isFetchingNextPage && (
-                    <div className="flex items-center text-gray-500 font-medium">
+                    <div className="flex items-center text-muted-foreground font-medium">
                       <Loader2 className="mr-2 h-5 w-5 animate-spin text-blue-500" />
                       Loading deeper history...
                     </div>
