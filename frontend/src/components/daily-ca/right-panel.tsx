@@ -60,32 +60,39 @@ export function RightPanel({ article }: Props) {
             <p className="text-xs text-gray-400">{article.subject_name}</p>
           </div>
           <div className="divide-y divide-gray-50">
-            {relatedArticles.slice(0, 5).map((rel) => {
-              const gsColor = GS_COLORS[rel.gs_paper] ?? GS_COLORS["CSAT"];
-              return (
-                <Link
-                  key={rel.id}
-                  href={`/daily-ca/article/${rel.slug}`}
-                  className="block px-4 py-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-1.5 mb-1">
-                    {rel.gs_paper && (
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${gsColor}`}
-                      >
-                        {rel.gs_paper}
+            {/* Drop entries with no slug before slicing. An article without a
+                slug has no URL, so linking it produced /daily-ca/article/null —
+                which was 18 of the API's 32 total 404s. Filtering first also
+                keeps the list at a genuine 5 rather than silently short. */}
+            {relatedArticles
+              .filter((rel) => Boolean(rel.slug))
+              .slice(0, 5)
+              .map((rel) => {
+                const gsColor = GS_COLORS[rel.gs_paper] ?? GS_COLORS["CSAT"];
+                return (
+                  <Link
+                    key={rel.id}
+                    href={`/daily-ca/article/${rel.slug}`}
+                    className="block px-4 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      {rel.gs_paper && (
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${gsColor}`}
+                        >
+                          {rel.gs_paper}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-gray-400">
+                        {formatDate(rel.published_date)}
                       </span>
-                    )}
-                    <span className="text-[10px] text-gray-400">
-                      {formatDate(rel.published_date)}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium text-gray-800 leading-snug line-clamp-2">
-                    {rel.title}
-                  </p>
-                </Link>
-              );
-            })}
+                    </div>
+                    <p className="text-xs font-medium text-gray-800 leading-snug line-clamp-2">
+                      {rel.title}
+                    </p>
+                  </Link>
+                );
+              })}
           </div>
         </div>
       )}

@@ -40,6 +40,11 @@ export function HeroLiveCA({
     year: "numeric",
   });
 
+  // An article with no slug has no URL — linking it produced
+  // /daily-ca/article/null. Filter before rendering so the numbering stays
+  // contiguous and the footer count reflects what is actually shown.
+  const linkable = articles.filter((a) => Boolean(a.slug));
+
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border bg-muted/60 px-4 py-3">
@@ -72,7 +77,7 @@ export function HeroLiveCA({
               </div>
             </div>
           ))
-        ) : articles.length === 0 ? (
+        ) : linkable.length === 0 ? (
           <div className="px-4 py-8 text-center">
             <p className="text-sm font-medium text-muted-foreground">
               No articles yet today.
@@ -82,7 +87,7 @@ export function HeroLiveCA({
             </p>
           </div>
         ) : (
-          articles.map((a, i) => {
+          linkable.map((a, i) => {
             const gsColor =
               GS_BADGE_COLORS[a.gs_paper] ?? GS_BADGE_COLORS["CSAT"];
             return (
@@ -118,8 +123,8 @@ export function HeroLiveCA({
 
       <div className="flex items-center justify-between border-t border-border bg-muted/40 px-4 py-2.5">
         <span className="text-[11px] text-muted-foreground">
-          {articles.length > 0
-            ? `Showing ${articles.length} of today's articles`
+          {linkable.length > 0
+            ? `Showing ${linkable.length} of today's articles`
             : "Updated daily"}
         </span>
         <Link
