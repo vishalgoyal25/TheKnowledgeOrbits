@@ -41,9 +41,27 @@ export const revalidate = 86400;
 
 // ── Server-side fetch (uses native fetch, not axios) ─────────────────────────
 
+// A slug of "null" or "undefined" reaches here when something upstream renders
+// /daily-ca/article/${slug} with a missing slug — the value is stringified into
+// the URL, Next hands it back as a route param, and we dutifully ask the API
+// for an article named "null".
+//
+// It was the single largest source of 4xx on the API: 18 of 32 total 404s, and
+// the 7th most-requested path on the whole site. The count is doubled because
+// fetchArticle runs twice per view — once in generateMetadata, once in the page
+// — so guarding here covers both call sites at once.
+//
+// This stops the request. It does NOT fix whatever produces a null slug
+// upstream; see the link guards in the components that build these hrefs.
+const INVALID_SLUGS = new Set(["null", "undefined", ""]);
+
 async function fetchArticle(
   slug: string,
 ): Promise<DailyCaArticleDetail | null> {
+  if (!slug || INVALID_SLUGS.has(slug)) {
+    return null;
+  }
+
   const apiBase = (
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1"
   ).replace(/\/$/, "");
