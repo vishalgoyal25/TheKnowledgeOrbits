@@ -61,6 +61,23 @@ RATE_LIMIT_REPLY = (
 
 ERROR_REPLY = "Something went wrong starting that research. Please try again."
 
+# Answer to any command — the platform's own entry point (Telegram shows a
+# /start button before the first message is ever typed) and anything else the
+# user types with command syntax.
+#
+# Deliberately ONE reply for every command rather than a lookup table: an
+# unknown command and a first-time hello both want the same thing, which is to
+# be told what this bot does. It also means a platform whose entry point is
+# named something other than "start" needs nothing added here.
+WELCOME_REPLY = (
+    "👋 Hi! I research questions for UPSC preparation.\n\n"
+    "Just send me a question in plain English — for example:\n"
+    "“Impact of GST on Indian federalism”\n\n"
+    "I'll take about a minute, then send you a summary, the full report as a "
+    "PDF, and the option to email it to yourself.\n\n"
+    "You get 3 questions a day."
+)
+
 # Sent when an identical question was researched recently. Saying so is honest —
 # otherwise an instant answer looks like the bot skipped the work.
 REUSED_REPLY = "⚡ I researched this recently — here's that report:"
@@ -97,6 +114,26 @@ def handle_inbound(adapter: ChannelAdapter, inbound: InboundMessage) -> str:
     if inbound.kind == k.MessageType.UNSUPPORTED:
         send_text(adapter, contact, UNSUPPORTED_REPLY)
         return "unsupported"
+
+    # A command is an entry point, never a question. This MUST come before
+    # state.handle() for two reasons: a command is not an email address and the
+    # state machine would reject it as one, and a user stuck mid-prompt needs a
+    # way out. Answering a command is also the only path here that starts no
+    # research — which is the entire point, since "/start" reaching
+    # _start_research burns a daily query, runs the full workflow on a string
+    # that is not a question, and then poisons the reuse cache for everyone
+    # who sends it afterwards.
+    if inbound.is_command:
+        if contact.pending_action:
+            contact.clear_pending(reason="command")
+        send_text(adapter, contact, WELCOME_REPLY)
+        logger.info(
+            "channel.command.handled",
+            channel=adapter.name,
+            command=inbound.action_id,
+            external_hash=contact.external_hash,
+        )
+        return "command"
 
     if inbound.is_callback:
         # Dismiss the platform's "processing" indicator. A default no-op on
