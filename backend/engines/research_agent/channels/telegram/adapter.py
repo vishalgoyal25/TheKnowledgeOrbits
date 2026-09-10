@@ -106,11 +106,24 @@ class TelegramAdapter(ChannelAdapter):
 
         text = message.get("text")
 
+        # Telegram shows every new user a /start button before they can type,
+        # and taps arrive as an ordinary text message. Classifying it here is
+        # what stops core treating "/start" as a research question.
+        command = self._bot_command(message, text)
+        if command:
+            kind = k.MessageType.COMMAND
+        elif text:
+            kind = k.MessageType.TEXT
+        else:
+            kind = k.MessageType.UNSUPPORTED
+
         return InboundMessage(
             external_id=str(chat_id),
             provider_message_id=provider_message_id,
-            kind=k.MessageType.TEXT if text else k.MessageType.UNSUPPORTED,
+            kind=kind,
             text=text,
+            # The bare command name, so core never parses Telegram's syntax.
+            action_id=command,
             display_name=self._display_name(sender),
             metadata={
                 "username": sender.get("username"),
@@ -144,6 +157,33 @@ class TelegramAdapter(ChannelAdapter):
                 "callback_query_id": callback.get("id"),
             },
         )
+
+    @staticmethod
+    def _bot_command(message: dict, text: str | None) -> str | None:
+        """
+        The command name if this message BEGINS with one, else None.
+
+        Read from Telegram's `entities` array rather than testing for a leading
+        "/" — Telegram marks real commands explicitly, so a question that merely
+        contains a slash is never mistaken for one.
+
+        `offset == 0` is required: "/start" is a command, "what does /start do"
+        is a question that deserves a real answer.
+
+        Returns the bare name, lowercased, with Telegram's group-chat "@BotName"
+        suffix stripped — core reads "start", never "/start@SomeBot".
+        """
+        if not text:
+            return None
+
+        for entity in message.get("entities") or []:
+            if entity.get("type") != "bot_command" or entity.get("offset") != 0:
+                continue
+            length = entity.get("length") or 0
+            name = text[:length].strip().split("@", 1)[0].lstrip("/").lower()
+            return name or None
+
+        return None
 
     @staticmethod
     def _display_name(sender: dict) -> str | None:

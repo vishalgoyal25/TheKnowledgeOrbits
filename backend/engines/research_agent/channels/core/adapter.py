@@ -90,10 +90,10 @@ class InboundMessage:
 
     external_id: str
     provider_message_id: str  # idempotency key; providers re-deliver
-    kind: str  # MessageType.TEXT | CALLBACK | UNSUPPORTED
+    kind: str  # MessageType.TEXT | CALLBACK | COMMAND | UNSUPPORTED
 
     text: str | None = None
-    action_id: str | None = None  # set when kind == CALLBACK
+    action_id: str | None = None  # set when kind == CALLBACK or COMMAND
     display_name: str | None = None
     metadata: dict = field(default_factory=dict)  # platform extras, stored as JSON
 
@@ -104,6 +104,16 @@ class InboundMessage:
     @property
     def is_callback(self) -> bool:
         return self.kind == k.MessageType.CALLBACK and bool(self.action_id)
+
+    @property
+    def is_command(self) -> bool:
+        """
+        A control instruction the user typed or tapped, not a question.
+
+        `action_id` carries the command NAME, normalised by the adapter — core
+        reads a plain word like "start", never a platform's "/start" syntax.
+        """
+        return self.kind == k.MessageType.COMMAND and bool(self.action_id)
 
 
 class ChannelAdapter(ABC):

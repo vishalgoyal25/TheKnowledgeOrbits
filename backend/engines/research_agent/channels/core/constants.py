@@ -39,10 +39,15 @@ class Direction:
 class MessageType:
     TEXT = "text"
     CALLBACK = "callback"  # a tapped button; carries an action id, not prose
+    # A control instruction, not a question — Telegram's /start, and whatever
+    # the equivalent is elsewhere. The SYNTAX is per-platform, so recognising
+    # one is an adapter's job; core only ever sees this normalised kind.
+    # Without it, Telegram's default /start button reads as a research query.
+    COMMAND = "command"
     DOCUMENT = "document"
     PROMPT = "prompt"  # text + an optional action, rendered per capability
     UNSUPPORTED = "unsupported"  # audio/image/location/etc — logged, then declined
-    ALL = (TEXT, CALLBACK, DOCUMENT, PROMPT, UNSUPPORTED)
+    ALL = (TEXT, CALLBACK, COMMAND, DOCUMENT, PROMPT, UNSUPPORTED)
 
 
 class MessageStatus:

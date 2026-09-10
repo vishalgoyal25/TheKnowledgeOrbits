@@ -91,11 +91,31 @@ repos:
       # pass_filenames: true because pre-commit already computes "what is in
       # this push" correctly for new branches, multi-commit pushes and force
       # pushes — deriving that from git by hand is where this goes wrong.
+      # require_serial is LOAD-BEARING, not a performance tweak.
+      #
+      # pre-commit partitions the file list and runs a pass_filenames hook
+      # CONCURRENTLY across those partitions. That launched two copies of
+      # scoped-pytest.ps1 at once, each calling pytest against the SAME test
+      # database. Whichever lost the race died in setup with a rotating cast of
+      # errors -- "duplicate key ... vector", "... analytics_daily_aggregate",
+      # and finally the honest one: database "test_TheKnowledgeOrbits" is being
+      # accessed by other users.
+      #
+      # It stayed hidden because it only bites when the push contains a
+      # migration: any other push uses --reuse-db, where two concurrent runs
+      # share the existing database harmlessly. The first push of a migration
+      # after this hook was written is what exposed it (2026-09-10).
+      #
+      # Serial execution also restores the scoping logic's correctness: a
+      # partitioned run only ever sees a SUBSET of the push, so a global file
+      # (core/, conftest.py) could land in one partition and its widening to
+      # the full suite would be silently lost in the others.
       - id: backend-pytest
         name: Backend Laboratory (Pytest, scoped)
         entry: powershell -NoProfile -ExecutionPolicy Bypass -File backend/scripts/dev/scoped-pytest.ps1
         language: system
         pass_filenames: true
+        require_serial: true
         stages: [pre-push]
 
       - id: frontend-jest
