@@ -647,36 +647,65 @@ def llm_call_json(
     )
 
 
+# The pre-flight probe's token budget. It was 3, which is what broke the
+# generate_static_content cron from 2026-09-08: the pool's primary model is
+# `openai/gpt-oss-120b`, a REASONING model that emits internal reasoning tokens
+# before any visible content. Three tokens are consumed before `message.content`
+# receives a character, so every probe came back empty and every provider was
+# declared dead — while research_agent used the same provider and the same model
+# successfully all week, because it never caps a call at 3 tokens.
+#
+# 64 leaves room for a reasoning preamble plus a short reply. The probe stays
+# cheap: it is one call, and only on the first healthy key.
+_HEALTH_MAX_TOKENS = 64
+
+
 def check_any_llm_available() -> bool:
     """
     Fast pre-flight / mid-run circuit breaker.
 
-    Tries one minimal call per ENABLED provider (not per key — a dead provider is
-    dead on every key, and the old per-key sweep was itself part of the 402 tax).
-    Returns True on the first provider that answers.
+    Answers ONE question: can any key reach a provider right now? It deliberately
+    does NOT judge output quality — the generation path already rejects and
+    retries empty bodies per call (`llm_empty_response`).
 
-    No sleep, no retry ladder — intentionally fast so the caller can decide whether
-    to continue or abort without burning quota.
-    Called by: ingestor_service.py and the generate_book_content command.
+    Tries every KEY until one answers, returning True on the first success. The
+    healthy path is therefore still a single call; the full sweep only happens
+    when things are actually failing, which is exactly when thoroughness is
+    wanted.
+
+    ⚠️ This used to try one key per provider, on the reasoning that "a dead
+    provider is dead on every key". **That premise is false for quota** — Groq's
+    free tier is metered PER KEY and this pool holds 5 of them, so one spent key
+    condemned four healthy ones. (The original concern behind it was the
+    Cerebras 402 tax; Cerebras is no longer in the pool, and these probes are
+    tiny.) Do not reinstate the per-provider short-circuit.
+
+    No sleep, no retry ladder — fast enough that the caller can decide whether to
+    continue or abort without burning quota.
+
+    Called by: ingestor_service.py, the generate_book_content command, and the
+    generate_static_content cron.
     """
-    seen: set[str] = set()
+    tried: set[str] = set()
 
     for entry in _pool:
-        if entry.provider in seen or _is_unhealthy(entry.provider):
+        # Every KEY is tried, not one per provider. The old code skipped to the
+        # next provider after one key, justified as "a dead provider is dead on
+        # every key". That is false for quota: Groq's free tier is metered PER
+        # KEY, and this pool holds 5 of them — so key #1 being spent declared
+        # the whole provider dead while four healthy keys sat unused. The
+        # generation path rotates through all of them; this must too.
+        if _is_unhealthy(entry.provider):
             continue
-        seen.add(entry.provider)
+        tried.add(entry.provider)
 
         try:
             response = entry.client.chat.completions.create(
                 model=_model_for(entry.spec),
                 messages=[{"role": "user", "content": "Reply: OK"}],
-                max_tokens=3,
+                max_tokens=_HEALTH_MAX_TOKENS,
                 temperature=0,
             )
-            if (response.choices[0].message.content or "").strip():
-                logger.info("llm_health_ok", provider=entry.provider)
-                return True
-            logger.warning("llm_health_empty", provider=entry.provider)
         except Exception as exc:
             action = _classify(exc)
             if action == _DISABLE_PROVIDER:
@@ -687,6 +716,29 @@ def check_any_llm_available() -> bool:
                 action=action,
                 error=str(exc)[:110],
             )
+            continue
 
-    logger.error("llm_health_all_failed", pool_size=_pool_size, providers=sorted(seen))
+        # The call SUCCEEDED — reachable, authenticated, inside quota. That is
+        # the entire question a pre-flight needs to answer, so it returns True
+        # even on an empty body.
+        #
+        # It used to return False there, and that single line took the
+        # generate_static_content cron down from 2026-09-08 onwards. An empty
+        # body is NOT evidence of an outage: a rate-limited provider raises 429
+        # (as Mistral does in those logs), while Groq answered HTTP 200 with
+        # nothing in it. Output quality is checked per call in the generation
+        # path, which already retries on `llm_empty_response` — availability and
+        # quality are different questions and only one of them belongs here.
+        if (response.choices[0].message.content or "").strip():
+            logger.info("llm_health_ok", provider=entry.provider)
+        else:
+            logger.warning(
+                "llm_health_ok_empty_body",
+                provider=entry.provider,
+                model=_model_for(entry.spec),
+                note="provider reachable; empty body treated as available",
+            )
+        return True
+
+    logger.error("llm_health_all_failed", pool_size=_pool_size, providers=sorted(tried))
     return False

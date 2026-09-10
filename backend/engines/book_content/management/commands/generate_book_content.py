@@ -257,14 +257,18 @@ class Command(BaseCommand):
         self._verify_db_state()
 
         # ── Step 1.2: LLM pre-flight health check ────────────────────────────
-        # Pings every key across every provider (GROQ + Cerebras).
+        # Pings every key across every provider until one answers.
         # Only aborts if ALL keys from ALL providers are simultaneously exhausted.
+        #
+        # That description was aspirational until 2026-09-10: the check actually
+        # tried ONE key per provider and stopped. Providers are no longer named
+        # here either — the old "(GROQ + Cerebras)" outlived Cerebras by months.
         if not dry_run:
-            self.stdout.write("STEP 1.2: LLM pre-flight check (GROQ + Cerebras)...")
+            self.stdout.write("STEP 1.2: LLM pre-flight check...")
             if not check_any_llm_available():
                 self.stdout.write(
                     self.style.WARNING(
-                        "   ⚠️  All LLM providers exhausted (GROQ + Cerebras).\n"
+                        "   ⚠️  All LLM providers exhausted.\n"
                         "   Aborting to protect rate-limit budget. Try again after UTC midnight."
                     )
                 )

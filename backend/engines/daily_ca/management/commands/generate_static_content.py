@@ -291,7 +291,11 @@ class Command(BaseCommand):
             return
 
         # ── Pre-flight LLM health check ───────────────────────────────────────
-        self.stdout.write("\n  🔍 LLM pre-flight check (GROQ + Cerebras)...")
+        # Providers are deliberately NOT named here. The old text said
+        # "(GROQ + Cerebras)" long after Cerebras was removed from the pool —
+        # naming a dynamic pool in a static string is how it went stale.
+        # `llm_pool_initialized` already logs the real composition each run.
+        self.stdout.write("\n  🔍 LLM pre-flight check...")
         if not check_any_llm_available():
             self.stdout.write(
                 self.style.WARNING(
