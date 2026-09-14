@@ -244,19 +244,36 @@ function KnowledgePageInner() {
     subjectIdRef.current = selectedSubjectId;
   }, [selectedSubjectId]);
 
-  const writeUrl = useCallback((topic: string | null, subject: string) => {
-    const params = new URLSearchParams(window.location.search);
-    if (topic) params.set("topic", topic);
-    else params.delete("topic");
-    if (subject) params.set("subject", subject);
-    else params.delete("subject");
-    const qs = params.toString();
-    window.history.pushState(
-      null,
-      "",
-      qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
-    );
-  }, []);
+  const writeUrl = useCallback(
+    (
+      topic: string | null,
+      subject: string,
+      mode: "push" | "replace" = "push",
+    ) => {
+      const params = new URLSearchParams(window.location.search);
+      if (topic) params.set("topic", topic);
+      else params.delete("topic");
+      if (subject) params.set("subject", subject);
+      else params.delete("subject");
+      const qs = params.toString();
+      const url = qs
+        ? `${window.location.pathname}?${qs}`
+        : window.location.pathname;
+      if (mode === "replace") window.history.replaceState(null, "", url);
+      else window.history.pushState(null, "", url);
+    },
+    [],
+  );
+
+  // The tab title follows the selected topic, and PageViewTracker sends it as
+  // page_title — GA4 drops the query string from page_path, so the title is
+  // what keeps topics apart in its Pages report. Deep-links arrive with no
+  // name; BookContentReader fills it in once the article loads.
+  useEffect(() => {
+    if (selectedTopicId && selectedTopicName) {
+      document.title = `${selectedTopicName} — TheKnowledgeOrbits`;
+    }
+  }, [selectedTopicId, selectedTopicName]);
 
   // ── Restore persisted view mode + panel split from localStorage ─────────
   useEffect(() => {
@@ -325,7 +342,8 @@ function KnowledgePageInner() {
 
   // ── Fetch subjects on mount ───────────────────────────────────────────────
   // ?subject in URL already called setSelectedSubjectId above — don't overwrite it.
-  // Fall back to data[0] only if no subject was encoded in the URL.
+  // Fall back to data[0] only if no subject was encoded in the URL, and
+  // canonicalise the address bar to it (replace, not push — no bare entry).
   useEffect(() => {
     const subjectParam = searchParams.get("subject");
     getBookSubjects()
@@ -333,6 +351,7 @@ function KnowledgePageInner() {
         setSubjects(data);
         if (data.length > 0 && !subjectParam) {
           setSelectedSubjectId(data[0].id);
+          writeUrl(null, data[0].id, "replace");
         }
       })
       .catch(() => {

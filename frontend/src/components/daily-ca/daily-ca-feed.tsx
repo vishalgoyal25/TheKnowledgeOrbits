@@ -83,14 +83,26 @@ function DailyCaFeedInner({ date }: Props) {
   // ── URL → state ─────────────────────────────────────────────────────────────
   // Runs on first load, on every pushState below, and on Back/Forward (the
   // router re-syncs searchParams on popstate). An unknown or absent slug falls
-  // back to the first article; the bare URL stays the canonical address for it.
+  // back to the first article AND canonicalises the address bar to it with
+  // replaceState — so the bare URL never stays as the visible address, and
+  // there is no bare history entry for Back to land on.
 
   useEffect(() => {
     if (articles.length === 0) return;
     const match = articleParam
       ? articles.find((a) => a.slug === articleParam)
       : undefined;
-    setActiveId((match ?? articles[0]).id);
+    const active = match ?? articles[0];
+    setActiveId(active.id);
+    if (!match) {
+      const params = new URLSearchParams(window.location.search);
+      params.set(ARTICLE_PARAM, active.slug);
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}?${params.toString()}`,
+      );
+    }
   }, [articleParam, articles]);
 
   // ── Scroll to top of centre column when article changes ─────────────────────
@@ -123,6 +135,13 @@ function DailyCaFeedInner({ date }: Props) {
   const activeIndex = articles.findIndex((a) => a.id === activeId);
   const displayIndex = activeIndex >= 0 ? activeIndex : 0;
   const activeArticle = articles[displayIndex] ?? null;
+
+  // The tab title follows the article. PageViewTracker reads it, so this is
+  // also what makes each article a distinct row in GA4's Pages report.
+  const activeTitle = activeArticle?.title;
+  useEffect(() => {
+    if (activeTitle) document.title = `${activeTitle} — TheKnowledgeOrbits`;
+  }, [activeTitle]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
