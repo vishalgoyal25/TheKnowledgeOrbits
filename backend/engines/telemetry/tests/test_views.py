@@ -238,6 +238,32 @@ class TestBeaconValidation:
         assert ContentRead.objects.count() == 0
 
     @pytest.mark.parametrize(
+        "content_type",
+        [
+            ContentRead.CONTENT_TYPE_DAILY_CA,
+            ContentRead.CONTENT_TYPE_CONCEPT,
+            ContentRead.CONTENT_TYPE_ARTICLE,
+            ContentRead.CONTENT_TYPE_TOPIC,
+        ],
+    )
+    def test_every_declared_content_type_is_accepted(
+        self, api_client, telemetry_on, content_type
+    ):
+        """
+        The serializer reads its choices from the model, so a new type needs
+        only the model constant — but nothing else proves the wiring holds.
+        `topic` was added for the /knowledge reader (G1.6); this is its guard.
+        """
+        response = api_client.post(
+            BEACON_URL,
+            {"content_type": content_type, "content_id": "some-id"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert ContentRead.objects.get().content_type == content_type
+
+    @pytest.mark.parametrize(
         "bad_id",
         [
             "has spaces",

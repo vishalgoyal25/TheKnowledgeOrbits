@@ -17,7 +17,11 @@ import { useEffect } from "react";
 
 import { tokenManager } from "@/lib/auth/token-manager";
 
-export type ReadContentType = "daily_ca_article" | "concept" | "article";
+export type ReadContentType =
+  | "daily_ca_article"
+  | "concept"
+  | "article"
+  | "topic";
 
 interface ReadBeaconProps {
   contentType: ReadContentType;

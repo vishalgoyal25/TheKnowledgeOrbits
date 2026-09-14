@@ -158,11 +158,13 @@ class ContentRead(models.Model):
     CONTENT_TYPE_DAILY_CA = "daily_ca_article"
     CONTENT_TYPE_CONCEPT = "concept"
     CONTENT_TYPE_ARTICLE = "article"
+    CONTENT_TYPE_TOPIC = "topic"
 
     CONTENT_TYPE_CHOICES = [
         (CONTENT_TYPE_DAILY_CA, "Daily CA Article"),
         (CONTENT_TYPE_CONCEPT, "Concept"),
         (CONTENT_TYPE_ARTICLE, "Generated Article"),
+        (CONTENT_TYPE_TOPIC, "Knowledge Map Topic"),
     ]
 
     id = models.UUIDField(

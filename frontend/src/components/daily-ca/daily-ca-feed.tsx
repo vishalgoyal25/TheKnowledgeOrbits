@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   getAllArticleDetails,
   getTodayArticles,
   getArticlesByDate,
   DailyCaArticleDetail,
 } from "@/lib/api/daily-ca";
+import ReadBeacon from "@/components/telemetry/ReadBeacon";
 import { LeftPanel } from "./left-panel";
 import { RightPanel } from "./right-panel";
 import { DailyCaArticle } from "./daily-ca-article";
@@ -16,17 +18,25 @@ import { DailyCaArticle } from "./daily-ca-article";
  *
  * Left panel lists all 10 articles; clicking one or using Prev/Next swaps
  * the single article shown in the centre column. No continuous scroll.
+ *
+ * The active article is mirrored into the URL as `?article=<slug>` so that
+ * every article has an address (share, refresh, Back) and so the route-change
+ * tracker and the read beacon see each one. Native history.pushState is used
+ * rather than router.push: the App Router syncs useSearchParams from it with
+ * no server round-trip, and the shell stays a single static page.
  */
 
 interface Props {
   date?: string;
 }
 
+const ARTICLE_PARAM = "article";
+
 function todayStr(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-export function DailyCaFeed({ date }: Props) {
+function DailyCaFeedInner({ date }: Props) {
   const effectiveDate = date ?? todayStr();
 
   const [articles, setArticles] = useState<DailyCaArticleDetail[]>([]);
@@ -36,6 +46,9 @@ export function DailyCaFeed({ date }: Props) {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
 
   const mainScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const searchParams = useSearchParams();
+  const articleParam = searchParams.get(ARTICLE_PARAM);
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
 
@@ -56,7 +69,6 @@ export function DailyCaFeed({ date }: Props) {
       const details = await getAllArticleDetails(slugs);
       details.sort((a, b) => a.order_on_date - b.order_on_date);
       setArticles(details);
-      if (details.length > 0) setActiveId(details[0].id);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load articles");
     } finally {
@@ -68,6 +80,19 @@ export function DailyCaFeed({ date }: Props) {
     fetchFeed();
   }, [fetchFeed]);
 
+  // ── URL → state ─────────────────────────────────────────────────────────────
+  // Runs on first load, on every pushState below, and on Back/Forward (the
+  // router re-syncs searchParams on popstate). An unknown or absent slug falls
+  // back to the first article; the bare URL stays the canonical address for it.
+
+  useEffect(() => {
+    if (articles.length === 0) return;
+    const match = articleParam
+      ? articles.find((a) => a.slug === articleParam)
+      : undefined;
+    setActiveId((match ?? articles[0]).id);
+  }, [articleParam, articles]);
+
   // ── Scroll to top of centre column when article changes ─────────────────────
 
   useEffect(() => {
@@ -78,8 +103,20 @@ export function DailyCaFeed({ date }: Props) {
 
   // ── Navigation helpers ──────────────────────────────────────────────────────
 
+  // State is set directly AND the URL is pushed. The direct set keeps the UI
+  // instant even if the router's history sync were ever to lag; the push is
+  // what gives the article an address and lets Back return to the previous one.
   const handleArticleClick = (id: string) => {
     setActiveId(id);
+    const article = articles.find((a) => a.id === id);
+    if (!article) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set(ARTICLE_PARAM, article.slug);
+    window.history.pushState(
+      null,
+      "",
+      `${window.location.pathname}?${params.toString()}`,
+    );
   };
 
   // Derived active article + index (used both for render and right panel)
@@ -264,6 +301,12 @@ export function DailyCaFeed({ date }: Props) {
                   <div ref={mainScrollRef} className="h-full overflow-y-auto">
                     <div className="px-4 py-6">
                       {activeArticle && (
+                        <ReadBeacon
+                          contentType="daily_ca_article"
+                          contentId={activeArticle.id}
+                        />
+                      )}
+                      {activeArticle && (
                         <DailyCaArticle
                           article={activeArticle}
                           index={displayIndex}
@@ -301,5 +344,17 @@ export function DailyCaFeed({ date }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+// useSearchParams() needs a Suspense boundary above it, otherwise the page
+// that renders this component bails from static to dynamic at build time.
+// The boundary lives here, not at the call site, so a future page rewrite
+// cannot drop it — same reasoning as PageViewTracker.
+export function DailyCaFeed(props: Props) {
+  return (
+    <Suspense fallback={null}>
+      <DailyCaFeedInner {...props} />
+    </Suspense>
   );
 }
