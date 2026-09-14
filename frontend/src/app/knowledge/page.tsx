@@ -220,16 +220,43 @@ function KnowledgePageInner() {
     return acc;
   }, [tree, selectedTopicId]);
 
-  // ── Pre-select topic + subject from URL query params ─────────────────────
+  // ── URL → state ──────────────────────────────────────────────────────────
   // ?topic=<uuid>   → pre-loads the article in the right panel
   // ?subject=<uuid> → immediately switches the left panel to the correct subject
   //                   (encoded by hamburger/navbar so no extra API call is needed)
+  // Also re-runs on Back/Forward, since the router re-syncs searchParams on
+  // popstate. An absent ?topic clears the reader so Back to the bare URL
+  // matches what the bare URL shows on a fresh load.
   useEffect(() => {
     const topicParam = searchParams.get("topic");
     const subjectParam = searchParams.get("subject");
-    if (topicParam) setSelectedTopicId(topicParam);
+    setSelectedTopicId(topicParam);
     if (subjectParam) setSelectedSubjectId(subjectParam);
   }, [searchParams]);
+
+  // ── State → URL ──────────────────────────────────────────────────────────
+  // Native pushState, not router.push: the App Router syncs useSearchParams
+  // from it with no server round-trip, and every topic gets an address the
+  // route-change tracker and the read beacon can see. The subject is read via
+  // a ref so handleNodeSelect keeps a stable identity for the graph.
+  const subjectIdRef = useRef("");
+  useEffect(() => {
+    subjectIdRef.current = selectedSubjectId;
+  }, [selectedSubjectId]);
+
+  const writeUrl = useCallback((topic: string | null, subject: string) => {
+    const params = new URLSearchParams(window.location.search);
+    if (topic) params.set("topic", topic);
+    else params.delete("topic");
+    if (subject) params.set("subject", subject);
+    else params.delete("subject");
+    const qs = params.toString();
+    window.history.pushState(
+      null,
+      "",
+      qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+    );
+  }, []);
 
   // ── Restore persisted view mode + panel split from localStorage ─────────
   useEffect(() => {
@@ -327,14 +354,18 @@ function KnowledgePageInner() {
   }, [selectedSubjectId, viewMode]);
 
   // ── Node selection handler (shared by both graph + outline) ───────────────
-  const handleNodeSelect = useCallback((topicId: string, topicName: string) => {
-    setSelectedTopicId(topicId);
-    setSelectedTopicName(topicName);
-    // On mobile: hide the panel so the article fills the screen
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      setShowMobilePanel(false);
-    }
-  }, []);
+  const handleNodeSelect = useCallback(
+    (topicId: string, topicName: string) => {
+      setSelectedTopicId(topicId);
+      setSelectedTopicName(topicName);
+      writeUrl(topicId, subjectIdRef.current);
+      // On mobile: hide the panel so the article fills the screen
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        setShowMobilePanel(false);
+      }
+    },
+    [writeUrl],
+  );
 
   // ── View mode change ──────────────────────────────────────────────────────
   const handleViewModeChange = useCallback(
@@ -421,6 +452,7 @@ function KnowledgePageInner() {
                 setSelectedSubjectId(e.target.value);
                 setTree(null);
                 setSelectedTopicId(null);
+                writeUrl(null, e.target.value);
               }}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
             >

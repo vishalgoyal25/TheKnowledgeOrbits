@@ -27,6 +27,7 @@ import { BookOpen, ExternalLink, AlertCircle, PenLine } from "lucide-react";
 
 import { getBookContent } from "@/lib/api/book-content";
 import { SocialBar } from "@/components/social/social-bar";
+import ReadBeacon from "@/components/telemetry/ReadBeacon";
 import { cn } from "@/lib/utils";
 import type {
   BookContent,
@@ -469,6 +470,12 @@ export default function BookContentReader({
         className,
       )}
     >
+      {/* A read is counted only once the article has actually arrived — not
+          while loading, and not on a failed fetch. */}
+      {topicId && content && !loading && (
+        <ReadBeacon contentType="topic" contentId={topicId} />
+      )}
+
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-3 sm:px-5 py-3 sm:py-4 border-b border-border bg-muted/20">
         {/* Empty state header */}
