@@ -59,11 +59,100 @@ const KnowledgeGraph = dynamic(
   },
 );
 
-import BookContentReader from "@/components/book-content/book-content-reader";
+import BookContentReader, {
+  type OverviewChild,
+  type OverviewNode,
+} from "@/components/book-content/book-content-reader";
 import GraphToggleButton, {
   ViewMode,
   VIEW_MODE_KEY,
 } from "@/components/book-content/graph-toggle-button";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OVERVIEW NODES  (subject / module — built from the tree already in state)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Depth-first: every topic under `topics`, including nested subtopics. */
+function flattenTopics(
+  topics: TreeTopic[],
+  acc: TreeTopic[] = [],
+): TreeTopic[] {
+  for (const t of topics) {
+    acc.push(t);
+    flattenTopics(t.subtopics, acc);
+  }
+  return acc;
+}
+
+/** Roll a module's status up from its topics: any article → ready. */
+function moduleStatus(topics: TreeTopic[]): OverviewChild["content_status"] {
+  const all = flattenTopics(topics);
+  if (all.some((t) => t.content_status === "book_quality"))
+    return "book_quality";
+  if (all.some((t) => t.content_status === "generating")) return "generating";
+  return "empty";
+}
+
+function firstReady(topics: TreeTopic[]): OverviewNode["startHere"] {
+  const hit = flattenTopics(topics).find(
+    (t) => t.content_status === "book_quality",
+  );
+  return hit ? { id: hit.id, name: hit.name } : null;
+}
+
+/**
+ * If `id` names the subject or one of its modules, describe it for the reader.
+ * Returns null for topic nodes, which have real articles.
+ */
+function buildOverview(
+  id: string,
+  subject: SubjectWithPlan | undefined,
+  tree: SubjectTree | null,
+): OverviewNode | null {
+  if (!tree) return null;
+
+  if (id === tree.id) {
+    const all = tree.modules.flatMap((m) => flattenTopics(m.topics));
+    return {
+      id,
+      name: tree.name,
+      kind: "subject",
+      description: subject?.description || undefined,
+      children: tree.modules.map((m) => ({
+        id: m.id,
+        name: m.name,
+        node_type: "module",
+        content_status: moduleStatus(m.topics),
+      })),
+      startHere: firstReady(tree.modules.flatMap((m) => m.topics)),
+      generatedCount: all.filter((t) => t.content_status === "book_quality")
+        .length,
+      totalCount: all.length,
+    };
+  }
+
+  const mod = tree.modules.find((m) => m.id === id);
+  if (mod) {
+    const all = flattenTopics(mod.topics);
+    return {
+      id,
+      name: mod.name,
+      kind: "module",
+      children: mod.topics.map((t) => ({
+        id: t.id,
+        name: t.name,
+        node_type: t.node_type,
+        content_status: t.content_status,
+      })),
+      startHere: firstReady(mod.topics),
+      generatedCount: all.filter((t) => t.content_status === "book_quality")
+        .length,
+      totalCount: all.length,
+    };
+  }
+
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OUTLINE TREE  (collapsible tree for "outline" mode)
@@ -370,16 +459,36 @@ function KnowledgePageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Fetch outline tree when subject changes (outline mode only) ───────────
+  // ── Fetch the tree when the subject changes — in BOTH modes ───────────────
+  // The outline draws it; the graph does not, but the reader needs it to
+  // describe a subject or module node (buildOverview). One cached GET.
+  const [treeFailed, setTreeFailed] = useState(false);
   useEffect(() => {
-    if (!selectedSubjectId || viewMode !== "outline") return;
+    if (!selectedSubjectId) return;
     setTree(null);
+    setTreeFailed(false);
     setLoadingTree(true);
     getBookTree(selectedSubjectId)
       .then(setTree)
-      .catch(() => setTree(null))
+      .catch(() => {
+        setTree(null);
+        setTreeFailed(true);
+      })
       .finally(() => setLoadingTree(false));
-  }, [selectedSubjectId, viewMode]);
+  }, [selectedSubjectId]);
+
+  // ── Overview for subject / module selections (null for topic nodes) ──────
+  const overview = useMemo(
+    () =>
+      selectedTopicId
+        ? buildOverview(
+            selectedTopicId,
+            subjects.find((s) => s.id === selectedSubjectId),
+            tree,
+          )
+        : null,
+    [selectedTopicId, selectedSubjectId, subjects, tree],
+  );
 
   // ── Node selection handler (shared by both graph + outline) ───────────────
   const handleNodeSelect = useCallback(
@@ -396,20 +505,10 @@ function KnowledgePageInner() {
   );
 
   // ── View mode change ──────────────────────────────────────────────────────
-  const handleViewModeChange = useCallback(
-    (mode: ViewMode) => {
-      setViewMode(mode);
-      // Load tree on first switch to outline
-      if (mode === "outline" && selectedSubjectId && !tree) {
-        setLoadingTree(true);
-        getBookTree(selectedSubjectId)
-          .then(setTree)
-          .catch(() => setTree(null))
-          .finally(() => setLoadingTree(false));
-      }
-    },
-    [selectedSubjectId, tree],
-  );
+  // The tree is loaded per subject regardless of mode, so switching is just state.
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -607,10 +706,16 @@ function KnowledgePageInner() {
             : "flex-1",
         )}
       >
+        {/* topicId is withheld until the tree has arrived (or failed) so a
+            subject/module id is never fetched as an article in the gap before
+            buildOverview can recognise it. `tree` rather than `loadingTree`:
+            the reader's effect runs before this page's on the first commit,
+            and loadingTree is still false then. */}
         <BookContentReader
-          topicId={selectedTopicId}
+          topicId={tree || treeFailed ? selectedTopicId : null}
           topicName={selectedTopicName}
           onSeeAlsoClick={handleNodeSelect}
+          overview={overview}
           className="h-full"
         />
       </div>

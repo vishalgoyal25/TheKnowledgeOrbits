@@ -23,7 +23,15 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { BookOpen, ExternalLink, AlertCircle, PenLine } from "lucide-react";
+import {
+  BookOpen,
+  ExternalLink,
+  AlertCircle,
+  PenLine,
+  ArrowRight,
+  FolderOpen,
+  Layers,
+} from "lucide-react";
 
 import { getBookContent } from "@/lib/api/book-content";
 import { SocialBar } from "@/components/social/social-bar";
@@ -32,8 +40,42 @@ import { cn } from "@/lib/utils";
 import type {
   BookContent,
   ContentMedia,
+  ContentStatus,
   CrossReference,
+  NodeType,
 } from "@/types/book-content";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OVERVIEW NODES  (subject / module — not Topic rows, so no article exists)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One child row in the overview panel: a module under a subject, or a topic under a module. */
+export interface OverviewChild {
+  id: string;
+  name: string;
+  node_type: NodeType;
+  content_status: ContentStatus;
+}
+
+/**
+ * What the reader shows for a subject or module node.
+ *
+ * BookContent is one-to-one with knowledge.Topic; subjects and modules live in
+ * their own tables and can never have an article at /book/content/<id>/. Until
+ * G3.9 gives them generated overviews, the honest thing to render is the map
+ * beneath them — not a "content may not be generated yet" error.
+ */
+export interface OverviewNode {
+  id: string;
+  name: string;
+  kind: "subject" | "module";
+  description?: string;
+  children: OverviewChild[];
+  /** First child (or deeper descendant) that already has a book-quality article. */
+  startHere: { id: string; name: string } | null;
+  generatedCount: number;
+  totalCount: number;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -379,6 +421,142 @@ function BookMarkdown({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OVERVIEW PANEL  (subject / module nodes)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STATUS_DOT: Record<ContentStatus, string> = {
+  book_quality: "bg-green-500",
+  generating: "bg-yellow-400 animate-pulse",
+  failed: "bg-red-400",
+  empty: "bg-muted-foreground/30",
+};
+
+const STATUS_LABEL: Record<ContentStatus, string> = {
+  book_quality: "Ready",
+  generating: "Generating",
+  failed: "Failed",
+  empty: "Not yet generated",
+};
+
+function OverviewPanel({
+  node,
+  onSelect,
+}: {
+  node: OverviewNode;
+  onSelect: (id: string, name: string) => void;
+}) {
+  const KindIcon = node.kind === "subject" ? Layers : FolderOpen;
+  const childLabel = node.kind === "subject" ? "Modules" : "Topics";
+  const pct =
+    node.totalCount > 0
+      ? Math.round((node.generatedCount / node.totalCount) * 100)
+      : 0;
+
+  return (
+    <>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-3 sm:px-5 py-3 sm:py-4 border-b border-border bg-muted/20 space-y-2">
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary">
+          <KindIcon className="h-3 w-3" />
+          {node.kind}
+        </span>
+        <h2 className="text-lg font-bold leading-snug text-foreground">
+          {node.name}
+        </h2>
+        {node.description && (
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {node.description}
+          </p>
+        )}
+      </div>
+
+      {/* ── Body ───────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 sm:py-5 space-y-5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-border">
+        {/* Progress + start-here */}
+        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                {node.generatedCount}
+              </span>{" "}
+              of {node.totalCount} topics have articles
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {pct}%
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {node.startHere ? (
+            <button
+              onClick={() =>
+                node.startHere &&
+                onSelect(node.startHere.id, node.startHere.name)
+              }
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              Start here: {node.startHere.name}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              No articles beneath this {node.kind} yet — the daily pipeline
+              fills them in over time.
+            </p>
+          )}
+        </div>
+
+        {/* Children */}
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70 mb-2">
+            {childLabel} · {node.children.length}
+          </p>
+          {node.children.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing beneath this {node.kind} yet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+              {node.children.map((child) => (
+                <li key={child.id}>
+                  <button
+                    onClick={() => onSelect(child.id, child.name)}
+                    className="flex items-center gap-3 w-full text-left px-3 py-2.5 hover:bg-muted/60 transition-colors group"
+                  >
+                    <span
+                      className={cn(
+                        "w-2 h-2 rounded-full flex-shrink-0",
+                        STATUS_DOT[child.content_status] ?? STATUS_DOT.empty,
+                      )}
+                      title={STATUS_LABEL[child.content_status]}
+                    />
+                    <span className="text-sm text-foreground group-hover:text-primary transition-colors flex-1 truncate">
+                      {child.name}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                      {STATUS_LABEL[child.content_status]}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Overview articles for subjects and modules are on the way. Until then,
+          pick a topic above to start reading.
+        </p>
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // EMPTY STATE
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -411,6 +589,12 @@ interface BookContentReaderProps {
    * The parent page should navigate the graph/tree to this node.
    */
   onSeeAlsoClick: (topicId: string, topicName: string) => void;
+  /**
+   * Set when the selected node is a subject or module. Those are not Topic
+   * rows and have no article endpoint; the reader shows an overview of what
+   * lies beneath them instead of fetching. Null / undefined = a topic node.
+   */
+  overview?: OverviewNode | null;
   className?: string;
 }
 
@@ -422,6 +606,7 @@ export default function BookContentReader({
   topicId,
   topicName,
   onSeeAlsoClick,
+  overview = null,
   className,
 }: BookContentReaderProps) {
   const [content, setContent] = useState<BookContent | null>(null);
@@ -429,10 +614,12 @@ export default function BookContentReader({
   const [error, setError] = useState<string | null>(null);
 
   // ── Fetch article whenever topicId changes ────────────────────────────────
+  // Overview nodes never fetch: the endpoint cannot answer for them.
   useEffect(() => {
-    if (!topicId) {
+    if (!topicId || overview) {
       setContent(null);
       setError(null);
+      setLoading(false);
       return;
     }
 
@@ -456,7 +643,7 @@ export default function BookContentReader({
         );
         setLoading(false);
       });
-  }, [topicId]);
+  }, [topicId, overview]);
 
   const handleSeeAlso = useCallback(
     (id: string, name: string) => {
@@ -468,13 +655,23 @@ export default function BookContentReader({
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
+  const shell = cn(
+    "flex flex-col h-full w-full overflow-hidden border border-border rounded-lg bg-background",
+    className,
+  );
+
+  // Subject / module: overview of what lies beneath, no fetch, no beacon
+  // (there is no topic content to record a read of — revisited in G3.9).
+  if (overview) {
+    return (
+      <div className={shell}>
+        <OverviewPanel node={overview} onSelect={handleSeeAlso} />
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={cn(
-        "flex flex-col h-full w-full overflow-hidden border border-border rounded-lg bg-background",
-        className,
-      )}
-    >
+    <div className={shell}>
       {/* A read is counted only once the article has actually arrived — not
           while loading, and not on a failed fetch. */}
       {topicId && content && !loading && (
