@@ -34,6 +34,7 @@ import UserMenu from "@/components/auth/UserMenu";
 import { useSearch } from "@/lib/hooks/use-search";
 import { SearchResult } from "@/lib/api/search";
 import { getBookSubjects, getBookTree } from "@/lib/api/book-content";
+import { knowledgePath } from "@/lib/content-urls";
 import { HierarchySubject, HierarchyModule, HierarchyTopic } from "@/lib/types";
 import type { TreeTopic } from "@/types/book-content";
 import OrbitIcon from "@/components/ui/orbit-icon";
@@ -669,7 +670,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                               );
                               const href = isNewsModule
                                 ? "/news"
-                                : `/knowledge?topic=${t.id}&subject=${drawerActiveSubjectId}`;
+                                : knowledgePath(drawerActiveSubjectId, t.id);
                               return (
                                 <Link
                                   key={`drawer-topic-${t.id}`}
@@ -1013,7 +1014,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                       }}
                     >
                       <Link
-                        href={`/knowledge?topic=${topic.id}&subject=${displaySubjectId}`}
+                        href={knowledgePath(displaySubjectId, topic.id)}
                         onClick={() => {
                           setHoveredModuleId(null);
                           setDropdownPos(null);
@@ -1051,7 +1052,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                     <div key={`fixed-sub-${st.id}`}>
                       {/* Sub-topic link */}
                       <Link
-                        href={`/knowledge?topic=${st.id}&subject=${displaySubjectId}`}
+                        href={knowledgePath(displaySubjectId, st.id)}
                         onClick={() => {
                           setHoveredModuleId(null);
                           setDropdownPos(null);
@@ -1066,7 +1067,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                       {st.sub_topics?.map((sst) => (
                         <Link
                           key={`fixed-subsub-${sst.id}`}
-                          href={`/knowledge?topic=${sst.id}&subject=${displaySubjectId}`}
+                          href={knowledgePath(displaySubjectId, sst.id)}
                           onClick={() => {
                             setHoveredModuleId(null);
                             setDropdownPos(null);
