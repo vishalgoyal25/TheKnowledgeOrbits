@@ -29,11 +29,9 @@ function PageViewTrackerInner() {
 
     // Deferred one microtask so the send runs AFTER every effect in this
     // commit. This component sits before {children} in the root layout, so
-    // its effect fires before a page's own — and pages that swap content
-    // behind a query string (/daily-ca?article=, /knowledge?topic=) set
-    // document.title in theirs. GA4's default Pages report groups by title,
-    // and its page_path dimension drops the query string, so the title is
-    // what makes those views distinguishable at all.
+    // its effect fires before a page's own — and pages that swap content in
+    // place (/daily-ca/<slug>, /knowledge/<subject>/<topic>) set
+    // document.title in theirs. GA4's default Pages report groups by title.
     queueMicrotask(() => {
       window.gtag?.("event", "page_view", {
         page_path: query ? `${pathname}?${query}` : pathname,
