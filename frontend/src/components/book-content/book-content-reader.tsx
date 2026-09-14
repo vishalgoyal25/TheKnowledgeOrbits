@@ -444,6 +444,11 @@ export default function BookContentReader({
       .then((data) => {
         setContent(data);
         setLoading(false);
+        // Deep-links (?topic= with no click) arrive without a topic name, so
+        // the page cannot set the title itself — the loaded article can.
+        if (data.topic_name) {
+          document.title = `${data.topic_name} — TheKnowledgeOrbits`;
+        }
       })
       .catch(() => {
         setError(
