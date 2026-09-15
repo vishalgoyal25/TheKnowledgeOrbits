@@ -5,6 +5,7 @@ import sentry_sdk
 Knowledge Engine Views
 """
 
+import uuid
 from typing import Any, Optional, cast
 
 from django.core.cache import cache
@@ -12,6 +13,7 @@ from django.db.models import QuerySet
 
 from rest_framework import status, viewsets, views
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -46,6 +48,33 @@ from engines.shared.services.cache_service import get_cache_service
 
 logger = structlog.get_logger(__name__)
 cache_service = get_cache_service()
+
+
+class SlugOrPkLookupMixin:
+    """
+    Resolve the detail route by slug OR UUID (G3.10).
+
+    /topics/fundamental-rights/ and /topics/<uuid>/ both answer, with the
+    same payload — and the payload carries `slug`, so a caller that arrived by
+    UUID can redirect to the canonical form. Old links never break.
+
+    The router's default lookup regex already admits both shapes; only the
+    lookup itself has to choose. Anything that is not a well-formed UUID is a
+    slug — a UUIDField filter on a bad string would raise instead of 404-ing.
+    """
+
+    def get_object(self):  # type: ignore[override]
+        queryset = self.filter_queryset(self.get_queryset())  # type: ignore[attr-defined]
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field  # type: ignore[attr-defined]
+        value = self.kwargs[lookup_url_kwarg]  # type: ignore[attr-defined]
+        try:
+            uuid.UUID(str(value))
+            lookup = {"pk": value}
+        except ValueError:
+            lookup = {"slug": value}
+        obj = get_object_or_404(queryset, **lookup)
+        self.check_object_permissions(self.request, obj)  # type: ignore[attr-defined]
+        return obj
 
 
 class ProgramViewSet(viewsets.ModelViewSet):  # type: ignore
@@ -87,8 +116,8 @@ class ProgramViewSet(viewsets.ModelViewSet):  # type: ignore
         return response
 
 
-class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
-    """ViewSet for Subject CRUD."""
+class SubjectViewSet(SlugOrPkLookupMixin, viewsets.ModelViewSet):  # type: ignore
+    """ViewSet for Subject CRUD. Detail resolves by slug or UUID."""
 
     queryset = Subject.objects.select_related("program").all()
     serializer_class = SubjectSerializer
@@ -134,8 +163,8 @@ class SubjectViewSet(viewsets.ModelViewSet):  # type: ignore
         return response
 
 
-class ModuleViewSet(viewsets.ModelViewSet):  # type: ignore
-    """ViewSet for Module CRUD."""
+class ModuleViewSet(SlugOrPkLookupMixin, viewsets.ModelViewSet):  # type: ignore
+    """ViewSet for Module CRUD. Detail resolves by slug or UUID."""
 
     queryset = Module.objects.select_related("subject__program").all()
     serializer_class = ModuleSerializer
@@ -176,8 +205,8 @@ class ModuleViewSet(viewsets.ModelViewSet):  # type: ignore
         return response
 
 
-class TopicViewSet(viewsets.ModelViewSet):  # type: ignore
-    """ViewSet for Topic CRUD."""
+class TopicViewSet(SlugOrPkLookupMixin, viewsets.ModelViewSet):  # type: ignore
+    """ViewSet for Topic CRUD. Detail resolves by slug or UUID."""
 
     queryset = Topic.objects.select_related("module__subject", "subject").all()
     serializer_class = TopicSerializer

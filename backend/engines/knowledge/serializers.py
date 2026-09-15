@@ -60,6 +60,7 @@ class SubjectListSerializer(serializers.ModelSerializer):  # type: ignore
         model = Subject
         fields = [
             "id",
+            "slug",
             "name",
             "program",
             "program_name",
@@ -79,6 +80,7 @@ class SubjectSerializer(serializers.ModelSerializer):  # type: ignore
         model = Subject
         fields = [
             "id",
+            "slug",
             "name",
             "program",
             "program_name",
@@ -91,6 +93,7 @@ class SubjectSerializer(serializers.ModelSerializer):  # type: ignore
         ]
         read_only_fields = [
             "id",
+            "slug",
             "program_name",
             "modules_count",
             "created_at",
@@ -107,6 +110,7 @@ class ModuleListSerializer(serializers.ModelSerializer):  # type: ignore
         model = Module
         fields = [
             "id",
+            "slug",
             "name",
             "subject",
             "subject_name",
@@ -126,6 +130,7 @@ class ModuleSerializer(serializers.ModelSerializer):  # type: ignore
         model = Module
         fields = [
             "id",
+            "slug",
             "name",
             "subject",
             "subject_name",
@@ -138,6 +143,7 @@ class ModuleSerializer(serializers.ModelSerializer):  # type: ignore
         ]
         read_only_fields = [
             "id",
+            "slug",
             "subject_name",
             "topics_count",
             "created_at",
@@ -155,6 +161,7 @@ class TopicListSerializer(serializers.ModelSerializer):  # type: ignore
         model = Topic
         fields = [
             "id",
+            "slug",
             "name",
             "module",
             "module_name",
@@ -183,6 +190,7 @@ class TopicSerializer(serializers.ModelSerializer):  # type: ignore
         model = Topic
         fields = [
             "id",
+            "slug",
             "name",
             "module",
             "module_name",
@@ -201,6 +209,7 @@ class TopicSerializer(serializers.ModelSerializer):  # type: ignore
         ]
         read_only_fields = [
             "id",
+            "slug",
             "module_name",
             "subject_name",
             "chunks_count",

@@ -41,16 +41,26 @@ class ProgramAdmin(admin.ModelAdmin):  # type: ignore
 class SubjectAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Subject."""
 
-    list_display = ["name", "program", "order_index", "is_active", "created_at"]
+    list_display = ["name", "slug", "program", "order_index", "is_active", "created_at"]
     list_filter = ["program", "is_active", "created_at"]
-    search_fields = ["name", "description"]
-    readonly_fields = ["id", "created_at", "updated_at"]
+    search_fields = ["name", "slug", "description"]
+    # slug is read-only here on purpose: a shared URL is a promise (G3.10)
+    readonly_fields = ["id", "slug", "created_at", "updated_at"]
     ordering = ["program", "order_index"]
 
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("name", "program", "description", "order_index", "is_active")},
+            {
+                "fields": (
+                    "name",
+                    "slug",
+                    "program",
+                    "description",
+                    "order_index",
+                    "is_active",
+                )
+            },
         ),
         (
             "System Information",
@@ -63,16 +73,25 @@ class SubjectAdmin(admin.ModelAdmin):  # type: ignore
 class ModuleAdmin(admin.ModelAdmin):  # type: ignore
     """Admin interface for Module."""
 
-    list_display = ["name", "subject", "order_index", "is_active", "created_at"]
+    list_display = ["name", "slug", "subject", "order_index", "is_active", "created_at"]
     list_filter = ["subject__program", "subject", "is_active", "created_at"]
-    search_fields = ["name", "description"]
-    readonly_fields = ["id", "created_at", "updated_at"]
+    search_fields = ["name", "slug", "description"]
+    readonly_fields = ["id", "slug", "created_at", "updated_at"]
     ordering = ["subject", "order_index"]
 
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("name", "subject", "description", "order_index", "is_active")},
+            {
+                "fields": (
+                    "name",
+                    "slug",
+                    "subject",
+                    "description",
+                    "order_index",
+                    "is_active",
+                )
+            },
         ),
         (
             "System Information",
@@ -87,6 +106,7 @@ class TopicAdmin(admin.ModelAdmin):  # type: ignore
 
     list_display = [
         "name",
+        "slug",
         "module",
         "topic_type",
         "difficulty_level",
@@ -102,14 +122,23 @@ class TopicAdmin(admin.ModelAdmin):  # type: ignore
         "is_active",
         "created_at",
     ]
-    search_fields = ["name", "description", "keywords"]
-    readonly_fields = ["id", "created_at", "updated_at"]
+    search_fields = ["name", "slug", "description", "keywords"]
+    readonly_fields = ["id", "slug", "created_at", "updated_at"]
     ordering = ["module", "order_index"]
 
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("name", "module", "subject", "parent_topic", "description")},
+            {
+                "fields": (
+                    "name",
+                    "slug",
+                    "module",
+                    "subject",
+                    "parent_topic",
+                    "description",
+                )
+            },
         ),
         (
             "Classification",

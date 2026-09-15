@@ -19,3 +19,17 @@ Keep this module free of heavy / optional imports.
 # generation-grounding can never silently drift apart.
 # 0.62 distance ⇔ 0.38 cosine similarity (permissive recall floor).
 GROUNDING_DISTANCE_THRESHOLD: float = 0.62
+
+# Redis keys for the per-subject tree and graph payloads. ONE definition: the
+# views read them, signals.py busts them, tests assert them. The version
+# suffix changes whenever the payload shape changes, so a stale entry from an
+# older deploy can never be served (v2 = nodes carry `slug`, G3.10).
+SUBJECT_CACHE_VERSION = "v2"
+
+
+def subject_tree_cache_key(subject_id: str) -> str:
+    return f"book_subject_tree_{subject_id}_{SUBJECT_CACHE_VERSION}"
+
+
+def subject_graph_cache_key(subject_id: str) -> str:
+    return f"book_subject_graph_{subject_id}_{SUBJECT_CACHE_VERSION}"

@@ -74,6 +74,51 @@ class TestTopicViewSet:
 
 
 @pytest.mark.django_db
+class TestSlugOrPkLookup:
+    """G3.10 — detail routes answer to a slug and to a UUID with the same payload."""
+
+    def _topic(self):
+        program = Program.objects.create(name="UPSC CSE")
+        subject = Subject.objects.create(name="Polity", program=program)
+        module = Module.objects.create(name="Constitution", subject=subject)
+        return Topic.objects.create(name="Article 370", module=module, subject=subject)
+
+    def test_topic_by_slug_and_by_uuid_are_the_same_row(self, api_client):
+        topic = self._topic()
+
+        by_slug = api_client.get(f"/api/v1/knowledge/topics/{topic.slug}/")
+        by_uuid = api_client.get(f"/api/v1/knowledge/topics/{topic.id}/")
+
+        assert by_slug.status_code == status.HTTP_200_OK
+        assert by_uuid.status_code == status.HTTP_200_OK
+        assert by_slug.data["id"] == by_uuid.data["id"] == str(topic.id)
+        assert by_slug.data["slug"] == "article-370"
+
+    def test_subject_and_module_by_slug(self, api_client):
+        topic = self._topic()
+
+        assert (
+            api_client.get(
+                f"/api/v1/knowledge/subjects/{topic.subject.slug}/"
+            ).status_code
+            == status.HTTP_200_OK
+        )
+        assert (
+            api_client.get(
+                f"/api/v1/knowledge/modules/{topic.module.slug}/"
+            ).status_code
+            == status.HTTP_200_OK
+        )
+
+    def test_unknown_slug_is_404_not_500(self, api_client):
+        self._topic()
+
+        response = api_client.get("/api/v1/knowledge/topics/no-such-topic/")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.django_db
 class TestSearchViewSet:
     """Tests for SearchViewSet — limit defaults and cap."""
 

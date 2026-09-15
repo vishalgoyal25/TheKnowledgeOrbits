@@ -8,9 +8,9 @@ These signals bust the cache whenever the underlying data changes:
   - Topic.save()        → tree + graph for that subject may have changed
   - BookContent.save()  → tree quality_score nodes may have changed
 
-Cache keys (must match views.py):
-  book_subject_tree_{subject_id}_v1
-  book_subject_graph_{subject_id}_v1
+Cache keys come from constants.py — the single definition the views use — so
+a payload-version bump there can never leave these signals deleting the old
+key while the views serve a new one.
 """
 
 import structlog
@@ -18,15 +18,18 @@ from django.core.cache import cache
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from engines.book_content.constants import (
+    subject_graph_cache_key,
+    subject_tree_cache_key,
+)
+
 logger = structlog.get_logger(__name__)
 
 
 def _bust_subject_caches(subject_id: str) -> None:
     """Delete both tree and graph cache for a subject."""
-    tree_key = f"book_subject_tree_{subject_id}_v1"
-    graph_key = f"book_subject_graph_{subject_id}_v1"
-    cache.delete(tree_key)
-    cache.delete(graph_key)
+    cache.delete(subject_tree_cache_key(subject_id))
+    cache.delete(subject_graph_cache_key(subject_id))
     logger.info("book_cache_busted", subject_id=subject_id)
 
 
