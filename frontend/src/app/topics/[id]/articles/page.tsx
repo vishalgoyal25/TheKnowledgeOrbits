@@ -21,9 +21,13 @@ import { useCAChunksForTopic } from "@/lib/hooks/use-current-affairs";
 
 export default function TopicArticlesPage() {
   const params = useParams();
-  const topicId = params.id as string;
+  // The segment is a slug or a UUID (G3.10). The topic endpoint accepts
+  // either; the article and CA filters below need the UUID, so they wait for
+  // the resolved topic — their hooks are `enabled: !!id`.
+  const segment = params.id as string;
 
-  const { data: topic, isLoading: topicLoading } = useTopic(topicId);
+  const { data: topic, isLoading: topicLoading } = useTopic(segment);
+  const topicId = topic?.id ?? null;
   const { data: articlesData, isLoading: articlesLoading } =
     useArticlesByTopic(topicId);
   const { data: caChunks, isLoading: _caChunksLoading } = useCAChunksForTopic(

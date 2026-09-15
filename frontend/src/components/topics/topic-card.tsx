@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { Topic } from "@/lib/types";
+import { topicPath } from "@/lib/content-urls";
 import {
   Card,
   CardContent,
@@ -24,7 +25,7 @@ interface TopicCardProps {
 
 export default function TopicCard({ topic, articleCount = 0 }: TopicCardProps) {
   return (
-    <Link href={`/topics/${topic.id}/articles`}>
+    <Link href={`${topicPath(topic)}/articles`}>
       <Card className="h-full transition-all hover:shadow-lg hover:scale-[1.02]">
         <CardHeader>
           <div className="flex items-start justify-between gap-2">

@@ -222,6 +222,12 @@ class BookContentSerializer(serializers.ModelSerializer):
         source="topic.name",
         read_only=True,
     )
+    topic_slug = serializers.CharField(
+        source="topic.slug",
+        read_only=True,
+        allow_null=True,
+        help_text="G3.10 — lets the reader build a slug share URL for its topic.",
+    )
     subject_name = serializers.CharField(
         source="subject.name",
         read_only=True,
@@ -249,6 +255,7 @@ class BookContentSerializer(serializers.ModelSerializer):
             "id",
             "topic_id",
             "topic_name",
+            "topic_slug",
             "subject_name",
             "content_markdown",
             "formatted_content",

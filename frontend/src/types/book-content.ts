@@ -89,8 +89,14 @@ export interface BookPlanStub {
 // SUBJECT  (subject_list view response)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * `slug` (G3.10): URL slug minted by the backend, never rewritten. Nullable in
+ * the type because a row created by an older deploy can carry NULL until
+ * `backfill_slugs` runs — callers fall back to the UUID when it is absent.
+ */
 export interface SubjectWithPlan {
   id: string;
+  slug: string | null;
   name: string;
   description: string;
   order_index: number;
@@ -108,6 +114,7 @@ export interface GraphPosition {
 
 export interface TopicNode {
   id: string;
+  slug: string | null;
   name: string;
   node_type: NodeType;
   content_status: ContentStatus;
@@ -163,6 +170,7 @@ export interface GraphData {
 
 export interface TreeTopic {
   id: string;
+  slug: string | null;
   name: string;
   node_type: NodeType;
   content_status: ContentStatus;
@@ -174,6 +182,7 @@ export interface TreeTopic {
 
 export interface TreeModule {
   id: string;
+  slug: string | null;
   name: string;
   order_index: number;
   topics: TreeTopic[];
@@ -181,6 +190,7 @@ export interface TreeModule {
 
 export interface SubjectTree {
   id: string;
+  slug: string | null;
   name: string;
   modules: TreeModule[];
 }
@@ -235,6 +245,7 @@ export interface BookContent {
   id: string;
   topic_id: string;
   topic_name: string;
+  topic_slug: string | null;
   subject_name: string;
   content_markdown: string;
   formatted_content: string;

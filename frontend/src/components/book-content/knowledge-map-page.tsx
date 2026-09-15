@@ -21,7 +21,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { knowledgePath } from "@/lib/content-urls";
+import {
+  isUuid,
+  knowledgePath,
+  segmentMatches,
+  type SluggedRef,
+} from "@/lib/content-urls";
 import {
   ChevronDown,
   ChevronRight,
@@ -98,6 +103,36 @@ function firstReady(topics: TreeTopic[]): OverviewNode["startHere"] {
     (t) => t.content_status === "book_quality",
   );
   return hit ? { id: hit.id, name: hit.name } : null;
+}
+
+/**
+ * G3.10 — resolve a node in the loaded tree by id, in either direction.
+ * The tree is the only place the map knows module and topic slugs, so URL
+ * writing (id → slug) and URL reading (slug → id) both go through it.
+ */
+function findNodeRef(tree: SubjectTree | null, id: string): SluggedRef | null {
+  if (!tree) return null;
+  if (tree.id === id) return { id: tree.id, slug: tree.slug };
+  const mod = tree.modules.find((m) => m.id === id);
+  if (mod) return { id: mod.id, slug: mod.slug };
+  const topic = tree.modules
+    .flatMap((m) => flattenTopics(m.topics))
+    .find((t) => t.id === id);
+  return topic ? { id: topic.id, slug: topic.slug } : null;
+}
+
+function findNodeBySegment(
+  tree: SubjectTree | null,
+  segment: string,
+): SluggedRef | null {
+  if (!tree) return null;
+  if (segmentMatches(segment, tree)) return { id: tree.id, slug: tree.slug };
+  const mod = tree.modules.find((m) => segmentMatches(segment, m));
+  if (mod) return { id: mod.id, slug: mod.slug };
+  const topic = tree.modules
+    .flatMap((m) => flattenTopics(m.topics))
+    .find((t) => segmentMatches(segment, t));
+  return topic ? { id: topic.id, slug: topic.slug } : null;
 }
 
 /**
@@ -327,20 +362,37 @@ function KnowledgePageInner() {
   // ── State → URL ──────────────────────────────────────────────────────────
   // Native pushState, not router.push: the App Router syncs usePathname from
   // it with no server round-trip, and every topic gets a path the
-  // route-change tracker and the read beacon can see. The subject is read via
-  // a ref so handleNodeSelect keeps a stable identity for the graph.
+  // route-change tracker and the read beacon can see. State is held in refs
+  // so handleNodeSelect keeps a stable identity for the graph.
+  //
+  // G3.10: the URL is written with SLUGS wherever the loaded data knows them —
+  // the subject from the subjects list, the topic/module from the tree — and
+  // falls back to the UUID for anything not yet loaded. Both forms resolve.
   const subjectIdRef = useRef("");
+  const subjectsRef = useRef<SubjectWithPlan[]>([]);
+  const treeRef = useRef<SubjectTree | null>(null);
   useEffect(() => {
     subjectIdRef.current = selectedSubjectId;
   }, [selectedSubjectId]);
+  useEffect(() => {
+    subjectsRef.current = subjects;
+  }, [subjects]);
+  useEffect(() => {
+    treeRef.current = tree;
+  }, [tree]);
 
   const writeUrl = useCallback(
     (
-      topic: string | null,
-      subject: string,
+      topicId: string | null,
+      subjectId: string,
       mode: "push" | "replace" = "push",
     ) => {
-      const url = knowledgePath(subject, topic);
+      const subjectNode =
+        subjectsRef.current.find((s) => s.id === subjectId) ?? subjectId;
+      const topicNode = topicId
+        ? (findNodeRef(treeRef.current, topicId) ?? topicId)
+        : null;
+      const url = knowledgePath(subjectNode, topicNode);
       if (mode === "replace") window.history.replaceState(null, "", url);
       else window.history.pushState(null, "", url);
     },
@@ -348,20 +400,61 @@ function KnowledgePageInner() {
   );
 
   // ── URL → state ──────────────────────────────────────────────────────────
-  // <topic>   → pre-loads the article in the right panel
-  // <subject> → immediately switches the left panel to the correct subject
-  //             (encoded by hamburger/navbar so no extra API call is needed)
-  // Also re-runs on Back/Forward, since the router re-syncs usePathname on
-  // popstate. An absent topic clears the reader so Back to a subject-only
-  // URL matches what that URL shows on a fresh load. A legacy query-form
-  // arrival is rewritten to the path form in place (replace, not push).
+  // <subject> → switches the left panel; resolved from the subjects list when
+  //             it is a slug, used directly when it is a UUID.
+  // <topic>   → pre-loads the reader; a slug is resolved against the tree
+  //             (subject, module or any topic beneath), a UUID is used directly.
+  // Both re-run on Back/Forward (the router re-syncs usePathname on popstate)
+  // and when the data they resolve against arrives. An absent topic clears the
+  // reader so Back to a subject-only URL matches a fresh load of it.
   useEffect(() => {
-    setSelectedTopicId(topicParam);
-    if (subjectParam) setSelectedSubjectId(subjectParam);
-    if (arrivedViaQuery && subjectParam) {
-      writeUrl(topicParam, subjectParam, "replace");
+    if (!subjectParam) return;
+    if (isUuid(subjectParam)) {
+      setSelectedSubjectId(subjectParam);
+      return;
     }
-  }, [topicParam, subjectParam, arrivedViaQuery, writeUrl]);
+    const match = subjects.find((s) => segmentMatches(subjectParam, s));
+    if (match) setSelectedSubjectId(match.id);
+  }, [subjectParam, subjects]);
+
+  useEffect(() => {
+    if (!topicParam) {
+      setSelectedTopicId(null);
+      return;
+    }
+    if (isUuid(topicParam)) {
+      setSelectedTopicId(topicParam);
+      return;
+    }
+    const match = findNodeBySegment(tree, topicParam);
+    if (match) setSelectedTopicId(match.id);
+  }, [topicParam, tree]);
+
+  // Canonicalise in place: a legacy query-form arrival, or a UUID path that the
+  // now-loaded data can express as slugs, is rewritten with replaceState — no
+  // history entry, no server round-trip, and the tracker sees the final URL.
+  useEffect(() => {
+    if (!selectedSubjectId) return;
+    const wantsRewrite =
+      arrivedViaQuery ||
+      (subjectParam && isUuid(subjectParam)) ||
+      (topicParam && isUuid(topicParam));
+    if (!wantsRewrite) return;
+    const subjectKnown = subjects.some((s) => s.id === selectedSubjectId);
+    const topicKnown = !selectedTopicId || !!findNodeRef(tree, selectedTopicId);
+    if (subjectKnown && topicKnown) {
+      writeUrl(selectedTopicId, selectedSubjectId, "replace");
+    }
+  }, [
+    arrivedViaQuery,
+    subjectParam,
+    topicParam,
+    selectedSubjectId,
+    selectedTopicId,
+    subjects,
+    tree,
+    writeUrl,
+  ]);
 
   // The tab title follows the selected topic, and PageViewTracker sends it as
   // page_title — GA4 drops the query string from page_path, so the title is

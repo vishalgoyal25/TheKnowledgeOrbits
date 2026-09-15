@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 
 import { getBookContent } from "@/lib/api/book-content";
+import { topicPath } from "@/lib/content-urls";
 import { SocialBar } from "@/components/social/social-bar";
 import ReadBeacon from "@/components/telemetry/ReadBeacon";
 import { cn } from "@/lib/utils";
@@ -798,7 +799,7 @@ export default function BookContentReader({
                 key={content.id}
                 contentType="book_article"
                 contentId={content.id}
-                shareUrl={`https://www.theknowledgeorbits.com/knowledge?topic=${content.topic_id}`}
+                shareUrl={`https://www.theknowledgeorbits.com${topicPath({ id: content.topic_id, slug: content.topic_slug })}`}
                 shareTitle={content.topic_name}
               />
             </div>

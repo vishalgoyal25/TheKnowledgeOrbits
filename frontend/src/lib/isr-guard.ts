@@ -31,13 +31,17 @@ import { isAxiosError } from "axios";
  * an outage would send the next person hunting the wrong problem.
  */
 export function abortIfApiUnreachable(error: unknown, label: string): void {
+  // Checked FIRST, before the CI short-circuit: a non-Axios error is never an
+  // API outcome. This includes Next's own control-flow throws — redirect() and
+  // notFound() — which must always propagate. Swallowing one under
+  // SKIP_BACKEND_WAIT would turn a canonical-URL redirect into a 404.
+  if (!isAxiosError(error)) {
+    throw error;
+  }
+
   // CI builds run with no backend on purpose (see wait-for-backend.js).
   if (process.env.SKIP_BACKEND_WAIT === "true") {
     return;
-  }
-
-  if (!isAxiosError(error)) {
-    throw error;
   }
 
   const status = error.response?.status;
