@@ -62,6 +62,8 @@ interface SimNode extends d3.SimulationNodeDatum {
   name: string;
   node_type: string;
   content_status: string;
+  /** An article exists — what "ready" styling keys on (G2.7). */
+  has_content: boolean;
   parent_topic_id: string | null;
   quality_score: number | null;
   /** Number of direct children in the full graph */
@@ -490,9 +492,11 @@ export default function KnowledgeGraph({
       .attr("class", "node")
       .style("cursor", "pointer");
 
-    // Outer glow ring — shown only for book_quality content
+    // Outer glow ring — shown for every node that has an article. Keyed on
+    // has_content, not content_status: the pipeline's `complete` lock state
+    // also means an article exists (G2.7).
     nodeSel
-      .filter((d) => d.content_status === "book_quality")
+      .filter((d) => d.has_content)
       .append("circle")
       .attr(
         "r",

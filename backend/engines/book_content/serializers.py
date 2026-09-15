@@ -53,6 +53,13 @@ class TopicNodeSerializer(serializers.ModelSerializer):
     quality_score = serializers.SerializerMethodField(
         help_text="Quality score from associated BookContent. Null if not yet generated.",
     )
+    has_content = serializers.SerializerMethodField(
+        help_text=(
+            "True when a BookContent article exists for this node. UI must key "
+            "'ready' on this, not on content_status — `book_quality` and "
+            "`complete` (the pipeline's lock state) both mean an article exists."
+        ),
+    )
     graph_position = serializers.SerializerMethodField(
         help_text="Reserved for future graph layout coordinates {x, y}. Currently null.",
     )
@@ -65,6 +72,7 @@ class TopicNodeSerializer(serializers.ModelSerializer):
             "name",
             "node_type",
             "content_status",
+            "has_content",
             "parent_topic_id",
             "quality_score",
             "graph_position",
@@ -79,6 +87,13 @@ class TopicNodeSerializer(serializers.ModelSerializer):
             return obj.book_content.quality_score
         except BookContent.DoesNotExist:
             return None
+
+    def get_has_content(self, obj: Topic) -> bool:
+        """Reads the prefetched reverse one-to-one; no extra query."""
+        try:
+            return obj.book_content is not None
+        except BookContent.DoesNotExist:
+            return False
 
     def get_graph_position(self, obj: Topic) -> dict | None:
         """

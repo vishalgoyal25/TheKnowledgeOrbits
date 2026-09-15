@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import type {
   SubjectWithPlan,
   SubjectTree,
+  TreeModule,
   TreeTopic,
 } from "@/types/book-content";
 
@@ -89,20 +90,32 @@ function flattenTopics(
   return acc;
 }
 
-/** Roll a module's status up from its topics: any article → ready. */
-function moduleStatus(topics: TreeTopic[]): OverviewChild["content_status"] {
-  const all = flattenTopics(topics);
-  if (all.some((t) => t.content_status === "book_quality"))
-    return "book_quality";
-  if (all.some((t) => t.content_status === "generating")) return "generating";
-  return "empty";
+/**
+ * "Ready" is `has_content` — a BookContent row exists — never a content_status
+ * value (G2.7). The pipeline's `complete` lock state also means an article
+ * exists, and 878 topics sat grey in this UI for months because the status
+ * string was read instead.
+ */
+function moduleChild(m: TreeModule): OverviewChild {
+  const all = flattenTopics(m.topics);
+  return {
+    id: m.id,
+    name: m.name,
+    node_type: "module",
+    has_content: all.some((t) => t.has_content),
+    content_status: all.some((t) => t.content_status === "generating")
+      ? "generating"
+      : "empty",
+  };
 }
 
 function firstReady(topics: TreeTopic[]): OverviewNode["startHere"] {
-  const hit = flattenTopics(topics).find(
-    (t) => t.content_status === "book_quality",
-  );
+  const hit = flattenTopics(topics).find((t) => t.has_content);
   return hit ? { id: hit.id, name: hit.name } : null;
+}
+
+function countReady(topics: TreeTopic[]): number {
+  return topics.filter((t) => t.has_content).length;
 }
 
 /**
@@ -136,6 +149,41 @@ function findNodeBySegment(
 }
 
 /**
+ * Breadcrumb trail for the reader: Subject › Module › Topic › … › selected.
+ * Walks the tree; every crumb is clickable (it is a node id the map can select).
+ */
+function buildTrail(
+  tree: SubjectTree | null,
+  id: string | null,
+): { id: string; name: string }[] {
+  if (!tree || !id) return [];
+  const subject = { id: tree.id, name: tree.name };
+  if (id === tree.id) return [subject];
+
+  for (const mod of tree.modules) {
+    const modCrumb = { id: mod.id, name: mod.name };
+    if (mod.id === id) return [subject, modCrumb];
+    const path = findPath(mod.topics, id);
+    if (path) return [subject, modCrumb, ...path];
+  }
+  return [];
+}
+
+/** Depth-first path of {id,name} from a root topic down to `targetId`. */
+function findPath(
+  topics: TreeTopic[],
+  targetId: string,
+): { id: string; name: string }[] | null {
+  for (const t of topics) {
+    const here = { id: t.id, name: t.name };
+    if (t.id === targetId) return [here];
+    const below = findPath(t.subtopics, targetId);
+    if (below) return [here, ...below];
+  }
+  return null;
+}
+
+/**
  * If `id` names the subject or one of its modules, describe it for the reader.
  * Returns null for topic nodes, which have real articles.
  */
@@ -153,15 +201,9 @@ function buildOverview(
       name: tree.name,
       kind: "subject",
       description: subject?.description || undefined,
-      children: tree.modules.map((m) => ({
-        id: m.id,
-        name: m.name,
-        node_type: "module",
-        content_status: moduleStatus(m.topics),
-      })),
+      children: tree.modules.map(moduleChild),
       startHere: firstReady(tree.modules.flatMap((m) => m.topics)),
-      generatedCount: all.filter((t) => t.content_status === "book_quality")
-        .length,
+      generatedCount: countReady(all),
       totalCount: all.length,
     };
   }
@@ -177,11 +219,11 @@ function buildOverview(
         id: t.id,
         name: t.name,
         node_type: t.node_type,
+        has_content: t.has_content,
         content_status: t.content_status,
       })),
       startHere: firstReady(mod.topics),
-      generatedCount: all.filter((t) => t.content_status === "book_quality")
-        .length,
+      generatedCount: countReady(all),
       totalCount: all.length,
     };
   }
@@ -239,12 +281,15 @@ function OutlineNode({
   const hasChildren = topic.subtopics.length > 0;
   const isSelected = selectedId === topic.id;
 
-  const statusDot: Record<string, string> = {
-    book_quality: "bg-green-500",
-    generating: "bg-yellow-400 animate-pulse",
-    failed: "bg-red-400",
-    empty: "bg-muted-foreground/30",
-  };
+  // Ready is `has_content`; the status string only styles the in-between states.
+  const dotClass = topic.has_content
+    ? "bg-green-500"
+    : topic.content_status === "generating"
+      ? "bg-yellow-400 animate-pulse"
+      : topic.content_status === "failed"
+        ? "bg-red-400"
+        : "bg-muted-foreground/30";
+  const dotTitle = topic.has_content ? "Article ready" : topic.content_status;
 
   return (
     <div>
@@ -274,11 +319,8 @@ function OutlineNode({
 
         {/* Content-status dot */}
         <span
-          className={cn(
-            "w-1.5 h-1.5 rounded-full flex-shrink-0",
-            statusDot[topic.content_status] ?? statusDot.empty,
-          )}
-          title={topic.content_status}
+          className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", dotClass)}
+          title={dotTitle}
         />
 
         {/* Name */}
@@ -570,6 +612,12 @@ function KnowledgePageInner() {
       .finally(() => setLoadingTree(false));
   }, [selectedSubjectId]);
 
+  // ── Breadcrumb trail for the reader (Subject › Module › … › selected) ─────
+  const trail = useMemo(
+    () => buildTrail(tree, selectedTopicId),
+    [tree, selectedTopicId],
+  );
+
   // ── Overview for subject / module selections (null for topic nodes) ──────
   const overview = useMemo(
     () =>
@@ -809,6 +857,7 @@ function KnowledgePageInner() {
           topicName={selectedTopicName}
           onSeeAlsoClick={handleNodeSelect}
           overview={overview}
+          trail={trail}
           className="h-full"
         />
       </div>
