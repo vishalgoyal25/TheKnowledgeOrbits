@@ -20,6 +20,10 @@
 import type { DailyFeedResponse, DailyCaArticleList } from "@/lib/api/daily-ca";
 import type { Quiz } from "@/lib/types";
 import HomePageClient from "@/components/home/home-page-client";
+import type { Metadata } from "next";
+
+// G3.4 — the homepage owns its canonical; the root layout supplies the rest.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 // ISR: Vercel re-generates this page in the background. 1800s (30 min) instead of
 // 300s — homepage content (today's CA/quiz) only changes a few times/day; 5-min

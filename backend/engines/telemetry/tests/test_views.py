@@ -244,6 +244,7 @@ class TestBeaconValidation:
             ContentRead.CONTENT_TYPE_CONCEPT,
             ContentRead.CONTENT_TYPE_ARTICLE,
             ContentRead.CONTENT_TYPE_TOPIC,
+            ContentRead.CONTENT_TYPE_CURRENT_AFFAIRS,
         ],
     )
     def test_every_declared_content_type_is_accepted(

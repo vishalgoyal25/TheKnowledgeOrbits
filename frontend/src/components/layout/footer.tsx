@@ -36,7 +36,8 @@ const footerColumns: { heading: string; links: FooterLink[] }[] = [
     links: [
       { label: "Daily Current Affairs", href: "/daily-ca" },
       { label: "Current Affairs Archive", href: "/current-affairs" },
-      { label: "Topics & Syllabus", href: "/topics" },
+      { label: "UPSC Syllabus", href: "/subjects" },
+      { label: "Browse Topics", href: "/topics" },
       { label: "Knowledge Graph", href: "/knowledge" },
       { label: "Articles", href: "/articles" },
       { label: "Practice Quiz", href: "/assessment" },

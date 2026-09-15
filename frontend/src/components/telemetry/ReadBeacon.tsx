@@ -21,7 +21,8 @@ export type ReadContentType =
   | "daily_ca_article"
   | "concept"
   | "article"
-  | "topic";
+  | "topic"
+  | "current_affairs";
 
 interface ReadBeaconProps {
   contentType: ReadContentType;

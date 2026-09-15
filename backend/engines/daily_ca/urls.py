@@ -15,11 +15,19 @@ Note: 'today' and 'archive' must come before '<date_str>' to avoid slug conflict
 
 from django.urls import path
 
-from engines.daily_ca.views import ArchiveView, ArticleDetailView, DateView, TodayView
+from engines.daily_ca.views import (
+    ArchiveView,
+    ArticleDetailView,
+    DateView,
+    SitemapEntriesView,
+    TodayView,
+)
 
 urlpatterns = [
     path("today/", TodayView.as_view(), name="daily-ca-today"),
     path("archive/", ArchiveView.as_view(), name="daily-ca-archive"),
+    # Before '<date_str>/' like the others — a literal segment must win.
+    path("sitemap/", SitemapEntriesView.as_view(), name="daily-ca-sitemap"),
     path(
         "article/<slug:slug>/",
         ArticleDetailView.as_view(),

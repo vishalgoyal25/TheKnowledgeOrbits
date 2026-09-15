@@ -8,6 +8,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import CurrentAffairsClient from "./ca-client";
 import { CAArticle, CASource } from "@/lib/types";
+import { buildMetadata } from "@/lib/seo/metadata";
+
+export const metadata = buildMetadata({
+  title: "Current Affairs for UPSC",
+  description:
+    "Latest current affairs curated for UPSC CSE, mapped to syllabus topics and sourced from official and reputed publications.",
+  path: "/current-affairs",
+});
 
 // Revalidate hourly — the Ghost worker publishes at most a few times/day, and
 // on-demand revalidation (/api/revalidate) refreshes this list instantly on

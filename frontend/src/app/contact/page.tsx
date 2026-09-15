@@ -8,6 +8,7 @@
  * Content is unchanged word for word.
  */
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/metadata";
 import {
   Github,
   Globe,
@@ -23,11 +24,12 @@ import { Section } from "@/components/shared/section";
 import { ContentCard } from "@/components/shared/content-card";
 import { ContactForm } from "@/components/contact/contact-form";
 
-export const metadata: Metadata = {
-  title: "Contact | TheKnowledgeOrbits",
+export const metadata: Metadata = buildMetadata({
+  title: "Contact",
   description:
     "Have a question about our AI technology or looking for institutional access? We'd love to hear from you.",
-};
+  path: "/contact",
+});
 
 const SOCIALS = [
   { label: "Twitter", href: "#", icon: Twitter },

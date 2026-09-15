@@ -71,6 +71,12 @@ class ConceptPageSerializer(serializers.ModelSerializer):
 class ConceptPageDetailSerializer(serializers.ModelSerializer):
     body = serializers.SerializerMethodField()
     linked_articles = serializers.SerializerMethodField()
+    is_indexable = serializers.SerializerMethodField(
+        help_text=(
+            "G0.3 rule (concept_seo_service): body >= 400 words and >= 3 headings. "
+            "The page sets robots noindex when False; the sitemap lists only True."
+        ),
+    )
 
     class Meta:
         model = ConceptPage
@@ -81,14 +87,21 @@ class ConceptPageDetailSerializer(serializers.ModelSerializer):
             "brief_description",
             "body",
             "is_content_ready",
+            "is_indexable",
             "usage_count",
             "created_at",
+            "updated_at",
             "linked_articles",
         ]
 
     def get_body(self, obj):
         """Return body_md only when full content is ready."""
         return obj.body_md if obj.is_content_ready else None
+
+    def get_is_indexable(self, obj) -> bool:
+        from engines.tags.services.concept_seo_service import is_indexable
+
+        return is_indexable(obj)
 
     def get_linked_articles(self, obj):
         from engines.daily_ca.models import DailyCaArticle

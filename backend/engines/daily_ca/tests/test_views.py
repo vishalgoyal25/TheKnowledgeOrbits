@@ -190,6 +190,34 @@ class TestArchiveView:
         assert "archive" in resp.json()
 
 
+@pytest.mark.django_db
+class TestSitemapEntriesView:
+    """G3.3 — every PUBLISHED article's slug + lastmod, unpaginated, nothing else."""
+
+    def test_lists_published_only(self, client, published_article, unpublished_article):
+        from django.core.cache import cache
+
+        cache.clear()
+        resp = client.get("/api/v1/daily-ca/sitemap/")
+        cache.clear()
+
+        assert resp.status_code == 200
+        rows = resp.json()
+        assert [r["slug"] for r in rows] == ["2099-04-10-published-test-article"]
+        assert set(rows[0]) == {"slug", "lastmod"}
+
+    def test_literal_segment_wins_over_date_route(self, client):
+        """'sitemap' must never be parsed as a <date_str>."""
+        from django.core.cache import cache
+
+        cache.clear()
+        resp = client.get("/api/v1/daily-ca/sitemap/")
+        cache.clear()
+
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
 # ── Admin Views ───────────────────────────────────────────────────────────────
 
 

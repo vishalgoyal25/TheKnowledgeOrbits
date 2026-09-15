@@ -10,6 +10,7 @@
  * calmer type weights (font-black -> font-semibold).
  */
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/metadata";
 import Link from "next/link";
 import {
   Target,
@@ -28,11 +29,12 @@ import { PageHero } from "@/components/shared/page-hero";
 import { Section } from "@/components/shared/section";
 import { ContentCard } from "@/components/shared/content-card";
 
-export const metadata: Metadata = {
-  title: "About | TheKnowledgeOrbits",
+export const metadata: Metadata = buildMetadata({
+  title: "About",
   description:
     "TheKnowledgeOrbits was born out of a simple observation: UPSC preparation shouldn't be about who has the most heavy books, but who has the most efficient access to distilled, syllabus-mapped knowledge.",
-};
+  path: "/about",
+});
 
 const PILLARS = [
   {

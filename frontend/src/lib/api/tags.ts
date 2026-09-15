@@ -35,8 +35,11 @@ export interface ConceptDetail {
   brief_description: string;
   body: string | null; // populated only when is_content_ready=true
   is_content_ready: boolean;
+  /** G0.3 rule applied server-side: >= 400 words and >= 3 headings. */
+  is_indexable: boolean;
   usage_count: number;
   created_at: string;
+  updated_at: string;
   linked_articles: { title: string; slug: string }[];
 }
 

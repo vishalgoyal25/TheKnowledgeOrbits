@@ -130,13 +130,17 @@ class ArticleViewSet(viewsets.ModelViewSet):  # type: ignore
         - Logged-in: (is_published=True AND is_public=True) OR (created_by=user)
         """
         user = self.request.user
-        if user.is_authenticated:
+        # `?scope=public` (G3.13): a PUBLIC page asks for public articles only,
+        # even for a logged-in caller — otherwise an author sees their private
+        # notebook articles mixed into the syllabus page they are viewing.
+        public_only = self.request.query_params.get("scope") == "public"
+        if user.is_authenticated and not public_only:
             # User can see all public published articles OR any article they created
             queryset = Article.objects.filter(
                 Q(is_published=True, is_public=True) | Q(created_by=user)
             )
         else:
-            # Anonymous see only public published
+            # Anonymous, or a public surface: only public published
             queryset = Article.objects.filter(is_published=True, is_public=True)
 
         # Performance: Use atomic counter caching for total count

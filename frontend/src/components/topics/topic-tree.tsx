@@ -47,7 +47,7 @@ function TopicNode({ topic, level, articleCount = 0 }: TopicNodeProps) {
         <Folder className="h-4 w-4 text-blue-500" />
 
         <Link
-          href={`${topicPath(topic)}/articles`}
+          href={topicPath(topic)}
           className="flex-1 hover:text-blue-600 transition-colors"
           onClick={(e) => e.stopPropagation()}
         >

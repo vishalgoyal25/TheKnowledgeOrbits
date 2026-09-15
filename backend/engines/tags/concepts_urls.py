@@ -11,9 +11,11 @@ Routes:
 
 from django.urls import path
 
-from engines.tags.views import ConceptDetailView, ConceptListView
+from engines.tags.views import ConceptDetailView, ConceptListView, ConceptSitemapView
 
 urlpatterns = [
     path("", ConceptListView.as_view(), name="concept-list"),
+    # Literal segment before '<slug>/' so "sitemap" is never treated as a slug.
+    path("sitemap/", ConceptSitemapView.as_view(), name="concept-sitemap"),
     path("<slug:slug>/", ConceptDetailView.as_view(), name="concept-detail"),
 ]

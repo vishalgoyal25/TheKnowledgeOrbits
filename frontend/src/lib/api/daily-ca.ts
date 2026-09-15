@@ -52,6 +52,7 @@ export interface DailyCaArticleDetail extends DailyCaArticleList {
   is_published: boolean;
   generation_metadata: Record<string, unknown>;
   created_at: string;
+  updated_at: string;
   concept_links: ConceptLink[];
   related_articles: DailyCaArticleList[];
   static_background: {

@@ -2,6 +2,15 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, Mail, Scale } from "lucide-react";
 import Link from "next/link";
 
+import { buildMetadata } from "@/lib/seo/metadata";
+
+export const metadata = buildMetadata({
+  title: "Terms of Service",
+  description:
+    "The terms under which TheKnowledgeOrbits provides AI-generated UPSC study content and tools.",
+  path: "/terms",
+});
+
 export default function TermsOfService() {
   return (
     <div className="bg-muted/40 min-h-screen py-16">

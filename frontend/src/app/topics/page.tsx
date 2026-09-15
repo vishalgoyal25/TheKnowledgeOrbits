@@ -7,9 +7,17 @@ import { topicsAPI } from "@/lib/api/topics";
 import { BookOpen } from "lucide-react";
 import TopicsClient from "./topics-client";
 import { Topic, Subject } from "@/lib/types";
+import { buildMetadata } from "@/lib/seo/metadata";
 
 // Revalidate every hour
 export const revalidate = 3600;
+
+export const metadata = buildMetadata({
+  title: "Browse UPSC Topics",
+  description:
+    "Every topic in the UPSC CSE syllabus, searchable and filterable by subject and difficulty, each with an AI-generated study article.",
+  path: "/topics",
+});
 
 export default async function TopicsPage() {
   let topics: Topic[] = [];

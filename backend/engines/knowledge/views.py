@@ -499,6 +499,44 @@ class SearchViewSet(viewsets.ViewSet):
         return Response(results)
 
 
+class SitemapEntriesView(views.APIView):
+    """
+    GET /api/v1/knowledge/sitemap/  (G3.3)
+
+    Every public hierarchy URL this engine owns, as the sitemap needs it:
+    slug + last-modified, nothing else. Engine-local on purpose — daily-CA and
+    concept pages expose their own feeds and the frontend sitemap composes the
+    three, so no engine reads another engine's tables.
+
+    Rows without a slug (created before backfill_slugs ran) are skipped rather
+    than emitted as UUIDs: the sitemap must only ever carry canonical URLs.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        cache_key = "sitemap_entries_knowledge_v1"
+        cached = cache_service.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        def rows(qs):
+            return [
+                {"slug": slug, "lastmod": updated_at.isoformat()}
+                for slug, updated_at in qs.filter(
+                    is_active=True, slug__isnull=False
+                ).values_list("slug", "updated_at")
+            ]
+
+        payload = {
+            "subjects": rows(Subject.objects),
+            "modules": rows(Module.objects),
+            "topics": rows(Topic.objects),
+        }
+        cache_service.set(cache_key, payload, 3600)  # 1 hour
+        return Response(payload)
+
+
 class HierarchyListView(views.APIView):
     """
     Returns the complete, deeply nested UPSC hierarchy:

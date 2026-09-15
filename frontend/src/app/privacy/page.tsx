@@ -2,6 +2,15 @@ import React from "react";
 import { ShieldCheck, Lock, Eye, Mail, Database } from "lucide-react";
 import Link from "next/link";
 
+import { buildMetadata } from "@/lib/seo/metadata";
+
+export const metadata = buildMetadata({
+  title: "Privacy Policy",
+  description:
+    "How TheKnowledgeOrbits collects, uses and protects your data — analytics, cookies, retention and your rights under the DPDP Act.",
+  path: "/privacy",
+});
+
 export default function PrivacyPolicy() {
   return (
     <div className="bg-muted/40 min-h-screen py-16">

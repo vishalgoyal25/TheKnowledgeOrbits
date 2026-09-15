@@ -32,7 +32,9 @@ import { ScrollSpyToC, Heading } from "./_components/scroll-spy-toc";
 import { ArticleTopBar } from "./_components/article-top-bar";
 import { SocialBar } from "@/components/social/social-bar";
 import ReadBeacon from "@/components/telemetry/ReadBeacon";
+import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
 import { preprocessArticleBody } from "@/lib/daily-ca-preprocess";
+import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
 
 // ── ISR — rebuild daily; articles are immutable after publish, so a longer
 // window is safe and cuts Vercel ISR writes across ~1,259 article pages.
@@ -88,16 +90,20 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const article = await fetchArticle(slug);
-  if (!article) return { title: "Article not found | TheKnowledgeOrbits" };
-  return {
-    title: `${article.title} | TheKnowledgeOrbits`,
+  if (!article) return { title: "Article not found", ...NOINDEX };
+  // G3.4 — shared builder: canonical, OG article type with dates, Twitter card.
+  // The root layout's title template appends the brand.
+  return buildMetadata({
+    title: article.title,
     description: article.news_context || article.title,
-    openGraph: {
-      title: article.title,
-      description: article.news_context || article.title,
-      images: article.hero_image_url ? [article.hero_image_url] : [],
+    path: `/daily-ca/article/${article.slug}`,
+    image: article.hero_image_url || undefined,
+    article: {
+      publishedTime: article.published_date,
+      modifiedTime: article.updated_at,
+      section: article.subject_name,
     },
-  };
+  });
 }
 
 // ── Pure helpers (run server-side, no state needed) ──────────────────────────
@@ -276,6 +282,25 @@ export default async function ArticleDetailPage({
       {/* Telemetry — renders null, fires once per mount. Uses article.id (not
           slug) so ContentRead rows key on the same identity SocialBar uses. */}
       <ReadBeacon contentType="daily_ca_article" contentId={article.id} />
+
+      {/* G3.5 — this page is server-rendered with the body in the HTML, so
+          the Article schema describes content the crawler actually sees
+          (the G0.1 decision: schema on the article page, never on the feed). */}
+      <ArticleJsonLd
+        headline={article.title}
+        description={article.news_context || article.title}
+        path={`/daily-ca/article/${article.slug}`}
+        datePublished={article.published_date}
+        dateModified={article.updated_at}
+        section={article.subject_name}
+        image={article.hero_image_url}
+      />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Daily Current Affairs", path: "/daily-ca" },
+          { name: article.title, path: `/daily-ca/article/${article.slug}` },
+        ]}
+      />
 
       {/* Top bar — client component (back button + share) */}
       <ArticleTopBar title={article.title} />
