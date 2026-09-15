@@ -1,8 +1,10 @@
 import { subjectsAPI } from "@/lib/api/subjects";
 import { topicsAPI } from "@/lib/api/topics";
 import { Layers } from "lucide-react";
+import { permanentRedirect } from "next/navigation";
 import TopicCard from "@/components/topics/topic-card";
 import { Topic, Module } from "@/lib/types";
+import { isUuid, modulePath } from "@/lib/content-urls";
 
 // Revalidate daily — module structure rarely changes; hourly rebuilds across
 // many dynamic pages wasted Vercel ISR-write quota.
@@ -12,19 +14,29 @@ export default async function ModulePage(props: {
   params: Promise<{ id: string }>;
 }) {
   const params = await props.params;
-  const moduleId = params.id;
+  // Slug or UUID (G3.10) — the API resolves either; the topic filter needs
+  // the UUID, so it follows the module fetch.
+  const segment = params.id;
   let moduleData: Module | null = null;
   let topics: Topic[] = [];
 
   try {
-    moduleData = await subjectsAPI.getModuleById(moduleId);
-    topics = (await topicsAPI.listByModule(moduleId, {
-      page_size: 200,
-    })) as Topic[];
+    moduleData = await subjectsAPI.getModuleById(segment);
+    if (moduleData) {
+      topics = (await topicsAPI.listByModule(moduleData.id, {
+        page_size: 200,
+      })) as Topic[];
+    }
   } catch (error) {
     if (process.env.SKIP_BACKEND_WAIT !== "true") {
       console.error("Failed to fetch module details", error);
     }
+  }
+
+  // Legacy UUID address → canonical slug address (308). Outside the try so
+  // the redirect throw is never mistaken for a fetch failure.
+  if (moduleData && isUuid(segment) && moduleData.slug) {
+    permanentRedirect(modulePath(moduleData));
   }
 
   if (!moduleData) {

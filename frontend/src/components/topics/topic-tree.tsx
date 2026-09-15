@@ -7,6 +7,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Topic } from "@/lib/types";
+import { topicPath } from "@/lib/content-urls";
 import { ChevronRight, ChevronDown, FileText, Folder } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ function TopicNode({ topic, level, articleCount = 0 }: TopicNodeProps) {
         <Folder className="h-4 w-4 text-blue-500" />
 
         <Link
-          href={`/topics/${topic.id}/articles`}
+          href={`${topicPath(topic)}/articles`}
           className="flex-1 hover:text-blue-600 transition-colors"
           onClick={(e) => e.stopPropagation()}
         >

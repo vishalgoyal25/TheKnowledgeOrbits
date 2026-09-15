@@ -10,19 +10,21 @@ import { topicsAPI } from "@/lib/api/topics";
 import { Article } from "@/lib/types";
 import { ArrowLeft, BookOpen, Hash, Layers } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { abortIfApiUnreachable } from "@/lib/isr-guard";
+import { isUuid, nodeSegment, topicPath } from "@/lib/content-urls";
 
 // Revalidate daily — topic content changes at most once/day, and there are
 // ~1,462 topic pages; hourly rebuilds × that many pages was the dominant
 // Vercel ISR-write cost. On-demand revalidation refreshes edits instantly.
 export const revalidate = 86400;
 
-// Pre-render topics for stability during build
+// Pre-render topics for stability during build. G3.10: params are SLUGS
+// (UUID only for a row not yet backfilled) — the address Google is told about.
 export async function generateStaticParams() {
   try {
     const topics = await topicsAPI.list({ page_size: 200 });
-    return (topics || []).map((topic) => ({ id: topic.id }));
+    return (topics || []).map((topic) => ({ id: nodeSegment(topic) }));
   } catch (error) {
     // Returning [] used to be silent: the build stayed green and prerendered
     // NOTHING for this route, with no signal in the output (§5A.2). An outage
@@ -42,19 +44,26 @@ interface TopicPageProps {
 }
 
 export default async function TopicDetailPage({ params }: TopicPageProps) {
-  const { id: topicId } = await params;
+  // The segment is a slug or a UUID (G3.10); the API resolves either.
+  const { id: segment } = await params;
 
   try {
-    // Fetch topic details and articles concurrently on the server
-    const [topic, articlesData] = await Promise.all([
-      topicsAPI.getById(topicId),
-      articlesAPI.listByTopic(topicId),
-    ]);
+    const topic = await topicsAPI.getById(segment);
 
     if (!topic) {
       return notFound();
     }
 
+    // A UUID address for a topic that has a slug is the legacy form: send the
+    // visitor (and the crawler) to the canonical one. 308, cached like any
+    // other ISR result for that path. permanentRedirect throws — the catch
+    // below rethrows anything that is not an API error, so it propagates.
+    if (isUuid(segment) && topic.slug) {
+      permanentRedirect(topicPath(topic));
+    }
+
+    // The article filter needs the UUID, so it follows the topic fetch.
+    const articlesData = await articlesAPI.listByTopic(topic.id);
     const articles = articlesData?.results || [];
 
     return (
@@ -172,7 +181,7 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
 
     // 4xx: the API answered and this topic is gone. Data, not an outage — one
     // missing topic must not fail a build that prerenders ~100 of them.
-    console.warn(`Topic ${topicId} unavailable — rendering 404.`);
+    console.warn(`Topic ${segment} unavailable — rendering 404.`);
     notFound();
   }
 }

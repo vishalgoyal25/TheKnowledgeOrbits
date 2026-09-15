@@ -88,6 +88,7 @@ export interface Document {
 // Topic Types
 export interface Topic {
   id: string;
+  slug?: string | null;
   name: string;
   description: string;
   keywords: string[];
@@ -106,6 +107,7 @@ export interface Topic {
 // Module Types
 export interface Module {
   id: string;
+  slug?: string | null;
   name: string;
   description: string;
   subject: Subject;
@@ -116,6 +118,7 @@ export interface Module {
 // Subject Types
 export interface Subject {
   id: string;
+  slug?: string | null;
   name: string;
   description: string;
   program: Program;
@@ -124,20 +127,25 @@ export interface Subject {
 }
 
 // Hierarchy Types (for Navigation/Syllabus Explorer)
+// `slug` (G3.10): minted by the backend, never rewritten. Optional/nullable so a
+// payload cached by an older deploy still type-checks; callers fall back to `id`.
 export interface HierarchyTopic {
   id: string;
+  slug?: string | null;
   name: string;
   sub_topics?: HierarchyTopic[]; // recursive: topic → subtopic → sub-subtopic
 }
 
 export interface HierarchyModule {
   id: string;
+  slug?: string | null;
   name: string;
   topics?: HierarchyTopic[];
 }
 
 export interface HierarchySubject {
   id: string;
+  slug?: string | null;
   name: string;
   description?: string;
   modules: HierarchyModule[];

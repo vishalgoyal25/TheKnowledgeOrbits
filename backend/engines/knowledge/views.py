@@ -510,7 +510,8 @@ class HierarchyListView(views.APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, *args, **kwargs):
-        cache_key = "master_hierarchy_list_v4"  # bumped to bust stale cache
+        # v5: every node carries `slug` (G3.10) so the navbar can link by slug.
+        cache_key = "master_hierarchy_list_v5"
         cached = cache_service.get(cache_key)
         if cached:
             return Response(cached)
@@ -524,25 +525,40 @@ class HierarchyListView(views.APIView):
                 "order_index"
             )
             for s in subjects:
-                s_data = {"id": str(s.id), "name": s.name, "modules": []}
+                s_data = {
+                    "id": str(s.id),
+                    "slug": s.slug,
+                    "name": s.name,
+                    "modules": [],
+                }
                 modules = Module.objects.filter(subject=s, is_active=True).order_by(
                     "order_index"
                 )
                 for m in modules:
-                    m_data = {"id": str(m.id), "name": m.name, "topics": []}
+                    m_data = {
+                        "id": str(m.id),
+                        "slug": m.slug,
+                        "name": m.name,
+                        "topics": [],
+                    }
                     # Return only top-level (root) topics.
                     # Children will be nested in sub_topics to prevent duplicates.
                     root_topics = Topic.objects.filter(
                         module=m, parent_topic__isnull=True, is_active=True
                     ).order_by("order_index")
                     for t in root_topics:
-                        t_data = {"id": str(t.id), "name": t.name, "sub_topics": []}
+                        t_data = {
+                            "id": str(t.id),
+                            "slug": t.slug,
+                            "name": t.name,
+                            "sub_topics": [],
+                        }
                         sub_topics = Topic.objects.filter(
                             parent_topic=t, is_active=True
                         ).order_by("order_index")
                         for st in sub_topics:
                             t_data["sub_topics"].append(
-                                {"id": str(st.id), "name": st.name}
+                                {"id": str(st.id), "slug": st.slug, "name": st.name}
                             )
                         m_data["topics"].append(t_data)
                     s_data["modules"].append(m_data)

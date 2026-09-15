@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Module } from "@/lib/types";
+import { modulePath } from "@/lib/content-urls";
 import {
   Card,
   CardContent,
@@ -17,7 +18,7 @@ interface ModuleCardProps {
 
 export default function ModuleCard({ module }: ModuleCardProps) {
   return (
-    <Link href={`/modules/${module.id}`}>
+    <Link href={modulePath(module)}>
       <Card className="h-full transition-all hover:shadow-lg hover:-translate-y-1 hover:border-blue-300">
         <CardHeader>
           <div className="flex items-start justify-between gap-2">

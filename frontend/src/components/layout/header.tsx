@@ -34,7 +34,7 @@ import UserMenu from "@/components/auth/UserMenu";
 import { useSearch } from "@/lib/hooks/use-search";
 import { SearchResult } from "@/lib/api/search";
 import { getBookSubjects, getBookTree } from "@/lib/api/book-content";
-import { knowledgePath } from "@/lib/content-urls";
+import { knowledgePath, modulePath, subjectPath } from "@/lib/content-urls";
 import { HierarchySubject, HierarchyModule, HierarchyTopic } from "@/lib/types";
 import type { TreeTopic } from "@/types/book-content";
 import OrbitIcon from "@/components/ui/orbit-icon";
@@ -152,26 +152,35 @@ export default function Header({ initialHierarchy }: HeaderProps) {
     string | null
   >(null);
 
+  // A node is "in the path" under either address form (G3.10): its slug or its UUID.
+  const inPath = (prefix: string, node: { id: string; slug?: string | null }) =>
+    pathname.includes(`${prefix}/${node.id}`) ||
+    (!!node.slug && pathname.includes(`${prefix}/${node.slug}`));
+
   const currentSubjectId = useMemo(() => {
     if (!hierarchyData || hierarchyData.length === 0) return null;
     const directSubject = hierarchyData.find(
       (s: HierarchySubject) =>
-        pathname.includes(`/subjects/${s.id}`) || pathname.includes(`/news`),
+        inPath("/subjects", s) || pathname.includes(`/news`),
     );
     if (directSubject) return directSubject.id;
     for (const subject of hierarchyData) {
       if (
-        subject.modules?.some((m: HierarchyModule) =>
-          pathname.includes(`/modules/${m.id}`),
-        )
+        subject.modules?.some((m: HierarchyModule) => inPath("/modules", m))
       ) {
         return subject.id;
       }
     }
     return hierarchyData[0].id;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, hierarchyData]);
 
   const displaySubjectId = hoveredSubject || currentSubjectId;
+
+  // Links are built from the subject OBJECT so they carry its slug; the id
+  // alone is what the hover/drawer state tracks.
+  const subjectRef = (id: string | null) =>
+    hierarchyData.find((s) => s.id === id) ?? id;
 
   useEffect(() => {
     // P3.5 — skip re-fetch when server-baked data is still fresh (< 30 min old).
@@ -258,22 +267,20 @@ export default function Header({ initialHierarchy }: HeaderProps) {
 
     for (const subject of hierarchyData) {
       if (
-        pathname.includes(`/subjects/${subject.id}`) ||
+        inPath("/subjects", subject) ||
         (subject.id === "news" && pathname.includes("/news"))
       ) {
         activeSubject = subject.id;
         break;
       }
-      const matchedModule = subject.modules?.find((m) =>
-        pathname.includes(`/modules/${m.id}`),
-      );
+      const matchedModule = subject.modules?.find((m) => inPath("/modules", m));
       if (matchedModule) {
         activeSubject = subject.id;
         activeModule = matchedModule.id;
         break;
       }
       const matchedTopic = subject.modules?.find((m) =>
-        m.topics?.some((t) => pathname.includes(`/topics/${t.id}`)),
+        m.topics?.some((t) => inPath("/topics", t)),
       );
       if (matchedTopic) {
         activeSubject = subject.id;
@@ -665,12 +672,13 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                             flattenTree(activeModule?.topics ?? [], false);
 
                             return flatTopics.map((t, i) => {
-                              const isActiveTopic = pathname.includes(
-                                `/topics/${t.id}`,
-                              );
+                              const isActiveTopic = inPath("/topics", t);
                               const href = isNewsModule
                                 ? "/news"
-                                : knowledgePath(drawerActiveSubjectId, t.id);
+                                : knowledgePath(
+                                    subjectRef(drawerActiveSubjectId),
+                                    t,
+                                  );
                               return (
                                 <Link
                                   key={`drawer-topic-${t.id}`}
@@ -878,7 +886,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                 return (
                   <Link
                     key={subject.id}
-                    href={isNews ? "/news" : `/subjects/${subject.id}`}
+                    href={isNews ? "/news" : subjectPath(subject)}
                     className={cn(
                       "flex items-center px-5 h-full text-sm font-bold transition-all whitespace-nowrap shrink-0 border-b-2 border-r border-slate-200 group",
                       isActive
@@ -912,13 +920,13 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                         ? module.id === "all"
                           ? pathname === "/news" && !activeCategory
                           : activeCategory === module.id
-                        : pathname.includes(`/modules/${module.id}`);
+                        : inPath("/modules", module);
                       const isHovered = hoveredModuleId === module.id;
                       const moduleHref = isNewsSubject
                         ? module.id === "all"
                           ? "/news"
                           : `/news?category=${module.id}`
-                        : `/modules/${module.id}`;
+                        : modulePath(module);
                       const allTopics: { id: string; name: string }[] = [];
                       module.topics?.forEach((t: HierarchyTopic) => {
                         allTopics.push({ id: t.id, name: t.name });
@@ -1014,7 +1022,10 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                       }}
                     >
                       <Link
-                        href={knowledgePath(displaySubjectId, topic.id)}
+                        href={knowledgePath(
+                          subjectRef(displaySubjectId),
+                          topic,
+                        )}
                         onClick={() => {
                           setHoveredModuleId(null);
                           setDropdownPos(null);
@@ -1052,7 +1063,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                     <div key={`fixed-sub-${st.id}`}>
                       {/* Sub-topic link */}
                       <Link
-                        href={knowledgePath(displaySubjectId, st.id)}
+                        href={knowledgePath(subjectRef(displaySubjectId), st)}
                         onClick={() => {
                           setHoveredModuleId(null);
                           setDropdownPos(null);
@@ -1067,7 +1078,10 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                       {st.sub_topics?.map((sst) => (
                         <Link
                           key={`fixed-subsub-${sst.id}`}
-                          href={knowledgePath(displaySubjectId, sst.id)}
+                          href={knowledgePath(
+                            subjectRef(displaySubjectId),
+                            sst,
+                          )}
                           onClick={() => {
                             setHoveredModuleId(null);
                             setDropdownPos(null);

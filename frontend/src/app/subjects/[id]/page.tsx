@@ -1,7 +1,9 @@
 import { subjectsAPI } from "@/lib/api/subjects";
 import { BookOpen } from "lucide-react";
+import { permanentRedirect } from "next/navigation";
 import ModuleCard from "@/components/modules/module-card";
 import { Module, Subject } from "@/lib/types";
+import { isUuid, subjectPath } from "@/lib/content-urls";
 
 // Revalidate daily — syllabus subjects rarely change; hourly rebuilds across
 // many dynamic pages wasted Vercel ISR-write quota.
@@ -11,17 +13,27 @@ export default async function SubjectPage(props: {
   params: Promise<{ id: string }>;
 }) {
   const params = await props.params;
-  const subjectId = params.id;
+  // Slug or UUID (G3.10) — the API resolves either; the module filter needs
+  // the UUID, so it follows the subject fetch.
+  const segment = params.id;
   let subject: Subject | null = null;
   let modules: Module[] = [];
 
   try {
-    subject = await subjectsAPI.getById(subjectId);
-    modules = (await subjectsAPI.getModulesBySubject(subjectId)) as Module[];
+    subject = await subjectsAPI.getById(segment);
+    if (subject) {
+      modules = (await subjectsAPI.getModulesBySubject(subject.id)) as Module[];
+    }
   } catch (error) {
     if (process.env.SKIP_BACKEND_WAIT !== "true") {
       console.error(`Failed to fetch subject details: ${error}`);
     }
+  }
+
+  // Legacy UUID address → canonical slug address (308). Outside the try so
+  // the redirect throw is never mistaken for a fetch failure.
+  if (subject && isUuid(segment) && subject.slug) {
+    permanentRedirect(subjectPath(subject));
   }
 
   if (!subject) {
