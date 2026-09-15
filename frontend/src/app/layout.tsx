@@ -15,13 +15,40 @@ import { GlobalErrorBoundary } from "@/components/shared/GlobalErrorBoundary";
 import { getHierarchyData } from "@/lib/api/server-hierarchy";
 import GoogleAnalytics from "@/components/telemetry/GoogleAnalytics";
 import PageViewTracker from "@/components/telemetry/PageViewTracker";
+import { SITE_NAME, SITE_URL } from "@/lib/seo/site";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// G3.4 — site-wide defaults. `metadataBase` turns every relative canonical /
+// OG URL below and in each page's metadata into an absolute one; `title.template`
+// gives every page the brand suffix once, so pages set only their own part.
 export const metadata: Metadata = {
-  title: "TheKnowledgeOrbits - AI-Powered UPSC Preparation",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "TheKnowledgeOrbits — AI-Powered UPSC Preparation",
+    template: "%s | TheKnowledgeOrbits",
+  },
   description:
-    "Master UPSC CSE with AI-generated articles and intelligent learning paths",
+    "Master UPSC CSE with AI-generated articles, daily current affairs and a connected knowledge map of the whole syllabus.",
+  applicationName: SITE_NAME,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "en_IN",
+    url: "/",
+    title: "TheKnowledgeOrbits — AI-Powered UPSC Preparation",
+    description:
+      "AI-generated study articles, daily current affairs and a connected knowledge map of the UPSC CSE syllabus.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TheKnowledgeOrbits — AI-Powered UPSC Preparation",
+    description:
+      "AI-generated study articles, daily current affairs and a connected knowledge map of the UPSC CSE syllabus.",
+  },
+  robots: { index: true, follow: true },
+  // No root canonical: each page sets its own, so a private page never
+  // inherits "/" as its canonical.
 };
 
 export default async function RootLayout({

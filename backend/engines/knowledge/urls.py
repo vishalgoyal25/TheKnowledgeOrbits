@@ -12,6 +12,7 @@ from engines.knowledge.views import (
     ModuleViewSet,
     ProgramViewSet,
     SearchViewSet,
+    SitemapEntriesView,
     SubjectViewSet,
     ThemeViewSet,
     TopicViewSet,
@@ -28,5 +29,6 @@ router.register(r"search", SearchViewSet, basename="search")
 
 urlpatterns = [
     path("hierarchy/", HierarchyListView.as_view(), name="hierarchy"),
+    path("sitemap/", SitemapEntriesView.as_view(), name="sitemap-entries"),
     path("", include(router.urls)),
 ]

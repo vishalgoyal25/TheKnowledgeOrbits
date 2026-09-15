@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import KnowledgeMapPage from "@/components/book-content/knowledge-map-page";
+import { NOINDEX } from "@/lib/seo/metadata";
 
 /**
  * /knowledge/[...path] — Knowledge Map with a selection in the URL.
@@ -18,10 +20,15 @@ interface Props {
   params: Promise<{ path: string[] }>;
 }
 
-export const metadata = {
-  title: "Knowledge Map — TheKnowledgeOrbits",
+// G3.6 — every deep-link is the same client-fetched shell as /knowledge with
+// a selection; thousands of near-duplicates. The indexable page for a topic
+// is /topics/<slug>. Keep these out of the index, canonical to the map root.
+export const metadata: Metadata = {
+  title: "Knowledge Map",
   description:
     "Browse the UPSC syllabus as a connected map — every subject, module and topic, with AI-generated articles one click away.",
+  alternates: { canonical: "/knowledge" },
+  ...NOINDEX,
 };
 
 export default async function KnowledgeDeepLinkPage({ params }: Props) {

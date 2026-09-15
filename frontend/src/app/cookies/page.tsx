@@ -2,6 +2,15 @@ import React from "react";
 import { Cookie, Info, Lock, Zap, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
+import { buildMetadata } from "@/lib/seo/metadata";
+
+export const metadata = buildMetadata({
+  title: "Cookie Policy",
+  description:
+    "Which cookies TheKnowledgeOrbits sets, what each is for, and how to control them.",
+  path: "/cookies",
+});
+
 export default function CookiePolicy() {
   return (
     <div className="bg-muted/40 min-h-screen py-16">

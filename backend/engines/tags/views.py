@@ -9,11 +9,13 @@ Routes served:
   /api/v1/tags/<slug>/articles/   → TagArticlesView
 
   /api/v1/concepts/               → ConceptListView
+  /api/v1/concepts/sitemap/       → ConceptSitemapView   (G3.3, curated subset)
   /api/v1/concepts/<slug>/        → ConceptDetailView
 
 All views: read-only, no authentication required.
 """
 
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
@@ -27,6 +29,7 @@ from engines.tags.serializers import (
     TagDetailSerializer,
     TagSerializer,
 )
+from engines.tags.services.concept_seo_service import is_indexable
 
 
 # ── Tag Views ─────────────────────────────────────────────────────────────────
@@ -129,3 +132,32 @@ class ConceptDetailView(generics.RetrieveAPIView):
     permission_classes = [AllowAny]
     lookup_field = "slug"
     queryset = ConceptPage.objects.all()
+
+
+class ConceptSitemapView(APIView):
+    """
+    GET /api/v1/concepts/sitemap/  (G3.3)
+
+    slug + last-modified for every concept page that passes the G0.3
+    indexability rule (concept_seo_service.is_indexable) — the curated subset,
+    never all 2,438. Scans body text, so it is cached for an hour; the rule is
+    live, so today's new pages classify themselves tomorrow.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        cache_key = "sitemap_entries_concepts_v1"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        payload = [
+            {"slug": c.slug, "lastmod": c.updated_at.isoformat()}
+            for c in ConceptPage.objects.filter(is_content_ready=True)
+            .only("slug", "body_md", "is_content_ready", "updated_at")
+            .iterator(chunk_size=200)
+            if is_indexable(c)
+        ]
+        cache.set(cache_key, payload, timeout=3600)
+        return Response(payload)

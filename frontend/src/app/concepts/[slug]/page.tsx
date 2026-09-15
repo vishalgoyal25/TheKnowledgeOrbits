@@ -1,85 +1,94 @@
-"use client";
+/**
+ * /concepts/<slug> — server wrapper (G3.4 / G0.3 follow-up a).
+ *
+ * Was a "use client" page that fetched in the browser, so Google received an
+ * empty shell for all 2,438 concept URLs and no per-page metadata could be
+ * set. Now: the concept is fetched server-side (ISR, daily), the words are in
+ * the HTML, and the page carries its own robots directive —
+ *
+ *   is_indexable (>= 400 words, >= 3 headings — the G0.3 rule, computed by
+ *   the tags engine) → index; the ~818 that pass are also the ones the
+ *   sitemap lists.
+ *   otherwise (stub or thin)               → noindex, follow. Still reachable
+ *   from every article that links it — readers use them — but Google is told
+ *   not to judge the domain on them.
+ *
+ * The existing client component renders the page exactly as before; it just
+ * receives the data as a prop instead of fetching it.
+ */
 
-import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { getConceptDetail, ConceptDetail } from "@/lib/api/tags";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
 import { ConceptDetailComponent } from "@/components/concepts/concept-detail";
+import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
 import ReadBeacon from "@/components/telemetry/ReadBeacon";
+import { getConceptDetail, type ConceptDetail } from "@/lib/api/tags";
+import { abortIfApiUnreachable } from "@/lib/isr-guard";
+import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
 
-export default function ConceptPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const router = useRouter();
+// On-demand ISR: a concept page is built on first request and refreshed at
+// most once a day. Nothing is prerendered at build (2,438 pages would be a
+// regeneration wave on every deploy — C13); the long tail costs one write per
+// page per day only when it is actually requested.
+export const revalidate = 86400;
 
-  const [concept, setConcept] = useState<ConceptDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface Props {
+  params: Promise<{ slug: string }>;
+}
 
-  const fetchConcept = useCallback(async () => {
-    if (!slug) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getConceptDetail(slug);
-      setConcept(data);
-    } catch {
-      setError("Concept not found.");
-    } finally {
-      setLoading(false);
-    }
-  }, [slug]);
-
-  useEffect(() => {
-    fetchConcept();
-  }, [fetchConcept]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-muted/40">
-        <div className="bg-white border-b border-border px-4 py-7">
-          <div className="max-w-[1200px] mx-auto space-y-2">
-            <div className="h-4 bg-gray-200 rounded animate-pulse w-24" />
-            <div className="h-7 bg-gray-200 rounded animate-pulse w-1/2" />
-          </div>
-        </div>
-        <div className="max-w-[1200px] mx-auto px-4 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
-            <div className="space-y-4">
-              <div className="h-32 bg-white rounded-lg border border-border animate-pulse" />
-              <div className="h-64 bg-white rounded-lg border border-border animate-pulse" />
-            </div>
-            <div className="hidden lg:block h-48 bg-white rounded-xl border border-border animate-pulse" />
-          </div>
-        </div>
-      </div>
-    );
+/** 404 = no such concept (data); an outage aborts rather than caching a 404. */
+async function fetchConcept(slug: string): Promise<ConceptDetail | null> {
+  try {
+    return await getConceptDetail(slug);
+  } catch (error) {
+    abortIfApiUnreachable(error, "Concept detail");
+    return null;
   }
+}
 
-  if (error || !concept) {
-    return (
-      <div className="min-h-screen bg-muted/40 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-4xl mb-4">🔷</p>
-          <p className="text-foreground font-semibold mb-2">
-            {error ?? "Concept not found"}
-          </p>
-          <button
-            onClick={() => router.push("/daily-ca")}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            ← Back to Daily CA
-          </button>
-        </div>
-      </div>
-    );
-  }
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const concept = await fetchConcept(slug);
+  if (!concept) return { title: "Concept not found", ...NOINDEX };
+  return buildMetadata({
+    title: `${concept.name} — UPSC Concept`,
+    description:
+      concept.brief_description ||
+      `${concept.name}: a UPSC-relevant concept explained, with the current-affairs articles that reference it.`,
+    path: `/concepts/${concept.slug}`,
+    noindex: !concept.is_indexable,
+    article: concept.is_indexable
+      ? { publishedTime: concept.created_at, modifiedTime: concept.updated_at }
+      : undefined,
+  });
+}
 
-  // Beacon fires only here — in the success branch — so a failed or still-loading
-  // fetch never records a read. Deliberately fires for stubs (is_content_ready
-  // false) too: whether readers land on unfinished concept pages is exactly the
-  // question G0.3 needs answered, and filtering them would hide it.
+export default async function ConceptPage({ params }: Props) {
+  const { slug } = await params;
+  const concept = await fetchConcept(slug);
+  if (!concept) notFound();
+
   return (
     <>
+      {/* Beacon fires for stubs too: whether readers land on unfinished
+          concept pages is exactly what G0.3 / G3.12 need to know. */}
       <ReadBeacon contentType="concept" contentId={concept.id} />
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Daily Current Affairs", path: "/daily-ca" },
+          { name: concept.name, path: `/concepts/${concept.slug}` },
+        ]}
+      />
+      {concept.is_indexable && (
+        <ArticleJsonLd
+          headline={concept.name}
+          description={concept.brief_description || concept.name}
+          path={`/concepts/${concept.slug}`}
+          datePublished={concept.created_at}
+          dateModified={concept.updated_at}
+        />
+      )}
       <ConceptDetailComponent concept={concept} />
     </>
   );

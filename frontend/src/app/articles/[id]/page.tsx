@@ -13,6 +13,8 @@ import Link from "next/link";
 import apiClient from "@/lib/api/client";
 import PrivateArticleFallback from "./private-article-fallback";
 import ReadBeacon from "@/components/telemetry/ReadBeacon";
+import type { Metadata } from "next";
+import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
 
 // Force dynamic rendering to exactly mirror localhost behavior and prevent ISR cache crashes
 export const dynamic = "force-dynamic";
@@ -20,6 +22,31 @@ export const dynamic = "force-dynamic";
 interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ type?: string; chunk?: string }>;
+}
+
+// G3.4 — public generated articles get real metadata; anything the server
+// cannot fetch anonymously (a private notebook article, a document view) is
+// noindex. The server fetch carries no user token, so a private article
+// simply fails here — exactly the visibility Google should see.
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const { type } = await searchParams;
+  if (type === "document") return NOINDEX;
+  try {
+    const article = await articlesAPI.getById(id);
+    if (!article || !article.is_published) return NOINDEX;
+    return buildMetadata({
+      title: article.title,
+      description: article.summary || article.title,
+      path: `/articles/${article.id}`,
+      article: { publishedTime: article.published_at ?? undefined },
+    });
+  } catch {
+    return NOINDEX;
+  }
 }
 
 /**

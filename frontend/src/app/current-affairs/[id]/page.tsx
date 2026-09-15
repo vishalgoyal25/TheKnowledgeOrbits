@@ -14,12 +14,43 @@ import {
   FileText,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArticleJsonLd } from "@/components/seo/JsonLd";
+import ReadBeacon from "@/components/telemetry/ReadBeacon";
 import { abortIfApiUnreachable } from "@/lib/isr-guard";
+import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
 
 // Revalidate once a day (CA articles don't change once published)
 export const revalidate = 86400;
+
+// G3.4 — these pages are ISR and indexable; until now they had only the
+// site default title.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const article = await currentAffairsAPI.getArticle(id);
+    if (!article) return NOINDEX;
+    return buildMetadata({
+      title: article.title,
+      description:
+        article.summary ||
+        `${article.title} — current affairs for UPSC CSE, from ${article.source_name}.`,
+      path: `/current-affairs/${article.id}`,
+      article: {
+        publishedTime: article.published_at,
+        section: "Current Affairs",
+      },
+    });
+  } catch {
+    return NOINDEX;
+  }
+}
 
 // This is the secret for the 1 Lakh archive:
 // Allow on-demand generation for items not pre-built
@@ -66,6 +97,17 @@ export default async function CAArticleDetailPage({ params }: PageProps) {
 
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* G1.7 — this ISR page is served from the edge; only the beacon tells
+            Django it was read. G3.5 — Article schema for a server-rendered page. */}
+        <ReadBeacon contentType="current_affairs" contentId={article.id} />
+        <ArticleJsonLd
+          headline={article.title}
+          description={article.summary || article.title}
+          path={`/current-affairs/${article.id}`}
+          datePublished={article.published_at}
+          section="Current Affairs"
+        />
+
         {/* Back button */}
         <Link href="/current-affairs">
           <Button variant="ghost" className="mb-6 gap-2">

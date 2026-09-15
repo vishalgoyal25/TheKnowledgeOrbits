@@ -119,6 +119,32 @@ class TestSlugOrPkLookup:
 
 
 @pytest.mark.django_db
+class TestSitemapEntries:
+    """G3.3 — slug + lastmod for every active, slugged hierarchy row."""
+
+    def test_feed_shape_and_null_slug_skipped(self, api_client):
+        from django.core.cache import cache
+
+        cache.clear()
+        program = Program.objects.create(name="UPSC CSE")
+        subject = Subject.objects.create(name="Polity", program=program)
+        module = Module.objects.create(name="Constitution", subject=subject)
+        topic = Topic.objects.create(name="Article 370", module=module, subject=subject)
+        # A row that predates the slug column and has not been backfilled
+        Topic.objects.filter(id=topic.id).update(slug=None)
+        Topic.objects.create(name="Article 371", module=module, subject=subject)
+
+        response = api_client.get("/api/v1/knowledge/sitemap/")
+
+        assert response.status_code == status.HTTP_200_OK
+        assert [s["slug"] for s in response.data["subjects"]] == ["polity"]
+        assert [m["slug"] for m in response.data["modules"]] == ["constitution"]
+        assert [t["slug"] for t in response.data["topics"]] == ["article-371"]
+        assert "lastmod" in response.data["topics"][0]
+        cache.clear()
+
+
+@pytest.mark.django_db
 class TestSearchViewSet:
     """Tests for SearchViewSet — limit defaults and cap."""
 

@@ -131,6 +131,7 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
             "is_published",
             "generation_metadata",
             "created_at",
+            "updated_at",
             "topic_name",
             "tags",
             "concept_links",

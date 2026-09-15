@@ -1,21 +1,43 @@
 /**
- * Topic detail page (ISR/SSG)
+ * /topics/<slug> — the topic IS the article (G3.13, ISR).
+ *
+ * Renders, in the initial HTML:
+ *   breadcrumb · the BookContent article body · the reading list of every
+ *   subtopic beneath it (with article status) · the syllabus context.
+ * No "Generate Article" — generation is a logged-in feature reached from the
+ * sidebar, never advertised on a public page. Generated (user) articles are
+ * private to their author's notebook and do not appear here.
+ *
+ * Data: the topic by slug-or-UUID, the subject tree (Redis-cached upstream)
+ * for nesting + `has_content`, and the article by topic UUID.
  */
 
-import ArticleCard from "@/components/articles/article-card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { articlesAPI } from "@/lib/api/articles";
-import { topicsAPI } from "@/lib/api/topics";
-import { Article } from "@/lib/types";
-import { ArrowLeft, BookOpen, Hash, Layers } from "lucide-react";
+import { BookOpen, Layers } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+
+import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
+import ArticleBody from "@/components/syllabus/article-body";
+import SyllabusBreadcrumb from "@/components/syllabus/syllabus-breadcrumb";
+import TopicOutline from "@/components/syllabus/topic-outline";
+import ReadBeacon from "@/components/telemetry/ReadBeacon";
+import { getBookContent, getBookTree } from "@/lib/api/book-content";
+import { topicsAPI } from "@/lib/api/topics";
+import {
+  isUuid,
+  modulePath,
+  nodeSegment,
+  subjectPath,
+  topicPath,
+} from "@/lib/content-urls";
 import { abortIfApiUnreachable } from "@/lib/isr-guard";
-import { isUuid, nodeSegment, topicPath } from "@/lib/content-urls";
+import { buildMetadata, NOINDEX, truncate } from "@/lib/seo/metadata";
+import { findTopic, trailTo } from "@/lib/syllabus-tree";
+import type { BookContent, SubjectTree } from "@/types/book-content";
 
 // Revalidate daily — topic content changes at most once/day, and there are
-// ~1,462 topic pages; hourly rebuilds × that many pages was the dominant
+// ~1,500 topic pages; hourly rebuilds × that many pages was the dominant
 // Vercel ISR-write cost. On-demand revalidation refreshes edits instantly.
 export const revalidate = 86400;
 
@@ -43,16 +65,47 @@ interface TopicPageProps {
   params: Promise<{ id: string }>;
 }
 
+// G3.4 — title, description, canonical (slug form), OG/Twitter. The topic
+// fetch is deduplicated with the page's own by Next's request memoisation.
+export async function generateMetadata({
+  params,
+}: TopicPageProps): Promise<Metadata> {
+  const { id: segment } = await params;
+  try {
+    const topic = await topicsAPI.getById(segment);
+    if (!topic) return NOINDEX;
+    return buildMetadata({
+      title: `${topic.name} — ${topic.subject_name}`,
+      description:
+        topic.description ||
+        `${topic.name}: a UPSC CSE study article under ${topic.module_name}, ${topic.subject_name}, with its subtopics and reading list.`,
+      path: topicPath(topic),
+      article: { section: topic.subject_name },
+    });
+  } catch {
+    return NOINDEX;
+  }
+}
+
+/** 404 from the content endpoint means "no article yet" — data, not an outage. */
+async function fetchArticleOrNull(
+  topicId: string,
+): Promise<BookContent | null> {
+  try {
+    return await getBookContent(topicId);
+  } catch (error) {
+    abortIfApiUnreachable(error, "Book content");
+    return null;
+  }
+}
+
 export default async function TopicDetailPage({ params }: TopicPageProps) {
   // The segment is a slug or a UUID (G3.10); the API resolves either.
   const { id: segment } = await params;
 
   try {
     const topic = await topicsAPI.getById(segment);
-
-    if (!topic) {
-      return notFound();
-    }
+    if (!topic) return notFound();
 
     // A UUID address for a topic that has a slug is the legacy form: send the
     // visitor (and the crawler) to the canonical one. 308, cached like any
@@ -62,114 +115,112 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
       permanentRedirect(topicPath(topic));
     }
 
-    // The article filter needs the UUID, so it follows the topic fetch.
-    const articlesData = await articlesAPI.listByTopic(topic.id);
-    const articles = articlesData?.results || [];
+    const [tree, article]: [SubjectTree, BookContent | null] =
+      await Promise.all([
+        getBookTree(topic.subject),
+        fetchArticleOrNull(topic.id),
+      ]);
+    const trail = trailTo(tree, topic.id);
+    const node = tree.modules
+      .map((m) => findTopic(m.topics, topic.id))
+      .find((t) => t !== null);
+    const subtopics = node?.subtopics ?? [];
+    const path = topicPath(topic);
+
+    // G3.5 — structured data, only for what is actually in this HTML.
+    const breadcrumbItems = [
+      { name: "Syllabus", path: "/subjects" },
+      ...trail.map((crumb, i) => ({
+        name: crumb.name,
+        path:
+          i === 0
+            ? subjectPath(crumb)
+            : i === 1
+              ? modulePath(crumb)
+              : topicPath(crumb),
+      })),
+    ];
 
     return (
-      <div className="container mx-auto px-4 py-8">
-        {/* Back button */}
-        <div className="mb-8">
-          <Link href="/topics">
-            <Button variant="ghost" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Topics
-            </Button>
-          </Link>
-        </div>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {trail.length > 0 && <BreadcrumbJsonLd items={breadcrumbItems} />}
+        {article && (
+          <ArticleJsonLd
+            headline={topic.name}
+            description={truncate(
+              topic.description ||
+                article.render_content.replace(/[#*_`>|-]/g, " "),
+            )}
+            path={path}
+            datePublished={article.created_at}
+            dateModified={article.updated_at}
+            section={topic.subject_name}
+          />
+        )}
 
-        {/* Topic Header */}
-        <div className="mb-8 p-8 bg-white rounded-xl border shadow-sm transition-all hover:shadow-md">
-          <div className="flex justify-between items-start gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-3 text-sm font-medium text-muted-foreground uppercase tracking-widest">
-                <span className="flex items-center gap-1.5 transition-colors hover:text-blue-600 cursor-default">
-                  <BookOpen className="h-4 w-4" />
-                  {topic.subject_name}
-                </span>
-                <span>•</span>
-                <span className="flex items-center gap-1.5 transition-colors hover:text-indigo-600 cursor-default">
-                  <Layers className="h-4 w-4" />
-                  {topic.module_name}
-                </span>
-              </div>
-              <h1 className="text-4xl font-semibold text-foreground leading-tight">
-                {topic.name}
-              </h1>
-            </div>
-            <Badge
-              variant={
-                topic.topic_type === "syllabus" ? "default" : "secondary"
-              }
-              className="text-xs px-3 py-1 uppercase font-bold"
-            >
-              {topic.topic_type}
-            </Badge>
+        {trail.length > 0 && <SyllabusBreadcrumb trail={trail} />}
+
+        {/* ── Header ───────────────────────────────────────────────────── */}
+        <header className="mb-8">
+          <div className="flex items-center gap-3 mb-3 text-xs font-medium text-muted-foreground uppercase tracking-widest">
+            <span className="flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4" />
+              {topic.subject_name}
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1.5">
+              <Layers className="h-4 w-4" />
+              {topic.module_name}
+            </span>
           </div>
-
-          {topic.description && (
-            <p className="text-muted-foreground text-lg mb-8 leading-relaxed max-w-4xl">
+          <h1 className="text-3xl md:text-4xl font-semibold text-foreground leading-tight">
+            {topic.name}
+          </h1>
+          {!article && topic.description && (
+            <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
               {topic.description}
             </p>
           )}
+        </header>
 
-          {topic.keywords && topic.keywords.length > 0 && (
-            <div className="flex items-start gap-3 border-t pt-6 bg-muted/40/50 p-4 rounded-lg">
-              <Hash className="h-5 w-5 mt-0.5 text-muted-foreground" />
-              <div className="flex flex-wrap gap-2.5">
-                {topic.keywords.map((kw, i) => (
-                  <Badge
-                    key={i}
-                    variant="outline"
-                    className="bg-white px-3 py-1 font-medium transition-colors hover:border-blue-300"
-                  >
-                    {kw}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Articles Section */}
-        <div className="space-y-8">
-          <div className="flex items-center justify-between border-b pb-4">
-            <h2 className="text-3xl font-semibold text-foreground font-heading">
-              Study Materials
-            </h2>
-            {articles.length > 0 && (
-              <span className="bg-blue-100 text-blue-700 font-bold px-4 py-1.5 rounded-full text-sm">
-                {articles.length} RELEVANT ARTICLE
-                {articles.length !== 1 ? "S" : ""}
-              </span>
-            )}
+        {/* ── The article ───────────────────────────────────────────────── */}
+        {article ? (
+          <article className="mb-12">
+            <ReadBeacon contentType="topic" contentId={topic.id} />
+            <ArticleBody markdown={article.render_content} />
+            <p className="mt-8 pt-4 border-t border-border/60 text-xs text-muted-foreground">
+              {article.word_count.toLocaleString()} words ·{" "}
+              {Math.max(1, Math.round(article.word_count / 200))} min read
+            </p>
+          </article>
+        ) : (
+          <div className="mb-12 rounded-xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center">
+            <p className="text-muted-foreground">
+              The article for this topic is being written by the daily pipeline.
+              Its subtopics below may already be ready.
+            </p>
           </div>
+        )}
 
-          {articles.length === 0 ? (
-            <div className="text-center py-20 bg-muted/40/50 rounded-xl border border-dashed border-gray-300">
-              <div className="max-w-md mx-auto">
-                <p className="text-muted-foreground text-lg mb-6">
-                  Our AI engines haven't generated specialized study material
-                  for this topic yet.
-                </p>
-                <Link href={`/generate?topic=${topic.id}`}>
-                  <Button
-                    size="lg"
-                    className="px-8 shadow-lg shadow-blue-500/20 active:scale-95 transition-transform"
-                  >
-                    ✨ Generate Intelligence
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {articles.map((article: Article) => (
-                <ArticleCard key={article.id} article={article} />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* ── Reading list ─────────────────────────────────────────────── */}
+        {subtopics.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-xl font-semibold text-foreground mb-3">
+              In this topic
+            </h2>
+            <TopicOutline topics={subtopics} />
+          </section>
+        )}
+
+        {/* ── Where this sits ───────────────────────────────────────────── */}
+        <nav className="flex flex-wrap gap-3 text-sm">
+          <Link
+            href={`/knowledge/${nodeSegment(tree)}/${nodeSegment(topic)}`}
+            className="rounded-md border border-border px-3 py-1.5 text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+          >
+            Open in the Knowledge Map →
+          </Link>
+        </nav>
       </div>
     );
   } catch (error) {

@@ -25,7 +25,7 @@ interface TopicCardProps {
 
 export default function TopicCard({ topic, articleCount = 0 }: TopicCardProps) {
   return (
-    <Link href={`${topicPath(topic)}/articles`}>
+    <Link href={topicPath(topic)}>
       <Card className="h-full transition-all hover:shadow-lg hover:scale-[1.02]">
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
@@ -65,10 +65,14 @@ export default function TopicCard({ topic, articleCount = 0 }: TopicCardProps) {
 
         <CardFooter className="text-sm text-gray-600">
           <div className="flex items-center gap-4 w-full">
-            <div className="flex items-center gap-1">
-              <FileText className="h-4 w-4" />
-              <span>{articleCount} articles</span>
-            </div>
+            {/* Generated-article count only when the caller has one; the
+                syllabus article itself lives on the topic page (G3.13). */}
+            {articleCount > 0 && (
+              <div className="flex items-center gap-1">
+                <FileText className="h-4 w-4" />
+                <span>{articleCount} articles</span>
+              </div>
+            )}
 
             <div className="flex items-center gap-1">
               <Layers className="h-4 w-4" />

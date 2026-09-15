@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { DailyCaFeed } from "@/components/daily-ca/daily-ca-feed";
 import { dateFromDailyCaSlug, isIsoDate } from "@/lib/content-urls";
+import { buildMetadata } from "@/lib/seo/metadata";
 
 /**
  * /daily-ca/[date]/ — the current-affairs feed for one day.
@@ -26,12 +28,23 @@ function resolveDate(segment: string): string | null {
   return isIsoDate(fromSlug) ? fromSlug : null;
 }
 
-export async function generateMetadata({ params }: Props) {
+// G3.4/G3.6 — the feed is a client-fetched shell (G0.1), so it is NOT the
+// page Google should index. A slug address is the same article as
+// /daily-ca/article/<slug>, which is server-rendered: point the canonical
+// there and keep this shell out of the index. A date address is a browsing
+// view: noindex, canonical to itself.
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { date: segment } = await params;
-  const date = resolveDate(decodeURIComponent(segment)) ?? segment;
+  const decoded = decodeURIComponent(segment);
+  const date = resolveDate(decoded) ?? decoded;
+  const isSlug = !isIsoDate(decoded);
   return {
-    title: `Current Affairs ${date} — TheKnowledgeOrbits`,
-    description: `UPSC Current Affairs for ${date} — GS-mapped articles with concept links.`,
+    ...buildMetadata({
+      title: `Current Affairs ${date}`,
+      description: `UPSC Current Affairs for ${date} — GS-mapped articles with concept links.`,
+      path: isSlug ? `/daily-ca/article/${decoded}` : `/daily-ca/${date}`,
+      noindex: true,
+    }),
   };
 }
 

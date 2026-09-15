@@ -207,6 +207,35 @@ class ArticleDetailView(APIView):
         return Response(data)
 
 
+class SitemapEntriesView(APIView):
+    """
+    GET /api/v1/daily-ca/sitemap/  (G3.3)
+
+    Every published article's slug + last-modified, unpaginated — the sitemap
+    needs the whole set (~1,250 rows, two small columns) in one call. Cached
+    an hour; the daily cron publishes once a day. Engine-local: the frontend
+    sitemap composes this with the knowledge and concept feeds, so no engine
+    reads another engine's tables.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        cache_key = "sitemap_entries_daily_ca_v1"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        payload = [
+            {"slug": slug, "lastmod": updated_at.isoformat()}
+            for slug, updated_at in DailyCaArticle.objects.filter(is_published=True)
+            .order_by("-published_date", "order_on_date")
+            .values_list("slug", "updated_at")
+        ]
+        cache.set(cache_key, payload, timeout=3600)
+        return Response(payload)
+
+
 class ArchiveView(APIView):
     """
     GET /api/v1/daily-ca/archive/
