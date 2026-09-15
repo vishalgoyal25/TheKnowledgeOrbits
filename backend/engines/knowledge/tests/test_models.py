@@ -86,6 +86,59 @@ class TestTopicModel:
 
 
 @pytest.mark.django_db
+class TestSlugs:
+    """G3.10 — slugs are minted once, globally unique per model, never rewritten."""
+
+    def _tree(self):
+        program = Program.objects.create(name="UPSC CSE")
+        subject = Subject.objects.create(
+            name="Indian Polity & Constitution", program=program
+        )
+        module = Module.objects.create(name="Fundamental Rights", subject=subject)
+        return program, subject, module
+
+    def test_slug_minted_on_create_for_all_three(self):
+        _, subject, module = self._tree()
+        topic = Topic.objects.create(
+            name="Article 32: Writs", module=module, subject=subject
+        )
+
+        assert subject.slug == "indian-polity-constitution"
+        assert module.slug == "fundamental-rights"
+        assert topic.slug == "article-32-writs"
+
+    def test_collision_takes_next_numeric_suffix(self):
+        program, subject, _ = self._tree()
+        other_subject = Subject.objects.create(name="Indian Economy", program=program)
+
+        first = Module.objects.create(name="Introduction", subject=subject)
+        second = Module.objects.create(name="Introduction", subject=other_subject)
+        third = Module.objects.create(name="Introduction!", subject=subject)
+
+        assert first.slug == "introduction"
+        assert second.slug == "introduction-2"
+        assert third.slug == "introduction-3"
+
+    def test_rename_does_not_rewrite_slug(self):
+        _, subject, module = self._tree()
+        topic = Topic.objects.create(name="Old Name", module=module, subject=subject)
+        assert topic.slug == "old-name"
+
+        topic.name = "Completely New Name"
+        topic.save()
+        topic.refresh_from_db()
+
+        assert topic.slug == "old-name"
+
+    def test_explicit_slug_is_kept(self):
+        _, subject, module = self._tree()
+        topic = Topic.objects.create(
+            name="Anything", slug="hand-picked", module=module, subject=subject
+        )
+        assert topic.slug == "hand-picked"
+
+
+@pytest.mark.django_db
 class TestChunkTopicMapModel:
     def test_create_mapping(self):
         program = Program.objects.create(name="UPSC CSE")

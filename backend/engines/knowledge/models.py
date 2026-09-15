@@ -10,6 +10,54 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
+from engines.knowledge.services.slug_service import unique_slug
+
+# Shared by Subject, Module and Topic. Longest topic name is 200 chars; the
+# slug column leaves room for slugify() expansion and a numeric suffix.
+SLUG_MAX_LENGTH = 230
+
+
+class SluggedModel(models.Model):
+    """
+    Mixin: a URL slug minted from `name` on first save, never rewritten.
+
+    G3.10 (2026-09-14). The hierarchy was UUID-only, so every public URL that
+    named a node was unreadable. The slug is set exactly once — at creation, or
+    by the backfill migration for rows that predate the column — and a later
+    rename does NOT change it: a URL that has been shared or indexed is a
+    promise. Re-slugging is a separate, deliberate act.
+
+    Nullable because the column is added to populated tables; rows are
+    backfilled by migration 0007 and every new row is minted here.
+    """
+
+    slug = models.SlugField(
+        max_length=SLUG_MAX_LENGTH,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="URL slug from `name`, set once at creation and never rewritten",
+    )
+
+    # Every concrete subclass declares `name`; this tells mypy so, without
+    # adding a field the subclasses would then have to override.
+    name: str
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            using = kwargs.get("using") or self._state.db or "default"
+            self.slug = unique_slug(
+                type(self),
+                self.name,
+                max_length=SLUG_MAX_LENGTH,
+                using=using,
+                exclude_pk=self.pk,
+            )
+        super().save(*args, **kwargs)
+
 
 class Program(models.Model):
     """
@@ -48,7 +96,7 @@ class Program(models.Model):
         return self.name
 
 
-class Subject(models.Model):
+class Subject(SluggedModel):
     """
     Subject within a program.
     Example: Polity, History, Geography
@@ -88,7 +136,7 @@ class Subject(models.Model):
         return f"{self.program.name} - {self.name}"
 
 
-class Module(models.Model):
+class Module(SluggedModel):
     """
     Module/unit within a subject.
     Example: Fundamental Rights, Indian History
@@ -128,7 +176,7 @@ class Module(models.Model):
         return f"{self.subject.name} - {self.name}"
 
 
-class Topic(models.Model):
+class Topic(SluggedModel):
     """
     Individual topic within a module.
     Can have parent-child relationships (sub-topics).

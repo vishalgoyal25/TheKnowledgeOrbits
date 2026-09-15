@@ -26,7 +26,17 @@ class TestBustSubjectCaches:
     """Unit tests for _bust_subject_caches — pure cache key deletion."""
 
     def test_deletes_tree_and_graph_keys(self):
-        """Both tree and graph cache keys must be deleted for the given subject_id."""
+        """
+        Both tree and graph cache keys must be deleted for the given subject_id.
+
+        Asserted through the SAME key builders the views use (constants.py), so
+        a payload-version bump cannot pass here while the signals delete a key
+        the views no longer read.
+        """
+        from engines.book_content.constants import (
+            subject_graph_cache_key,
+            subject_tree_cache_key,
+        )
         from engines.book_content.signals import _bust_subject_caches
 
         subject_id = str(uuid.uuid4())
@@ -34,12 +44,9 @@ class TestBustSubjectCaches:
         with patch("engines.book_content.signals.cache") as mock_cache:
             _bust_subject_caches(subject_id)
 
-        expected_tree_key = f"book_subject_tree_{subject_id}_v1"
-        expected_graph_key = f"book_subject_graph_{subject_id}_v1"
-
         deleted_keys = [c.args[0] for c in mock_cache.delete.call_args_list]
-        assert expected_tree_key in deleted_keys
-        assert expected_graph_key in deleted_keys
+        assert subject_tree_cache_key(subject_id) in deleted_keys
+        assert subject_graph_cache_key(subject_id) in deleted_keys
 
     def test_calls_delete_exactly_twice(self):
         """Exactly two cache.delete calls — one for tree, one for graph."""

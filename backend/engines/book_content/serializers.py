@@ -61,6 +61,7 @@ class TopicNodeSerializer(serializers.ModelSerializer):
         model = Topic
         fields = [
             "id",
+            "slug",
             "name",
             "node_type",
             "content_status",

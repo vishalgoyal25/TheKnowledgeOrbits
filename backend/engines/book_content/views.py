@@ -29,6 +29,10 @@ from rest_framework.permissions import IsAdminUser, AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from engines.book_content.constants import (
+    subject_graph_cache_key,
+    subject_tree_cache_key,
+)
 from engines.book_content.models import (
     BookContent,
     CrossReference,
@@ -67,6 +71,7 @@ def _build_topic_tree(topic: Topic) -> dict:
 
     node: dict[str, Any] = {
         "id": str(topic.id),
+        "slug": topic.slug,
         "name": topic.name,
         "node_type": topic.node_type,
         "content_status": topic.content_status,
@@ -115,6 +120,7 @@ def subject_list(request: Request) -> Response:
     for subject in subjects:
         entry: dict = {
             "id": str(subject.id),
+            "slug": subject.slug,
             "name": subject.name,
             "description": subject.description,
             "order_index": subject.order_index,
@@ -155,7 +161,7 @@ def subject_tree(request: Request, subject_id: str) -> Response:
     """
     # P3.4 — Redis cache: topic hierarchy changes only when topics are added/edited.
     # Invalidated by post_save signal on Topic and BookContent (see signals.py).
-    cache_key = f"book_subject_tree_{subject_id}_v1"
+    cache_key = subject_tree_cache_key(subject_id)
     cached = cache.get(cache_key)
     if cached is not None:
         return Response(cached)
@@ -175,6 +181,7 @@ def subject_tree(request: Request, subject_id: str) -> Response:
 
     tree: dict[str, Any] = {
         "id": str(subject.id),
+        "slug": subject.slug,
         "name": subject.name,
         "modules": [],
     }
@@ -182,6 +189,7 @@ def subject_tree(request: Request, subject_id: str) -> Response:
     for module in modules:
         module_node: dict[str, Any] = {
             "id": str(module.id),
+            "slug": module.slug,
             "name": module.name,
             "order_index": module.order_index,
             "topics": [],
@@ -226,7 +234,7 @@ def subject_graph(request: Request, subject_id: str) -> Response:
 
     Used by: Knowledge Graph UI (eye toggle).
     """
-    cache_key = f"book_subject_graph_{subject_id}_v1"
+    cache_key = subject_graph_cache_key(subject_id)
     cached = cache.get(cache_key)
     if cached is not None:
         return Response(cached)
@@ -247,6 +255,7 @@ def subject_graph(request: Request, subject_id: str) -> Response:
     # graph nodes so the D3 graph shows the full 4-level hierarchy.
     subject_node = {
         "id": str(subject.id),
+        "slug": subject.slug,
         "name": subject.name,
         "node_type": "subject_root",
         "content_status": "empty",
@@ -269,6 +278,7 @@ def subject_graph(request: Request, subject_id: str) -> Response:
         module_nodes.append(
             {
                 "id": str(module.id),
+                "slug": module.slug,
                 "name": module.name,
                 "node_type": "module",
                 "content_status": "empty",
