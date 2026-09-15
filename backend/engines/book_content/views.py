@@ -63,9 +63,14 @@ def _build_topic_tree(topic: Topic) -> dict:
     Attaches quality_score from BookContent if generated.
     Depth: topic → subtopics → sub_subtopics (follows parent_topic FK chain).
     """
+    # `has_content` is what the UI keys "ready" on (G2.7): content_status has
+    # two "has an article" values — book_quality and complete, the ingestor's
+    # lock state — and the frontend must not have to know that.
     quality_score = None
+    has_content = False
     try:
         quality_score = topic.book_content.quality_score
+        has_content = True
     except BookContent.DoesNotExist:
         pass
 
@@ -75,6 +80,7 @@ def _build_topic_tree(topic: Topic) -> dict:
         "name": topic.name,
         "node_type": topic.node_type,
         "content_status": topic.content_status,
+        "has_content": has_content,
         "quality_score": quality_score,
         "order_index": topic.order_index,
         "difficulty_level": topic.difficulty_level,
@@ -259,6 +265,7 @@ def subject_graph(request: Request, subject_id: str) -> Response:
         "name": subject.name,
         "node_type": "subject_root",
         "content_status": "empty",
+        "has_content": False,
         "parent_topic_id": None,
         "quality_score": None,
         "graph_position": None,
@@ -282,6 +289,7 @@ def subject_graph(request: Request, subject_id: str) -> Response:
                 "name": module.name,
                 "node_type": "module",
                 "content_status": "empty",
+                "has_content": False,
                 "parent_topic_id": None,
                 "quality_score": None,
                 "graph_position": None,

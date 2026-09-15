@@ -23,8 +23,9 @@ GROUNDING_DISTANCE_THRESHOLD: float = 0.62
 # Redis keys for the per-subject tree and graph payloads. ONE definition: the
 # views read them, signals.py busts them, tests assert them. The version
 # suffix changes whenever the payload shape changes, so a stale entry from an
-# older deploy can never be served (v2 = nodes carry `slug`, G3.10).
-SUBJECT_CACHE_VERSION = "v2"
+# older deploy can never be served (v2 = nodes carry `slug`, G3.10;
+# v3 = nodes carry `has_content`, G2.7).
+SUBJECT_CACHE_VERSION = "v3"
 
 
 def subject_tree_cache_key(subject_id: str) -> str:

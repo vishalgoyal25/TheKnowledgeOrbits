@@ -247,6 +247,19 @@ class Topic(SluggedModel):
             "Drives graph node visual type and hamburger navbar depth."
         ),
     )
+    # Values, and who owns them — the book_content ingestor writes every one:
+    #   empty         no article yet
+    #   generating    a run is in progress
+    #   book_quality  has an article; not locked (subtopics stay here permanently)
+    #   complete      LOCK — topic-level node whose overview + subtopics are all
+    #                 generated. Never regenerated; only sub-subtopics are extended.
+    #                 `_find_complete_topic()` in ingestor_service.py keys on it.
+    #   failed        last run failed
+    # UI code must NOT decide "has content" from this string — `book_quality`
+    # and `complete` both mean an article exists. Payloads carry a derived
+    # `has_content` (a BookContent row exists) for that purpose (G2.7).
+    # (help_text deliberately left as-is: changing it would generate a
+    # metadata-only migration for no schema change.)
     content_status = models.CharField(
         max_length=20,
         default="empty",

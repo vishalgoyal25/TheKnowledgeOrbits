@@ -172,6 +172,50 @@ class TestBookContent(TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# has_content (G2.7)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestHasContent(TestCase):
+    """
+    `has_content` is derived from the BookContent row, never from
+    content_status — `complete` is the ingestor's LOCK state and also means an
+    article exists. Rewriting it was nearly done once (§6.6b); this pins the
+    contract so the UI never has to know the vocabulary.
+    """
+
+    def setUp(self) -> None:
+        self.subject, self.module, self.topic, self.topic2 = _make_hierarchy("_hc")
+
+    def test_node_serializer_true_for_complete_locked_topic(self) -> None:
+        from engines.book_content.serializers import TopicNodeSerializer
+
+        BookContent.objects.create(
+            topic=self.topic, subject=self.subject, content_markdown="body"
+        )
+        Topic.objects.filter(id=self.topic.id).update(content_status="complete")
+        self.topic.refresh_from_db()
+
+        data = TopicNodeSerializer(self.topic).data
+        assert data["content_status"] == "complete"
+        assert data["has_content"] is True
+
+    def test_node_serializer_false_without_book_content(self) -> None:
+        from engines.book_content.serializers import TopicNodeSerializer
+
+        assert TopicNodeSerializer(self.topic2).data["has_content"] is False
+
+    def test_tree_carries_has_content(self) -> None:
+        from engines.book_content.views import _build_topic_tree
+
+        BookContent.objects.create(
+            topic=self.topic, subject=self.subject, content_markdown="body"
+        )
+        assert _build_topic_tree(self.topic)["has_content"] is True
+        assert _build_topic_tree(self.topic2)["has_content"] is False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # TopicRelation
 # ─────────────────────────────────────────────────────────────────────────────
 

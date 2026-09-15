@@ -17,8 +17,6 @@ export type NodeType =
   | "subtopic"
   | "sub_subtopic";
 
-export type ContentStatus = "empty" | "generating" | "book_quality" | "failed";
-
 export type DifficultyLevel = "easy" | "medium" | "hard";
 
 export type RelationType =
@@ -112,12 +110,25 @@ export interface GraphPosition {
   y: number;
 }
 
+/**
+ * `content_status` is the PIPELINE's vocabulary and has two "an article exists"
+ * values — `book_quality` and `complete` (its lock state). UI keys "ready" on
+ * `has_content` (G2.7), and uses the status only for generating/failed styling.
+ */
+export type ContentStatus =
+  | "empty"
+  | "generating"
+  | "book_quality"
+  | "complete"
+  | "failed";
+
 export interface TopicNode {
   id: string;
   slug: string | null;
   name: string;
   node_type: NodeType;
   content_status: ContentStatus;
+  has_content: boolean;
   parent_topic_id: string | null;
   quality_score: number | null;
   /** Reserved for future graph layout engine. Currently always null. */
@@ -174,6 +185,7 @@ export interface TreeTopic {
   name: string;
   node_type: NodeType;
   content_status: ContentStatus;
+  has_content: boolean;
   quality_score: number | null;
   order_index: number;
   difficulty_level: DifficultyLevel;

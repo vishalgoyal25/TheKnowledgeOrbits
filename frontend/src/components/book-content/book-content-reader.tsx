@@ -29,6 +29,7 @@ import {
   AlertCircle,
   PenLine,
   ArrowRight,
+  ChevronRight,
   FolderOpen,
   Layers,
 } from "lucide-react";
@@ -55,6 +56,9 @@ export interface OverviewChild {
   id: string;
   name: string;
   node_type: NodeType;
+  /** An article exists (G2.7) — the only thing "Ready" is keyed on. */
+  has_content: boolean;
+  /** Pipeline state, used only to style generating/failed. */
   content_status: ContentStatus;
 }
 
@@ -425,19 +429,20 @@ function BookMarkdown({
 // OVERVIEW PANEL  (subject / module nodes)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STATUS_DOT: Record<ContentStatus, string> = {
-  book_quality: "bg-green-500",
-  generating: "bg-yellow-400 animate-pulse",
-  failed: "bg-red-400",
-  empty: "bg-muted-foreground/30",
-};
+/** Ready is `has_content`; the status only distinguishes the not-ready states. */
+function childDot(c: OverviewChild): string {
+  if (c.has_content) return "bg-green-500";
+  if (c.content_status === "generating") return "bg-yellow-400 animate-pulse";
+  if (c.content_status === "failed") return "bg-red-400";
+  return "bg-muted-foreground/30";
+}
 
-const STATUS_LABEL: Record<ContentStatus, string> = {
-  book_quality: "Ready",
-  generating: "Generating",
-  failed: "Failed",
-  empty: "Not yet generated",
-};
+function childStatusLabel(c: OverviewChild): string {
+  if (c.has_content) return "Ready";
+  if (c.content_status === "generating") return "Generating";
+  if (c.content_status === "failed") return "Failed";
+  return "Not yet generated";
+}
 
 function OverviewPanel({
   node,
@@ -531,15 +536,15 @@ function OverviewPanel({
                     <span
                       className={cn(
                         "w-2 h-2 rounded-full flex-shrink-0",
-                        STATUS_DOT[child.content_status] ?? STATUS_DOT.empty,
+                        childDot(child),
                       )}
-                      title={STATUS_LABEL[child.content_status]}
+                      title={childStatusLabel(child)}
                     />
                     <span className="text-sm text-foreground group-hover:text-primary transition-colors flex-1 truncate">
                       {child.name}
                     </span>
                     <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                      {STATUS_LABEL[child.content_status]}
+                      {childStatusLabel(child)}
                     </span>
                   </button>
                 </li>
@@ -596,7 +601,55 @@ interface BookContentReaderProps {
    * lies beneath them instead of fetching. Null / undefined = a topic node.
    */
   overview?: OverviewNode | null;
+  /**
+   * Subject › Module › Topic › … › selected. Rendered as a clickable breadcrumb
+   * above the content so the reader always knows where in the syllabus the
+   * open node sits; each crumb selects that node. Empty = nothing selected.
+   */
+  trail?: { id: string; name: string }[];
   className?: string;
+}
+
+function Breadcrumb({
+  trail,
+  onSelect,
+}: {
+  trail: { id: string; name: string }[];
+  onSelect: (id: string, name: string) => void;
+}) {
+  if (trail.length === 0) return null;
+  const last = trail.length - 1;
+  return (
+    <nav
+      aria-label="Syllabus path"
+      className="flex-shrink-0 px-3 sm:px-5 py-2 border-b border-border/60 bg-muted/10 overflow-x-auto [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-border"
+    >
+      <ol className="flex items-center gap-1 text-xs whitespace-nowrap">
+        {trail.map((crumb, i) => (
+          <li key={crumb.id} className="flex items-center gap-1">
+            {i > 0 && (
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50 flex-shrink-0" />
+            )}
+            {i === last ? (
+              <span
+                className="font-semibold text-foreground truncate max-w-[16rem]"
+                aria-current="page"
+              >
+                {crumb.name}
+              </span>
+            ) : (
+              <button
+                onClick={() => onSelect(crumb.id, crumb.name)}
+                className="text-muted-foreground hover:text-primary hover:underline transition-colors truncate max-w-[12rem]"
+              >
+                {crumb.name}
+              </button>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -608,6 +661,7 @@ export default function BookContentReader({
   topicName,
   onSeeAlsoClick,
   overview = null,
+  trail = [],
   className,
 }: BookContentReaderProps) {
   const [content, setContent] = useState<BookContent | null>(null);
@@ -666,6 +720,7 @@ export default function BookContentReader({
   if (overview) {
     return (
       <div className={shell}>
+        <Breadcrumb trail={trail} onSelect={handleSeeAlso} />
         <OverviewPanel node={overview} onSelect={handleSeeAlso} />
       </div>
     );
@@ -673,6 +728,8 @@ export default function BookContentReader({
 
   return (
     <div className={shell}>
+      <Breadcrumb trail={trail} onSelect={handleSeeAlso} />
+
       {/* A read is counted only once the article has actually arrived — not
           while loading, and not on a failed fetch. */}
       {topicId && content && !loading && (
