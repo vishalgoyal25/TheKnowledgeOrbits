@@ -16,6 +16,17 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_API_URL:
       process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1",
   },
+  experimental: {
+    // Build-time backpressure for the free Render dyno (2026-09-16). The
+    // default (8 pages in flight, each firing 2–3 API calls) overran gunicorn's
+    // 8 threads on 0.1 CPU; Render's proxy answered 502 and the build — now
+    // correctly gated — failed. Two pages at a time keeps the backend inside
+    // its capacity; a failed page is retried before the build gives up.
+    // Cost: a longer build (minutes), which is free. See FEATURES_GROWTH_STACK
+    // §15A.7.
+    staticGenerationMaxConcurrency: 2,
+    staticGenerationRetryCount: 2,
+  },
   images: {
     // V2 (Vercel quota fix): route resizing to Cloudinary's CDN instead of
     // Vercel's optimizer. Hero images are already f_auto/q_auto/≤1200px from
