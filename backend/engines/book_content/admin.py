@@ -15,8 +15,52 @@ from engines.book_content.models import (
     ContentMedia,
     CrossReference,
     GenerationLog,
+    OverviewContent,
     TopicRelation,
 )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OVERVIEW CONTENT (G3.9) — where the first batch is read and published by hand
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@admin.register(OverviewContent)
+class OverviewContentAdmin(admin.ModelAdmin):  # type: ignore
+    """Subject/module overviews. Flip `is_published` here after reading one."""
+
+    list_display = (
+        "target_type",
+        "target_id",
+        "word_count",
+        "grounded_on",
+        "generation_pass",
+        "quality_score",
+        "is_published",
+        "created_at",
+    )
+    list_filter = ("target_type", "is_published")
+    search_fields = ("target_id", "content_markdown")
+    readonly_fields = (
+        "id",
+        "target_type",
+        "target_id",
+        "word_count",
+        "grounded_on",
+        "generation_pass",
+        "quality_score",
+        "created_at",
+        "updated_at",
+    )
+    actions = ("publish_selected", "unpublish_selected")
+
+    @admin.action(description="Publish selected overviews")
+    def publish_selected(self, request: Any, queryset: Any) -> None:
+        queryset.update(is_published=True)
+
+    @admin.action(description="Unpublish selected overviews")
+    def unpublish_selected(self, request: Any, queryset: Any) -> None:
+        queryset.update(is_published=False)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

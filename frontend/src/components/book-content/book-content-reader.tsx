@@ -34,7 +34,7 @@ import {
   Layers,
 } from "lucide-react";
 
-import { getBookContent } from "@/lib/api/book-content";
+import { getBookContent, getOverview } from "@/lib/api/book-content";
 import { topicPath } from "@/lib/content-urls";
 import { SocialBar } from "@/components/social/social-bar";
 import ReadBeacon from "@/components/telemetry/ReadBeacon";
@@ -45,6 +45,7 @@ import type {
   ContentStatus,
   CrossReference,
   NodeType,
+  OverviewContent,
 } from "@/types/book-content";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -458,6 +459,25 @@ function OverviewPanel({
       ? Math.round((node.generatedCount / node.totalCount) * 100)
       : 0;
 
+  // G3.9 — the generated overview, when one has been published for this node.
+  // 404 → null keeps the G2.6 panel exactly as it was; the panel is the frame,
+  // the overview is the content that fills it.
+  const [overview, setOverview] = useState<OverviewContent | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setOverview(null);
+    getOverview(node.kind, node.id)
+      .then((row) => {
+        if (!cancelled) setOverview(row);
+      })
+      .catch(() => {
+        /* the frame renders without it */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.kind, node.id]);
+
   return (
     <>
       {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -478,6 +498,16 @@ function OverviewPanel({
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 sm:py-5 space-y-5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-border">
+        {/* G3.9 overview — above the map beneath it */}
+        {overview && (
+          <article className="pb-2 border-b border-border">
+            <BookMarkdown
+              content={overview.content_markdown}
+              mediaAssets={[]}
+            />
+          </article>
+        )}
+
         {/* Progress + start-here */}
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-3">
           <div className="flex items-center justify-between text-sm">
@@ -553,10 +583,12 @@ function OverviewPanel({
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground leading-relaxed">
-          Overview articles for subjects and modules are on the way. Until then,
-          pick a topic above to start reading.
-        </p>
+        {!overview && (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            The overview for this {node.kind} is being written. Until then, pick
+            a topic above to start reading.
+          </p>
+        )}
       </div>
     </>
   );

@@ -9,6 +9,7 @@ Endpoints:
   GET  graph/<uuid:subject_id>/node/<uuid:topic_id>/children/  → graph_node_children
   GET  content/<uuid:topic_id>/                     → book_content_detail
   GET  content/<uuid:topic_id>/cross-references/    → book_content_cross_references
+  GET  overview/<subject|module>/<slug-or-uuid>/    → overview_detail     (G3.9)
   GET  generation-log/                              → generation_log_list  (staff only)
   POST internal/generate/<uuid:topic_id>/           → internal_generate   (internal only)
 """
@@ -21,6 +22,7 @@ from engines.book_content.views import (
     generation_log_list,
     graph_node_children,
     internal_generate,
+    overview_detail,
     subject_graph,
     subject_list,
     subject_tree,
@@ -34,6 +36,12 @@ urlpatterns = [
         "subjects/",
         subject_list,
         name="subject-list",
+    ),
+    # G3.9 — published overview of a subject or module (slug or UUID)
+    path(
+        "overview/<str:target_type>/<str:ref>/",
+        overview_detail,
+        name="overview-detail",
     ),
     # Navbar / hamburger tree
     path(

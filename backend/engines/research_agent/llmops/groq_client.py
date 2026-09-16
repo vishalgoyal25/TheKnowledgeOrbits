@@ -59,8 +59,9 @@ logger = structlog.get_logger(__name__)
 
 # ── Pool configuration ────────────────────────────────────────────────────────
 # Global failover priority. The agent's preferred provider is tried FIRST, then
-# the remaining enabled providers in this order. Cerebras and Gemini are
-# deliberately absent — their entries below are kept for a one-line re-enable.
+# the remaining enabled providers in this order. Gemini is deliberately absent —
+# its entries below are kept for a one-line re-enable. Cerebras was removed
+# 2026-09-16 (402 on every key since 2026-08-19; its SDK is no longer installed).
 POOL_PRIORITY = ["groq", "mistral", "openrouter"]
 
 # Each provider's default model — used when failing over to a provider the
@@ -71,7 +72,6 @@ PROVIDER_DEFAULT_MODEL = {
     "mistral": "mistral-medium-2508",  # L0b winner: fast, clean markdown
     "openrouter": "minimax/minimax-m3:free",  # seed; free line-up rotates
     # ── retained, not in POOL_PRIORITY ──
-    "cerebras": "gpt-oss-120b",
     "gemini": "gemini-2.0-flash",
 }
 
@@ -87,7 +87,6 @@ PROVIDER_SETTINGS_KEY = {
     "groq": "GROQ_API_KEY",
     "mistral": "MISTRAL_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
-    "cerebras": "CEREBRAS_API_KEY",
     "gemini": "GEMINI_API_KEY",
 }
 
@@ -465,17 +464,12 @@ class LLMClient:
         if key in self._clients:
             return self._clients[key]
 
-        # One of three different SDK client types depending on provider.
+        # One of two SDK client types depending on provider.
         client: Any
         if provider == "groq":
             from groq import Groq
 
             client = Groq(api_key=key)
-        elif provider == "cerebras":
-            # Native SDK: the groq SDK hardcodes an /openai/v1/ prefix that 404s here.
-            from cerebras.cloud.sdk import Cerebras
-
-            client = Cerebras(api_key=key)
         elif provider in PROVIDER_BASE_URL:
             # Every remaining provider (mistral, openrouter, gemini) is
             # OpenAI-compatible — base_url is the only difference between them.

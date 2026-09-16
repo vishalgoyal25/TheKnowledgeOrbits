@@ -7,17 +7,47 @@
  * generation-log endpoint additionally requires is_staff.
  */
 
+import { isAxiosError } from "axios";
+
 import {
   BookContent,
   GenerationLog,
   GenerationLogFilters,
   GraphData,
+  OverviewContent,
+  OverviewTargetType,
   SubjectTree,
   SubjectWithPlan,
   TopicNode,
   CrossReference,
 } from "@/types/book-content";
 import apiClient from "./client";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/book/overview/{subject|module}/{slug-or-uuid}/   (G3.9)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The PUBLISHED overview of a subject or module, or null when none exists
+ * yet (the API answers 404 for drafts and for nodes not yet generated —
+ * ~60 nodes over 14 days, so "none yet" is the normal case at first).
+ * Any other failure propagates so an ISR build can abort instead of caching
+ * a page that silently lost its overview.
+ */
+export async function getOverview(
+  targetType: OverviewTargetType,
+  ref: string,
+): Promise<OverviewContent | null> {
+  try {
+    const response = await apiClient.get(
+      `/book/overview/${targetType}/${ref}/`,
+    );
+    return response.data;
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) return null;
+    throw error;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/book/subjects/

@@ -128,12 +128,9 @@ services:
       # query cache, user memory. Use a free Upstash rediss:// URL.
       - key: REDIS_URL
         sync: false
-      # DISABLED but RETAINED — every Cerebras key returned 402 Payment Required
-      # from 2026-08-19. The provider is switched off in the registry
-      # (enabled=False), NOT removed. Keep this var set: restoring Cerebras is a
-      # one-boolean change if free access ever returns.
-      - key: CEREBRAS_API_KEY
-        sync: false
+      # CEREBRAS_API_KEY removed from the blueprint 2026-09-16 — the provider was
+      # removed from both pools (402 on every key since 2026-08-19). A value left
+      # in the dashboard is ignored by the code.
       - key: TAVILY_API_KEY
         sync: false
       - key: EXA_API_KEY
@@ -247,5 +244,28 @@ services:
         - "**/*.md"
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
     startCommand: "cd backend && python manage.py generate_static_content --max-articles 3 --database=supabase"
+    envVars:
+      - fromGroup: TheKnowledgeOrbits
+
+  # G3.9 — subject/module overviews (FEATURES_GROWTH_STACK.md §7.9a).
+  # Its OWN service on purpose: separate failure, separate log, separate kill
+  # switch, and a window that cannot overlap generate-static-content (03:30 +
+  # ~1.5 h). One SUBJECT and all of its modules per run → 14 subjects, 14 days.
+  # Inert until OVERVIEW_GENERATION_ENABLED=True is set in the env group; rows
+  # stay drafts until OVERVIEW_AUTO_PUBLISH=True (flip after the first subject
+  # has been read in admin). With nothing pending it logs and exits in seconds.
+  - type: cron
+    name: overview-content
+    runtime: python
+    region: oregon
+    schedule: "30 5 * * *" # 05:30 UTC daily
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - backend/**
+      ignoredPaths:
+        - "**/*.md"
+    buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
+    startCommand: "cd backend && python manage.py generate_overview_content --max 1 --database=supabase"
     envVars:
       - fromGroup: TheKnowledgeOrbits

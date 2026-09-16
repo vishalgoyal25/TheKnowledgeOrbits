@@ -208,6 +208,26 @@ export interface SubjectTree {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OVERVIEW CONTENT  (OverviewContentSerializer, G3.9)
+// The published introductory overview of a subject or module — the two
+// hierarchy levels that never have a BookContent. 404 → null in the client.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type OverviewTargetType = "subject" | "module";
+
+export interface OverviewContent {
+  id: string;
+  target_type: OverviewTargetType;
+  target_id: string;
+  target_name: string;
+  target_slug: string | null;
+  content_markdown: string;
+  word_count: number;
+  grounded_on: number;
+  updated_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CROSS REFERENCE  (CrossReferenceSerializer)
 // ─────────────────────────────────────────────────────────────────────────────
 

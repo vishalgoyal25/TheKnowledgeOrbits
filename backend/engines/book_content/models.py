@@ -226,6 +226,78 @@ class BookContent(models.Model):
         super().save(*args, **kwargs)
 
 
+class OverviewContent(models.Model):
+    """
+    G3.9 (FEATURES_GROWTH_STACK.md §7.9a): the LLM-written overview of a
+    SUBJECT or MODULE — the two hierarchy levels that have no `Topic` row and
+    therefore can never have a `BookContent`.
+
+    Deliberately NOT a field on Subject/Module (the seeded tree is read-only to
+    this job) and NOT a `BookContent` (that is 1:1 with `Topic` and half the
+    engine depends on it). A generic (target_type, target_id) pair — the same
+    shape `telemetry.ContentRead` uses — pointing AT a node. Nothing in the
+    article pipeline reads or writes this table.
+
+    Rows land `is_published=False`; the first batch is published by hand in
+    admin. Only published rows are served or rendered.
+    """
+
+    TARGET_SUBJECT = "subject"
+    TARGET_MODULE = "module"
+    TARGET_CHOICES = [
+        (TARGET_SUBJECT, "Subject"),
+        (TARGET_MODULE, "Module"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    target_type = models.CharField(max_length=10, choices=TARGET_CHOICES)
+    target_id = models.UUIDField(
+        help_text="knowledge.Subject.id or knowledge.Module.id (no FK — see docstring)"
+    )
+    content_markdown = models.TextField(
+        help_text="The overview, grounded in the generated topic articles beneath the node."
+    )
+    word_count = models.IntegerField(default=0, help_text="Computed on save.")
+    quality_score = models.FloatField(
+        default=0.0, help_text="Heuristic 0–100 from the generator's gate."
+    )
+    generation_pass = models.IntegerField(
+        default=1, help_text="1 = first draft passed the gate; 2 = the retry did."
+    )
+    grounded_on = models.IntegerField(
+        default=0, help_text="How many generated topic articles fed the prompt."
+    )
+    is_published = models.BooleanField(
+        default=False, help_text="Served and rendered only when True."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "knowledge_overview_content"
+        ordering = ["target_type", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["target_type", "target_id"],
+                name="overview_content_one_per_target",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["target_type", "is_published"],
+                name="overview_target_pub_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Overview[{self.target_type}:{self.target_id}] ({self.word_count}w)"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.content_markdown:
+            self.word_count = len(self.content_markdown.split())
+        super().save(*args, **kwargs)
+
+
 class TopicRelation(models.Model):
     """
     Layer 2: Semantic relationship between two topic nodes.

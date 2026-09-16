@@ -24,8 +24,8 @@ langchain-groq>=0.2.10
 langchain>=0.3.25
 langchain-core>=1.4.0
 langchain-text-splitters>=0.3.0
-cerebras-cloud-sdk>=1.67.0   # Cerebras free-tier LLM (gpt-oss-120b — Llama retired from public endpoints)
-openai>=1.0.0                 # OpenAI-compatible client — used for Gemini + future providers
+openai>=1.0.0                 # OpenAI-compatible client — Mistral, OpenRouter, Gemini
+# cerebras-cloud-sdk removed 2026-09-16 — provider dead (402) since 2026-08-19
 tenacity>=8.1.0,!=8.4.0,<9.0.0
 
 # AgenticAI — Research Agent Engine

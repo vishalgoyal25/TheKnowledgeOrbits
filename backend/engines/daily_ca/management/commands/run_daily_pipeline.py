@@ -31,10 +31,15 @@ Pipeline (6 steps, sequential):
              Idempotent: skips if quiz for this date already exists.
 
   Step 6 — generate_concept_content
-             Generates full encyclopaedic body_md for 10 ConceptPage stubs where
+             Generates full encyclopaedic body_md for 20 ConceptPage stubs where
              is_content_ready=False, ordered by usage_count DESC (most-referenced
              concepts first). Runs after Steps 1–5 so CA + quiz are never blocked
              by concept generation. Non-fatal: failure here never aborts the pipeline.
+             G3.11: a draft that fails the quality gate is not saved.
+
+  Step 7 — regenerate_concept_content --max 5   (G3.12, 2026-09-16)
+             Rewrites up to 5 READY-but-thin concept pages in place. Exits at once
+             unless CONCEPT_REGENERATION_ENABLED=True in the environment. Non-fatal.
 
 Usage:
     python manage.py run_daily_pipeline
@@ -261,7 +266,7 @@ class Command(BaseCommand):
         # ── STEP 6: Generate Concept Page content ────────────────────────────
         self.stdout.write(
             self.style.MIGRATE_HEADING(
-                "\n▶ Step 6/6 — Generating Concept Page content (20 stubs)..."
+                "\n▶ Step 6/7 — Generating Concept Page content (20 stubs)..."
             )
         )
         try:
@@ -279,6 +284,32 @@ class Command(BaseCommand):
                 self.style.ERROR(
                     f"\n✗ Step 6 failed: {exc}\n"
                     "  (CA articles and quiz unaffected — concept generation is independent)"
+                )
+            )
+
+        # ── STEP 7: Rewrite thin/broken concept pages (G3.12) ────────────────
+        # Behind CONCEPT_REGENERATION_ENABLED (default off) — with the switch off
+        # the command exits at once. --max 5 bounds the LLM spend per day.
+        self.stdout.write(
+            self.style.MIGRATE_HEADING(
+                "\n▶ Step 7/7 — Regenerating thin concept pages (max 5, kill-switched)..."
+            )
+        )
+        try:
+            call_command(
+                "regenerate_concept_content",
+                max=5,
+                database=db_alias,
+                stdout=self.stdout,
+                stderr=self.stderr,
+            )
+        except Exception as exc:
+            sentry_sdk.capture_exception(exc)
+            logger.error("pipeline_step7_failed", error=str(exc))
+            self.stderr.write(
+                self.style.ERROR(
+                    f"\n✗ Step 7 failed: {exc}\n"
+                    "  (CA articles, quiz and new concept pages unaffected)"
                 )
             )
 

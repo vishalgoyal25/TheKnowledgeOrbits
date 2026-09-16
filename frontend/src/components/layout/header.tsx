@@ -190,9 +190,13 @@ export default function Header({ initialHierarchy }: HeaderProps) {
     if (Date.now() - lastHierarchyFetchRef.current < STALE_MS) return;
 
     // Moved to useEffect root (not inside async arrow) to satisfy linter rule.
+    // Carries `slug` at every level (G3.10): without it, a session that took
+    // this path — the server-baked hierarchy came back empty — rendered every
+    // navbar link as a UUID (found on production 2026-09-16, §7.1b).
     function treeTopicToHierarchy(t: TreeTopic): HierarchyTopic {
       return {
         id: t.id,
+        slug: t.slug,
         name: t.name,
         sub_topics: t.subtopics.map(treeTopicToHierarchy),
       };
@@ -211,9 +215,11 @@ export default function Header({ initialHierarchy }: HeaderProps) {
         const hierarchySubjects: HierarchySubject[] = bookSubjects.map(
           (s, i) => ({
             id: s.id,
+            slug: s.slug,
             name: s.name,
             modules: (trees[i]?.modules ?? []).map((mod) => ({
               id: mod.id,
+              slug: mod.slug,
               name: mod.name,
               topics: mod.topics.map(treeTopicToHierarchy),
             })),

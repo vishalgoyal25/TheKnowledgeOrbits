@@ -383,12 +383,12 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "")  # blank → registry default
 # The active pool + per-provider capabilities live in the registry:
 #   engines/book_content/services/llm_service.py  →  PROVIDERS
 #
-# DISABLED but deliberately RETAINED (FEATURES_LLM_FIX.md decisions #1/#2, #5):
-#   Cerebras — every key returned 402 Payment Required from 2026-08-19.
-#              Keys and config stay; the provider is switched off in the registry.
+# DISABLED but deliberately RETAINED (FEATURES_LLM_FIX.md decision #5):
 #   Gemini   — free-tier RPM too tight for a rotating pool.
-CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
-CEREBRAS_MODEL = os.getenv("CEREBRAS_MODEL", "")
+# REMOVED 2026-09-16: Cerebras (402 Payment Required on every key since
+#   2026-08-19). Its SDK import crashed the lean CA-scraper install twice; the
+#   settings, registry row and requirement are gone. Any CEREBRAS_* env var still
+#   set in Render/.env is simply ignored.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # ── Active free providers (verified L0/L0b, FEATURES_LLM_FIX.md §5) ──────────

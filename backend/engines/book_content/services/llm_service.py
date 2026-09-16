@@ -8,8 +8,12 @@ PROVIDER REGISTRY (see PROVIDERS below — the single source of truth):
   • groq        openai/gpt-oss-120b     ~5.5k token cap   small calls (primary)
   • mistral     mistral-medium-2508      ~120k cap        large calls (primary)
   • openrouter  minimax/minimax-m3:free  ~900k cap        emergency fallback
-  • cerebras    DISABLED (402 Payment Required since 2026-08-19) — config RETAINED
   • gemini      DISABLED (free-tier RPM too tight for a pool) — config RETAINED
+  • cerebras    REMOVED 2026-09-16 — 402 Payment Required on every key since
+                2026-08-19, and its module-level SDK import crashed every lean
+                environment without the package (the CA scraper, twice). If free
+                access ever returns it comes back as a new ProviderSpec + the SDK
+                in requirements, not by resurrecting the old row.
 
 WHY THIS FILE WAS REWRITTEN (incident 2026-08-19, FEATURES_LLM_FIX.md):
 The previous pool was a FLAT LIST OF KEYS that treated every exception identically
@@ -61,9 +65,6 @@ from django.core.cache import cache
 import requests
 import sentry_sdk
 import structlog
-from cerebras.cloud.sdk import (
-    Cerebras,
-)  # cerebras-cloud-sdk>=1.67.0 (kept: provider disabled, not removed)
 from groq import Groq
 from openai import OpenAI
 
@@ -163,7 +164,7 @@ class ProviderSpec:
     settings_key: str  # env var NAME holding comma-separated keys
     model_setting: str  # settings attr allowing a model override
     default_model: str
-    sdk: str  # "groq" | "cerebras" | "openai"
+    sdk: str  # "groq" | "openai" (OpenAI-compatible: mistral, openrouter, gemini)
     max_request_tokens: int  # CAPABILITY GATE — the permanent 413 fix
     supports_json_mode: bool
     enabled: bool
@@ -206,19 +207,9 @@ PROVIDERS: list[ProviderSpec] = [
         enabled=True,
     ),
     # ── DISABLED — configuration deliberately RETAINED ───────────────────────
-    # Cerebras served every large prompt until 2026-08-19, when all keys began
-    # returning 402. Keys, SDK import and this row stay in place: restoring the
-    # provider is a one-boolean change if free access ever returns.
-    ProviderSpec(
-        name="cerebras",
-        settings_key="CEREBRAS_API_KEY",
-        model_setting="CEREBRAS_MODEL",
-        default_model="gpt-oss-120b",
-        sdk="cerebras",
-        max_request_tokens=60_000,
-        supports_json_mode=True,
-        enabled=False,
-    ),
+    # (Cerebras used to sit here, disabled. Removed 2026-09-16 — see the module
+    # docstring. A disabled row still needs its SDK importable, which is what
+    # broke the lean scraper environment.)
     # Gemini: free-tier RPM too tight for a rotating pool (project decision).
     ProviderSpec(
         name="gemini",
@@ -240,7 +231,7 @@ _DISABLED_KEY_VALUES = {"", "dummy-key-for-build"}
 class _LLMEntry:
     """One API key bound to its provider spec."""
 
-    client: Any  # Groq | Cerebras | OpenAI — all expose .chat.completions.create()
+    client: Any  # Groq | OpenAI — both expose .chat.completions.create()
     provider: str
     spec: ProviderSpec
 
@@ -382,8 +373,6 @@ def _model_for(spec: ProviderSpec) -> str:
 def _build_client(spec: ProviderSpec, key: str) -> Any:
     if spec.sdk == "groq":
         return Groq(api_key=key)
-    if spec.sdk == "cerebras":
-        return Cerebras(api_key=key)
     return OpenAI(api_key=key, base_url=spec.base_url)
 
 
