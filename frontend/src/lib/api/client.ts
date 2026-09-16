@@ -58,13 +58,52 @@ apiClient.interceptors.request.use(
   },
 );
 
+// ── Server-side transient-error retry ────────────────────────────────────────
+// `next build` (and every ISR regeneration) calls the free Render dyno from
+// many pages at once. Under that burst Render's proxy answers 502/503/504 for
+// requests that would have succeeded a second later. Before 2026-09-16 the
+// build swallowed those and cached the broken page (§5A.4a); now the guard
+// fails the build. A short backoff retry on the server turns "one 502 fails
+// the deploy" into "one 502 costs two seconds". Browser requests are untouched
+// — the user gets the real error immediately.
+const RETRY_STATUSES = new Set([502, 503, 504]);
+const RETRY_DELAYS_MS = [2000, 4000, 8000];
+const RETRYABLE_CODES = new Set(["ECONNRESET", "ECONNREFUSED", "EAI_AGAIN"]);
+
+function isTransientServerFailure(error: AxiosError): boolean {
+  if (error.response) return RETRY_STATUSES.has(error.response.status);
+  // No response: connection-level failures only — never a timeout, which is
+  // already 120 s and would triple the wait for nothing.
+  return !!error.code && RETRYABLE_CODES.has(error.code);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Response interceptor - Handle token refresh
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
+      _transientRetries?: number;
     };
+
+    if (
+      typeof window === "undefined" &&
+      originalRequest &&
+      (originalRequest.method ?? "get").toLowerCase() === "get" &&
+      isTransientServerFailure(error)
+    ) {
+      const attempt = originalRequest._transientRetries ?? 0;
+      if (attempt < RETRY_DELAYS_MS.length) {
+        originalRequest._transientRetries = attempt + 1;
+        logger.warn(
+          `Transient ${error.response?.status ?? error.code} for GET ${originalRequest.url} — retry ${attempt + 1}/${RETRY_DELAYS_MS.length} in ${RETRY_DELAYS_MS[attempt]} ms`,
+        );
+        await sleep(RETRY_DELAYS_MS[attempt]);
+        return apiClient(originalRequest);
+      }
+    }
 
     // If 401 and not already retried, try to refresh token
     if (error.response?.status === 401 && !originalRequest?._retry) {

@@ -6,7 +6,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  Suspense,
+} from "react";
 import { cn } from "@/lib/utils";
 import {
   Search,
@@ -152,10 +159,15 @@ export default function Header({ initialHierarchy }: HeaderProps) {
     string | null
   >(null);
 
-  // A node is "in the path" under either address form (G3.10): its slug or its UUID.
-  const inPath = (prefix: string, node: { id: string; slug?: string | null }) =>
-    pathname.includes(`${prefix}/${node.id}`) ||
-    (!!node.slug && pathname.includes(`${prefix}/${node.slug}`));
+  // A node is "in the path" under either address form (G3.10): its slug or its
+  // UUID. Memoised on pathname so the hooks below can list it as a dependency
+  // without re-running on every render (the lint notice on PR #26).
+  const inPath = useCallback(
+    (prefix: string, node: { id: string; slug?: string | null }) =>
+      pathname.includes(`${prefix}/${node.id}`) ||
+      (!!node.slug && pathname.includes(`${prefix}/${node.slug}`)),
+    [pathname],
+  );
 
   const currentSubjectId = useMemo(() => {
     if (!hierarchyData || hierarchyData.length === 0) return null;
@@ -172,8 +184,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
       }
     }
     return hierarchyData[0].id;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, hierarchyData]);
+  }, [pathname, hierarchyData, inPath]);
 
   const displaySubjectId = hoveredSubject || currentSubjectId;
 
@@ -297,7 +308,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
 
     setDrawerActiveSubjectId(activeSubject ?? hierarchyData[0]?.id ?? null);
     setDrawerActiveModuleId(activeModule);
-  }, [isDrawerOpen, pathname, hierarchyData]);
+  }, [isDrawerOpen, pathname, hierarchyData, inPath]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
