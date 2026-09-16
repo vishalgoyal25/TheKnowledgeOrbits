@@ -28,8 +28,8 @@ export default function CookiePolicy() {
               Cookie Policy
             </h1>
             <p className="text-muted-foreground font-medium text-lg max-w-2xl">
-              We use only essential technical cookies to keep your study
-              sessions smooth. No advertising or tracking cookies are used here.
+              Two first-party cookies keep you logged in, and Google Analytics
+              sets two more to count page views. No advertising cookies.
             </p>
           </div>
         </div>
@@ -44,10 +44,11 @@ export default function CookiePolicy() {
               Transparency First
             </h2>
             <p className="text-amber-800 text-xs leading-relaxed">
-              As a hobby and educational project, we don&apos;t use complex
-              tracking pixels or third-party advertising cookies. We only use
-              browser-side storage that is strictly necessary for our platform
-              to function.
+              Exactly four cookies, listed below by name. Two are ours and
+              strictly necessary (login); two are Google Analytics&apos; (usage
+              statistics), which you can block without losing any feature. No
+              advertising or cross-site tracking cookies. Updated 16 September
+              2026.
             </p>
           </div>
         </div>
@@ -90,29 +91,39 @@ export default function CookiePolicy() {
                     ALWAYS ENABLED
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    We use these cookies to manage your login session (via
-                    Supabase/JWT). Without these, our dashboard and preparation
-                    tracking features won&apos;t work.
+                    <code>access_token</code> and <code>refresh_token</code> —
+                    set only when you log in, first-party,{" "}
+                    <code>SameSite=Lax</code>, expiring after 7 days. They carry
+                    your login session to our backend. Without them the
+                    dashboard, notebook and bookmarks cannot work. Logging out
+                    deletes them.
                   </p>
                 </div>
               </div>
 
-              {/* Preference Cookies */}
+              {/* Analytics Cookies */}
               <div className="p-6 bg-muted/40 rounded-lg border border-border flex flex-col md:flex-row gap-6">
                 <div className="h-10 w-10 shrink-0 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center">
                   <Zap className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-foreground mb-1">
-                    Functionality Cookies (Study State)
+                    Analytics Cookies (Google Analytics 4)
                   </h3>
                   <p className="text-sm text-muted-foreground mb-3 underline italic uppercase tracking-widest text-[10px]">
-                    OPTIONAL
+                    THIRD PARTY · BLOCKABLE
                   </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    These remember preferences like your theme choice
-                    (Light/Dark mode) or which filter you used last on the
-                    Current Affairs page.
+                    <code>_ga</code> and <code>_ga_*</code> — set by Google
+                    Analytics to tell one visitor&apos;s page views from
+                    another&apos;s, for up to 2 years. They give us aggregated
+                    statistics (which pages are read, from which regions) and
+                    nothing about you individually. Blocking them removes no
+                    feature. Details and opt-out in the{" "}
+                    <Link href="/privacy" className="text-blue-600 underline">
+                      Privacy Policy
+                    </Link>
+                    .
                   </p>
                 </div>
               </div>
@@ -123,19 +134,21 @@ export default function CookiePolicy() {
           <section>
             <div className="flex items-center gap-3 mb-6">
               <h2 className="text-2xl font-semibold text-foreground">
-                Third-Party Cookies
+                Advertising and Tracking Cookies
               </h2>
             </div>
             <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-2xl">
               <p className="text-red-900 text-sm leading-relaxed italic mb-4">
-                We currently use{" "}
-                <strong>
-                  ZERO third-party advertising or marketing cookies
-                </strong>
-                . We are not interested in tracking you across the web.
+                <strong>None.</strong> No advertising network, no social pixel,
+                no cross-site tracker. Interface preferences (the knowledge-map
+                view, the sidebar state) are kept in your browser&apos;s local
+                storage, not in a cookie, and never leave your device. If
+                advertising is ever introduced, this page changes first and
+                consent is asked where the law requires it.
               </p>
               <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase tracking-widest">
-                <CheckCircle className="h-4 w-4" /> 100% Privacy-First Stack
+                <CheckCircle className="h-4 w-4" /> Four cookies, all named
+                above
               </div>
             </div>
           </section>
