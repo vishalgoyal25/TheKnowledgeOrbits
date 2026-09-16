@@ -13,7 +13,7 @@ import { absoluteUrl } from "@/lib/seo/site";
  *                         >= 3 headings) applied server-side, ~818 of 2,438
  *
  * Only canonical (slug) URLs are listed; a row with no slug is skipped by the
- * feed, never emitted as a UUID. Static pages are listed by hand.
+ * feed, never emitted as a UUID. Static and hub pages are listed by hand (15).
  *
  * Cost: `revalidate = 86400` keeps this a static route rebuilt once a day —
  * ~1 ISR write/day. It must never become dynamic (C2): a sitemap that renders
@@ -58,6 +58,21 @@ const STATIC: MetadataRoute.Sitemap = [
     url: absoluteUrl("/current-affairs"),
     changeFrequency: "daily",
     priority: 0.6,
+  },
+  // Public hubs found missing on the first production read (2026-09-16).
+  // Their UUID detail pages (/current-affairs/<id>, /articles/<id>) stay out
+  // by decision — thin, unslugged, reachable by links.
+  { url: absoluteUrl("/news"), changeFrequency: "daily", priority: 0.6 },
+  { url: absoluteUrl("/articles"), changeFrequency: "weekly", priority: 0.5 },
+  {
+    url: absoluteUrl("/current-affairs/chunks"),
+    changeFrequency: "weekly",
+    priority: 0.4,
+  },
+  {
+    url: absoluteUrl("/current-affairs/sources"),
+    changeFrequency: "weekly",
+    priority: 0.4,
   },
   { url: absoluteUrl("/about"), changeFrequency: "monthly", priority: 0.4 },
   { url: absoluteUrl("/contact"), changeFrequency: "monthly", priority: 0.3 },

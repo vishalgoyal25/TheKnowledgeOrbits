@@ -17,7 +17,8 @@ Auth pattern:
 """
 
 import threading
-from typing import Any
+import uuid
+from typing import Any, cast
 
 import sentry_sdk
 import structlog
@@ -37,6 +38,7 @@ from engines.book_content.models import (
     BookContent,
     CrossReference,
     GenerationLog,
+    OverviewContent,
     TopicRelation,
 )
 from engines.book_content.serializers import (
@@ -44,6 +46,7 @@ from engines.book_content.serializers import (
     BookPlanSerializer,
     CrossReferenceSerializer,
     GenerationLogSerializer,
+    OverviewContentSerializer,
     TopicNodeSerializer,
     TopicRelationSerializer,
 )
@@ -459,6 +462,64 @@ def book_content_cross_references(request: Request, topic_id: str) -> Response:
         count=len(serialized),
     )
     return Response(serialized, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /api/v1/book/overview/<subject|module>/<slug-or-uuid>/     (G3.9)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_OVERVIEW_MODELS: dict[str, type[Subject] | type[Module]] = {
+    OverviewContent.TARGET_SUBJECT: Subject,
+    OverviewContent.TARGET_MODULE: Module,
+}
+
+
+def _resolve_node(model: type[Subject] | type[Module], ref: str) -> Subject | Module:
+    """Slug or UUID, like every other hierarchy lookup since G3.10."""
+    # mypy joins the union of model classes to their shared abstract base
+    # (SluggedModel); the runtime object is always one of the two concrete rows.
+    try:
+        uuid.UUID(str(ref))
+    except ValueError:
+        return cast(
+            Subject | Module, get_object_or_404(model, slug=ref, is_active=True)
+        )
+    return cast(Subject | Module, get_object_or_404(model, pk=ref, is_active=True))
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def overview_detail(request: Request, target_type: str, ref: str) -> Response:
+    """
+    The PUBLISHED overview of a subject or module, or 404. Public read: the
+    subject/module ISR pages and the map's overview panel both render it.
+    Cached 1 h per node; the row changes at most once a day.
+    """
+    model = _OVERVIEW_MODELS.get(target_type)
+    if model is None:
+        return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    node = _resolve_node(model, ref)
+    cache_key = f"book_overview_v1:{target_type}:{node.id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return Response(cached, status=status.HTTP_200_OK)
+
+    row = get_object_or_404(
+        OverviewContent,
+        target_type=target_type,
+        target_id=node.id,
+        is_published=True,
+    )
+    row.target_name = node.name  # type: ignore[attr-defined]
+    row.target_slug = node.slug  # type: ignore[attr-defined]
+    data = OverviewContentSerializer(row).data
+    cache.set(cache_key, data, timeout=3600)
+
+    logger.info(
+        "overview_fetched", target=f"{target_type}:{node.id}", words=row.word_count
+    )
+    return Response(data, status=status.HTTP_200_OK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -23,11 +23,38 @@ from engines.book_content.models import (
     ContentMedia,
     CrossReference,
     GenerationLog,
+    OverviewContent,
     TopicRelation,
 )
 from engines.knowledge.models import Topic
 
 logger = structlog.get_logger(__name__)
+
+
+class OverviewContentSerializer(serializers.ModelSerializer):
+    """
+    G3.9 — the public payload for a subject/module overview. The view adds
+    `target_name` and `target_slug` from the node so the frontend can render
+    without a second call.
+    """
+
+    target_name = serializers.CharField(read_only=True)
+    target_slug = serializers.CharField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = OverviewContent
+        fields = [
+            "id",
+            "target_type",
+            "target_id",
+            "target_name",
+            "target_slug",
+            "content_markdown",
+            "word_count",
+            "grounded_on",
+            "updated_at",
+        ]
+        read_only_fields = fields
 
 
 # ─────────────────────────────────────────────────────────────────────────────

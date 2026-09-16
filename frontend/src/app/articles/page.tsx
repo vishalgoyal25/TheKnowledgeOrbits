@@ -2,12 +2,24 @@
  * Article listing page (ISR/Resilient)
  */
 
+import type { Metadata } from "next";
+
 import { articlesAPI } from "@/lib/api/articles";
+import { buildMetadata } from "@/lib/seo/metadata";
 import { Sparkles } from "lucide-react";
 import ArticlesClient from "./articles-client";
 
 // Revalidate every hour
 export const revalidate = 3600;
+
+// G3.4 — the one list page in §7.5 that had no metadata of its own; it is in
+// the sitemap from 2026-09-16, so it needs a title Google can show.
+export const metadata: Metadata = buildMetadata({
+  title: "UPSC Articles",
+  description:
+    "Long-form, AI-generated articles on UPSC syllabus topics — published explainers for prelims and mains preparation.",
+  path: "/articles",
+});
 
 import { Article } from "@/lib/types";
 

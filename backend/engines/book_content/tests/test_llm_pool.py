@@ -192,11 +192,15 @@ class TestCapabilityRouting(_PoolTestCase):
 
 
 class TestRegistry(_PoolTestCase):
-    def test_cerebras_present_but_disabled(self) -> None:
-        """Config RETAINED, plug pulled — re-enabling must stay a one-line change."""
-        cerebras = [p for p in llm.PROVIDERS if p.name == "cerebras"]
-        assert len(cerebras) == 1, "Cerebras config must not be deleted"
-        assert cerebras[0].enabled is False
+    def test_cerebras_removed(self) -> None:
+        """
+        Removed 2026-09-16 (was: disabled, config retained). Its module-level SDK
+        import crashed every lean install without the package — the CA scraper
+        died twice on it. Every remaining provider must build on an SDK that
+        `requirements/base.txt` AND the pool's own imports actually carry.
+        """
+        assert all(p.name != "cerebras" for p in llm.PROVIDERS)
+        assert {p.sdk for p in llm.PROVIDERS} <= {"groq", "openai"}
 
     def test_gemini_present_but_disabled(self) -> None:
         gemini = [p for p in llm.PROVIDERS if p.name == "gemini"]

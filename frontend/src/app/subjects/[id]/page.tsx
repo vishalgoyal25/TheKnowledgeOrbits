@@ -11,15 +11,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 
-import { BreadcrumbJsonLd } from "@/components/seo/JsonLd";
+import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
+import ArticleBody from "@/components/syllabus/article-body";
 import SyllabusBreadcrumb from "@/components/syllabus/syllabus-breadcrumb";
-import { getBookTree } from "@/lib/api/book-content";
+import { getBookTree, getOverview } from "@/lib/api/book-content";
 import { subjectsAPI } from "@/lib/api/subjects";
 import { isUuid, modulePath, subjectPath } from "@/lib/content-urls";
-import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
+import { buildMetadata, NOINDEX, truncate } from "@/lib/seo/metadata";
 import { countWithContent, flattenTopics } from "@/lib/syllabus-tree";
 import type { Subject } from "@/lib/types";
-import type { SubjectTree } from "@/types/book-content";
+import type { OverviewContent, SubjectTree } from "@/types/book-content";
 
 // Revalidate daily — syllabus subjects rarely change; hourly rebuilds across
 // many dynamic pages wasted Vercel ISR-write quota.
@@ -53,10 +54,17 @@ export default async function SubjectPage(props: {
   const segment = params.id;
   let subject: Subject | null = null;
   let tree: SubjectTree | null = null;
+  let overview: OverviewContent | null = null;
 
   try {
     subject = await subjectsAPI.getById(segment);
-    if (subject) tree = await getBookTree(subject.id);
+    if (subject) {
+      // G3.9 — the overview is null until its row is generated and published.
+      [tree, overview] = await Promise.all([
+        getBookTree(subject.id),
+        getOverview("subject", subject.id),
+      ]);
+    }
   } catch (error) {
     if (process.env.SKIP_BACKEND_WAIT !== "true") {
       console.error(`Failed to fetch subject details: ${error}`);
@@ -120,6 +128,21 @@ export default async function SubjectPage(props: {
           </p>
         )}
       </header>
+
+      {/* G3.9 — introductory overview, server-rendered so the words are in the
+          HTML Google reads. Absent until generated and published. */}
+      {overview && (
+        <section className="mb-12 max-w-3xl">
+          <ArticleJsonLd
+            headline={`${subject.name} — Overview`}
+            description={truncate(overview.content_markdown)}
+            path={subjectPath(subject)}
+            dateModified={overview.updated_at}
+            section={subject.name}
+          />
+          <ArticleBody markdown={overview.content_markdown} />
+        </section>
+      )}
 
       {/* Module cards */}
       {modules.length === 0 ? (

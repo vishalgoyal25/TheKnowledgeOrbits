@@ -6,9 +6,12 @@ Redis-backed provider health flag (a lightweight circuit breaker).
 
 Routing philosophy (already reflected in the agents' class attributes; this is
 the documented, queryable central map):
-  - Heavy reasoning / synthesis / report  → Groq  openai/gpt-oss-120b (quality)
-  - Fast judgement / summary / reflection  → Cerebras gpt-oss-120b (speed)
+  - Every LLM agent                        → Groq openai/gpt-oss-120b first, then
+                                             the pool's failover order (mistral,
+                                             openrouter)
   - Tool-only nodes (search)               → no LLM
+  (Fast agents were pinned to Cerebras until it went 402 on 2026-08-19; the
+  provider was removed 2026-09-16.)
 
 The actual cross-provider FAILOVER lives in llmops/groq_client.py (the pool).
 This router supplements it with a health flag: when a provider fails repeatedly,
@@ -35,11 +38,10 @@ logger = structlog.get_logger(__name__)
 _GROQ = "groq"
 _GROQ_MODEL = "openai/gpt-oss-120b"
 
-# RETAINED for a one-line re-enable. Cerebras returned 402 Payment Required on
-# every key from 2026-08-19, so no agent is routed to it any more. Do not delete:
-# restoring the provider means putting these back in the map below.
-_CEREBRAS = "cerebras"
-_CEREBRAS_MODEL = "gpt-oss-120b"
+# Cerebras (402 on every key since 2026-08-19) was removed from the pool on
+# 2026-09-16; the retained constants went with it. Historical rows in
+# AgentExecutionLog still carry provider="cerebras" — that choice is kept on the
+# model, nothing here routes to it.
 
 # Per-agent model assignment (mirrors each agent's class attributes).
 _AGENT_MODEL_MAP: dict[str, dict] = {

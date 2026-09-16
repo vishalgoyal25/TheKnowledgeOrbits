@@ -29,7 +29,6 @@ from engines.tags.serializers import (
     TagDetailSerializer,
     TagSerializer,
 )
-from engines.tags.services.concept_seo_service import is_indexable
 
 
 # ── Tag Views ─────────────────────────────────────────────────────────────────
@@ -139,25 +138,27 @@ class ConceptSitemapView(APIView):
     GET /api/v1/concepts/sitemap/  (G3.3)
 
     slug + last-modified for every concept page that passes the G0.3
-    indexability rule (concept_seo_service.is_indexable) — the curated subset,
-    never all 2,438. Scans body text, so it is cached for an hour; the rule is
-    live, so today's new pages classify themselves tomorrow.
+    indexability rule — the curated subset, never all 2,438. Reads the STORED
+    `is_indexable` column (kept true by `ConceptPage.save()`, backfilled by
+    migration 0006): an indexed filter, not a body scan. The scan version
+    502'd on the free Render dyno under the Vercel build's request storm and
+    failed the deploy (§15A.7). Cached 1 h; new pages classify themselves on
+    save, so tomorrow's feed lists today's generation.
     """
 
     permission_classes = [AllowAny]
 
     def get(self, request):
-        cache_key = "sitemap_entries_concepts_v1"
+        cache_key = "sitemap_entries_concepts_v2"
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
 
         payload = [
-            {"slug": c.slug, "lastmod": c.updated_at.isoformat()}
-            for c in ConceptPage.objects.filter(is_content_ready=True)
-            .only("slug", "body_md", "is_content_ready", "updated_at")
-            .iterator(chunk_size=200)
-            if is_indexable(c)
+            {"slug": slug, "lastmod": updated_at.isoformat()}
+            for slug, updated_at in ConceptPage.objects.filter(is_indexable=True)
+            .order_by("slug")
+            .values_list("slug", "updated_at")
         ]
         cache.set(cache_key, payload, timeout=3600)
         return Response(payload)

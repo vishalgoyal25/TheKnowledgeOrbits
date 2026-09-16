@@ -24,6 +24,8 @@ import uuid
 
 from django.db import models
 
+from engines.tags.text_rules import passes_index_rule
+
 
 # ── TAG TYPES ─────────────────────────────────────────────────────────────────
 TAG_TYPE_CHOICES = [
@@ -217,6 +219,16 @@ class ConceptPage(models.Model):
         db_index=True,
         help_text="False = stub only (brief_description only). True = full page live.",
     )
+    # G3.3/G3.11 (stored 2026-09-16): the G0.3 rule — ready AND >= 400 words
+    # AND >= 3 headings — recomputed on every save from body_md, so the
+    # sitemap feed is an indexed filter instead of a regex scan of ~1,400
+    # bodies. The scan was fine locally and 502'd on the free Render dyno under
+    # the Vercel build's request storm, which failed the deploy (§15A.7).
+    is_indexable = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Ready AND body passes the G0.3 rule (>= 400 words, >= 3 headings). Computed on save.",
+    )
     usage_count = models.PositiveIntegerField(
         default=0,
         help_text="Number of CA articles this concept has been linked from",
@@ -236,6 +248,19 @@ class ConceptPage(models.Model):
     def __str__(self) -> str:
         status = "full" if self.is_content_ready else "stub"
         return f"{self.name} [{status}]"
+
+    def save(self, *args, **kwargs) -> None:
+        """Keep `is_indexable` true to the body — including partial saves."""
+
+        self.is_indexable = bool(self.is_content_ready) and passes_index_rule(
+            self.body_md
+        )
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "is_indexable" not in update_fields:
+            touched = {"body_md", "is_content_ready"} & set(update_fields)
+            if touched:
+                kwargs["update_fields"] = [*update_fields, "is_indexable"]
+        super().save(*args, **kwargs)
 
 
 # ── MODEL 4: ConceptArticleLink ───────────────────────────────────────────────

@@ -169,8 +169,13 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"✓  ({word_count} words)"))
                 generated += 1
             else:
-                # Skipped = already is_content_ready=True and force=False
-                self.stdout.write(self.style.WARNING("skipped (already ready)"))
+                # Already ready (force=False), or the G3.11 gate rejected the
+                # draft and left the stub untouched — the log line says which.
+                self.stdout.write(
+                    self.style.WARNING(
+                        "skipped (already ready, or rejected by the gate)"
+                    )
+                )
                 skipped += 1
 
         # ── Summary ───────────────────────────────────────────────────────────

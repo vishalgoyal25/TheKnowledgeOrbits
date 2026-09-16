@@ -2,16 +2,27 @@
 engines/tags/services/concept_content_service.py
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Phase G (FEATURES3) — Concept Page full content generation service.
+G3.11 (2026-09-16) — quality gate: a draft is saved as ready ONLY when it passes
+the same rule the sitemap uses to list a page.
 
 One public method: ConceptContentService.generate_concept_content(concept) → bool
 
-Generates a 450–600 word encyclopaedic article for a ConceptPage stub.
-Sets is_content_ready=True and locks the content permanently after generation.
+Generates a 500–700 word encyclopaedic article for a ConceptPage stub.
+Sets is_content_ready=True and locks the content after generation.
 
 Design rules enforced here:
-  - NEVER regenerates a concept where is_content_ready=True (locked permanently)
-  - 1 GROQ call per concept in 'writer' mode (high token limit, low temperature)
-  - Word count enforced: min 200 chars to accept, hard-trim at 700 words
+  - NEVER regenerates a concept where is_content_ready=True unless force=True
+    (G3.12 uses force to rewrite thin pages in place)
+  - 1 LLM call per concept, plus AT MOST one corrective retry when the draft
+    fails the gate — the retry carries the measured failure back to the model
+  - GATE (concept_seo_service.quality_issues): >= 400 words, >= 3 `##`
+    headings, <= 900 words, real line breaks. A draft that still fails after
+    the retry is REJECTED — the row is left exactly as it was (a stub stays a
+    stub, a thin page stays thin) and `concept_content_rejected` is logged.
+    This is what makes the G0.3 "thin" count unable to grow (G3.11 exit).
+  - Over-long drafts are trimmed by PARAGRAPH, never by word — the old
+    `" ".join(words[:700])` destroyed every newline and therefore every
+    heading, which is one way the zero-heading pages were made (§4.3 d)
   - Context enriched with titles of CA articles that link to this concept (up to 5)
   - No UPSC language, no exam notes, no tables — pure encyclopaedic prose
   - All exceptions captured to Sentry + structlog; never propagated to caller
@@ -23,11 +34,20 @@ Three-entity rule (never confuse these):
   BookContent  → syllabus topic   → /learn/[slug]    → structured article
 """
 
+import re
+
 import sentry_sdk
 import structlog
 
 from engines.book_content.services.llm_service import llm_call
 from engines.tags.models import ConceptArticleLink, ConceptPage
+from engines.tags.services.concept_seo_service import (
+    MAX_WORDS,
+    MIN_HEADINGS,
+    MIN_WORDS,
+    quality_issues,
+    word_count,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -54,7 +74,7 @@ WRITING INSTRUCTIONS:
    Lead with what makes this concept specifically significant or unique.
    Do NOT start with "This concept..." or "In India..." — open with the concept itself.
 
-2. BODY (3–5 sections with ## headings):
+2. BODY (3–5 sections, EACH under its own "## " heading — at least 3 headings):
    Choose headings based on what THIS SPECIFIC CONCEPT requires. Use headings such as:
    - "Origins / Historical Background"  — for constitutional provisions, landmark cases, Acts
    - "How It Works / Mechanism"         — for schemes, policies, technical processes
@@ -68,7 +88,7 @@ WRITING INSTRUCTIONS:
 3. PARAGRAPH STRUCTURE:
    Each ## section: 2–3 paragraphs. Each paragraph: 3–5 sentences.
    Never write a single dense block for an entire section.
-   Leave a blank line between paragraphs.
+   Leave a blank line between paragraphs and before every heading.
 
 4. FACTUAL DENSITY:
    Include actual numbers, dates, article numbers, named provisions, and named
@@ -83,8 +103,8 @@ WRITING INSTRUCTIONS:
      ✗ "India produces 42.7 million tonnes annually..." (if you are guessing the figure)
    NEVER invent statistics, names, dates, or legal provisions not in your training knowledge.
 
-6. LENGTH: 450 to 600 words. Hard maximum: 650 words.
-   Quality over quantity — a tight 450-word entry beats a padded 600-word one.
+6. LENGTH: 500 to 700 words. Hard maximum: 800 words. Never fewer than 450.
+   Quality over quantity — a tight 500-word entry beats a padded 700-word one.
 
 7. TONE: Factual, precise, intellectually engaging. Not dry. Not exam-note style.
    Write as if explaining to a well-read colleague encountering the topic for the first time.
@@ -102,6 +122,48 @@ OUTPUT: Return ONLY the article markdown — no preamble, no meta-commentary, \
 no "Here is the article:" prefix.
 """
 
+# Appended to the prompt on the single retry, carrying the measured failure.
+RETRY_SUFFIX = """
+
+────────────────────────────────────────────────────────────────────────────────
+YOUR PREVIOUS DRAFT WAS REJECTED: {issues}.
+Rewrite it in full. It MUST have at least {min_words} words and at most {max_words}, \
+at least {min_headings} sections each starting with "## " on its own line, and a \
+blank line between every paragraph. Real line breaks — never a single line.
+"""
+
+
+# ── Markdown shaping (pure functions) ─────────────────────────────────────────
+
+
+def normalise_markdown(raw: str) -> str:
+    """
+    LLMs occasionally return headings with a single \\n before them instead of
+    the blank line (\\n\\n) that markdown requires for block rendering.
+    Normalise so the stored body_md always renders correctly.
+    """
+    text = raw.replace("\r\n", "\n").replace("\r", "\n")
+    # Blank line before ## / ### headings
+    text = re.sub(r"([^\n])\n(#{1,3} )", r"\1\n\n\2", text)
+    # Blank line after ## / ### headings before body text
+    text = re.sub(r"(#{1,3} [^\n]+)\n([^#\n])", r"\1\n\n\2", text)
+    # Collapse 3+ blank lines to 2
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def trim_to_paragraphs(text: str, max_words: int = MAX_WORDS) -> str:
+    """
+    Drop trailing paragraphs until the body fits `max_words`. Paragraph
+    boundaries are kept intact, so headings and line breaks survive — the
+    property the old word-join trim destroyed.
+    """
+    if word_count(text) <= max_words:
+        return text
+    paragraphs = text.split("\n\n")
+    while len(paragraphs) > 1 and word_count("\n\n".join(paragraphs)) > max_words:
+        paragraphs.pop()
+    return "\n\n".join(paragraphs).strip()
+
 
 # ── Service ────────────────────────────────────────────────────────────────────
 
@@ -111,7 +173,8 @@ class ConceptContentService:
     Generates full body_md content for ConceptPage stubs.
 
     Designed to be called from the generate_concept_content management command
-    (batch mode) or directly for a single concept (admin/debug mode).
+    (batch mode), the regenerate_concept_content command (G3.12, force=True) or
+    directly for a single concept (admin/debug mode).
     """
 
     @staticmethod
@@ -127,11 +190,12 @@ class ConceptContentService:
             concept:  The ConceptPage instance to generate content for.
             db_alias: DB alias to query ConceptArticleLink context from.
             force:    If True, regenerate even when is_content_ready=True.
-                      Use ONLY for admin override — single concept refresh.
+                      G3.12 regeneration and admin override.
 
         Returns:
-            True  — content generated and saved successfully.
-            False — skipped (already ready and force=False) or generation failed.
+            True  — content generated, passed the gate and saved.
+            False — skipped (already ready and force=False), rejected by the
+                    gate (row untouched), or generation failed.
         """
         if concept.is_content_ready and not force:
             logger.info(
@@ -173,65 +237,76 @@ class ConceptContentService:
             "\n".join(f"- {t}" for t in linked_titles if t) or "No linked articles yet."
         )
 
-        # ── Build and fire prompt ─────────────────────────────────────────────
         prompt = CONCEPT_CONTENT_PROMPT.format(
             concept_name=concept.name,
             linked_article_titles=linked_context,
             brief_description=concept.brief_description or "Not available.",
         )
 
-        try:
-            # mode="standard" → max_tokens=2048, sufficient for 450–600 word output.
-            # mode="writer" → max_tokens=16384 which exceeds Groq free-tier per-request
-            # limit (8192 total tokens) and causes HTTP 413 Payload Too Large.
-            raw = llm_call(prompt, mode="standard")
-        except Exception as exc:
-            sentry_sdk.capture_exception(exc)
-            logger.error(
-                "concept_content_llm_call_failed",
-                slug=concept.slug,
-                error=str(exc),
-            )
-            return False
+        # ── Generate, gate, retry once ────────────────────────────────────────
+        body = ""
+        issues: list[str] = ["no draft"]
+        for attempt in (1, 2):
+            try:
+                # mode="standard" → max_tokens=2048, sufficient for 500–700 words.
+                # mode="writer" → 16384 exceeds Groq's per-request cap → HTTP 413.
+                raw = llm_call(prompt, mode="standard")
+            except Exception as exc:
+                sentry_sdk.capture_exception(exc)
+                logger.error(
+                    "concept_content_llm_call_failed",
+                    slug=concept.slug,
+                    attempt=attempt,
+                    error=str(exc),
+                )
+                return False
 
-        if not raw or len(raw.strip()) < 200:
+            if not raw or len(raw.strip()) < 200:
+                logger.warning(
+                    "concept_content_empty_response",
+                    slug=concept.slug,
+                    attempt=attempt,
+                    response_length=len(raw.strip()) if raw else 0,
+                )
+                return False
+
+            body = trim_to_paragraphs(normalise_markdown(raw))
+            issues = quality_issues(body)
+            if not issues:
+                break
+
             logger.warning(
-                "concept_content_empty_response",
+                "concept_content_gate_failed",
                 slug=concept.slug,
-                response_length=len(raw.strip()) if raw else 0,
+                attempt=attempt,
+                issues=issues,
+                words=word_count(body),
+            )
+            prompt = CONCEPT_CONTENT_PROMPT.format(
+                concept_name=concept.name,
+                linked_article_titles=linked_context,
+                brief_description=concept.brief_description or "Not available.",
+            ) + RETRY_SUFFIX.format(
+                issues="; ".join(issues),
+                min_words=MIN_WORDS,
+                max_words=MAX_WORDS,
+                min_headings=MIN_HEADINGS,
+            )
+
+        if issues:
+            # G3.11: never save a body that the sitemap would refuse to list.
+            logger.warning(
+                "concept_content_rejected",
+                slug=concept.slug,
+                name=concept.name,
+                issues=issues,
+                was_ready=concept.is_content_ready,
             )
             return False
-
-        # ── Word count guard ──────────────────────────────────────────────────
-        words = raw.split()
-        word_count = len(words)
-        if word_count > 700:
-            # Hard-trim to keep concept pages tight
-            raw = " ".join(words[:700])
-            logger.info(
-                "concept_content_trimmed",
-                slug=concept.slug,
-                original_words=word_count,
-                trimmed_to=700,
-            )
-
-        # ── Markdown normalisation ────────────────────────────────────────────
-        # LLMs occasionally return headings with a single \n before them instead
-        # of the blank line (\n\n) that markdown requires for block rendering.
-        # Normalise here so the stored body_md always renders correctly.
-        raw = raw.replace("\r\n", "\n").replace("\r", "\n")
-        # Blank line before ## / ### headings
-        import re as _re
-
-        raw = _re.sub(r"([^\n])\n(#{1,3} )", r"\1\n\n\2", raw)
-        # Blank line after ## / ### headings before body text
-        raw = _re.sub(r"(#{1,3} [^\n]+)\n([^#\n])", r"\1\n\n\2", raw)
-        # Collapse 3+ blank lines to 2
-        raw = _re.sub(r"\n{3,}", "\n\n", raw).strip()
 
         # ── Save and lock ─────────────────────────────────────────────────────
         try:
-            concept.body_md = raw
+            concept.body_md = body
             concept.is_content_ready = True
             concept.save(update_fields=["body_md", "is_content_ready", "updated_at"])
         except Exception as exc:
@@ -247,7 +322,8 @@ class ConceptContentService:
             "concept_content_generated",
             slug=concept.slug,
             name=concept.name,
-            word_count=word_count,
+            word_count=word_count(body),
+            regenerated=force,
             had_linked_context=bool(linked_titles),
         )
         return True

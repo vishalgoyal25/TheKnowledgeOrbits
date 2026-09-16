@@ -10,7 +10,7 @@ across multiple Render workers (Risk #2). Two independent limiters live here:
    - Enforced in query_view BEFORE a session/task is created.
 
 2. GLOBAL PER-PROVIDER RPM LIMIT (Risk #6 / #7)
-   - Groq 30 RPM, Cerebras 60 RPM — shared across ALL workers.
+   - Groq 30 RPM, Mistral 4 RPM, OpenRouter 15 RPM — shared across ALL workers.
    - Enforced inside groq_client BEFORE each LLM call. When a provider is at its
      cap, the limiter raises → the pool's failover loop SKIPS it and tries the
      other provider. This pre-emptively spreads load and avoids upstream 429s.
@@ -30,7 +30,6 @@ from engines.research_agent.constants import (
     GROQ_REQUESTS_PER_MINUTE,
     MISTRAL_REQUESTS_PER_MINUTE,
     OPENROUTER_REQUESTS_PER_MINUTE,
-    CEREBRAS_REQUESTS_PER_MINUTE,
 )
 
 logger = structlog.get_logger(__name__)
@@ -51,7 +50,6 @@ _PROVIDER_RPM = {
     "groq": GROQ_REQUESTS_PER_MINUTE,
     "mistral": MISTRAL_REQUESTS_PER_MINUTE,
     "openrouter": OPENROUTER_REQUESTS_PER_MINUTE,
-    "cerebras": CEREBRAS_REQUESTS_PER_MINUTE,  # retained; provider disabled
 }
 
 
