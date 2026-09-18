@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { absoluteUrl } from "@/lib/seo/site";
+import { absoluteUrl, SITE_NAME } from "@/lib/seo/site";
 
 /**
  * Shared metadata builder (G3.4). Every public page calls this so title,
@@ -46,6 +46,7 @@ export function buildMetadata(meta: PageMeta): Metadata {
     openGraph: {
       type: meta.article ? "article" : "website",
       url,
+      siteName: SITE_NAME, // card checkers flagged its absence (§7.9, 2026-09-16)
       title: meta.title,
       description,
       ...(images ? { images } : {}),

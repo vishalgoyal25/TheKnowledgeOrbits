@@ -22,8 +22,10 @@ import ReadBeacon from "@/components/telemetry/ReadBeacon";
 import { abortIfApiUnreachable } from "@/lib/isr-guard";
 import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
 
-// Revalidate once a day (CA articles don't change once published)
-export const revalidate = 86400;
+// Revalidate weekly (was daily; raised 2026-09-18). CA items never change once
+// published, and crawlers request thousands of them — daily windows were the
+// largest share of ~8–17k ISR writes/day against 200k/month (§7.11).
+export const revalidate = 604800;
 
 // G3.4 — these pages are ISR and indexable; until now they had only the
 // site default title.

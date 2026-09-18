@@ -28,10 +28,13 @@ import { abortIfApiUnreachable } from "@/lib/isr-guard";
 import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
 
 // On-demand ISR: a concept page is built on first request and refreshed at
-// most once a day. Nothing is prerendered at build (2,438 pages would be a
-// regeneration wave on every deploy — C13); the long tail costs one write per
-// page per day only when it is actually requested.
-export const revalidate = 86400;
+// most once a WEEK (was a day; raised 2026-09-18 — crawlers request all
+// ~2,400 concept URLs, and daily windows across every content family ran the
+// project at ~8–17k ISR writes/day against 200k/month, §7.11). Nothing is
+// prerendered at build (a regeneration wave on every deploy — C13). A G3.12
+// rewrite therefore shows up to a week late; on-demand revalidation can
+// shorten that when W2 is wired.
+export const revalidate = 604800;
 
 interface Props {
   params: Promise<{ slug: string }>;

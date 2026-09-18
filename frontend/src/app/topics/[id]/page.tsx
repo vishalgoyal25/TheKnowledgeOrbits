@@ -36,10 +36,14 @@ import { buildMetadata, NOINDEX, truncate } from "@/lib/seo/metadata";
 import { findTopic, trailTo } from "@/lib/syllabus-tree";
 import type { BookContent, SubjectTree } from "@/types/book-content";
 
-// Revalidate daily — topic content changes at most once/day, and there are
-// ~1,500 topic pages; hourly rebuilds × that many pages was the dominant
-// Vercel ISR-write cost. On-demand revalidation refreshes edits instantly.
-export const revalidate = 86400;
+// Revalidate weekly (was daily; raised 2026-09-18). A topic's article is
+// locked once generated, so the page's only moving part is the reading list's
+// ready-state, which can lag a week. After the sitemap went live, crawlers
+// touch all ~1,550 topic pages, and each touch after expiry is an ISR write:
+// daily windows across every content family ran the project at ~8–17k
+// writes/day against a 200k/month allowance (§7.11). Raising is always
+// allowed (C2 forbids lowering); on-demand revalidation can refresh instantly.
+export const revalidate = 604800;
 
 // Pre-render topics for stability during build. G3.10: params are SLUGS
 // (UUID only for a row not yet backfilled) — the address Google is told about.

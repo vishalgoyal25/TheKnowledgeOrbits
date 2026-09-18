@@ -661,8 +661,13 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                             const isNewsModule =
                               drawerActiveSubjectId === "news";
 
+                            // `slug` must survive the flattening: this list feeds
+                            // knowledgePath(), which falls back to the UUID when
+                            // it is absent — the drawer was the one place still
+                            // emitting UUID links (found on production 2026-09-18).
                             const flatTopics: {
                               id: string;
+                              slug?: string | null;
                               name: string;
                               isSubTopic?: boolean;
                             }[] = [];
@@ -677,6 +682,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                                 if (!seenIds.has(t.id)) {
                                   flatTopics.push({
                                     id: t.id,
+                                    slug: t.slug,
                                     name: t.name,
                                     isSubTopic: isSub || undefined,
                                   });
