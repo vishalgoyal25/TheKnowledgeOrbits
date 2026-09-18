@@ -36,10 +36,11 @@ import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
 import { preprocessArticleBody } from "@/lib/daily-ca-preprocess";
 import { buildMetadata, NOINDEX } from "@/lib/seo/metadata";
 
-// ── ISR — rebuild daily; articles are immutable after publish, so a longer
-// window is safe and cuts Vercel ISR writes across ~1,259 article pages.
-// On-demand revalidation (/api/revalidate) still refreshes instantly on publish.
-export const revalidate = 86400;
+// ── ISR — rebuild weekly (was daily; raised 2026-09-18). Articles are
+// immutable after publish, so the window costs nothing in freshness and cuts
+// crawler-driven ISR writes across ~1,400 article pages by ~7× (§7.11).
+// On-demand revalidation (/api/revalidate) can still refresh instantly.
+export const revalidate = 604800;
 
 // ── Server-side fetch (uses native fetch, not axios) ─────────────────────────
 
