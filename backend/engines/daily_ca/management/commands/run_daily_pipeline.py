@@ -54,6 +54,14 @@ Notes:
   - --top is a soft cap: if fewer proposals were created, all of them are approved
   - All steps share the same --date and --database arguments
   - Step 6 always generates exactly 10 concept pages per daily run
+  - EXIT STATUS (L12, FEATURES_LLM_FIX.md Part II, 2026-09-20): a run that ends
+    with ZERO published articles for the day exits non-zero, AFTER every step,
+    the retention prune and the output guard have run. Between 2026-09-18 and
+    09-20 the pipeline built nothing for three days while Render showed a green
+    tick — each cycle's failure is caught by design, the process exited 0, and
+    the cron command chained `; prune_telemetry`, whose exit code became the
+    run's. Sentry fired; the tick is what gets looked at. render.yaml now runs
+    prune_telemetry FIRST so this command's exit code is the run's.
 """
 
 import sentry_sdk
@@ -63,7 +71,7 @@ from datetime import datetime
 from datetime import timedelta
 
 from django.core.management import call_command
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -317,14 +325,19 @@ class Command(BaseCommand):
         self._prune_old_ca(db_alias)
 
         # ── OUTPUT GUARD — the run must never fail silently ──────────────────
-        self._verify_output(target_date, db_alias)
+        published = self._verify_output(target_date, db_alias)
 
         # ── Final summary ─────────────────────────────────────────────────────
+        articles_line = (
+            "  CA Articles    : LIVE on /news\n"
+            if published != 0
+            else "  CA Articles    : NONE — see the error above\n"
+        )
         self.stdout.write(
             self.style.MIGRATE_HEADING(
                 f"\n{_DIVIDER}\n"
                 f"  Pipeline complete for {target_date}.\n"
-                f"  CA Articles    : LIVE on /news\n"
+                f"{articles_line}"
                 f"  Daily Quiz     : LIVE on /quiz\n"
                 f"  Concept Pages  : 20 stubs enriched (usage_count DESC)\n"
                 f"{_DIVIDER}\n"
@@ -335,7 +348,19 @@ class Command(BaseCommand):
             date=str(target_date),
             db_alias=db_alias,
             top_n=top_n,
+            published=published,
         )
+
+        # ── EXIT STATUS (L12) — a zero-article day is a FAILED run ───────────
+        # Raised last, after every step, the prune and the guard have run, so
+        # nothing is skipped; manage.py turns CommandError into exit status 1
+        # and Render shows the tick red. `None` means the guard's own query
+        # failed — that is already a Sentry error and must not double-count.
+        if published == 0:
+            raise CommandError(
+                f"Daily CA pipeline produced 0 published articles for {target_date} "
+                "(see pipeline_zero_articles above)."
+            )
 
     # ── Retention (S7) ────────────────────────────────────────────────────────
 
@@ -409,9 +434,11 @@ class Command(BaseCommand):
 
     # ── Output guard ──────────────────────────────────────────────────────────
 
-    def _verify_output(self, target_date, db_alias: str) -> None:
+    def _verify_output(self, target_date, db_alias: str) -> int | None:
         """
         Confirm the run actually produced published articles — and be LOUD if not.
+        Returns the published count (None if the check itself could not run) so
+        handle() can turn a zero into a non-zero exit status (L12).
 
         WHY THIS EXISTS
         The 2026-08-19 LLM outage ran for three days undetected. Each cycle failed,
@@ -435,7 +462,7 @@ class Command(BaseCommand):
         except Exception as exc:
             sentry_sdk.capture_exception(exc)
             logger.error("pipeline_output_check_failed", error=str(exc))
-            return
+            return None
 
         if published == 0:
             message = (
@@ -477,6 +504,8 @@ class Command(BaseCommand):
                     f"\n  ✓ Output verified: {published} published article(s)."
                 )
             )
+
+        return published
 
     # ── Step 2 helper ─────────────────────────────────────────────────────────
 
