@@ -113,12 +113,18 @@ OPENROUTER_MODEL_TTL = 24 * 3600
 OPENROUTER_BAD_MODEL_TTL = 24 * 3600
 OPENROUTER_MAX_DEMOTIONS_PER_CALL = 2
 OPENROUTER_MAX_CANDIDATES = 5
+# The free tier's "free-models-per-day" quota is per ACCOUNT and resets daily;
+# once the smoke call sees it, no candidate can pass — park the provider instead
+# of burning five more calls per resolution (first live run, 2026-09-20).
+OPENROUTER_QUOTA_PARK_SECONDS = 60 * 60
 
-# L11c (2026-09-20). A provider whose every key answered 429 in three consecutive
-# rounds is parked for five minutes. Mistral's free tier had been answering 429 on
-# every call for days; each large call paid the full 15/30/60/120 s ladder before
-# giving up. Three rounds is well past any per-minute burst (Groq's clear on the
-# next round), so a healthy provider is never parked by a blip.
+# L11c (2026-09-20). A provider whose every key answered a QUOTA-class 429 (a
+# daily / account allowance — see _is_quota_429) in three consecutive rounds is
+# parked for five minutes, so a spent free tier costs seconds, not the full
+# 15/30/60/120 s ladder, on every call. Per-minute 429s never count: the first
+# production run proved Groq can answer them for three short rounds under
+# sustained load and still be perfectly healthy — parking it cost four of five
+# Step-7 rewrites that day.
 RATE_LIMIT_PARK_SECONDS = 5 * 60
 RATE_LIMIT_ROUNDS_TO_PARK = 3
 
@@ -238,6 +244,30 @@ def _is_429(exc: Exception) -> bool:
     status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
     text = str(exc).lower()
     return status == 429 or "error code: 429" in text or "rate limit" in text
+
+
+# A 429 whose message names a DAILY / account-level allowance, as opposed to a
+# per-minute burst. Groq: "tokens per day (TPD)"; OpenRouter: "free-models-per-day";
+# a "credits"/"quota" wording is the same class. Groq's ordinary "tokens per
+# minute (TPM) … try again in 2s" is NOT — it clears within the retry ladder.
+_QUOTA_429_MARKERS = ("per day", "per-day", "daily", "quota", "credits", "monthly")
+
+
+def _is_quota_429(exc: Exception) -> bool:
+    """
+    Only a quota-class 429 may feed the rate-limit park (L11c).
+
+    The first production run after the park shipped (2026-09-20, Step 7) proved the
+    distinction is load-bearing: Groq answered per-minute 429s for three short
+    rounds (0 s + 15 s + 30 s is less than its 60 s window), the streak rule parked
+    Groq — the only working provider — for five minutes, and four of five rewrites
+    were rejected with "no capable provider". A per-minute 429 is what the retry
+    ladder is for; it never proves a provider is spent for the day.
+    """
+    if not _is_429(exc):
+        return False
+    text = str(exc).lower()
+    return any(marker in text for marker in _QUOTA_429_MARKERS)
 
 
 # ── Provider registry ─────────────────────────────────────────────────────────
@@ -391,16 +421,18 @@ def _rate_limited_key(provider: str) -> str:
     return f"llm:ratelimited:{provider}"
 
 
-def _mark_rate_limited(provider: str) -> None:
+def _mark_rate_limited(
+    provider: str, ttl_seconds: int = RATE_LIMIT_PARK_SECONDS, reason: str = "429"
+) -> None:
     try:
-        cache.set(_rate_limited_key(provider), "429", RATE_LIMIT_PARK_SECONDS)
+        cache.set(_rate_limited_key(provider), reason[:120], ttl_seconds)
     except Exception:
-        _local_rate_limited[provider] = time.time() + RATE_LIMIT_PARK_SECONDS
+        _local_rate_limited[provider] = time.time() + ttl_seconds
     logger.warning(
         "llm_provider_rate_limit_parked",
         provider=provider,
-        ttl_seconds=RATE_LIMIT_PARK_SECONDS,
-        rounds=RATE_LIMIT_ROUNDS_TO_PARK,
+        ttl_seconds=ttl_seconds,
+        reason=reason[:120],
     )
 
 
@@ -455,8 +487,20 @@ def demote_openrouter_model(model_id: str, reason: str) -> None:
     )
 
 
-def _smoke_test(client: Any, model_id: str) -> bool:
-    """One tiny call. A model that cannot say OK is not adopted (§4.7 item 3)."""
+_SMOKE_OK = "ok"
+_SMOKE_BAD_MODEL = "bad_model"
+_SMOKE_QUOTA = "quota"
+
+
+def _smoke_test(client: Any, model_id: str) -> str:
+    """
+    One tiny call. A model that cannot say OK is not adopted (§4.7 item 3).
+
+    Three verdicts, because the first live run (2026-09-20) showed the difference
+    matters: a 429 "free-models-per-day" is the ACCOUNT's daily free quota, not the
+    model — every candidate would fail the same way, and demoting ten healthy
+    models for a day because the quota was spent would be wrong twice over.
+    """
     try:
         response = client.chat.completions.create(
             model=model_id,
@@ -464,10 +508,19 @@ def _smoke_test(client: Any, model_id: str) -> bool:
             max_tokens=_HEALTH_MAX_TOKENS,
             temperature=0,
         )
-        return bool((response.choices[0].message.content or "").strip())
     except Exception as exc:
-        logger.warning("openrouter_smoke_failed", model=model_id, error=str(exc)[:110])
-        return False
+        verdict = _SMOKE_QUOTA if _is_429(exc) else _SMOKE_BAD_MODEL
+        logger.warning(
+            "openrouter_smoke_failed",
+            model=model_id,
+            verdict=verdict,
+            error=str(exc)[:110],
+        )
+        return verdict
+    if (response.choices[0].message.content or "").strip():
+        return _SMOKE_OK
+    logger.warning("openrouter_smoke_failed", model=model_id, verdict="empty body")
+    return _SMOKE_BAD_MODEL
 
 
 def _free_openrouter_candidates() -> list[str]:
@@ -512,7 +565,10 @@ def _resolve_openrouter_model(default: str, client: Any = None) -> str:
     skipped for a day.
 
     Order of preference: settings override → cache → live list (smoke-tested,
-    demoted ids skipped) → the pinned default. Never raises.
+    demoted ids skipped) → the pinned default (only when the list is unreachable and
+    the default is not itself demoted). Returns "" when nothing is usable right
+    now — the caller skips the provider for that call. Never raises, never caches
+    a model that did not pass.
     """
     override = (getattr(settings, "OPENROUTER_MODEL", "") or "").strip()
     if override:
@@ -525,33 +581,51 @@ def _resolve_openrouter_model(default: str, client: Any = None) -> str:
     except Exception:
         pass
 
-    candidates = [m for m in _free_openrouter_candidates() if not _is_demoted(m)]
-    if not candidates:
-        # List unreachable, or everything demoted: fall back WITHOUT caching, so
-        # a transient failure never pins the seed default for a day.
-        return default
+    listed = _free_openrouter_candidates()
+    if not listed:
+        # List unreachable: the seed default, WITHOUT caching, unless it is known
+        # dead (the seed went paid-only on 2026-09-20 and was demoted twice).
+        return "" if _is_demoted(default) else default
 
-    chosen = default
+    candidates = [m for m in listed if not _is_demoted(m)]
     tried = 0
     for model_id in candidates[:OPENROUTER_MAX_CANDIDATES]:
         tried += 1
-        if client is not None and not _smoke_test(client, model_id):
+        verdict = _SMOKE_OK if client is None else _smoke_test(client, model_id)
+        if verdict == _SMOKE_QUOTA:
+            # The account's free daily quota is spent — no candidate can pass
+            # today. Park the provider for an hour and leave the models alone.
+            _mark_rate_limited(
+                "openrouter",
+                OPENROUTER_QUOTA_PARK_SECONDS,
+                "free-models-per-day quota exhausted",
+            )
+            return ""
+        if verdict == _SMOKE_BAD_MODEL:
             demote_openrouter_model(model_id, "failed the adoption smoke call")
             continue
-        chosen = model_id
-        break
+        try:
+            cache.set(OPENROUTER_MODEL_CACHE_KEY, model_id, OPENROUTER_MODEL_TTL)
+        except Exception:
+            pass
+        logger.info(
+            "openrouter_model_resolved",
+            model=model_id,
+            free_candidates=len(candidates),
+            smoke_tested=tried,
+        )
+        return model_id
 
-    try:
-        cache.set(OPENROUTER_MODEL_CACHE_KEY, chosen, OPENROUTER_MODEL_TTL)
-    except Exception:
-        pass
-    logger.info(
-        "openrouter_model_resolved",
-        model=chosen,
+    # Nothing passed (or everything is demoted): skip the provider for this call.
+    # The seed default is NOT a fallback here — the first live run cached it after
+    # five failed smoke calls, then hit its 404 twice in one call.
+    logger.warning(
+        "openrouter_no_usable_model",
         free_candidates=len(candidates),
+        listed=len(listed),
         smoke_tested=tried,
     )
-    return chosen
+    return ""
 
 
 def _model_for(spec: ProviderSpec, client: Any = None) -> str:
@@ -670,6 +744,14 @@ def _dispatch(
     Rounds exist only for RETRY-class errors (429 / 5xx). A 413 removes the provider
     from this request immediately, and a 402 parks it for everyone — neither ever
     reaches the cooldown ladder, which is what made the old pool so slow.
+
+    ORDER (L11d, 2026-09-20): the first capable provider in registry order is the
+    PRIMARY for this call, and the key rotation happens only among ITS keys. The
+    old rotation walked the whole flat key list, so with 5 Groq + 2 Mistral + 3
+    OpenRouter keys roughly a third of every call type — the Daily-CA article
+    included — *started* on a fallback provider and was written by whichever free
+    model happened to answer. Groq's quota still spreads across its five keys;
+    Mistral and OpenRouter are reached only when every Groq key has failed.
     """
     global _current_key_idx
 
@@ -704,12 +786,22 @@ def _dispatch(
         round_attempts: dict[str, int] = {}
         round_429s: dict[str, int] = {}
 
-        for offset in range(len(entries)):
-            entry = entries[(_current_key_idx + offset) % len(entries)]
+        primary = entries[0].provider
+        primary_keys = [e for e in entries if e.provider == primary]
+        fallbacks = [e for e in entries if e.provider != primary]
+        start = _current_key_idx % len(primary_keys)
+        ordered = primary_keys[start:] + primary_keys[:start] + fallbacks
+
+        for pos, entry in enumerate(ordered):
             if entry.provider in skipped or _is_unhealthy(entry.provider):
                 continue
 
             model = _model_for(entry.spec, entry.client)
+            if not model:
+                # Nothing usable behind this provider right now (OpenRouter with
+                # no adoptable free model, or its daily quota spent): no API call.
+                skipped.add(entry.provider)
+                continue
             kwargs: dict = {
                 "model": model,
                 "messages": messages,
@@ -750,9 +842,10 @@ def _dispatch(
                 # provider (see last_call_provider()).
                 _last_call.provider = entry.provider
                 _last_call.model = model
-                _current_key_idx = (_current_key_idx + offset + 1) % max(
-                    len(entries), 1
-                )
+                # Advance the rotation only when a PRIMARY key answered, so the
+                # next call starts on the primary's next key — never on a fallback.
+                if entry.provider == primary:
+                    _current_key_idx = (start + pos + 1) % len(primary_keys)
                 return content
 
             except Exception as exc:
@@ -782,18 +875,19 @@ def _dispatch(
                     skipped.add(entry.provider)
                 else:
                     retryable_seen = True
-                    if _is_429(exc):
+                    if _is_quota_429(exc):
                         round_429s[entry.provider] = (
                             round_429s.get(entry.provider, 0) + 1
                         )
 
-        # L11c: a provider whose EVERY attempt this round was a 429 extends its
-        # streak; anything else resets it. Three consecutive such rounds park it.
+        # L11c: a provider whose EVERY attempt this round was a QUOTA-class 429
+        # extends its streak; anything else — a success, another error, or a
+        # per-minute 429 — resets it. Three consecutive such rounds park it.
         for provider, attempts in round_attempts.items():
             if attempts and round_429s.get(provider, 0) == attempts:
                 streak_429[provider] = streak_429.get(provider, 0) + 1
                 if streak_429[provider] >= RATE_LIMIT_ROUNDS_TO_PARK:
-                    _mark_rate_limited(provider)
+                    _mark_rate_limited(provider, reason=last_error)
                     skipped.add(provider)
             else:
                 streak_429[provider] = 0
@@ -901,11 +995,14 @@ def check_any_llm_available() -> bool:
     wanted.
 
     ⚠️ This used to try one key per provider, on the reasoning that "a dead
-    provider is dead on every key". **That premise is false for quota** — Groq's
-    free tier is metered PER KEY and this pool holds 5 of them, so one spent key
-    condemned four healthy ones. (The original concern behind it was the
-    Cerebras 402 tax; Cerebras is no longer in the pool, and these probes are
-    tiny.) Do not reinstate the per-provider short-circuit.
+    provider is dead on every key". That premise is false for a revoked or
+    mis-set key, so every key is still tried. Correction from the first live run
+    on 2026-09-20: Groq's 429 reads "Rate limit reached for model … in
+    organization …" — the free tier is metered PER ORGANISATION, so five keys
+    from one account share ONE quota and do not multiply capacity. Keys are
+    rotated for resilience, not for throughput. (The original concern behind the
+    short-circuit was the Cerebras 402 tax; Cerebras is no longer in the pool,
+    and these probes are tiny.) Do not reinstate the per-provider short-circuit.
 
     No sleep, no retry ladder — fast enough that the caller can decide whether to
     continue or abort without burning quota.
@@ -927,8 +1024,11 @@ def check_any_llm_available() -> bool:
         tried.add(entry.provider)
 
         # The client is passed so a cache-miss OpenRouter resolution is smoke-tested
-        # here too, never adopted blind (L11b).
+        # here too, never adopted blind (L11b). "" = nothing usable behind this
+        # provider right now — not a failure of the key, just no call to make.
         model = _model_for(entry.spec, entry.client)
+        if not model:
+            continue
         try:
             response = entry.client.chat.completions.create(
                 model=model,

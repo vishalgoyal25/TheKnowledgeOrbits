@@ -419,10 +419,66 @@ class TestOpenRouterAdoption(_PoolTestCase):
         assert llm._is_demoted("b/silent:free"), "a failed smoke call demotes"
         assert cache.get(llm.OPENROUTER_MODEL_CACHE_KEY) == "c/alive:free"
 
-    def test_resolver_returns_seed_without_caching_when_nothing_is_usable(self) -> None:
+    def test_resolver_returns_seed_without_caching_when_the_list_is_unreachable(
+        self,
+    ) -> None:
         with patch.object(llm, "_free_openrouter_candidates", return_value=[]):
             assert llm._resolve_openrouter_model("seed", _smoke_client({})) == "seed"
         assert cache.get(llm.OPENROUTER_MODEL_CACHE_KEY) is None
+
+    def test_a_demoted_seed_is_never_returned(self) -> None:
+        """The seed went paid-only on 2026-09-20 — a fallback that 404s is no fallback."""
+        llm.demote_openrouter_model("seed", "404 unavailable for free")
+        with patch.object(llm, "_free_openrouter_candidates", return_value=[]):
+            assert llm._resolve_openrouter_model("seed", _smoke_client({})) == ""
+
+    def test_nothing_passing_the_smoke_call_returns_empty_and_caches_nothing(
+        self,
+    ) -> None:
+        """First live run: five failed smoke calls, then the seed got cached and 404'd."""
+        client = _smoke_client({"a:free": "", "b:free": ""})
+        with patch.object(
+            llm, "_free_openrouter_candidates", return_value=["a:free", "b:free"]
+        ):
+            assert llm._resolve_openrouter_model("seed", client) == ""
+        assert cache.get(llm.OPENROUTER_MODEL_CACHE_KEY) is None
+        assert llm._is_demoted("a:free") and llm._is_demoted("b:free")
+
+    def test_daily_quota_429_parks_the_provider_and_demotes_no_model(self) -> None:
+        """'free-models-per-day' is the ACCOUNT's quota, not a model fault."""
+        quota = _HTTPError(
+            429, "Error code: 429 - Rate limit exceeded: free-models-per-day"
+        )
+        client = _smoke_client({"a:free": quota, "b:free": quota})
+        with patch.object(
+            llm, "_free_openrouter_candidates", return_value=["a:free", "b:free"]
+        ):
+            assert llm._resolve_openrouter_model("seed", client) == ""
+        assert len(client.calls) == 1, "stop at the first quota answer"
+        assert llm._is_rate_limited("openrouter") is True
+        assert not llm._is_demoted("a:free") and not llm._is_demoted("b:free")
+        assert cache.get(llm.OPENROUTER_MODEL_CACHE_KEY) is None
+
+    def test_dispatch_skips_a_provider_with_no_usable_model_without_calling_it(
+        self,
+    ) -> None:
+        router = _entry("openrouter", content="never")
+        groq = _entry("groq", content="article")
+        with (
+            patch.object(llm, "_pool", [router, groq]),
+            patch.object(llm, "_pool_size", 2),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(llm, "_model_for", side_effect=["", "openai/gpt-oss-120b"]),
+        ):
+            result = llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg={"temperature": 0.1, "max_tokens": 512},
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+        assert result == "article"
+        assert router.client.calls == []
 
     def test_demotion_clears_the_cached_pick(self) -> None:
         cache.set(llm.OPENROUTER_MODEL_CACHE_KEY, "x/model:free", 3600)
@@ -501,12 +557,16 @@ class TestOpenRouterAdoption(_PoolTestCase):
         assert total_calls == 3, "after the cap the provider is skipped, not retried"
 
 
-# ── L11c — rate-limit park ────────────────────────────────────────────────────
+# ── L11d — the rotation stays on the primary provider ────────────────────────
 
 
-class TestRateLimitPark(_PoolTestCase):
-    """Mistral's free tier answered 429 on every call for days; each large call
-    paid the whole 15/30/60/120 s ladder before giving up."""
+class TestPrimaryProviderRotation(_PoolTestCase):
+    """
+    First live run on 2026-09-20: the flat key rotation started roughly a third
+    of all calls on Mistral or OpenRouter, so a free model wrote some proposals
+    and could have written articles. Registry order is the routing order; the
+    rotation only spreads load across the FIRST provider's keys.
+    """
 
     def _dispatch(self, pool):
         with (
@@ -523,7 +583,114 @@ class TestRateLimitPark(_PoolTestCase):
                 est_tokens=100,
             )
 
-    def test_three_all_429_rounds_park_the_provider(self) -> None:
+    def test_consecutive_calls_rotate_groq_keys_and_never_start_on_a_fallback(
+        self,
+    ) -> None:
+        k1 = _entry("groq", content="k1")
+        k2 = _entry("groq", content="k2")
+        k3 = _entry("groq", content="k3")
+        mistral = _entry("mistral", content="mistral")
+        router = _entry("openrouter", content="router")
+        pool = [k1, k2, k3, mistral, router]
+
+        answers = [self._dispatch(pool) for _ in range(6)]
+
+        assert answers == ["k1", "k2", "k3", "k1", "k2", "k3"]
+        assert mistral.client.calls == [] and router.client.calls == []
+
+    def test_fallbacks_are_reached_only_after_every_primary_key_failed(self) -> None:
+        k1 = _entry("groq", exc=_HTTPError(429, "Error code: 429 - Rate limit"))
+        k2 = _entry("groq", exc=_HTTPError(429, "Error code: 429 - Rate limit"))
+        mistral = _entry("mistral", content="mistral")
+        llm._current_key_idx = 1  # rotation parked on k2 from an earlier call
+
+        assert self._dispatch([k1, k2, mistral]) == "mistral"
+        assert len(k1.client.calls) == 1 and len(k2.client.calls) == 1
+        assert llm._current_key_idx == 1, "a fallback answer does not move the rotation"
+
+    def test_a_skipped_primary_makes_the_next_provider_primary(self) -> None:
+        groq = _entry("groq", exc=_HTTPError(413))
+        m1 = _entry("mistral", content="m1")
+        m2 = _entry("mistral", content="m2")
+        # 413 skips groq for this call; mistral becomes the primary for the rest of it
+        assert self._dispatch([groq, m1, m2]) == "m1"
+
+
+# ── L11c — rate-limit park ────────────────────────────────────────────────────
+
+
+_GROQ_TPM = (
+    "Error code: 429 - Rate limit reached for model `openai/gpt-oss-120b` in "
+    "organization `org_x` service tier `on_demand` on tokens per minute (TPM): "
+    "Limit 8000, Used 7900, Requested 3100. Please try again in 2.5s."
+)
+_GROQ_TPD = (
+    "Error code: 429 - Rate limit reached for model `openai/gpt-oss-120b` in "
+    "organization `org_x` on tokens per day (TPD): Limit 200000, Used 200000."
+)
+_OPENROUTER_DAILY = (
+    "Error code: 429 - Rate limit exceeded: free-models-per-day. Add 10 credits"
+)
+
+
+class TestRateLimitPark(_PoolTestCase):
+    """
+    A spent free tier used to cost the whole 15/30/60/120 s ladder on every call.
+    But only a QUOTA-class 429 may park: on 2026-09-20 the first version parked
+    Groq — the only working provider — after three short rounds of per-minute
+    429s under sustained load, and four of five Step-7 rewrites were lost.
+    """
+
+    def _dispatch(self, pool):
+        with (
+            patch.object(llm, "_pool", pool),
+            patch.object(llm, "_pool_size", len(pool)),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(llm.sentry_sdk, "capture_message"),
+        ):
+            return llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg={"temperature": 0.1, "max_tokens": 512},
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+
+    def test_quota_classification(self) -> None:
+        assert llm._is_quota_429(_HTTPError(429, _GROQ_TPD)) is True
+        assert llm._is_quota_429(_HTTPError(429, _OPENROUTER_DAILY)) is True
+        assert llm._is_quota_429(_HTTPError(429, _GROQ_TPM)) is False
+        assert llm._is_quota_429(_HTTPError(429, "Rate limit exceeded")) is False
+        assert llm._is_quota_429(_HTTPError(503, "per day")) is False
+
+    def test_three_all_quota_429_rounds_park_the_provider(self) -> None:
+        pool = [
+            _entry("openrouter", exc=_HTTPError(429, _OPENROUTER_DAILY)),
+            _entry("openrouter", exc=_HTTPError(429, _OPENROUTER_DAILY)),
+        ]
+        with patch.object(llm, "_model_for", return_value="x/model:free"):
+            assert self._dispatch(pool) == ""
+        assert llm._is_rate_limited("openrouter") is True
+        total_calls = sum(len(e.client.calls) for e in pool)
+        assert (
+            total_calls == 2 * llm.RATE_LIMIT_ROUNDS_TO_PARK
+        ), "parked after three all-quota-429 rounds, not after the full ladder"
+
+    def test_per_minute_429s_never_park_even_across_the_whole_ladder(self) -> None:
+        """Groq under sustained load: every round 429s, the ladder keeps trying."""
+        pool = [
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM)),
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM)),
+        ]
+        assert self._dispatch(pool) == ""
+        assert llm._is_rate_limited("groq") is False
+        total_calls = sum(len(e.client.calls) for e in pool)
+        assert total_calls == 2 * (
+            1 + len(llm.RETRY_WAIT_TIMES)
+        ), "every round of the ladder was attempted — nothing parked Groq"
+
+    def test_a_generic_429_without_a_quota_marker_never_parks(self) -> None:
+        """Mistral's bare 'Rate limit exceeded' is not proof of a spent tier."""
         pool = [
             _entry(
                 "mistral", exc=_HTTPError(429, "Error code: 429 - Rate limit exceeded")
@@ -533,15 +700,11 @@ class TestRateLimitPark(_PoolTestCase):
             ),
         ]
         assert self._dispatch(pool) == ""
-        assert llm._is_rate_limited("mistral") is True
-        total_calls = sum(len(e.client.calls) for e in pool)
-        assert (
-            total_calls == 2 * llm.RATE_LIMIT_ROUNDS_TO_PARK
-        ), "parked after three all-429 rounds, not after the full five-round ladder"
+        assert llm._is_rate_limited("mistral") is False
 
     def test_a_burst_429_followed_by_success_never_parks(self) -> None:
         pool = [
-            _entry("groq", exc=_HTTPError(429, "Error code: 429 - Rate limit reached")),
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM)),
             _entry("groq", content="ok"),
         ]
         assert self._dispatch(pool) == "ok"
