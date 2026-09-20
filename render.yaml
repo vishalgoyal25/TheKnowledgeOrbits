@@ -225,7 +225,13 @@ services:
     # retention to stop, since a stalled prune fills the Supabase ceiling and
     # then breaks API writes, not just analytics. prune_telemetry exits 0 even
     # on its own failure, so it can never mark this run red either.
-    startCommand: "cd backend && python manage.py run_daily_pipeline --database=supabase; python manage.py prune_telemetry --database=supabase"
+    #
+    # ORDER (L12, FEATURES_LLM_FIX.md Part II, 2026-09-20): the prune runs FIRST
+    # and the pipeline LAST, so the run's exit status is the pipeline's. With the
+    # pipeline first, its status was overwritten by the prune's 0 — three days of
+    # zero articles (2026-09-18 → 20) showed a green tick. The pipeline now exits
+    # non-zero on a zero-article day; this order is what lets Render show it.
+    startCommand: "cd backend && python manage.py prune_telemetry --database=supabase; python manage.py run_daily_pipeline --database=supabase"
     envVars:
       - fromGroup: TheKnowledgeOrbits
 
