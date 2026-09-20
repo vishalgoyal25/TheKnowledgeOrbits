@@ -105,6 +105,8 @@ class _PoolTestCase(unittest.TestCase):
         except Exception:
             pass
         llm._local_unhealthy.clear()
+        llm._local_rate_limited.clear()
+        llm._local_demoted.clear()
 
         # _current_key_idx is a module-level round-robin counter that advances on
         # EVERY successful dispatch, including those in other tests. Left alone,
@@ -211,10 +213,94 @@ class TestRegistry(_PoolTestCase):
         active = [p.name for p in llm.PROVIDERS if p.enabled]
         assert active == ["groq", "mistral", "openrouter"]
 
-    def test_groq_capacity_is_below_the_article_prompt_size(self) -> None:
-        """If this ever rises above ~9k, the 413 outage silently returns."""
+    def test_groq_gate_stays_inside_the_proven_request_envelope(self) -> None:
+        """
+        L11a (2026-09-20): the gate is 7,500 *estimated* tokens because a live call
+        proved Groq accepts 10,889 tokens per request (prompt + max_tokens) and real
+        tokens run 0.873 × estimate. Raising it past that arithmetic brings the 413
+        outage back; lowering it below the article prompt (≤ 6,000 est.) sends the
+        article back to the free-tier lottery that died on 2026-09-18.
+        """
         groq = next(p for p in llm.PROVIDERS if p.name == "groq")
-        assert groq.max_request_tokens < 9_000
+        largest_completion = max(cfg["max_tokens"] for cfg in llm._MODE_CONFIG.values())
+        assert groq.max_request_tokens * 0.873 + largest_completion <= 10_889
+        assert groq.max_request_tokens >= 6_000
+
+    def test_ca_article_mode_has_the_measured_completion_budget(self) -> None:
+        """
+        4,000 because 2,048 truncated the article; "medium" because the A/B on the
+        rewritten prompt (2026-09-20) gave 8/6/6 links and 0–3 untraceable numbers,
+        while "low" gave 0/3/8 links and 5–9 numbers that traced to nothing.
+        """
+        cfg = llm._MODE_CONFIG["ca_article"]
+        assert cfg["max_tokens"] == 4000
+        assert cfg["reasoning_effort"] == "medium"
+        assert cfg["temperature"] == llm._MODE_CONFIG["writer"]["temperature"]
+
+
+# ── Reasoning effort (ca_article) ─────────────────────────────────────────────
+
+
+class TestReasoningEffort(_PoolTestCase):
+    def test_sent_to_groq_reasoning_models_only(self) -> None:
+        cfg = {"temperature": 0.25, "max_tokens": 4000, "reasoning_effort": "low"}
+        assert llm._reasoning_kwargs("groq", "openai/gpt-oss-120b", cfg) == {
+            "extra_body": {"reasoning_effort": "low"}
+        }
+        assert llm._reasoning_kwargs("groq", "qwen/qwen3-32b", cfg) == {
+            "extra_body": {"reasoning_effort": "low"}
+        }
+        # A Groq model without reasoning support would answer 400.
+        assert llm._reasoning_kwargs("groq", "llama-3.3-70b-versatile", cfg) == {}
+        # Never to the OpenAI-compatible providers.
+        assert llm._reasoning_kwargs("mistral", "mistral-medium-2508", cfg) == {}
+        assert (
+            llm._reasoning_kwargs("openrouter", "openai/gpt-oss-120b:free", cfg) == {}
+        )
+
+    def test_modes_without_an_effort_send_nothing(self) -> None:
+        for mode, cfg in llm._MODE_CONFIG.items():
+            if mode == "ca_article":
+                continue
+            assert llm._reasoning_kwargs("groq", "openai/gpt-oss-120b", cfg) == {}, mode
+
+    def test_dispatch_passes_extra_body_only_where_it_applies(self) -> None:
+        groq = _entry("groq", content="article")
+        mistral = _entry("mistral", content="article")
+        cfg = dict(llm._MODE_CONFIG["ca_article"])
+        with (
+            patch.object(llm, "_pool", [groq, mistral]),
+            patch.object(llm, "_pool_size", 2),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(llm, "_model_for", return_value="openai/gpt-oss-120b"),
+        ):
+            llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg=cfg,
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+        assert groq.client.calls[0]["extra_body"] == {"reasoning_effort": "medium"}
+        assert groq.client.calls[0]["max_tokens"] == 4000
+        assert mistral.client.calls == []  # groq answered first
+
+        groq_fail = _entry("groq", exc=_HTTPError(413))
+        mistral_ok = _entry("mistral", content="article")
+        with (
+            patch.object(llm, "_pool", [groq_fail, mistral_ok]),
+            patch.object(llm, "_pool_size", 2),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(llm, "_model_for", return_value="mistral-medium-2508"),
+        ):
+            llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg=cfg,
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+        assert "extra_body" not in mistral_ok.client.calls[0]
 
 
 # ── Dispatch behaviour ────────────────────────────────────────────────────────
@@ -276,6 +362,196 @@ class TestDispatch(_PoolTestCase):
 
     def test_successful_call_returns_stripped_content(self) -> None:
         assert self._dispatch([_entry("groq", content="  spaced  ")]) == "spaced"
+
+
+# ── L11b — OpenRouter models earn adoption ────────────────────────────────────
+
+
+def _smoke_client(answers: dict[str, str | Exception]):
+    """Fake client whose reply depends on the model id it is asked for."""
+    calls: list = []
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        reply = answers.get(kwargs["model"], "")
+        if isinstance(reply, Exception):
+            raise reply
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=reply))]
+        )
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
+    client.calls = calls  # type: ignore[attr-defined]
+    return client
+
+
+class TestOpenRouterAdoption(_PoolTestCase):
+    """
+    2026-09-18: the blind daily pick landed on a model returning HTTP 200 with an
+    empty body and the cache served it all day; on 09-20 the id went paid-only
+    (404) and the cache still held it. Adoption now needs a smoke call, and a
+    model that fails in service is demoted for a day.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        # The env pin bypasses resolution entirely; make sure local .env cannot
+        # short-circuit these tests. (override_settings cannot decorate a plain
+        # unittest.TestCase class, hence enable/cleanup here, as _PoolTestCase does.)
+        override = override_settings(OPENROUTER_MODEL="")
+        override.enable()
+        self.addCleanup(override.disable)
+
+    def test_resolver_smoke_tests_candidates_and_skips_demoted_ones(self) -> None:
+        llm.demote_openrouter_model("a/dead:free", "seen empty on 09-18")
+        client = _smoke_client({"b/silent:free": "", "c/alive:free": "OK"})
+        with patch.object(
+            llm,
+            "_free_openrouter_candidates",
+            return_value=["a/dead:free", "b/silent:free", "c/alive:free"],
+        ):
+            chosen = llm._resolve_openrouter_model("seed", client)
+
+        assert chosen == "c/alive:free"
+        assert [c["model"] for c in client.calls] == ["b/silent:free", "c/alive:free"]
+        assert llm._is_demoted("b/silent:free"), "a failed smoke call demotes"
+        assert cache.get(llm.OPENROUTER_MODEL_CACHE_KEY) == "c/alive:free"
+
+    def test_resolver_returns_seed_without_caching_when_nothing_is_usable(self) -> None:
+        with patch.object(llm, "_free_openrouter_candidates", return_value=[]):
+            assert llm._resolve_openrouter_model("seed", _smoke_client({})) == "seed"
+        assert cache.get(llm.OPENROUTER_MODEL_CACHE_KEY) is None
+
+    def test_demotion_clears_the_cached_pick(self) -> None:
+        cache.set(llm.OPENROUTER_MODEL_CACHE_KEY, "x/model:free", 3600)
+        llm.demote_openrouter_model("x/model:free", "404 unavailable for free")
+        assert cache.get(llm.OPENROUTER_MODEL_CACHE_KEY) is None
+        assert llm._is_demoted("x/model:free")
+
+    def test_empty_body_demotes_the_model_and_the_next_entry_re_resolves(self) -> None:
+        silent = _entry("openrouter", content="")
+        alive = _entry("openrouter", content="article")
+        with (
+            patch.object(llm, "_pool", [silent, alive]),
+            patch.object(llm, "_pool_size", 2),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(
+                llm, "_model_for", side_effect=["x/dead:free", "y/alive:free"]
+            ),
+            patch.object(llm, "demote_openrouter_model") as demote,
+        ):
+            result = llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg={"temperature": 0.1, "max_tokens": 512},
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+        assert result == "article"
+        demote.assert_called_once_with("x/dead:free", "empty response")
+
+    def test_paid_only_404_demotes_the_model_instead_of_skipping_the_provider(
+        self,
+    ) -> None:
+        gone = _entry(
+            "openrouter",
+            exc=_HTTPError(404, "Error code: 404 - This model is unavailable for free"),
+        )
+        alive = _entry("openrouter", content="article")
+        with (
+            patch.object(llm, "_pool", [gone, alive]),
+            patch.object(llm, "_pool_size", 2),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(
+                llm, "_model_for", side_effect=["x/paid:free", "y/alive:free"]
+            ),
+            patch.object(llm, "demote_openrouter_model") as demote,
+        ):
+            result = llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg={"temperature": 0.1, "max_tokens": 512},
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+        assert result == "article"
+        assert demote.call_args[0][0] == "x/paid:free"
+
+    def test_demotions_are_capped_per_call_then_the_provider_is_skipped(self) -> None:
+        pool = [_entry("openrouter", content="") for _ in range(3)]
+        with (
+            patch.object(llm, "_pool", pool),
+            patch.object(llm, "_pool_size", 3),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(llm, "_model_for", return_value="x/dead:free"),
+            patch.object(llm, "demote_openrouter_model") as demote,
+        ):
+            result = llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg={"temperature": 0.1, "max_tokens": 512},
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+        assert result == ""
+        assert demote.call_count == llm.OPENROUTER_MAX_DEMOTIONS_PER_CALL
+        total_calls = sum(len(e.client.calls) for e in pool)
+        assert total_calls == 3, "after the cap the provider is skipped, not retried"
+
+
+# ── L11c — rate-limit park ────────────────────────────────────────────────────
+
+
+class TestRateLimitPark(_PoolTestCase):
+    """Mistral's free tier answered 429 on every call for days; each large call
+    paid the whole 15/30/60/120 s ladder before giving up."""
+
+    def _dispatch(self, pool):
+        with (
+            patch.object(llm, "_pool", pool),
+            patch.object(llm, "_pool_size", len(pool)),
+            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(llm.sentry_sdk, "capture_message"),
+        ):
+            return llm._dispatch(
+                messages=[{"role": "user", "content": "hi"}],
+                cfg={"temperature": 0.1, "max_tokens": 512},
+                log_name="test",
+                json_mode=False,
+                est_tokens=100,
+            )
+
+    def test_three_all_429_rounds_park_the_provider(self) -> None:
+        pool = [
+            _entry(
+                "mistral", exc=_HTTPError(429, "Error code: 429 - Rate limit exceeded")
+            ),
+            _entry(
+                "mistral", exc=_HTTPError(429, "Error code: 429 - Rate limit exceeded")
+            ),
+        ]
+        assert self._dispatch(pool) == ""
+        assert llm._is_rate_limited("mistral") is True
+        total_calls = sum(len(e.client.calls) for e in pool)
+        assert (
+            total_calls == 2 * llm.RATE_LIMIT_ROUNDS_TO_PARK
+        ), "parked after three all-429 rounds, not after the full five-round ladder"
+
+    def test_a_burst_429_followed_by_success_never_parks(self) -> None:
+        pool = [
+            _entry("groq", exc=_HTTPError(429, "Error code: 429 - Rate limit reached")),
+            _entry("groq", content="ok"),
+        ]
+        assert self._dispatch(pool) == "ok"
+        assert llm._is_rate_limited("groq") is False
+
+    def test_parked_provider_is_excluded_from_routing(self) -> None:
+        pool = [_entry("mistral", content="x"), _entry("groq", content="x")]
+        llm._mark_rate_limited("mistral")
+        with patch.object(llm, "_pool", pool):
+            assert {e.provider for e in llm._usable_entries(100, False)} == {"groq"}
 
 
 if __name__ == "__main__":

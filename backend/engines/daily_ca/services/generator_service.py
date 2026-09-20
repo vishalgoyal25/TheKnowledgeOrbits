@@ -808,7 +808,9 @@ class DailyCaGeneratorService:
                 topic_name=proposal.topic.name if proposal.topic else proposal.title,
             )
 
-            raw_response = llm_call(prompt, mode="writer")
+            # `ca_article` (L11): a 4,000-token completion with low reasoning effort
+            # on Groq — the shared `writer` mode (2,048) cut the article at ~615 words.
+            raw_response = llm_call(prompt, mode="ca_article")
             # Capture immediately: any later llm_call (concept stubs, tags)
             # overwrites the thread-local record.
             article_provider = last_call_provider()

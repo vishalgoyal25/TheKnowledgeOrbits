@@ -5,9 +5,17 @@ Unified multi-provider LLM client — shared by every engine except research_age
 (which has its own isolated pool at research_agent/llmops/groq_client.py).
 
 PROVIDER REGISTRY (see PROVIDERS below — the single source of truth):
-  • groq        openai/gpt-oss-120b     ~5.5k token cap   small calls (primary)
-  • mistral     mistral-medium-2508      ~120k cap        large calls (primary)
-  • openrouter  minimax/minimax-m3:free  ~900k cap        emergency fallback
+  • groq        openai/gpt-oss-120b     7.5k est-token cap  primary (incl. the CA article)
+  • mistral     mistral-medium-2508      ~120k cap          large calls beyond the gate
+  • openrouter  minimax/minimax-m3:free  ~900k cap          emergency fallback
+
+L10/L11 (FEATURES_LLM_FIX.md Part II, 2026-09-20): the Daily-CA article prompt was
+shrunk to fit Groq (its 27k-char instruction template was 78 % of the prompt), the
+Groq gate was raised to what a live call proved (≥ 10,889 tokens per request), and
+the article got its own `ca_article` mode (4,000-token completion, low reasoning
+effort) because gpt-oss-120b spent 1,126 of a 2,048-token budget reasoning and cut
+the article short. Between 2026-09-18 and 09-20 the article body had depended on
+Mistral (quota-dead) and OpenRouter's daily free-model pick, which broke.
   • gemini      DISABLED (free-tier RPM too tight for a pool) — config RETAINED
   • cerebras    REMOVED 2026-09-16 — 402 Payment Required on every key since
                 2026-08-19, and its module-level SDK import crashed every lean
@@ -41,6 +49,16 @@ Three mechanisms fix that permanently:
   C. TTL'D CIRCUIT BREAKER (_mark_unhealthy)
      A dead provider is parked for 30 minutes, not for the process lifetime — the
      long-running web dyno recovers on its own, cron jobs recover on next start.
+
+  D. OPENROUTER MODELS EARN ADOPTION (L11b, 2026-09-20 — _resolve_openrouter_model)
+     A resolved free model is smoke-tested before it is cached; one that answers
+     with an empty body or a 404 is demoted for a day and the next candidate is
+     tried within the same call (demote_openrouter_model, capped per call).
+
+  E. RATE-LIMIT PARK (L11c — _mark_rate_limited)
+     A provider whose every key answered 429 for three consecutive rounds is
+     parked for five minutes, so a quota-dead free tier costs seconds, not the
+     whole cooldown ladder, on every large call.
 
 An empty/whitespace completion is treated as a FAILURE, never a success: one
 OpenRouter free model was observed returning HTTP 200 with an empty body.
@@ -85,6 +103,25 @@ OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 OPENROUTER_MODEL_CACHE_KEY = "llm:openrouter:model"
 OPENROUTER_MODEL_TTL = 24 * 3600
 
+# L11b (2026-09-20). A resolved model is adopted only after a one-shot smoke call,
+# and a model that answers with an empty body or a 404 is DEMOTED for a day — the
+# cached pick is cleared and the next candidate is tried within the same call. On
+# 2026-09-18 the blind pick landed on a model returning HTTP 200 with nothing in
+# it; every key retried it, every round retried it, every article retried it
+# (~15 minutes each), and the cache served the same dead id all day. Two days
+# later the id went paid-only (404) and the cache still held it.
+OPENROUTER_BAD_MODEL_TTL = 24 * 3600
+OPENROUTER_MAX_DEMOTIONS_PER_CALL = 2
+OPENROUTER_MAX_CANDIDATES = 5
+
+# L11c (2026-09-20). A provider whose every key answered 429 in three consecutive
+# rounds is parked for five minutes. Mistral's free tier had been answering 429 on
+# every call for days; each large call paid the full 15/30/60/120 s ladder before
+# giving up. Three rounds is well past any per-minute burst (Groq's clear on the
+# next round), so a healthy provider is never parked by a blip.
+RATE_LIMIT_PARK_SECONDS = 5 * 60
+RATE_LIMIT_ROUNDS_TO_PARK = 3
+
 # Models that are $0 but unusable. Verified 2026-08-21 (FEATURES_LLM_FIX.md §5):
 #   dots-3-note-preview  → HTTP 200 with an EMPTY body
 #   nvidia/nemotron-*    → leak chain-of-thought into the article body
@@ -108,14 +145,46 @@ _NON_CHAT_MARKERS = (
     "stable-diffusion",
 )
 
-# Temperature / token settings per call mode — unchanged.
+# Temperature / token settings per call mode.
+#
+# `ca_article` (L11, 2026-09-20) is the Daily-CA article's own mode. Measured on real
+# prompts: at max_tokens 2,048 gpt-oss-120b used 1,126 tokens on reasoning and
+# returned a 615-word stub with no closing lines (`finish_reason=length`), so the
+# completion budget is 4,000. Effort was A/B'd on the same three proposals with the
+# rewritten prompt: "low" gave 0 / 3 / 8 concept links and 5–9 numbers per article
+# that traced to nothing in the sources; "medium" gave 8 / 6 / 6 links, 633–751
+# words and 0–3 untraceable numbers — it follows the rules, "low" rationalises
+# around them. ~1,100 reasoning + ~1,000 article tokens still sit well inside 4,000.
+# `reasoning_effort` is only sent to Groq, and only for its reasoning models — see
+# _dispatch. The shared `writer` mode (book sections, overviews, planner) is left
+# exactly as it was: one root cause at a time.
 _MODE_CONFIG: dict[str, dict] = {
     "writer": {"temperature": 0.25, "max_tokens": 2048},
     "critique": {"temperature": 0.10, "max_tokens": 2048},
     "standard": {"temperature": 0.10, "max_tokens": 2048},
     "quiz": {"temperature": 0.70, "max_tokens": 4000},
     "article": {"temperature": 0.70, "max_tokens": 2000},
+    "ca_article": {
+        "temperature": 0.25,
+        "max_tokens": 4000,
+        "reasoning_effort": "medium",
+    },
 }
+
+# Groq models that accept `reasoning_effort`. Sending it to any other model is a
+# 400, so the marker list is the gate, not the provider name alone.
+_REASONING_MODEL_MARKERS = ("gpt-oss", "qwen3")
+
+
+def _reasoning_kwargs(provider: str, model: str, cfg: dict) -> dict:
+    """`extra_body` for a Groq reasoning model when the mode asks for an effort level."""
+    effort = cfg.get("reasoning_effort")
+    if not effort or provider != "groq":
+        return {}
+    if not any(marker in model.lower() for marker in _REASONING_MODEL_MARKERS):
+        return {}
+    return {"extra_body": {"reasoning_effort": effort}}
+
 
 # ── Error classification ──────────────────────────────────────────────────────
 _RETRY = "retry"  # transient — try another key, then back off
@@ -153,6 +222,24 @@ def _classify(exc: Exception) -> str:
     return _RETRY
 
 
+def _classify_is_404(exc: Exception) -> bool:
+    """A retired / paid-only MODEL (not an oversized request) — demotable."""
+    status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    text = str(exc).lower()
+    return (
+        status == 404
+        or "error code: 404" in text
+        or "model not found" in text
+        or "unavailable for free" in text
+    )
+
+
+def _is_429(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    text = str(exc).lower()
+    return status == 429 or "error code: 429" in text or "rate limit" in text
+
+
 # ── Provider registry ─────────────────────────────────────────────────────────
 
 
@@ -173,14 +260,19 @@ class ProviderSpec:
 
 PROVIDERS: list[ProviderSpec] = [
     # Order matters: first usable provider wins. groq is first so small calls keep
-    # today's exact behaviour; its low cap excludes it from large prompts automatically.
+    # today's exact behaviour; its cap excludes it from oversized prompts automatically.
     ProviderSpec(
         name="groq",
         settings_key="GROQ_API_KEY",
         model_setting="GROQ_MODEL",
         default_model="openai/gpt-oss-120b",
         sdk="groq",
-        max_request_tokens=5_500,  # free tier ≈ 6k TPM; headroom for the completion
+        # Estimated tokens (len/4). Raised 5,500 → 7,500 on 2026-09-20 (L11a) from a
+        # live measurement, not a guess: a 6,889-real-token prompt with max_tokens
+        # 4,000 (10,889 requested) was accepted; real tokens run 0.873 × estimate, so
+        # 7,500 est. → 6,548 real + 4,000 = 10,548 < 10,889. Never raise it past
+        # (proven TPM − largest mode max_tokens) ÷ 0.873; the 413 returns if you do.
+        max_request_tokens=7_500,
         supports_json_mode=True,
         enabled=True,
     ),
@@ -291,7 +383,39 @@ def _is_unhealthy(provider: str) -> bool:
     return until is not None and until > time.time()
 
 
+# ── Rate-limit park (L11c) ────────────────────────────────────────────────────
+_local_rate_limited: dict[str, float] = {}
+
+
+def _rate_limited_key(provider: str) -> str:
+    return f"llm:ratelimited:{provider}"
+
+
+def _mark_rate_limited(provider: str) -> None:
+    try:
+        cache.set(_rate_limited_key(provider), "429", RATE_LIMIT_PARK_SECONDS)
+    except Exception:
+        _local_rate_limited[provider] = time.time() + RATE_LIMIT_PARK_SECONDS
+    logger.warning(
+        "llm_provider_rate_limit_parked",
+        provider=provider,
+        ttl_seconds=RATE_LIMIT_PARK_SECONDS,
+        rounds=RATE_LIMIT_ROUNDS_TO_PARK,
+    )
+
+
+def _is_rate_limited(provider: str) -> bool:
+    try:
+        if cache.get(_rate_limited_key(provider)) is not None:
+            return True
+    except Exception:
+        pass
+    until = _local_rate_limited.get(provider)
+    return until is not None and until > time.time()
+
+
 # ── OpenRouter dynamic model resolution ───────────────────────────────────────
+_local_demoted: dict[str, float] = {}
 
 
 def _is_usable_model_id(model_id: str) -> bool:
@@ -299,36 +423,62 @@ def _is_usable_model_id(model_id: str) -> bool:
     return not any(bad in low for bad in _MODEL_DENYLIST + _NON_CHAT_MARKERS)
 
 
-def _resolve_openrouter_model(default: str) -> str:
-    """
-    Return a currently-free OpenRouter chat model, cached for 24 h.
+def _demoted_key(model_id: str) -> str:
+    return f"llm:openrouter:bad:{model_id}"
 
-    OpenRouter retires free models without notice — every id hardcoded at design
-    time had already moved to paid within days. Sorting by context length alone is
-    NOT enough: the 2nd–4th ranked models were found to leak chain-of-thought or
-    return an empty body, hence the denylist.
 
-    Order of preference: cache → settings override → live list → the pinned default.
-    Never raises.
-    """
-    override = (getattr(settings, "OPENROUTER_MODEL", "") or "").strip()
-    if override:
-        return override
-
+def _is_demoted(model_id: str) -> bool:
     try:
-        cached = cache.get(OPENROUTER_MODEL_CACHE_KEY)
-        if cached:
-            return str(cached)
+        if cache.get(_demoted_key(model_id)) is not None:
+            return True
     except Exception:
         pass
+    until = _local_demoted.get(model_id)
+    return until is not None and until > time.time()
 
+
+def demote_openrouter_model(model_id: str, reason: str) -> None:
+    """
+    Park a free model for a day and forget the cached pick, so the next OpenRouter
+    entry re-resolves to a different candidate. Never raises.
+    """
+    try:
+        cache.set(_demoted_key(model_id), reason[:120], OPENROUTER_BAD_MODEL_TTL)
+        cache.delete(OPENROUTER_MODEL_CACHE_KEY)
+    except Exception:
+        _local_demoted[model_id] = time.time() + OPENROUTER_BAD_MODEL_TTL
+    logger.warning(
+        "openrouter_model_demoted",
+        model=model_id,
+        ttl_seconds=OPENROUTER_BAD_MODEL_TTL,
+        reason=reason[:120],
+    )
+
+
+def _smoke_test(client: Any, model_id: str) -> bool:
+    """One tiny call. A model that cannot say OK is not adopted (§4.7 item 3)."""
+    try:
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=[{"role": "user", "content": "Reply: OK"}],
+            max_tokens=_HEALTH_MAX_TOKENS,
+            temperature=0,
+        )
+        return bool((response.choices[0].message.content or "").strip())
+    except Exception as exc:
+        logger.warning("openrouter_smoke_failed", model=model_id, error=str(exc)[:110])
+        return False
+
+
+def _free_openrouter_candidates() -> list[str]:
+    """Currently-$0 chat models from the live list, best context first. Never raises."""
     try:
         resp = requests.get(OPENROUTER_MODELS_URL, timeout=15)
         resp.raise_for_status()
         rows = resp.json().get("data", [])
     except Exception as exc:
         logger.warning("openrouter_model_list_failed", error=str(exc)[:120])
-        return default
+        return []
 
     free: list[tuple[int, str]] = []
     for row in rows:
@@ -346,8 +496,48 @@ def _resolve_openrouter_model(default: str) -> str:
             continue
 
     free.sort(reverse=True)
+    return [model_id for _ctx, model_id in free]
+
+
+def _resolve_openrouter_model(default: str, client: Any = None) -> str:
+    """
+    Return a currently-free OpenRouter chat model, cached for 24 h.
+
+    OpenRouter retires free models without notice — every id hardcoded at design
+    time had already moved to paid within days. Sorting by context length alone is
+    NOT enough: the 2nd–4th ranked models were found to leak chain-of-thought or
+    return an empty body, hence the denylist — and, since 2026-09-18, the smoke
+    call and the demotion list: a candidate is adopted only after it has answered
+    a one-token question, and a model that later returns nothing or a 404 is
+    skipped for a day.
+
+    Order of preference: settings override → cache → live list (smoke-tested,
+    demoted ids skipped) → the pinned default. Never raises.
+    """
+    override = (getattr(settings, "OPENROUTER_MODEL", "") or "").strip()
+    if override:
+        return override
+
+    try:
+        cached = cache.get(OPENROUTER_MODEL_CACHE_KEY)
+        if cached:
+            return str(cached)
+    except Exception:
+        pass
+
+    candidates = [m for m in _free_openrouter_candidates() if not _is_demoted(m)]
+    if not candidates:
+        # List unreachable, or everything demoted: fall back WITHOUT caching, so
+        # a transient failure never pins the seed default for a day.
+        return default
+
     chosen = default
-    for _ctx, model_id in free[:5]:
+    tried = 0
+    for model_id in candidates[:OPENROUTER_MAX_CANDIDATES]:
+        tried += 1
+        if client is not None and not _smoke_test(client, model_id):
+            demote_openrouter_model(model_id, "failed the adoption smoke call")
+            continue
         chosen = model_id
         break
 
@@ -355,15 +545,20 @@ def _resolve_openrouter_model(default: str) -> str:
         cache.set(OPENROUTER_MODEL_CACHE_KEY, chosen, OPENROUTER_MODEL_TTL)
     except Exception:
         pass
-    logger.info("openrouter_model_resolved", model=chosen, free_candidates=len(free))
+    logger.info(
+        "openrouter_model_resolved",
+        model=chosen,
+        free_candidates=len(candidates),
+        smoke_tested=tried,
+    )
     return chosen
 
 
-def _model_for(spec: ProviderSpec) -> str:
+def _model_for(spec: ProviderSpec, client: Any = None) -> str:
     """Model id for this provider — env override, dynamic resolution, or default."""
     configured = (getattr(settings, spec.model_setting, "") or "").strip()
     if spec.name == "openrouter":
-        return _resolve_openrouter_model(configured or spec.default_model)
+        return _resolve_openrouter_model(configured or spec.default_model, client)
     return configured or spec.default_model
 
 
@@ -450,6 +645,7 @@ def _usable_entries(est_tokens: int, needs_json: bool) -> list[_LLMEntry]:
         if e.spec.max_request_tokens >= est_tokens
         and (e.spec.supports_json_mode or not needs_json)
         and not _is_unhealthy(e.provider)
+        and not _is_rate_limited(e.provider)
     ]
     if not usable:
         logger.error(
@@ -479,6 +675,17 @@ def _dispatch(
 
     skipped: set[str] = set()
     last_error = ""
+    demotions = 0  # L11b: OpenRouter models dropped within THIS call (capped)
+    streak_429: dict[str, int] = {}  # L11c: consecutive all-429 rounds per provider
+
+    def _drop_openrouter_model(model_id: str, reason: str) -> None:
+        """Demote the model (up to the cap) so the next entry re-resolves; then skip."""
+        nonlocal demotions
+        if demotions < OPENROUTER_MAX_DEMOTIONS_PER_CALL:
+            demotions += 1
+            demote_openrouter_model(model_id, reason)
+        else:
+            skipped.add("openrouter")
 
     for round_idx, wait in enumerate([0] + RETRY_WAIT_TIMES):
         if wait:
@@ -494,13 +701,15 @@ def _dispatch(
             break
 
         retryable_seen = False
+        round_attempts: dict[str, int] = {}
+        round_429s: dict[str, int] = {}
 
         for offset in range(len(entries)):
             entry = entries[(_current_key_idx + offset) % len(entries)]
             if entry.provider in skipped or _is_unhealthy(entry.provider):
                 continue
 
-            model = _model_for(entry.spec)
+            model = _model_for(entry.spec, entry.client)
             kwargs: dict = {
                 "model": model,
                 "messages": messages,
@@ -509,6 +718,8 @@ def _dispatch(
             }
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
+            kwargs.update(_reasoning_kwargs(entry.provider, model, cfg))
+            round_attempts[entry.provider] = round_attempts.get(entry.provider, 0) + 1
 
             try:
                 response = entry.client.chat.completions.create(**kwargs)
@@ -516,11 +727,15 @@ def _dispatch(
 
                 # An empty body is a FAILURE, not a success. One free OpenRouter
                 # model returns HTTP 200 with nothing in it; treating that as valid
-                # is exactly how a silent outage starts.
+                # is exactly how a silent outage starts. For OpenRouter the MODEL
+                # is the problem, not the key: demote it so the next entry picks a
+                # different candidate instead of retrying the same dead id.
                 if not content:
                     logger.warning(
                         "llm_empty_response", provider=entry.provider, model=model
                     )
+                    if entry.provider == "openrouter":
+                        _drop_openrouter_model(model, "empty response")
                     retryable_seen = True
                     continue
 
@@ -553,12 +768,35 @@ def _dispatch(
                 )
 
                 if action == _SKIP_PROVIDER:
-                    skipped.add(entry.provider)
+                    # A retired/paid-only OpenRouter model is a MODEL problem:
+                    # demote it and let the next entry re-resolve, rather than
+                    # skipping the whole provider while the cache keeps the dead
+                    # id for the rest of the day (the 2026-09-20 shape).
+                    if entry.provider == "openrouter" and _classify_is_404(exc):
+                        _drop_openrouter_model(model, last_error)
+                        retryable_seen = True
+                    else:
+                        skipped.add(entry.provider)
                 elif action == _DISABLE_PROVIDER:
                     _mark_unhealthy(entry.provider, last_error)
                     skipped.add(entry.provider)
                 else:
                     retryable_seen = True
+                    if _is_429(exc):
+                        round_429s[entry.provider] = (
+                            round_429s.get(entry.provider, 0) + 1
+                        )
+
+        # L11c: a provider whose EVERY attempt this round was a 429 extends its
+        # streak; anything else resets it. Three consecutive such rounds park it.
+        for provider, attempts in round_attempts.items():
+            if attempts and round_429s.get(provider, 0) == attempts:
+                streak_429[provider] = streak_429.get(provider, 0) + 1
+                if streak_429[provider] >= RATE_LIMIT_ROUNDS_TO_PARK:
+                    _mark_rate_limited(provider)
+                    skipped.add(provider)
+            else:
+                streak_429[provider] = 0
 
         # Nothing transient left to wait for — backing off would only waste time.
         if not retryable_seen:
@@ -688,9 +926,12 @@ def check_any_llm_available() -> bool:
             continue
         tried.add(entry.provider)
 
+        # The client is passed so a cache-miss OpenRouter resolution is smoke-tested
+        # here too, never adopted blind (L11b).
+        model = _model_for(entry.spec, entry.client)
         try:
             response = entry.client.chat.completions.create(
-                model=_model_for(entry.spec),
+                model=model,
                 messages=[{"role": "user", "content": "Reply: OK"}],
                 max_tokens=_HEALTH_MAX_TOKENS,
                 temperature=0,
@@ -724,7 +965,7 @@ def check_any_llm_available() -> bool:
             logger.warning(
                 "llm_health_ok_empty_body",
                 provider=entry.provider,
-                model=_model_for(entry.spec),
+                model=model,
                 note="provider reachable; empty body treated as available",
             )
         return True
