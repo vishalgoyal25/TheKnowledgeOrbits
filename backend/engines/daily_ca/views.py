@@ -8,6 +8,8 @@ Public endpoints (L2):
   GET /api/v1/daily-ca/<date>/            → articles for specific date (YYYY-MM-DD)
   GET /api/v1/daily-ca/article/<slug>/    → full article detail
   GET /api/v1/daily-ca/archive/           → last 30 days, date-grouped summary
+  GET /api/v1/daily-ca/by-node/<uuid>/    → published articles under a syllabus node
+                                            (?scope=topic|module|subject, paginated) — G3.14a
 
 Admin endpoints — no auth (L3 — solo developer):
   GET  /api/v1/admin/daily-ca/proposals/<date>/     → list proposals for review
@@ -24,7 +26,7 @@ import sentry_sdk
 import structlog
 from django.core.cache import cache
 from django.core.management import call_command
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -197,14 +199,118 @@ class ArticleDetailView(APIView):
 
     def get(self, request, slug):
         try:
+            # G3.14a: the `syllabus` block walks topic → module → subject; join
+            # them here so the serializer adds no query per level.
             article = DailyCaArticle.objects.select_related(
-                "topic", "static_background"
+                "topic__module__subject", "topic__subject", "static_background"
             ).get(slug=slug, is_published=True)
         except DailyCaArticle.DoesNotExist:
             return Response({"error": "Article not found."}, status=404)
 
         data = DailyCaArticleDetailSerializer(article).data
         return Response(data)
+
+
+# ── G3.14a — articles under a syllabus node ───────────────────────────────────
+_BY_NODE_CACHE_TTL = 3600  # articles land once a day; an hour is nothing
+_BY_NODE_SCOPES = ("topic", "module", "subject")
+_BY_NODE_DEFAULT_LIMIT = 10
+_BY_NODE_MAX_LIMIT = 30
+_BY_NODE_MAX_OFFSET = 10_000
+
+
+def _int_param(request, name: str, default: int, low: int, high: int) -> int:
+    """A bounded integer query parameter; anything unparseable is the default."""
+    raw = request.query_params.get(name)
+    try:
+        value = int(raw) if raw is not None else default
+    except (TypeError, ValueError):
+        value = default
+    return max(low, min(high, value))
+
+
+class ByNodeView(APIView):
+    """
+    GET /api/v1/daily-ca/by-node/<uuid:node_id>/?scope=topic|module|subject&limit=10&offset=0
+
+    Published daily-CA articles filed under one syllabus node, newest first —
+    the reverse direction of the syllabus ⇄ daily-CA link (G3.14). Pure FK
+    matching on `DailyCaArticle.topic`:
+
+      topic    the node itself AND the sub-topics beneath it (two levels of
+               `parent_topic`) — the classifier may file an article under a
+               sub-topic, and its parent's page must still show it
+      module   every topic of the module         (`topic__module`)
+      subject  every topic of the subject        (`topic__subject`)
+
+    The same article therefore appears on its topic, its module and its subject
+    page — hierarchy, not duplication; each page runs one query for one node.
+    An unknown node is an empty page, not a 404: the view never reads the
+    knowledge tables to check (engine boundary), and the UI treats "none" and
+    "unknown" the same way — it renders nothing.
+
+    Fetched from the browser (CSR) so the weekly-cached static pages never
+    carry stale news; Redis-cached an hour per (scope, node, limit, offset).
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, node_id):
+        scope = (request.query_params.get("scope") or "topic").strip().lower()
+        if scope not in _BY_NODE_SCOPES:
+            return Response(
+                {"error": f"scope must be one of {', '.join(_BY_NODE_SCOPES)}."},
+                status=400,
+            )
+        limit = _int_param(
+            request, "limit", _BY_NODE_DEFAULT_LIMIT, 1, _BY_NODE_MAX_LIMIT
+        )
+        offset = _int_param(request, "offset", 0, 0, _BY_NODE_MAX_OFFSET)
+
+        cache_key = f"daily_ca_by_node_{scope}_{node_id}_{limit}_{offset}_v1"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        if scope == "topic":
+            where = (
+                Q(topic_id=node_id)
+                | Q(topic__parent_topic_id=node_id)
+                | Q(topic__parent_topic__parent_topic_id=node_id)
+            )
+        elif scope == "module":
+            where = Q(topic__module_id=node_id)
+        else:
+            where = Q(topic__subject_id=node_id)
+
+        qs = (
+            DailyCaArticle.objects.filter(where, is_published=True)
+            .defer(
+                "body_md",
+                "body_md_processed",
+                "generation_metadata",
+                "ca_chunk_ids",
+                "static_links",
+            )
+            .order_by("-published_date", "order_on_date")
+        )
+        total = qs.count()
+        page = list(qs[offset : offset + limit])
+        tags_map = _build_tags_map(page)
+        data = DailyCaArticleListSerializer(
+            page, many=True, context={"prefetched_tags": tags_map}
+        ).data
+        payload = {
+            "scope": scope,
+            "node_id": str(node_id),
+            "count": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(data) < total,
+            "articles": data,
+        }
+        cache.set(cache_key, payload, timeout=_BY_NODE_CACHE_TTL)
+        return Response(payload)
 
 
 class SitemapEntriesView(APIView):
