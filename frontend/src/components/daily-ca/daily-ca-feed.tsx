@@ -345,6 +345,16 @@ export function DailyCaFeed({ date }: Props) {
                           }
                         />
                       )}
+
+                      {/* Below xl the right panel is hidden, so the same
+                          panel — Related Articles → Concepts Mentioned →
+                          Explore Syllabus — follows the active article inside
+                          this scroll area. Pure props, no fetch (G3.14b). */}
+                      {activeArticle && (
+                        <div className="xl:hidden mt-6">
+                          <RightPanel article={activeArticle} />
+                        </div>
+                      )}
                     </div>
                   </div>
 

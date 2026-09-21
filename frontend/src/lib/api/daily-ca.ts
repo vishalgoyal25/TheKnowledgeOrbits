@@ -46,6 +46,29 @@ export interface SourceItem {
   title: string;
 }
 
+/**
+ * G3.14 — a syllabus node as the API names it: `slug` is null only for a row
+ * not yet backfilled (`nodeSegment()` falls back to the UUID, which 308s).
+ */
+export interface SyllabusNodeRef {
+  id: string;
+  slug: string | null;
+  name: string;
+}
+
+/**
+ * Where a daily-CA article sits in the syllabus. The pipeline links exactly
+ * ONE topic per article; module and subject are its parents. `has_content`
+ * mirrors the tree's rule (G2.7): a BookContent article exists for the topic.
+ * Absent (older cached payloads) or null (no topic) → the panel keeps its
+ * placeholder.
+ */
+export interface ArticleSyllabus {
+  topic: SyllabusNodeRef & { has_content: boolean };
+  module: SyllabusNodeRef | null;
+  subject: SyllabusNodeRef | null;
+}
+
 export interface DailyCaArticleDetail extends DailyCaArticleList {
   body_md_processed: string;
   sources_used: SourceItem[];
@@ -63,6 +86,20 @@ export interface DailyCaArticleDetail extends DailyCaArticleList {
     quality_score: number;
     is_published: boolean;
   } | null;
+  syllabus?: ArticleSyllabus | null;
+}
+
+/** G3.14 — the reverse direction: published articles filed under one node. */
+export type SyllabusScope = "topic" | "module" | "subject";
+
+export interface ByNodeResponse {
+  scope: SyllabusScope;
+  node_id: string;
+  count: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  articles: DailyCaArticleList[];
 }
 
 export interface DailyFeedResponse {
@@ -114,6 +151,23 @@ export async function getArchive(params?: {
   before?: string;
 }): Promise<ArchiveResponse> {
   const res = await apiClient.get("/daily-ca/archive/", { params });
+  return res.data;
+}
+
+/**
+ * G3.14 — recent daily-CA articles under a syllabus node, newest first.
+ * Called from the browser only (the static pages are ISR-cached for a week,
+ * so this never runs at build or regeneration time — zero ISR writes).
+ * Pass the node's UUID, never its slug: the endpoint filters on the FK.
+ */
+export async function getArticlesByNode(
+  scope: SyllabusScope,
+  nodeId: string,
+  params?: { limit?: number; offset?: number },
+): Promise<ByNodeResponse> {
+  const res = await apiClient.get(`/daily-ca/by-node/${nodeId}/`, {
+    params: { scope, ...params },
+  });
   return res.data;
 }
 
