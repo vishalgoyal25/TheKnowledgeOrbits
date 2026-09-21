@@ -35,6 +35,10 @@ HEALTH = (
     "engines.book_content.management.commands.generate_overview_content."
     "check_any_llm_available"
 )
+EXHAUSTED = (
+    "engines.book_content.management.commands.generate_overview_content."
+    "pool_exhausted"
+)
 LOCMEM = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -204,6 +208,29 @@ class TestCommand:
         assert "would write subject:" in out.getvalue()
         assert llm.call_count == 0
         assert OverviewContent.objects.count() == 0
+
+    def test_exhausted_pool_stops_the_run_after_the_current_item(self):
+        """
+        L16 (FEATURES_LLM_FIX.md Part III): once every LLM key is parked for the
+        day the run stops with a summary instead of walking the batch — on
+        2026-09-21 it spent 31 min retrying 5 of 10 targets against empty
+        buckets. The lock is still released; the rest re-queue tomorrow.
+        """
+        s1, s2, m1, m2 = _tree()
+        cache.clear()
+        out = StringIO()
+        with (
+            patch(HEALTH, return_value=True),
+            patch(EXHAUSTED, side_effect=[False, True]),
+            patch(LLM, return_value=GOOD) as llm,
+        ):
+            call_command("generate_overview_content", manual=True, stdout=out)
+        assert OverviewContent.objects.filter(target_id=s1.id).exists()
+        assert not OverviewContent.objects.filter(target_id=m1.id).exists()
+        assert llm.call_count == 1, "the module was never attempted"
+        assert "stopped early: LLM daily budget exhausted" in out.getvalue()
+        assert "Written 1" in out.getvalue()
+        assert cache.get("overview_generation_lock") is None
 
 
 # ── Endpoint ─────────────────────────────────────────────────────────────────

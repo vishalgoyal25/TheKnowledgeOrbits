@@ -7,10 +7,14 @@ Runs as a SEPARATE Render Cron job, after the main daily pipeline.
 NO dependency on daily_CA proposals. Walks the seeded knowledge hierarchy
 (Subject → Module → Topic) and fills in content for incomplete topics.
 
-Render Cron schedule:
+Render Cron schedule (render.yaml is the source of truth):
   Name   : generate-static-content
-  Command: cd backend && python manage.py generate_static_content --max-articles 3 --database=supabase
-  Schedule: 30 9 * * *   (09:30 UTC = 15:00 IST)
+  Command: cd backend && python manage.py generate_static_content --max-articles 1 --database=supabase
+  Schedule: 30 3 * * *   (03:30 UTC = 09:00 IST)
+  --max-articles 1 since 2026-09-21: Groq's free tier is 200k tokens per model per
+  organisation on a rolling 24 h window and a 3-topic run drained every key's
+  window (FEATURES_LLM_FIX.md Part III). The run also stops early, with a
+  summary, the moment every key is parked for the day (pool_exhausted).
 
 What it does:
   1. Queries the seeded Topic table directly (node_type='topic', not complete).
@@ -56,12 +60,41 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from engines.book_content.services.ingestor_service import ingest_topic
-from engines.book_content.services.llm_service import check_any_llm_available
+from engines.book_content.services.llm_service import (
+    check_any_llm_available,
+    pool_exhausted,
+)
 from engines.knowledge.models import Subject, Topic
 
 logger = structlog.get_logger(__name__)
 
 _DIVIDER = "━" * 60
+
+
+def _report_pool_exhausted(command: BaseCommand, generated: int, deferred: int) -> None:
+    """
+    L16 (FEATURES_LLM_FIX.md Part III, 2026-09-21): every LLM key is parked by a
+    daily-class 429, so every further call would return "" at once. Say so and
+    stop — on 2026-09-21 this run walked its whole queue against empty buckets
+    for 4 h+ instead. Sentry is a convenience here, never a failure path.
+    """
+    command.stdout.write(
+        command.style.WARNING(
+            f"\n  🛑 stopped early: LLM daily budget exhausted "
+            f"({generated} topic(s) generated; {deferred} deferred to the next run)."
+        )
+    )
+    logger.warning(
+        "static_gen_llm_pool_exhausted", generated=generated, deferred=deferred
+    )
+    try:
+        sentry_sdk.capture_message(
+            f"generate_static_content stopped early: LLM daily budget exhausted "
+            f"({generated} generated, {deferred} deferred).",
+            level="warning",
+        )
+    except Exception:
+        pass
 
 
 class Command(BaseCommand):
@@ -327,6 +360,12 @@ class Command(BaseCommand):
         skip_limit = max(max_articles * 3, 10)
 
         for i, (topic_obj, subject_name) in enumerate(topic_queue, 1):
+            # L16: every key parked for the day → stop, do not walk the queue.
+            if pool_exhausted():
+                capped = len(topic_queue) - (i - 1)
+                _report_pool_exhausted(self, generated, capped)
+                break
+
             # Hard cap check
             if generated >= max_articles or budget["remaining"] <= 0:
                 capped = len(topic_queue) - (i - 1)

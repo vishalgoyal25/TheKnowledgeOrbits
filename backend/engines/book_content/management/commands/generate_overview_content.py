@@ -39,7 +39,10 @@ from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandParser
 
 from engines.book_content.services import overview_service
-from engines.book_content.services.llm_service import check_any_llm_available
+from engines.book_content.services.llm_service import (
+    check_any_llm_available,
+    pool_exhausted,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -113,8 +116,11 @@ class Command(BaseCommand):
 
         written = 0
         rejected = 0
+        stopped_early = False
         try:
             for _ in range(subjects_max):
+                if stopped_early:
+                    break
                 batch = overview_service.next_subject_batch(db)
                 if not batch:
                     self.stdout.write("Nothing pending.")
@@ -123,6 +129,32 @@ class Command(BaseCommand):
                 subject_name = batch[0].subject_name
                 self.stdout.write(f"▶ {subject_name}: {len(batch)} node(s)")
                 for t in batch:
+                    # L16 (FEATURES_LLM_FIX.md Part III, 2026-09-21): every LLM
+                    # key parked by a daily-class 429 → every further call would
+                    # return "" at once. Stop with a summary; the unwritten
+                    # targets are re-queued by next_subject_batch() tomorrow.
+                    # (2026-09-21: 31 min of retries for 5 of 10, all on empty
+                    # buckets.) Sentry is a convenience, never a failure path.
+                    if pool_exhausted():
+                        stopped_early = True
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"stopped early: LLM daily budget exhausted "
+                                f"({written} written; the rest re-queue tomorrow)."
+                            )
+                        )
+                        logger.warning(
+                            "overview_llm_pool_exhausted", database=db, written=written
+                        )
+                        try:
+                            sentry_sdk.capture_message(
+                                "generate_overview_content stopped early: LLM daily "
+                                f"budget exhausted ({written} written).",
+                                level="warning",
+                            )
+                        except Exception:
+                            pass
+                        break
                     self.stdout.write(f"  {t.key}  {t.name} ... ", ending="")
                     try:
                         row = overview_service.generate_overview(t, db, publish=publish)
