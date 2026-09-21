@@ -111,6 +111,7 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
     concept_links = serializers.SerializerMethodField()
     static_background = serializers.SerializerMethodField()
     related_articles = serializers.SerializerMethodField()
+    syllabus = serializers.SerializerMethodField()
 
     class Meta:
         model = DailyCaArticle
@@ -137,7 +138,46 @@ class DailyCaArticleDetailSerializer(serializers.ModelSerializer):
             "concept_links",
             "static_background",
             "related_articles",
+            "syllabus",
         ]
+
+    def get_syllabus(self, obj):
+        """
+        G3.14a — where this article sits in the syllabus, as links.
+
+        The pipeline links exactly ONE topic per article (`CaDailyProposal` is
+        unique on (date, topic)); its module and subject come from the topic's
+        own FKs. `has_content` mirrors the tree payload's rule (G2.7): a
+        BookContent row exists for the topic — the same read `static_background`
+        already does into book_content. None when the classifier attached no
+        topic; the UI keeps its placeholder then.
+        """
+        topic = obj.topic
+        if topic is None:
+            return None
+        from engines.book_content.models import BookContent
+
+        def node(ref) -> dict | None:
+            if ref is None:
+                return None
+            return {"id": str(ref.id), "slug": ref.slug, "name": ref.name}
+
+        try:
+            module = topic.module
+        except Exception:
+            module = None
+        try:
+            subject = topic.subject or (module.subject if module else None)
+        except Exception:
+            subject = None
+
+        topic_node = {
+            "id": str(topic.id),
+            "slug": topic.slug,
+            "name": topic.name,
+            "has_content": BookContent.objects.filter(topic_id=topic.id).exists(),
+        }
+        return {"topic": topic_node, "module": node(module), "subject": node(subject)}
 
     def get_tags(self, obj):
         from engines.tags.models import ArticleTag
