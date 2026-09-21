@@ -13,6 +13,7 @@ import { permanentRedirect } from "next/navigation";
 
 import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
 import ArticleBody from "@/components/syllabus/article-body";
+import RecentCurrentAffairs from "@/components/syllabus/recent-current-affairs";
 import SyllabusBreadcrumb from "@/components/syllabus/syllabus-breadcrumb";
 import TopicOutline from "@/components/syllabus/topic-outline";
 import { getBookTree, getOverview } from "@/lib/api/book-content";
@@ -108,7 +109,7 @@ export default async function ModulePage(props: {
   const trail = tree ? trailTo(tree, moduleData.id) : [];
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl xl:max-w-6xl">
       {trail.length > 0 && (
         <>
           <BreadcrumbJsonLd
@@ -122,54 +123,71 @@ export default async function ModulePage(props: {
         </>
       )}
 
-      {/* Header */}
-      <header className="mb-8 pb-6 border-b border-border">
-        <div className="flex items-center gap-3 text-primary mb-3">
-          <Layers className="h-8 w-8" />
-          <h1 className="text-3xl md:text-4xl font-semibold font-heading tracking-tight text-foreground">
-            {moduleData.name}
-          </h1>
-        </div>
-        <p className="text-muted-foreground text-lg max-w-3xl">
-          {moduleData.description ||
-            "The syllabus topics inside this module, in reading order."}
-        </p>
-        {total > 0 && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            <span className="font-semibold text-foreground">{ready}</span> of{" "}
-            {total} articles ready
-          </p>
-        )}
-      </header>
+      {/* G3.14c — two columns from xl (content · recent daily-CA under this
+          module), one column below. Content keeps its max-w-4xl measure. */}
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 max-w-4xl">
+          {/* Header */}
+          <header className="mb-8 pb-6 border-b border-border">
+            <div className="flex items-center gap-3 text-primary mb-3">
+              <Layers className="h-8 w-8" />
+              <h1 className="text-3xl md:text-4xl font-semibold font-heading tracking-tight text-foreground">
+                {moduleData.name}
+              </h1>
+            </div>
+            <p className="text-muted-foreground text-lg max-w-3xl">
+              {moduleData.description ||
+                "The syllabus topics inside this module, in reading order."}
+            </p>
+            {total > 0 && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{ready}</span>{" "}
+                of {total} articles ready
+              </p>
+            )}
+          </header>
 
-      {/* G3.9 — introductory overview, server-rendered; absent until
+          {/* G3.9 — introductory overview, server-rendered; absent until
           generated and published. */}
-      {overview && (
-        <section className="mb-10">
-          <ArticleJsonLd
-            headline={`${moduleData.name} — Overview`}
-            description={truncate(overview.content_markdown)}
-            path={modulePath(moduleData)}
-            dateModified={overview.updated_at}
-            section={trail[0]?.name}
-          />
-          <ArticleBody markdown={overview.content_markdown} />
-        </section>
-      )}
+          {overview && (
+            <section className="mb-10">
+              <ArticleJsonLd
+                headline={`${moduleData.name} — Overview`}
+                description={truncate(overview.content_markdown)}
+                path={modulePath(moduleData)}
+                dateModified={overview.updated_at}
+                section={trail[0]?.name}
+              />
+              <ArticleBody markdown={overview.content_markdown} />
+            </section>
+          )}
 
-      {/* Nested outline */}
-      {topics.length === 0 ? (
-        <div className="text-center py-16 bg-muted/40 rounded-xl border border-dashed border-border">
-          <p className="text-muted-foreground">
-            No topics mapped to this module yet.
-          </p>
+          {/* Nested outline */}
+          {topics.length === 0 ? (
+            <div className="text-center py-16 bg-muted/40 rounded-xl border border-dashed border-border">
+              <p className="text-muted-foreground">
+                No topics mapped to this module yet.
+              </p>
+            </div>
+          ) : (
+            <section>
+              <h2 className="text-xl font-semibold text-foreground mb-3">
+                Topics
+              </h2>
+              <TopicOutline topics={topics} />
+            </section>
+          )}
         </div>
-      ) : (
-        <section>
-          <h2 className="text-xl font-semibold text-foreground mb-3">Topics</h2>
-          <TopicOutline topics={topics} />
-        </section>
-      )}
+
+        {/* In the news — client-fetched, never in this cached HTML */}
+        <aside className="xl:sticky xl:top-[60px] xl:self-start">
+          <RecentCurrentAffairs
+            scope="module"
+            nodeId={moduleData.id}
+            title="In the news"
+          />
+        </aside>
+      </div>
     </div>
   );
 }

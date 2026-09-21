@@ -15,7 +15,18 @@ export interface Heading {
   id: string;
 }
 
-export function ScrollSpyToC({ headings }: { headings: Heading[] }) {
+/**
+ * `showBackLink=false` for the mobile "On this page" variant (G3.14b): the
+ * top bar already has a back button there, and the box lives inside a
+ * <details> above the body rather than in a sidebar.
+ */
+export function ScrollSpyToC({
+  headings,
+  showBackLink = true,
+}: {
+  headings: Heading[];
+  showBackLink?: boolean;
+}) {
   const [activeId, setActiveId] = useState("");
   const observerRef = useRef<IntersectionObserver | null>(null);
 
@@ -49,12 +60,14 @@ export function ScrollSpyToC({ headings }: { headings: Heading[] }) {
   return (
     <aside className="flex flex-col gap-4">
       {/* Back link */}
-      <Link
-        href="/daily-ca"
-        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors"
-      >
-        ← Back to Feed
-      </Link>
+      {showBackLink && (
+        <Link
+          href="/daily-ca"
+          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors"
+        >
+          ← Back to Feed
+        </Link>
+      )}
 
       {headings.length > 0 && (
         <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">

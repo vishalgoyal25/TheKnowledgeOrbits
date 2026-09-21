@@ -41,7 +41,7 @@ import UserMenu from "@/components/auth/UserMenu";
 import { useSearch } from "@/lib/hooks/use-search";
 import { SearchResult } from "@/lib/api/search";
 import { getBookSubjects, getBookTree } from "@/lib/api/book-content";
-import { knowledgePath, modulePath, subjectPath } from "@/lib/content-urls";
+import { modulePath, subjectPath, topicPath } from "@/lib/content-urls";
 import { HierarchySubject, HierarchyModule, HierarchyTopic } from "@/lib/types";
 import type { TreeTopic } from "@/types/book-content";
 import OrbitIcon from "@/components/ui/orbit-icon";
@@ -187,11 +187,6 @@ export default function Header({ initialHierarchy }: HeaderProps) {
   }, [pathname, hierarchyData, inPath]);
 
   const displaySubjectId = hoveredSubject || currentSubjectId;
-
-  // Links are built from the subject OBJECT so they carry its slug; the id
-  // alone is what the hover/drawer state tracks.
-  const subjectRef = (id: string | null) =>
-    hierarchyData.find((s) => s.id === id) ?? id;
 
   useEffect(() => {
     // P3.5 — skip re-fetch when server-baked data is still fresh (< 30 min old).
@@ -662,9 +657,10 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                               drawerActiveSubjectId === "news";
 
                             // `slug` must survive the flattening: this list feeds
-                            // knowledgePath(), which falls back to the UUID when
-                            // it is absent — the drawer was the one place still
-                            // emitting UUID links (found on production 2026-09-18).
+                            // topicPath(), which falls back to the UUID when it
+                            // is absent — the drawer was one of the two places
+                            // still emitting UUID links (2026-09-18, PR #28;
+                            // the mega-menu's copy was the other, G3.14d).
                             const flatTopics: {
                               id: string;
                               slug?: string | null;
@@ -696,12 +692,13 @@ export default function Header({ initialHierarchy }: HeaderProps) {
 
                             return flatTopics.map((t, i) => {
                               const isActiveTopic = inPath("/topics", t);
+                              // G3.14d: children land on the topic page — the
+                              // content and the indexed URL — not on the map.
+                              // The map keeps two doors: the header button
+                              // and "Open in the Knowledge Map →" on a topic.
                               const href = isNewsModule
                                 ? "/news"
-                                : knowledgePath(
-                                    subjectRef(drawerActiveSubjectId),
-                                    t,
-                                  );
+                                : topicPath(t);
                               return (
                                 <Link
                                   key={`drawer-topic-${t.id}`}
@@ -973,10 +970,14 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                               left: rect.left,
                               top: rect.bottom,
                             });
+                            // Pass the nodes through untouched. This used to
+                            // copy {id, name, sub_topics} and DROPPED `slug`
+                            // for every topic-level row — the mega-menu's
+                            // last UUID emitter (G3.14d; the drawer's
+                            // flattenTree had the same defect, fixed in #28).
                             const topics =
                               module.topics?.map((t: HierarchyTopic) => ({
-                                id: t.id,
-                                name: t.name,
+                                ...t,
                                 sub_topics: t.sub_topics || [],
                               })) || [];
                             setHoveredModuleTopics(topics);
@@ -1045,10 +1046,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                       }}
                     >
                       <Link
-                        href={knowledgePath(
-                          subjectRef(displaySubjectId),
-                          topic,
-                        )}
+                        href={topicPath(topic)}
                         onClick={() => {
                           setHoveredModuleId(null);
                           setDropdownPos(null);
@@ -1086,7 +1084,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                     <div key={`fixed-sub-${st.id}`}>
                       {/* Sub-topic link */}
                       <Link
-                        href={knowledgePath(subjectRef(displaySubjectId), st)}
+                        href={topicPath(st)}
                         onClick={() => {
                           setHoveredModuleId(null);
                           setDropdownPos(null);
@@ -1101,10 +1099,7 @@ export default function Header({ initialHierarchy }: HeaderProps) {
                       {st.sub_topics?.map((sst) => (
                         <Link
                           key={`fixed-subsub-${sst.id}`}
-                          href={knowledgePath(
-                            subjectRef(displaySubjectId),
-                            sst,
-                          )}
+                          href={topicPath(sst)}
                           onClick={() => {
                             setHoveredModuleId(null);
                             setDropdownPos(null);

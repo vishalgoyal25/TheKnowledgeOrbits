@@ -27,7 +27,6 @@ import { CalloutBlock } from "@/components/daily-ca/callout-block";
 import { TagChips } from "@/components/daily-ca/tag-chips";
 import { SourceAccordion } from "@/components/daily-ca/source-accordion";
 import { RightPanel } from "@/components/daily-ca/right-panel";
-import { ConceptCard } from "@/components/daily-ca/concept-card";
 import { ScrollSpyToC, Heading } from "./_components/scroll-spy-toc";
 import { ArticleTopBar } from "./_components/article-top-bar";
 import { SocialBar } from "@/components/social/social-bar";
@@ -316,121 +315,134 @@ export default async function ArticleDetailPage({
             </div>
           </div>
 
-          {/* Main — Article body (fully server-rendered) */}
-          <article className="rounded-lg border border-border bg-card shadow-sm">
-            {/* Header */}
-            <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                {article.gs_paper && (
-                  <span
-                    className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${gsColor}`}
-                  >
-                    {article.gs_paper}
+          {/* Main cell — the article, then (below xl) the side panels stacked
+              underneath it. One grid child, so the lg/xl column layout is
+              unchanged. */}
+          <div className="min-w-0">
+            <article className="rounded-lg border border-border bg-card shadow-sm">
+              {/* Header */}
+              <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {article.gs_paper && (
+                    <span
+                      className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${gsColor}`}
+                    >
+                      {article.gs_paper}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {article.subject_name}
                   </span>
+                  <span className="text-xs text-gray-300">·</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(article.published_date)}
+                  </span>
+                  <span className="text-xs text-gray-300">·</span>
+                  <span className="text-xs text-muted-foreground">
+                    {readMin} min read
+                  </span>
+                </div>
+
+                <h1 className="text-xl font-bold text-blue-900 leading-snug mb-3">
+                  {article.title}
+                </h1>
+
+                {article.news_context && (
+                  <p className="text-sm text-muted-foreground italic leading-relaxed border-l-2 border-border pl-3 mb-4">
+                    {article.news_context}
+                  </p>
                 )}
-                <span className="text-xs text-muted-foreground">
-                  {article.subject_name}
-                </span>
-                <span className="text-xs text-gray-300">·</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDate(article.published_date)}
-                </span>
-                <span className="text-xs text-gray-300">·</span>
-                <span className="text-xs text-muted-foreground">
-                  {readMin} min read
-                </span>
+
+                {/* On this page — mobile / tablet (< lg), where the sidebar ToC is
+                  hidden. Native <details>: no JS, collapsed by default (G3.14b). */}
+                {headings.length > 0 && (
+                  <details className="lg:hidden group rounded-lg border border-border bg-muted/30">
+                    <summary className="cursor-pointer select-none list-none px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center justify-between">
+                      On this page
+                      <span className="text-gray-400 transition-transform group-open:rotate-180">
+                        ▾
+                      </span>
+                    </summary>
+                    <div className="px-3 pb-3">
+                      <ScrollSpyToC headings={headings} showBackLink={false} />
+                    </div>
+                  </details>
+                )}
               </div>
 
-              <h1 className="text-xl font-bold text-blue-900 leading-snug mb-3">
-                {article.title}
-              </h1>
-
-              {article.news_context && (
-                <p className="text-sm text-muted-foreground italic leading-relaxed border-l-2 border-border pl-3 mb-4">
-                  {article.news_context}
-                </p>
-              )}
-            </div>
-
-            {/* Hero Image */}
-            {article.hero_image_url && (
-              <div className="relative w-full h-56 sm:h-72 overflow-hidden">
-                <Image
-                  src={article.hero_image_url}
-                  alt={article.title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 860px"
-                  priority
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-              </div>
-            )}
-
-            {/* In Summary */}
-            {article.body_md_processed && (
-              <div className="px-4 sm:px-6 pt-4">
-                <InSummaryBox
-                  bodyMd={article.body_md_processed}
-                  newsContext={article.news_context}
-                />
-              </div>
-            )}
-
-            {/* Body */}
-            <div className="px-4 sm:px-6 pb-6">
-              {parts.map((part, i) =>
-                part.type === "callout" ? (
-                  <CalloutBlock key={i} content={part.content} />
-                ) : (
-                  <ReactMarkdown
-                    key={i}
-                    remarkPlugins={[remarkGfm]}
-                    components={markdownComponents}
-                  >
-                    {part.content}
-                  </ReactMarkdown>
-                ),
-              )}
-
-              {/* Tags */}
-              {article.tags.length > 0 && (
-                <div className="mt-5 pt-4 border-t border-border">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Tags
-                  </p>
-                  <TagChips tags={article.tags} />
+              {/* Hero Image */}
+              {article.hero_image_url && (
+                <div className="relative w-full h-56 sm:h-72 overflow-hidden">
+                  <Image
+                    src={article.hero_image_url}
+                    alt={article.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 860px"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
                 </div>
               )}
 
-              {/* Concepts — mobile only */}
-              {article.concept_links.length > 0 && (
-                <div className="mt-4 xl:hidden">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Concepts Mentioned
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {article.concept_links.map((c) => (
-                      <ConceptCard key={c.id} concept={c} />
-                    ))}
+              {/* In Summary */}
+              {article.body_md_processed && (
+                <div className="px-4 sm:px-6 pt-4">
+                  <InSummaryBox
+                    bodyMd={article.body_md_processed}
+                    newsContext={article.news_context}
+                  />
+                </div>
+              )}
+
+              {/* Body */}
+              <div className="px-4 sm:px-6 pb-6">
+                {parts.map((part, i) =>
+                  part.type === "callout" ? (
+                    <CalloutBlock key={i} content={part.content} />
+                  ) : (
+                    <ReactMarkdown
+                      key={i}
+                      remarkPlugins={[remarkGfm]}
+                      components={markdownComponents}
+                    >
+                      {part.content}
+                    </ReactMarkdown>
+                  ),
+                )}
+
+                {/* Tags */}
+                {article.tags.length > 0 && (
+                  <div className="mt-5 pt-4 border-t border-border">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Tags
+                    </p>
+                    <TagChips tags={article.tags} />
                   </div>
+                )}
+
+                {/* Sources */}
+                <SourceAccordion sources={article.sources_used ?? []} />
+
+                {/* Social — Like · Comments · Share */}
+                <div className="mt-4 pt-4 border-t border-border">
+                  <SocialBar
+                    contentType="daily_ca_article"
+                    contentId={article.id}
+                    shareUrl={`https://www.theknowledgeorbits.com/daily-ca/article/${article.slug}`}
+                    shareTitle={article.title}
+                  />
                 </div>
-              )}
-
-              {/* Sources */}
-              <SourceAccordion sources={article.sources_used ?? []} />
-
-              {/* Social — Like · Comments · Share */}
-              <div className="mt-4 pt-4 border-t border-border">
-                <SocialBar
-                  contentType="daily_ca_article"
-                  contentId={article.id}
-                  shareUrl={`https://www.theknowledgeorbits.com/daily-ca/article/${article.slug}`}
-                  shareTitle={article.title}
-                />
               </div>
+            </article>
+
+            {/* Below xl the sidebar is hidden, so the same panel — Related
+              Articles → Concepts Mentioned → Explore Syllabus — stacks under
+              the article. Pure props: no second fetch (G3.14b). */}
+            <div className="xl:hidden mt-6">
+              <RightPanel article={article} />
             </div>
-          </article>
+          </div>
 
           {/* Right panel */}
           <div className="hidden xl:block">

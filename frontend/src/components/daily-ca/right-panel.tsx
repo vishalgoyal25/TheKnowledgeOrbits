@@ -2,13 +2,20 @@
 
 import Link from "next/link";
 import { DailyCaArticleDetail } from "@/lib/api/daily-ca";
+import { modulePath, subjectPath, topicPath } from "@/lib/content-urls";
 import { ConceptCard } from "./concept-card";
 
 /**
  * RightPanel — contextual sidebar showing data for the focused article:
  *  - Related Articles (5, same subject)
  *  - Concepts Mentioned (from concept_links)
- *  - Explore Syllabus placeholder (Phase P+)
+ *  - Explore Syllabus (G3.14b) — the article's one syllabus topic as the
+ *    Subject › Module › Topic trail, from the detail payload's `syllabus`
+ *    block; falls back to the old placeholder when the block is absent
+ *    (a page cached before the field existed) or null (no topic).
+ *
+ * Pure props, no fetch — so it can be rendered twice on one page (the xl
+ * sidebar and the below-the-article block on smaller screens) at no cost.
  */
 
 interface Props {
@@ -47,6 +54,8 @@ export function RightPanel({ article }: Props) {
 
   const relatedArticles = article.related_articles ?? [];
   const conceptLinks = article.concept_links ?? [];
+  // Absent on payloads cached before G3.14a, null when the article has no topic.
+  const syllabus = article.syllabus ?? null;
 
   return (
     <aside className="space-y-4">
@@ -116,19 +125,93 @@ export function RightPanel({ article }: Props) {
         </div>
       )}
 
-      {/* Explore Syllabus — placeholder */}
+      {/* Explore Syllabus — the article's place in the syllabus (G3.14b) */}
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         <div className="px-4 py-2.5 border-b border-gray-100">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
             Explore Syllabus
           </p>
+          {syllabus && (
+            <p className="text-xs text-gray-400">Where this news sits</p>
+          )}
         </div>
-        <div className="p-4 flex items-center justify-center">
-          <p className="text-xs text-gray-400 text-center">
-            Static content library coming soon
-          </p>
-        </div>
+        {syllabus ? (
+          <div className="divide-y divide-gray-50">
+            {syllabus.subject && (
+              <SyllabusRow
+                label="Subject"
+                name={syllabus.subject.name}
+                href={subjectPath(syllabus.subject)}
+              />
+            )}
+            {syllabus.module && (
+              <SyllabusRow
+                label="Module"
+                name={syllabus.module.name}
+                href={modulePath(syllabus.module)}
+              />
+            )}
+            <SyllabusRow
+              label="Topic"
+              name={syllabus.topic.name}
+              href={topicPath(syllabus.topic)}
+              emphasis
+            />
+            <div className="px-4 py-3">
+              {syllabus.topic.has_content ? (
+                <Link
+                  href={topicPath(syllabus.topic)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  Read the topic notes →
+                </Link>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  Topic notes are being written — the module and subject pages
+                  are ready.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 flex items-center justify-center">
+            <p className="text-xs text-gray-400 text-center">
+              Static content library coming soon
+            </p>
+          </div>
+        )}
       </div>
     </aside>
+  );
+}
+
+/** One level of the Subject › Module › Topic trail — same row shape as Related Articles. */
+function SyllabusRow({
+  label,
+  name,
+  href,
+  emphasis = false,
+}: {
+  label: string;
+  name: string;
+  href: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="block px-4 py-3 hover:bg-gray-50 transition-colors"
+    >
+      <span className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
+        {label}
+      </span>
+      <span
+        className={`block text-xs leading-snug line-clamp-2 ${
+          emphasis ? "font-semibold text-blue-900" : "font-medium text-gray-800"
+        }`}
+      >
+        {name}
+      </span>
+    </Link>
   );
 }

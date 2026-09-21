@@ -19,6 +19,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 
 import { ArticleJsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
 import ArticleBody from "@/components/syllabus/article-body";
+import RecentCurrentAffairs from "@/components/syllabus/recent-current-affairs";
 import SyllabusBreadcrumb from "@/components/syllabus/syllabus-breadcrumb";
 import TopicOutline from "@/components/syllabus/topic-outline";
 import ReadBeacon from "@/components/telemetry/ReadBeacon";
@@ -146,7 +147,7 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
     ];
 
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-4xl xl:max-w-6xl">
         {trail.length > 0 && <BreadcrumbJsonLd items={breadcrumbItems} />}
         {article && (
           <ArticleJsonLd
@@ -164,67 +165,83 @@ export default async function TopicDetailPage({ params }: TopicPageProps) {
 
         {trail.length > 0 && <SyllabusBreadcrumb trail={trail} />}
 
-        {/* ── Header ───────────────────────────────────────────────────── */}
-        <header className="mb-8">
-          <div className="flex items-center gap-3 mb-3 text-xs font-medium text-muted-foreground uppercase tracking-widest">
-            <span className="flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4" />
-              {topic.subject_name}
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <Layers className="h-4 w-4" />
-              {topic.module_name}
-            </span>
+        {/* G3.14c — two columns from xl (content · recent daily-CA), one column
+            below: the news block simply follows the content. The content column
+            keeps its max-w-4xl measure; only the container widened at xl. */}
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0 max-w-4xl">
+            {/* ── Header ───────────────────────────────────────────────────── */}
+            <header className="mb-8">
+              <div className="flex items-center gap-3 mb-3 text-xs font-medium text-muted-foreground uppercase tracking-widest">
+                <span className="flex items-center gap-1.5">
+                  <BookOpen className="h-4 w-4" />
+                  {topic.subject_name}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1.5">
+                  <Layers className="h-4 w-4" />
+                  {topic.module_name}
+                </span>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-semibold text-foreground leading-tight">
+                {topic.name}
+              </h1>
+              {!article && topic.description && (
+                <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
+                  {topic.description}
+                </p>
+              )}
+            </header>
+
+            {/* ── The article ───────────────────────────────────────────────── */}
+            {article ? (
+              <article className="mb-12">
+                <ReadBeacon contentType="topic" contentId={topic.id} />
+                <ArticleBody markdown={article.render_content} />
+                <p className="mt-8 pt-4 border-t border-border/60 text-xs text-muted-foreground">
+                  {article.word_count.toLocaleString()} words ·{" "}
+                  {Math.max(1, Math.round(article.word_count / 200))} min read
+                </p>
+              </article>
+            ) : (
+              <div className="mb-12 rounded-xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center">
+                <p className="text-muted-foreground">
+                  The article for this topic is being written by the daily
+                  pipeline. Its subtopics below may already be ready.
+                </p>
+              </div>
+            )}
+
+            {/* ── Reading list ─────────────────────────────────────────────── */}
+            {subtopics.length > 0 && (
+              <section className="mb-12">
+                <h2 className="text-xl font-semibold text-foreground mb-3">
+                  In this topic
+                </h2>
+                <TopicOutline topics={subtopics} />
+              </section>
+            )}
+
+            {/* ── Where this sits ───────────────────────────────────────────── */}
+            <nav className="flex flex-wrap gap-3 text-sm">
+              <Link
+                href={`/knowledge/${nodeSegment(tree)}/${nodeSegment(topic)}`}
+                className="rounded-md border border-border px-3 py-1.5 text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+              >
+                Open in the Knowledge Map →
+              </Link>
+            </nav>
           </div>
-          <h1 className="text-3xl md:text-4xl font-semibold text-foreground leading-tight">
-            {topic.name}
-          </h1>
-          {!article && topic.description && (
-            <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
-              {topic.description}
-            </p>
-          )}
-        </header>
 
-        {/* ── The article ───────────────────────────────────────────────── */}
-        {article ? (
-          <article className="mb-12">
-            <ReadBeacon contentType="topic" contentId={topic.id} />
-            <ArticleBody markdown={article.render_content} />
-            <p className="mt-8 pt-4 border-t border-border/60 text-xs text-muted-foreground">
-              {article.word_count.toLocaleString()} words ·{" "}
-              {Math.max(1, Math.round(article.word_count / 200))} min read
-            </p>
-          </article>
-        ) : (
-          <div className="mb-12 rounded-xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center">
-            <p className="text-muted-foreground">
-              The article for this topic is being written by the daily pipeline.
-              Its subtopics below may already be ready.
-            </p>
-          </div>
-        )}
-
-        {/* ── Reading list ─────────────────────────────────────────────── */}
-        {subtopics.length > 0 && (
-          <section className="mb-12">
-            <h2 className="text-xl font-semibold text-foreground mb-3">
-              In this topic
-            </h2>
-            <TopicOutline topics={subtopics} />
-          </section>
-        )}
-
-        {/* ── Where this sits ───────────────────────────────────────────── */}
-        <nav className="flex flex-wrap gap-3 text-sm">
-          <Link
-            href={`/knowledge/${nodeSegment(tree)}/${nodeSegment(topic)}`}
-            className="rounded-md border border-border px-3 py-1.5 text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
-          >
-            Open in the Knowledge Map →
-          </Link>
-        </nav>
+          {/* ── In the news — client-fetched, never in this cached HTML ────── */}
+          <aside className="xl:sticky xl:top-[60px] xl:self-start">
+            <RecentCurrentAffairs
+              scope="topic"
+              nodeId={topic.id}
+              title="In the news"
+            />
+          </aside>
+        </div>
       </div>
     );
   } catch (error) {
