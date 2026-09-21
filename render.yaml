@@ -249,7 +249,12 @@ services:
       ignoredPaths:
         - "**/*.md"
     buildCommand: "pip install -r backend/requirements/base.txt -r backend/requirements/prod.txt"
-    startCommand: "cd backend && python manage.py generate_static_content --max-articles 3 --database=supabase"
+    # --max-articles 1 (was 3) since 2026-09-21: Groq's free tier allows 200k
+    # tokens per model per organisation on a ROLLING 24 h window, and one
+    # 3-topic run (~15 book articles) drained every key's window before the
+    # 05:30 overview cron and the next day's daily-CA cron could draw on it.
+    # One topic (~5 articles) keeps each key under ~125k/24 h with the CA run.
+    startCommand: "cd backend && python manage.py generate_static_content --max-articles 1 --database=supabase"
     envVars:
       - fromGroup: TheKnowledgeOrbits
 
