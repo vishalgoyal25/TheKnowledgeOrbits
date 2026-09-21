@@ -83,11 +83,19 @@ def _client(content: str | None = None, exc: Exception | None = None):
     return client
 
 
-def _entry(provider="groq", content=None, exc=None, max_tokens=1_000_000, json_ok=True):
+def _entry(
+    provider="groq",
+    content=None,
+    exc=None,
+    max_tokens=1_000_000,
+    json_ok=True,
+    key_idx=0,
+):
     return llm._LLMEntry(
         client=_client(content, exc),
         provider=provider,
         spec=_spec(provider, max_tokens, json_ok),
+        key_idx=key_idx,
     )
 
 
@@ -616,7 +624,7 @@ class TestPrimaryProviderRotation(_PoolTestCase):
         assert self._dispatch([groq, m1, m2]) == "m1"
 
 
-# ── L11c — rate-limit park ────────────────────────────────────────────────────
+# ── L15 — 429s are read, not counted ─────────────────────────────────────────
 
 
 _GROQ_TPM = (
@@ -626,26 +634,103 @@ _GROQ_TPM = (
 )
 _GROQ_TPD = (
     "Error code: 429 - Rate limit reached for model `openai/gpt-oss-120b` in "
-    "organization `org_x` on tokens per day (TPD): Limit 200000, Used 200000."
+    "organization `org_x` service tier `on_demand` on tokens per day (TPD): "
+    "Limit 200000, Used 199123, Requested 3100. Please try again in 47m3.2s."
+)
+_GROQ_RPD = (
+    "Error code: 429 - Rate limit reached for model `openai/gpt-oss-120b` in "
+    "organization `org_x` on requests per day (RPD): Limit 1000, Used 1000, "
+    "Requested 1. Please try again in 1h2m3.5s."
 )
 _OPENROUTER_DAILY = (
     "Error code: 429 - Rate limit exceeded: free-models-per-day. Add 10 credits"
 )
+_MISTRAL_1300 = (
+    "Error code: 429 - {'object': 'error', 'message': 'Rate limit exceeded', "
+    "'type': 'rate_limited', 'param': None, 'code': '1300', 'raw_status_code': 429}"
+)
+
+
+class TestLimitAnatomy(_PoolTestCase):
+    """
+    The 2026-09-21 log could not say whether a 429 was per-minute or per-day —
+    our own truncation cut Groq's message before the allowance name. The class
+    and the provider's own wait are now derived from the full text.
+    """
+
+    def test_limit_class_table(self) -> None:
+        cases = {
+            _GROQ_TPM: llm._LIMIT_TPM,
+            _GROQ_TPD: llm._LIMIT_TPD,
+            _GROQ_RPD: llm._LIMIT_RPD,
+            "Error code: 429 - on requests per minute (RPM): Limit 30": llm._LIMIT_RPM,
+            _OPENROUTER_DAILY: llm._LIMIT_QUOTA,
+            _MISTRAL_1300: llm._LIMIT_MISTRAL_1300,
+            "Error code: 429 - Rate limit exceeded": llm._LIMIT_OTHER,
+        }
+        for message, expected in cases.items():
+            assert llm._limit_class(_HTTPError(429, message)) == expected, message
+        assert llm._limit_class(_HTTPError(503, "tokens per day (TPD)")) == ""
+
+    def test_quota_classification_is_daily_only(self) -> None:
+        assert llm._is_quota_429(_HTTPError(429, _GROQ_TPD)) is True
+        assert llm._is_quota_429(_HTTPError(429, _GROQ_RPD)) is True
+        assert llm._is_quota_429(_HTTPError(429, _OPENROUTER_DAILY)) is True
+        assert llm._is_quota_429(_HTTPError(429, _GROQ_TPM)) is False
+        assert llm._is_quota_429(_HTTPError(429, _MISTRAL_1300)) is False
+        assert llm._is_quota_429(_HTTPError(429, "Rate limit exceeded")) is False
+        assert llm._is_quota_429(_HTTPError(503, "per day")) is False
+
+    def test_retry_hint_table(self) -> None:
+        cases = {
+            "Please try again in 2.5s.": 2.5,
+            "Please try again in 1m19.968s.": 79.968,
+            "Please try again in 1h2m3.5s.": 3723.5,
+            "Please try again in 320ms.": 0.32,
+            "Please try again in 47m3.2s. Need more tokens?": 2823.2,
+        }
+        for message, expected in cases.items():
+            hint = llm._retry_hint_seconds(_HTTPError(429, message))
+            assert hint is not None and abs(hint - expected) < 1e-6, message
+        assert llm._retry_hint_seconds(_HTTPError(429, "Rate limit exceeded")) is None
+
+    def test_retry_after_header_is_read_when_the_message_says_nothing(self) -> None:
+        exc = _HTTPError(429, "Rate limit exceeded")
+        headers = {"retry-after": "12"}
+        exc.response = SimpleNamespace(headers=headers)  # type: ignore[attr-defined]
+        assert llm._retry_hint_seconds(exc) == 12.0
+
+    def test_park_seconds_clamp(self) -> None:
+        hinted = llm._park_seconds_for(_HTTPError(429, _GROQ_TPD), "groq")
+        assert abs(hinted - 2823.2) < 1e-6, "47m3.2s, inside the clamp, is used as-is"
+        # Hint below the floor → floor; above the cap → cap
+        short = _HTTPError(429, "on tokens per day (TPD) … try again in 3s")
+        assert llm._park_seconds_for(short, "groq") == llm.RATE_LIMIT_PARK_SECONDS
+        long = _HTTPError(429, "on tokens per day (TPD) … try again in 23h59m")
+        assert llm._park_seconds_for(long, "groq") == llm.KEY_PARK_MAX_SECONDS
+        # No hint: OpenRouter keeps its hour, anyone else the floor
+        no_hint = _HTTPError(429, _OPENROUTER_DAILY)
+        assert (
+            llm._park_seconds_for(no_hint, "openrouter")
+            == llm.OPENROUTER_QUOTA_PARK_SECONDS
+        )
+        assert llm._park_seconds_for(no_hint, "groq") == llm.RATE_LIMIT_PARK_SECONDS
 
 
 class TestRateLimitPark(_PoolTestCase):
     """
-    A spent free tier used to cost the whole 15/30/60/120 s ladder on every call.
-    But only a QUOTA-class 429 may park: on 2026-09-20 the first version parked
-    Groq — the only working provider — after three short rounds of per-minute
-    429s under sustained load, and four of five Step-7 rewrites were lost.
+    A spent bucket used to cost the whole 15/30/60/120 s ladder on every call —
+    and, once the L11c streak rule existed, parked the whole PROVIDER after three
+    rounds: on 2026-09-20 that silenced the only working provider on per-minute
+    bursts; on 2026-09-21 it let five empty daily buckets sit in the ladder.
+    Now one daily-class message parks exactly the key that sent it, at once.
     """
 
-    def _dispatch(self, pool):
+    def _dispatch(self, pool, sleep=None):
         with (
             patch.object(llm, "_pool", pool),
             patch.object(llm, "_pool_size", len(pool)),
-            patch.object(llm.time, "sleep", return_value=None),
+            patch.object(llm.time, "sleep", sleep or (lambda _s: None)),
             patch.object(llm.sentry_sdk, "capture_message"),
         ):
             return llm._dispatch(
@@ -656,47 +741,94 @@ class TestRateLimitPark(_PoolTestCase):
                 est_tokens=100,
             )
 
-    def test_quota_classification(self) -> None:
-        assert llm._is_quota_429(_HTTPError(429, _GROQ_TPD)) is True
-        assert llm._is_quota_429(_HTTPError(429, _OPENROUTER_DAILY)) is True
-        assert llm._is_quota_429(_HTTPError(429, _GROQ_TPM)) is False
-        assert llm._is_quota_429(_HTTPError(429, "Rate limit exceeded")) is False
-        assert llm._is_quota_429(_HTTPError(503, "per day")) is False
+    def test_first_daily_429_parks_that_key_and_the_sibling_serves_the_call(
+        self,
+    ) -> None:
+        spent = _entry("groq", exc=_HTTPError(429, _GROQ_TPD), key_idx=0)
+        fresh = _entry("groq", content="from key 1", key_idx=1)
 
-    def test_three_all_quota_429_rounds_park_the_provider(self) -> None:
+        assert self._dispatch([spent, fresh]) == "from key 1"
+        assert len(spent.client.calls) == 1, "one message is proof — no second try"
+        assert llm._is_rate_limited("groq", 0) is True
+        assert llm._is_rate_limited("groq", 1) is False
+        assert llm._is_rate_limited("groq") is False, "the provider is not parked"
+
+    def test_a_parked_key_is_skipped_on_the_next_call_without_a_request(self) -> None:
+        spent = _entry("groq", exc=_HTTPError(429, _GROQ_TPD), key_idx=0)
+        fresh = _entry("groq", content="ok", key_idx=1)
+        pool = [spent, fresh]
+
+        self._dispatch(pool)
+        self._dispatch(pool)
+        assert len(spent.client.calls) == 1, "parked for the hinted 47 minutes"
+        assert len(fresh.client.calls) == 2
+
+    def test_openrouter_daily_quota_parks_on_the_first_message(self) -> None:
         pool = [
-            _entry("openrouter", exc=_HTTPError(429, _OPENROUTER_DAILY)),
-            _entry("openrouter", exc=_HTTPError(429, _OPENROUTER_DAILY)),
+            _entry("openrouter", exc=_HTTPError(429, _OPENROUTER_DAILY), key_idx=0),
+            _entry("openrouter", exc=_HTTPError(429, _OPENROUTER_DAILY), key_idx=1),
         ]
         with patch.object(llm, "_model_for", return_value="x/model:free"):
             assert self._dispatch(pool) == ""
-        assert llm._is_rate_limited("openrouter") is True
+        assert llm._is_rate_limited("openrouter", 0) is True
+        assert llm._is_rate_limited("openrouter", 1) is True
         total_calls = sum(len(e.client.calls) for e in pool)
-        assert (
-            total_calls == 2 * llm.RATE_LIMIT_ROUNDS_TO_PARK
-        ), "parked after three all-quota-429 rounds, not after the full ladder"
+        assert total_calls == 2, "each key answered once, then nothing — no ladder"
+
+    def test_mistral_1300_parks_the_provider_for_a_quarter_hour(self) -> None:
+        pool = [
+            _entry("mistral", exc=_HTTPError(429, _MISTRAL_1300), key_idx=0),
+            _entry("mistral", exc=_HTTPError(429, _MISTRAL_1300), key_idx=1),
+        ]
+        assert self._dispatch(pool) == ""
+        assert llm._is_rate_limited("mistral") is True
+        total_calls = sum(len(e.client.calls) for e in pool)
+        assert total_calls == 1, "one 1300 parks the account; the sibling is not tried"
 
     def test_per_minute_429s_never_park_even_across_the_whole_ladder(self) -> None:
         """Groq under sustained load: every round 429s, the ladder keeps trying."""
         pool = [
-            _entry("groq", exc=_HTTPError(429, _GROQ_TPM)),
-            _entry("groq", exc=_HTTPError(429, _GROQ_TPM)),
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM), key_idx=0),
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM), key_idx=1),
         ]
         assert self._dispatch(pool) == ""
-        assert llm._is_rate_limited("groq") is False
+        assert llm._is_rate_limited("groq", 0) is False
+        assert llm._is_rate_limited("groq", 1) is False
         total_calls = sum(len(e.client.calls) for e in pool)
         assert total_calls == 2 * (
             1 + len(llm.RETRY_WAIT_TIMES)
         ), "every round of the ladder was attempted — nothing parked Groq"
 
+    def test_a_per_minute_round_waits_the_providers_hint_not_the_ladder(self) -> None:
+        sleeps: list[float] = []
+        pool = [
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM), key_idx=0),
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM), key_idx=1),
+        ]
+        self._dispatch(pool, sleep=sleeps.append)
+        assert sleeps == [2.5] * len(llm.RETRY_WAIT_TIMES), sleeps
+
+    def test_a_round_with_an_unhinted_failure_keeps_the_ladder(self) -> None:
+        sleeps: list[float] = []
+        pool = [
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM), key_idx=0),
+            _entry("groq", exc=_HTTPError(503, "Error code: 503"), key_idx=1),
+        ]
+        self._dispatch(pool, sleep=sleeps.append)
+        assert sleeps == [float(s) for s in llm.RETRY_WAIT_TIMES], sleeps
+
     def test_a_generic_429_without_a_quota_marker_never_parks(self) -> None:
-        """Mistral's bare 'Rate limit exceeded' is not proof of a spent tier."""
+        """A bare 'Rate limit exceeded' (no code, no allowance) is not proof."""
         pool = [
             _entry(
-                "mistral", exc=_HTTPError(429, "Error code: 429 - Rate limit exceeded")
+                "mistral",
+                exc=_HTTPError(429, "Error code: 429 - Rate limit exceeded"),
+                key_idx=0,
             ),
             _entry(
-                "mistral", exc=_HTTPError(429, "Error code: 429 - Rate limit exceeded")
+                "mistral",
+                exc=_HTTPError(429, "Error code: 429 - Rate limit exceeded"),
+                key_idx=1,
             ),
         ]
         assert self._dispatch(pool) == ""
@@ -704,17 +836,94 @@ class TestRateLimitPark(_PoolTestCase):
 
     def test_a_burst_429_followed_by_success_never_parks(self) -> None:
         pool = [
-            _entry("groq", exc=_HTTPError(429, _GROQ_TPM)),
-            _entry("groq", content="ok"),
+            _entry("groq", exc=_HTTPError(429, _GROQ_TPM), key_idx=0),
+            _entry("groq", content="ok", key_idx=1),
         ]
         assert self._dispatch(pool) == "ok"
-        assert llm._is_rate_limited("groq") is False
+        assert llm._is_rate_limited("groq", 0) is False
 
     def test_parked_provider_is_excluded_from_routing(self) -> None:
         pool = [_entry("mistral", content="x"), _entry("groq", content="x")]
         llm._mark_rate_limited("mistral")
         with patch.object(llm, "_pool", pool):
             assert {e.provider for e in llm._usable_entries(100, False)} == {"groq"}
+
+    def test_parked_key_is_excluded_from_routing_but_its_sibling_is_not(self) -> None:
+        pool = [
+            _entry("groq", content="x", key_idx=0),
+            _entry("groq", content="x", key_idx=1),
+        ]
+        llm._mark_rate_limited("groq", key_idx=0)
+        with patch.object(llm, "_pool", pool):
+            assert [e.key_idx for e in llm._usable_entries(100, False)] == [1]
+
+
+# ── L16 — fail fast, stop clean ───────────────────────────────────────────────
+
+
+class TestFailFast(_PoolTestCase):
+    """
+    With every key parked a call must cost milliseconds: no ladder, no 15 s
+    throttle. A cron reads `pool_exhausted()` between items and stops with a
+    summary instead of walking its whole queue against empty buckets.
+    """
+
+    def test_all_keys_parked_returns_empty_with_zero_sleeps(self) -> None:
+        pool = [
+            _entry("groq", content="never", key_idx=0),
+            _entry("groq", content="never", key_idx=1),
+        ]
+        llm._mark_rate_limited("groq", key_idx=0)
+        llm._mark_rate_limited("groq", key_idx=1)
+        sleeps: list[float] = []
+        with (
+            patch.object(llm, "_pool", pool),
+            patch.object(llm, "_pool_size", len(pool)),
+            patch.object(llm.time, "sleep", sleeps.append),
+            patch.object(llm.sentry_sdk, "capture_message"),
+        ):
+            assert llm.llm_call("hi") == ""
+        assert sleeps == [], "neither the throttle nor the ladder ran"
+        assert all(e.client.calls == [] for e in pool)
+
+    def test_pool_exhausted_tracks_parks_and_disabled_providers(self) -> None:
+        pool = [_entry("groq", key_idx=0), _entry("mistral", key_idx=0)]
+        with patch.object(llm, "_pool", pool):
+            assert llm.pool_exhausted() is False
+            llm._mark_rate_limited("groq", key_idx=0)
+            assert llm.pool_exhausted() is False, "mistral is still usable"
+            llm._mark_unhealthy("mistral", "402")
+            assert llm.pool_exhausted() is True
+
+    def test_throttle_sleeps_only_while_something_can_be_called(self) -> None:
+        pool = [_entry("groq", key_idx=0)]
+        sleeps: list[float] = []
+        with (
+            patch.object(llm, "_pool", pool),
+            patch.object(llm.time, "sleep", sleeps.append),
+        ):
+            llm._throttle()
+            assert sleeps == [llm.INTER_CALL_SLEEP]
+            llm._mark_rate_limited("groq", key_idx=0)
+            llm._throttle()
+            assert sleeps == [llm.INTER_CALL_SLEEP], "no sleep for an exhausted pool"
+
+    def test_groq_first_order_holds_for_every_mode(self) -> None:
+        """R1 (developer, 2026-09-21): all Groq keys, then the others — always."""
+        k1 = _entry("groq", content="k1", key_idx=0)
+        k2 = _entry("groq", content="k2", key_idx=1)
+        mistral = _entry("mistral", content="mistral")
+        router = _entry("openrouter", content="router")
+        pool = [k1, k2, mistral, router]
+        with (
+            patch.object(llm, "_pool", pool),
+            patch.object(llm, "_pool_size", len(pool)),
+            patch.object(llm.time, "sleep", return_value=None),
+        ):
+            for mode in ("standard", "writer", "quiz", "ca_article"):
+                llm._current_key_idx = 0
+                assert llm.llm_call("hi", mode=mode) == "k1", mode
+        assert mistral.client.calls == [] and router.client.calls == []
 
 
 if __name__ == "__main__":

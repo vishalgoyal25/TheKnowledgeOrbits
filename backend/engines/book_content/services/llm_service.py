@@ -55,10 +55,17 @@ Three mechanisms fix that permanently:
      with an empty body or a 404 is demoted for a day and the next candidate is
      tried within the same call (demote_openrouter_model, capped per call).
 
-  E. RATE-LIMIT PARK (L11c — _mark_rate_limited)
-     A provider whose every key answered 429 for three consecutive rounds is
-     parked for five minutes, so a quota-dead free tier costs seconds, not the
-     whole cooldown ladder, on every large call.
+  E. PER-KEY PARK ON THE PROVIDER'S OWN CLOCK (L15, Part III 2026-09-21 —
+     _limit_class / _retry_hint_seconds / _mark_rate_limited)
+     Groq meters the free tier PER ORGANISATION PER MODEL on a ROLLING 24 h
+     window (200k tokens/day for gpt-oss-120b), and the five Groq keys are five
+     accounts, i.e. five separate buckets. A 429 is read, not counted: a daily-class
+     message ("tokens per day (TPD) … try again in 47m") parks THAT KEY for the time
+     the provider names; a per-minute one ("… try again in 2.5s") makes the round
+     wait that hint instead of the 15/30/60/120 s ladder; anything else is retried
+     as before. With every key parked a call returns "" at once — no ladder — and
+     `pool_exhausted()` lets a cron stop cleanly instead of grinding every item
+     through four and a half minutes of retries (the 2026-09-21 shape).
 
 An empty/whitespace completion is treated as a FAILURE, never a success: one
 OpenRouter free model was observed returning HTTP 200 with an empty body.
@@ -67,11 +74,13 @@ PUBLIC API — unchanged, no caller edits required:
     llm_call(prompt, mode="standard") -> str          ("" on permanent failure)
     llm_call_json(prompt, system_prompt, mode) -> str ("" on permanent failure)
     check_any_llm_available() -> bool
+    pool_exhausted() -> bool                          (every key parked right now)
     INTER_CALL_SLEEP
 
 Adding a provider: append one ProviderSpec below + the key in settings. Nothing else.
 """
 
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -118,15 +127,22 @@ OPENROUTER_MAX_CANDIDATES = 5
 # of burning five more calls per resolution (first live run, 2026-09-20).
 OPENROUTER_QUOTA_PARK_SECONDS = 60 * 60
 
-# L11c (2026-09-20). A provider whose every key answered a QUOTA-class 429 (a
-# daily / account allowance — see _is_quota_429) in three consecutive rounds is
-# parked for five minutes, so a spent free tier costs seconds, not the full
-# 15/30/60/120 s ladder, on every call. Per-minute 429s never count: the first
-# production run proved Groq can answer them for three short rounds under
-# sustained load and still be perfectly healthy — parking it cost four of five
-# Step-7 rewrites that day.
-RATE_LIMIT_PARK_SECONDS = 5 * 60
-RATE_LIMIT_ROUNDS_TO_PARK = 3
+# L15 (Part III, 2026-09-21). A key that answers a DAILY-class 429 is parked at
+# once, for as long as the provider says ("Please try again in 47m3.2s"), clamped:
+# never under five minutes — Groq's rolling 24 h window returns a few thousand
+# tokens at a time, and polling it faster only burns requests — and never over six
+# hours, so a cron always recovers within its own day. The L11c streak counter
+# ("three rounds of 429s") is gone: it parked a healthy provider on per-minute
+# bursts on 2026-09-20 and, on 2026-09-21, let five empty daily buckets sit in
+# the 15/30/60/120 s ladder for three rounds before it noticed.
+RATE_LIMIT_PARK_SECONDS = 5 * 60  # default / floor
+KEY_PARK_MAX_SECONDS = 6 * 3600
+# Mistral's "Rate limit exceeded … code 1300" has been every reply from that tier
+# since 2026-09-18 and carries no hint. A quarter-hour park saves ~4 s per retry
+# round on every call while the keys are configured at all.
+MISTRAL_1300_PARK_SECONDS = 15 * 60
+# A per-minute 429 that names a wait no longer than this replaces the ladder step.
+HINT_WAIT_MAX_SECONDS = 60.0
 
 # Models that are $0 but unusable. Verified 2026-08-21 (FEATURES_LLM_FIX.md §5):
 #   dots-3-note-preview  → HTTP 200 with an EMPTY body
@@ -246,28 +262,82 @@ def _is_429(exc: Exception) -> bool:
     return status == 429 or "error code: 429" in text or "rate limit" in text
 
 
-# A 429 whose message names a DAILY / account-level allowance, as opposed to a
-# per-minute burst. Groq: "tokens per day (TPD)"; OpenRouter: "free-models-per-day";
-# a "credits"/"quota" wording is the same class. Groq's ordinary "tokens per
-# minute (TPM) … try again in 2s" is NOT — it clears within the retry ladder.
+# ── 429 anatomy (L15) ─────────────────────────────────────────────────────────
+# A 429 is read, never just counted. The class decides the reaction:
+#   tpd / rpd / quota  → a DAILY or account allowance — park the key for the time
+#                        the provider names (Groq "tokens per day (TPD) … try again
+#                        in 47m3.2s", OpenRouter "free-models-per-day", any
+#                        credits / quota / monthly wording)
+#   tpm / rpm          → a per-minute burst — retry; the round waits the hint
+#                        ("try again in 2.5s") instead of the ladder step
+#   mistral_1300       → Mistral's bare "Rate limit exceeded … code 1300", the only
+#                        reply from that tier since 2026-09-18 — park the provider
+#   other              → retry ladder, unchanged
+# Counting was the 2026-09-20 mistake (three rounds of per-minute 429s parked the
+# only working provider); trusting the message is what the first Part III log
+# lacked — our own truncation hid whether a 429 was TPM or TPD.
+_LIMIT_TPM = "tpm"
+_LIMIT_RPM = "rpm"
+_LIMIT_TPD = "tpd"
+_LIMIT_RPD = "rpd"
+_LIMIT_QUOTA = "quota"
+_LIMIT_MISTRAL_1300 = "mistral_1300"
+_LIMIT_OTHER = "other"
+_DAILY_LIMIT_CLASSES = frozenset({_LIMIT_TPD, _LIMIT_RPD, _LIMIT_QUOTA})
+_PER_MINUTE_LIMIT_CLASSES = frozenset({_LIMIT_TPM, _LIMIT_RPM})
 _QUOTA_429_MARKERS = ("per day", "per-day", "daily", "quota", "credits", "monthly")
+
+# Groq: "Please try again in 1h2m3.5s" / "1m19.968s" / "2.5s" / "320ms".
+_RETRY_HINT_RE = re.compile(r"try again in\s+([0-9hms.]+)", re.IGNORECASE)
+_DURATION_PART_RE = re.compile(r"(\d+(?:\.\d+)?)(ms|h|m|s)")
+_DURATION_UNIT_SECONDS = {"h": 3600.0, "m": 60.0, "s": 1.0, "ms": 0.001}
+
+
+def _limit_class(exc: Exception) -> str:
+    """Which allowance a 429 names — '' when the error is not a 429 at all."""
+    if not _is_429(exc):
+        return ""
+    text = str(exc).lower()
+    if "tokens per day" in text or "(tpd)" in text:
+        return _LIMIT_TPD
+    if "requests per day" in text or "(rpd)" in text:
+        return _LIMIT_RPD
+    if "tokens per minute" in text or "(tpm)" in text:
+        return _LIMIT_TPM
+    if "requests per minute" in text or "(rpm)" in text:
+        return _LIMIT_RPM
+    if "'code': '1300'" in text or '"code": "1300"' in text:
+        return _LIMIT_MISTRAL_1300
+    if any(marker in text for marker in _QUOTA_429_MARKERS):
+        return _LIMIT_QUOTA
+    return _LIMIT_OTHER
 
 
 def _is_quota_429(exc: Exception) -> bool:
-    """
-    Only a quota-class 429 may feed the rate-limit park (L11c).
+    """A 429 naming a daily / account allowance — the only kind that parks a key."""
+    return _limit_class(exc) in _DAILY_LIMIT_CLASSES
 
-    The first production run after the park shipped (2026-09-20, Step 7) proved the
-    distinction is load-bearing: Groq answered per-minute 429s for three short
-    rounds (0 s + 15 s + 30 s is less than its 60 s window), the streak rule parked
-    Groq — the only working provider — for five minutes, and four of five rewrites
-    were rejected with "no capable provider". A per-minute 429 is what the retry
-    ladder is for; it never proves a provider is spent for the day.
+
+def _retry_hint_seconds(exc: Exception) -> float | None:
     """
-    if not _is_429(exc):
-        return False
-    text = str(exc).lower()
-    return any(marker in text for marker in _QUOTA_429_MARKERS)
+    How long the provider itself says to wait, in seconds — None when it does not
+    say. Groq puts it in the message; an OpenAI-compatible provider may send a
+    `Retry-After` header instead, read when the SDK exposes the response.
+    """
+    match = _RETRY_HINT_RE.search(str(exc))
+    if match:
+        parts = _DURATION_PART_RE.findall(match.group(1))
+        if parts:
+            return sum(
+                float(value) * _DURATION_UNIT_SECONDS[unit] for value, unit in parts
+            )
+    try:
+        header = exc.response.headers.get("retry-after")  # type: ignore[attr-defined]
+        if header:
+            return float(header)
+    except Exception:
+        pass
+    return None
 
 
 # ── Provider registry ─────────────────────────────────────────────────────────
@@ -356,6 +426,9 @@ class _LLMEntry:
     client: Any  # Groq | OpenAI — both expose .chat.completions.create()
     provider: str
     spec: ProviderSpec
+    # Position among this provider's keys — the unit a daily-class 429 parks.
+    # For Groq each key is its own account, hence its own daily bucket (L15).
+    key_idx: int = 0
 
 
 # ── Circuit breaker (TTL'd, never permanent) ──────────────────────────────────
@@ -413,37 +486,75 @@ def _is_unhealthy(provider: str) -> bool:
     return until is not None and until > time.time()
 
 
-# ── Rate-limit park (L11c) ────────────────────────────────────────────────────
+# ── Rate-limit park (L11c → L15) ─────────────────────────────────────────────
+# Two levels. A PROVIDER park (`llm:ratelimited:<provider>`) is for an allowance
+# shared by every key of that provider — OpenRouter's per-account daily quota seen
+# by the smoke call. A KEY park (`llm:ratelimited:<provider>:<idx>`) is what a
+# daily-class 429 on the generation path sets: the five Groq keys are five
+# accounts, i.e. five separate buckets, so one empty bucket must neither silence
+# the other four nor keep hammering itself. Both levels are checked on routing.
+# Keyed by the cache key so the local fallback dict mirrors the cache exactly.
 _local_rate_limited: dict[str, float] = {}
 
 
-def _rate_limited_key(provider: str) -> str:
-    return f"llm:ratelimited:{provider}"
+def _rate_limited_key(provider: str, key_idx: int | None = None) -> str:
+    if key_idx is None:
+        return f"llm:ratelimited:{provider}"
+    return f"llm:ratelimited:{provider}:{key_idx}"
 
 
 def _mark_rate_limited(
-    provider: str, ttl_seconds: int = RATE_LIMIT_PARK_SECONDS, reason: str = "429"
+    provider: str,
+    ttl_seconds: float = RATE_LIMIT_PARK_SECONDS,
+    reason: str = "429",
+    key_idx: int | None = None,
+    limit: str = "",
 ) -> None:
+    ttl = int(round(ttl_seconds))
+    cache_key = _rate_limited_key(provider, key_idx)
     try:
-        cache.set(_rate_limited_key(provider), reason[:120], ttl_seconds)
+        cache.set(cache_key, reason[:120], ttl)
     except Exception:
-        _local_rate_limited[provider] = time.time() + ttl_seconds
+        _local_rate_limited[cache_key] = time.time() + ttl
     logger.warning(
-        "llm_provider_rate_limit_parked",
+        "llm_key_parked" if key_idx is not None else "llm_provider_rate_limit_parked",
         provider=provider,
-        ttl_seconds=ttl_seconds,
+        key=key_idx,
+        limit=limit,
+        ttl_seconds=ttl,
         reason=reason[:120],
     )
 
 
-def _is_rate_limited(provider: str) -> bool:
-    try:
-        if cache.get(_rate_limited_key(provider)) is not None:
+def _is_rate_limited(provider: str, key_idx: int | None = None) -> bool:
+    """Parked at the provider level, or — when a key is named — at the key level."""
+    cache_keys = [_rate_limited_key(provider)]
+    if key_idx is not None:
+        cache_keys.append(_rate_limited_key(provider, key_idx))
+    for cache_key in cache_keys:
+        try:
+            if cache.get(cache_key) is not None:
+                return True
+        except Exception:
+            pass
+        until = _local_rate_limited.get(cache_key)
+        if until is not None and until > time.time():
             return True
-    except Exception:
-        pass
-    until = _local_rate_limited.get(provider)
-    return until is not None and until > time.time()
+    return False
+
+
+def _park_seconds_for(exc: Exception, provider: str) -> float:
+    """
+    How long a daily-class 429 parks a key: the provider's own hint, clamped to
+    [5 min, 6 h]. Without a hint OpenRouter's daily quota keeps its hour (the
+    smoke-call figure); anything else gets the five-minute floor.
+    """
+    hint = _retry_hint_seconds(exc)
+    if hint is None:
+        if provider == "openrouter":
+            return float(OPENROUTER_QUOTA_PARK_SECONDS)
+        return float(RATE_LIMIT_PARK_SECONDS)
+    return min(max(hint, float(RATE_LIMIT_PARK_SECONDS)), float(KEY_PARK_MAX_SECONDS))
 
 
 # ── OpenRouter dynamic model resolution ───────────────────────────────────────
@@ -651,6 +762,7 @@ def _build_pool() -> list[_LLMEntry]:
     configured key are skipped silently — a missing key must never crash boot.
     """
     pool: list[_LLMEntry] = []
+    per_provider: dict[str, int] = {}
 
     for spec in PROVIDERS:
         if not spec.enabled:
@@ -665,8 +777,10 @@ def _build_pool() -> list[_LLMEntry]:
                         client=_build_client(spec, key),
                         provider=spec.name,
                         spec=spec,
+                        key_idx=per_provider.get(spec.name, 0),
                     )
                 )
+                per_provider[spec.name] = per_provider.get(spec.name, 0) + 1
             except Exception as exc:  # a broken SDK must not kill the others
                 logger.warning(
                     "llm_client_init_failed", provider=spec.name, error=str(exc)[:120]
@@ -711,7 +825,8 @@ def _usable_entries(est_tokens: int, needs_json: bool) -> list[_LLMEntry]:
     Filtering on `max_request_tokens` is what permanently prevents the 413: a 9k
     prompt is simply never offered to a ~6k-capacity provider. It also produces the
     intended ordering for free — small prompts see groq first, large prompts land
-    deterministically on mistral.
+    deterministically on mistral. A key parked by a daily-class 429 (L15) is
+    filtered here too, so a spent bucket is never offered a request.
     """
     usable = [
         e
@@ -719,7 +834,7 @@ def _usable_entries(est_tokens: int, needs_json: bool) -> list[_LLMEntry]:
         if e.spec.max_request_tokens >= est_tokens
         and (e.spec.supports_json_mode or not needs_json)
         and not _is_unhealthy(e.provider)
-        and not _is_rate_limited(e.provider)
+        and not _is_rate_limited(e.provider, e.key_idx)
     ]
     if not usable:
         logger.error(
@@ -727,8 +842,25 @@ def _usable_entries(est_tokens: int, needs_json: bool) -> list[_LLMEntry]:
             est_tokens=est_tokens,
             needs_json=needs_json,
             pool_size=_pool_size,
+            exhausted=pool_exhausted(),
         )
     return usable
+
+
+def pool_exhausted() -> bool:
+    """
+    True when no key in the pool may be called right now — every key parked by a
+    daily-class 429 or its provider disabled. No network, cache reads only.
+
+    A cron checks this between items: once the day's buckets are spent, every
+    further `llm_call` would return "" and the run should stop with a summary
+    instead of walking its whole queue (Part III, 2026-09-21: static content
+    4 h+, overviews 31 min, all of it retries against empty buckets).
+    """
+    return not any(
+        not _is_unhealthy(e.provider) and not _is_rate_limited(e.provider, e.key_idx)
+        for e in _pool
+    )
 
 
 def _dispatch(
@@ -750,15 +882,24 @@ def _dispatch(
     old rotation walked the whole flat key list, so with 5 Groq + 2 Mistral + 3
     OpenRouter keys roughly a third of every call type — the Daily-CA article
     included — *started* on a fallback provider and was written by whichever free
-    model happened to answer. Groq's quota still spreads across its five keys;
-    Mistral and OpenRouter are reached only when every Groq key has failed.
+    model happened to answer. Mistral and OpenRouter are reached only when every
+    Groq key has failed. The five Groq keys are five accounts — five separate
+    daily buckets on a rolling 24 h window — so the rotation spreads the day's
+    load across them (corrected 2026-09-21; #30 had called it one shared quota).
+
+    429s (L15, 2026-09-21): read, not counted. A daily-class 429 parks that KEY
+    for the time the provider names and the call moves on to the next key at
+    once; a per-minute 429 makes the round wait the provider's hint instead of
+    the ladder step. A round with nothing left to try ends the call immediately —
+    no sleep — so with every key parked a call costs milliseconds, not the
+    4.5 minutes that turned a 3-minute cron into a 31-minute one.
     """
     global _current_key_idx
 
     skipped: set[str] = set()
     last_error = ""
     demotions = 0  # L11b: OpenRouter models dropped within THIS call (capped)
-    streak_429: dict[str, int] = {}  # L11c: consecutive all-429 rounds per provider
+    wait = 0.0  # seconds to sleep before the NEXT round, decided by this round
 
     def _drop_openrouter_model(model_id: str, reason: str) -> None:
         """Demote the model (up to the cap) so the next entry re-resolves; then skip."""
@@ -769,22 +910,25 @@ def _dispatch(
         else:
             skipped.add("openrouter")
 
-    for round_idx, wait in enumerate([0] + RETRY_WAIT_TIMES):
-        if wait:
-            logger.warning("llm_all_keys_exhausted", cooldown_seconds=wait)
-            time.sleep(wait)
-
+    for round_idx in range(1 + len(RETRY_WAIT_TIMES)):
         entries = [
             e
             for e in _usable_entries(est_tokens, json_mode)
             if e.provider not in skipped
         ]
         if not entries:
+            # Nothing usable — waiting could not change that. Return now.
             break
+        if wait:
+            logger.warning("llm_all_keys_exhausted", cooldown_seconds=wait)
+            time.sleep(wait)
 
         retryable_seen = False
-        round_attempts: dict[str, int] = {}
-        round_429s: dict[str, int] = {}
+        # Per-minute hints seen this round; the round's wait is their maximum
+        # when NOTHING else transient happened (a 5xx or an empty body keeps
+        # the ladder — those carry no timing information).
+        minute_hints: list[float] = []
+        unhinted_retryable = False
 
         primary = entries[0].provider
         primary_keys = [e for e in entries if e.provider == primary]
@@ -794,6 +938,10 @@ def _dispatch(
 
         for pos, entry in enumerate(ordered):
             if entry.provider in skipped or _is_unhealthy(entry.provider):
+                continue
+            # A sibling key's daily-class 429 earlier in THIS round cannot have
+            # parked this key, but a provider-level park (Mistral 1300) can.
+            if _is_rate_limited(entry.provider, entry.key_idx):
                 continue
 
             model = _model_for(entry.spec, entry.client)
@@ -811,7 +959,6 @@ def _dispatch(
             if json_mode:
                 kwargs["response_format"] = {"type": "json_object"}
             kwargs.update(_reasoning_kwargs(entry.provider, model, cfg))
-            round_attempts[entry.provider] = round_attempts.get(entry.provider, 0) + 1
 
             try:
                 response = entry.client.chat.completions.create(**kwargs)
@@ -851,12 +998,19 @@ def _dispatch(
             except Exception as exc:
                 action = _classify(exc)
                 last_error = str(exc).replace("\n", " ")[:160]
+                limit = _limit_class(exc)
+                hint = _retry_hint_seconds(exc) if limit else None
+                # `limit=` / `retry_in=` are the fields the raw text cannot show:
+                # it is cut before the allowance name (and would carry the org id).
                 logger.warning(
                     f"{log_name}_failed",
                     provider=entry.provider,
+                    key=entry.key_idx,
                     model=model,
                     action=action,
                     round=round_idx,
+                    limit=limit or None,
+                    retry_in=round(hint, 1) if hint is not None else None,
                     error=last_error[:110],
                 )
 
@@ -873,28 +1027,44 @@ def _dispatch(
                 elif action == _DISABLE_PROVIDER:
                     _mark_unhealthy(entry.provider, last_error)
                     skipped.add(entry.provider)
+                elif limit in _DAILY_LIMIT_CLASSES:
+                    # This KEY's bucket is spent for as long as the provider
+                    # says. Park it and move to the next key at once — the
+                    # sibling keys are separate buckets (L15). Not retryable
+                    # within this call: a parked key is filtered next round.
+                    _mark_rate_limited(
+                        entry.provider,
+                        ttl_seconds=_park_seconds_for(exc, entry.provider),
+                        reason=last_error,
+                        key_idx=entry.key_idx,
+                        limit=limit,
+                    )
+                elif limit == _LIMIT_MISTRAL_1300:
+                    # One account, one allowance: park the provider, not the key.
+                    _mark_rate_limited(
+                        entry.provider,
+                        ttl_seconds=MISTRAL_1300_PARK_SECONDS,
+                        reason=last_error,
+                        limit=limit,
+                    )
+                    skipped.add(entry.provider)
                 else:
                     retryable_seen = True
-                    if _is_quota_429(exc):
-                        round_429s[entry.provider] = (
-                            round_429s.get(entry.provider, 0) + 1
-                        )
-
-        # L11c: a provider whose EVERY attempt this round was a QUOTA-class 429
-        # extends its streak; anything else — a success, another error, or a
-        # per-minute 429 — resets it. Three consecutive such rounds park it.
-        for provider, attempts in round_attempts.items():
-            if attempts and round_429s.get(provider, 0) == attempts:
-                streak_429[provider] = streak_429.get(provider, 0) + 1
-                if streak_429[provider] >= RATE_LIMIT_ROUNDS_TO_PARK:
-                    _mark_rate_limited(provider, reason=last_error)
-                    skipped.add(provider)
-            else:
-                streak_429[provider] = 0
+                    if limit in _PER_MINUTE_LIMIT_CLASSES and hint is not None:
+                        minute_hints.append(hint)
+                    else:
+                        unhinted_retryable = True
 
         # Nothing transient left to wait for — backing off would only waste time.
-        if not retryable_seen:
+        if not retryable_seen or round_idx == len(RETRY_WAIT_TIMES):
             break
+
+        # The next round's wait: the provider's own per-minute hint when that is
+        # all this round saw (a burst clears in seconds, not in a 15/30/60/120 s
+        # ladder), otherwise the ladder step as before.
+        wait = float(RETRY_WAIT_TIMES[round_idx])
+        if minute_hints and not unhinted_retryable:
+            wait = min(max(minute_hints), HINT_WAIT_MAX_SECONDS)
 
     logger.error(
         "llm_permanently_failed",
@@ -914,6 +1084,17 @@ def _dispatch(
 # ── Core Call Wrappers ────────────────────────────────────────────────────────
 
 
+def _throttle() -> None:
+    """
+    The 15 s soft throttle between calls — skipped when no key can be called at
+    all, so a caller that keeps asking an exhausted pool gets its "" in
+    milliseconds rather than paying 15 s per item for nothing.
+    """
+    if pool_exhausted():
+        return
+    time.sleep(INTER_CALL_SLEEP)
+
+
 def llm_call(prompt: str, mode: str = "standard") -> str:
     """
     One LLM call through the multi-provider pool.
@@ -926,7 +1107,7 @@ def llm_call(prompt: str, mode: str = "standard") -> str:
         Response string. Empty string on permanent failure (every capable provider
         exhausted) — callers treat "" as a failed cycle.
     """
-    time.sleep(INTER_CALL_SLEEP)
+    _throttle()
     cfg = _MODE_CONFIG.get(mode, _MODE_CONFIG["standard"])
     return _dispatch(
         messages=[{"role": "user", "content": prompt}],
@@ -951,7 +1132,7 @@ def llm_call_json(
     Returns:
         Raw JSON string (caller does json.loads). Empty string on permanent failure.
     """
-    time.sleep(INTER_CALL_SLEEP)
+    _throttle()
     cfg = _MODE_CONFIG.get(mode, _MODE_CONFIG["standard"])
 
     messages: list[dict[str, str]] = []
@@ -996,13 +1177,15 @@ def check_any_llm_available() -> bool:
 
     ⚠️ This used to try one key per provider, on the reasoning that "a dead
     provider is dead on every key". That premise is false for a revoked or
-    mis-set key, so every key is still tried. Correction from the first live run
-    on 2026-09-20: Groq's 429 reads "Rate limit reached for model … in
-    organization …" — the free tier is metered PER ORGANISATION, so five keys
-    from one account share ONE quota and do not multiply capacity. Keys are
-    rotated for resilience, not for throughput. (The original concern behind the
-    short-circuit was the Cerebras 402 tax; Cerebras is no longer in the pool,
-    and these probes are tiny.) Do not reinstate the per-provider short-circuit.
+    mis-set key AND for quota: Groq meters the free tier per ORGANISATION per
+    model on a rolling 24 h window, and the five Groq keys are five accounts —
+    five separate buckets — so key #1 being spent says nothing about the other
+    four. (#30 had read one truncated 429 as "five keys share one quota"; the
+    console read of 2026-09-21 corrected it.) Every key is therefore tried, and a
+    key already parked by a daily-class 429 is skipped without a call. (The
+    original concern behind the short-circuit was the Cerebras 402 tax; Cerebras
+    is no longer in the pool, and these probes are tiny.) Do not reinstate the
+    per-provider short-circuit.
 
     No sleep, no retry ladder — fast enough that the caller can decide whether to
     continue or abort without burning quota.
@@ -1013,13 +1196,13 @@ def check_any_llm_available() -> bool:
     tried: set[str] = set()
 
     for entry in _pool:
-        # Every KEY is tried, not one per provider. The old code skipped to the
-        # next provider after one key, justified as "a dead provider is dead on
-        # every key". That is false for quota: Groq's free tier is metered PER
-        # KEY, and this pool holds 5 of them — so key #1 being spent declared
-        # the whole provider dead while four healthy keys sat unused. The
-        # generation path rotates through all of them; this must too.
-        if _is_unhealthy(entry.provider):
+        # Every KEY is tried, not one per provider — each Groq key is its own
+        # daily bucket, so one spent key must never declare the provider dead
+        # while four full ones sit unused. A key the generation path has already
+        # parked for the day is skipped: the answer is known, the call is waste.
+        if _is_unhealthy(entry.provider) or _is_rate_limited(
+            entry.provider, entry.key_idx
+        ):
             continue
         tried.add(entry.provider)
 
