@@ -123,11 +123,13 @@ TheKnowledgeOrbits_Research_Agent.pdf
 !assets/research-agent-sample-report.pdf
 
 
+# No Markdown is tracked except what GitHub itself needs. CLAUDE.md predates
+# this rule and stays tracked (an ignore rule never untracks a tracked file).
+# FEATURES_SUPABASE_CLEANUP.md was the one exception until 2026-09-22; it now
+# lives with the other feature records in FEATURES/ (ignored below).
 *.md
 !README.md
 !SECURITY.md
-# Public incident write-up (DB cleanup + infra) — tracked like a normal file,
-!FEATURES_SUPABASE_CLEANUP.md
 
 # Interview prep — private assets
 INTERVIEW_PREP/
