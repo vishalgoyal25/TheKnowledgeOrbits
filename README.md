@@ -7,6 +7,13 @@ _Engine-First Django/Next.js Architecture | Built for Scale | Solo-Developed_
   <a href="https://theknowledgeorbits.com"><img src="https://img.shields.io/badge/%F0%9F%8C%90_Live_Site-theknowledgeorbits.com-2ea44f?style=for-the-badge" alt="Live Site"></a>
 </p>
 
+<!-- Support the developer. Both are public creator pages; Ko-fi takes 0% on tips. -->
+<p align="center">
+  <sub><b>❤️ Support the Code</b></sub><br>
+  <a href="https://buymeacoffee.com/vishalgoyal25"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
+  <a href="https://ko-fi.com/vishalgoyal25"><img src="https://img.shields.io/badge/Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white" alt="Ko-fi"></a>
+</p>
+
 <p align="center">
   <sub><b>⚙️ Backend &amp; Core</b></sub><br>
   <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" alt="Python">
