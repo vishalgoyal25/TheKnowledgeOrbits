@@ -12,6 +12,11 @@
  * and is still clickable, as requested, but is visibly labelled so a visitor is
  * not walked into a 404 and a crawler is not invited to index one. Flip the
  * flag to false as each page ships — nothing else needs to change.
+ *
+ * "Support the Code" sits inside the brand column, deliberately apart from the
+ * legal navigation. These are voluntary developer tips for the open-source
+ * work, not a product a student buys — conflating the two in one row would
+ * misrepresent both to a visitor and to a payment aggregator's reviewer.
  */
 
 "use client";
@@ -26,6 +31,7 @@ import {
   Facebook,
   Mail,
   MapPin,
+  Heart,
 } from "lucide-react";
 
 type FooterLink = { label: string; href: string; soon?: boolean };
@@ -92,6 +98,24 @@ const socialLinks = [
   { icon: Facebook, href: "#", label: "Facebook" },
 ];
 
+/**
+ * Public creator pages. Both open in a new tab so a supporter never loses
+ * their place in the site, and both carry `rel="noopener noreferrer"` — the
+ * destination must never get a handle on our window.
+ */
+const supportLinks: { label: string; href: string; note: string }[] = [
+  {
+    label: "Buy Me a Coffee",
+    href: "https://buymeacoffee.com/vishalgoyal25",
+    note: "Card payments, worldwide",
+  },
+  {
+    label: "Ko-fi",
+    href: "https://ko-fi.com/vishalgoyal25",
+    note: "0% platform fee",
+  },
+];
+
 function FooterLinkItem({ link }: { link: FooterLink }) {
   return (
     <Link
@@ -137,6 +161,38 @@ export default function Footer() {
                 </Link>
               ))}
             </div>
+
+            <section aria-labelledby="footer-support-heading" className="pt-1">
+              <h3
+                id="footer-support-heading"
+                className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-foreground"
+              >
+                <Heart
+                  className="h-4 w-4 fill-rose-500 text-rose-500"
+                  aria-hidden="true"
+                />
+                Support the Code
+              </h3>
+              <p className="mb-3 max-w-sm text-xs leading-relaxed text-muted-foreground">
+                This platform is open source and built solo. If it helped your
+                preparation, you can buy the developer a coffee — entirely
+                voluntary, and it unlocks nothing on the site.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {supportLinks.map((support) => (
+                  <a
+                    key={support.label}
+                    href={support.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={support.note}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:border-primary/40 hover:bg-accent hover:text-primary"
+                  >
+                    {support.label}
+                  </a>
+                ))}
+              </div>
+            </section>
           </div>
 
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 lg:col-span-4">
