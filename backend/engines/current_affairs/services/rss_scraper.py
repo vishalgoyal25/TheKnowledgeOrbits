@@ -21,9 +21,55 @@ from ..models import CAArticle, CASource
 
 logger = structlog.get_logger(__name__)
 
+# Shared by the feed fetch and the full-content fetch. feedparser sends its own
+# User-Agent and has NO request timeout of its own — a publisher that refuses
+# that agent, or a slow host, would silently kill or stall the run. Fetching
+# with `requests` gives us a real HTTP status code and a hard timeout.
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/rss+xml,application/xml;q=0.9,text/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+}
+
+FEED_TIMEOUT_SECONDS = 20
+
 
 class RSSScraperService:
     """RSS feed scraping service"""
+
+    @staticmethod
+    def _fetch_feed(source: CASource) -> Any:
+        """
+        Fetch and parse one feed.
+
+        Fetches with `requests` (browser UA + hard timeout) and hands the bytes
+        to feedparser. Falls back to feedparser's own fetch if the HTTP request
+        itself fails, so this change can never be strictly worse than the bare
+        `feedparser.parse(url)` it replaces.
+        """
+        try:
+            response = requests.get(
+                source.url, headers=BROWSER_HEADERS, timeout=FEED_TIMEOUT_SECONDS
+            )
+            if response.status_code != 200:
+                logger.warning(
+                    "feed_http_error",
+                    source_name=source.name,
+                    status=response.status_code,
+                )
+                # Still parse it — some publishers return a usable body with a
+                # non-200 status. The bozo check below decides if it is usable.
+            return feedparser.parse(response.content)
+        except Exception as exc:
+            logger.warning(
+                "feed_http_fetch_failed",
+                source_name=source.name,
+                error=str(exc),
+            )
+            return feedparser.parse(source.url)
 
     @staticmethod
     def scrape_source(source: CASource) -> Dict[str, Any]:
@@ -33,10 +79,20 @@ class RSSScraperService:
         logger.info("scraping_source", source_name=source.name)
 
         try:
-            # Parse RSS feed
-            feed = feedparser.parse(source.url)
-            if feed.bozo:
-                error_msg = f"Feed parsing error: {feed.bozo_exception}"
+            feed = RSSScraperService._fetch_feed(source)
+
+            # `bozo` is set by ANY well-formedness warning — a stray ampersand,
+            # a smart quote, one malformed item. feedparser's loose parser
+            # almost always still extracts the entries. Treating bozo alone as
+            # fatal threw away the whole source on the first complaint, which
+            # is what killed Indian Express on 2026-09-28 ("mismatched tag" at
+            # <unknown>:5:2) while the feed was otherwise fine — verified
+            # 2026-10-02: the same URL parses 200 entries with bozo=False.
+            #
+            # A feed is only genuinely broken when nothing parsed out of it.
+            if feed.bozo and not feed.entries:
+                bozo_exc = getattr(feed, "bozo_exception", None)
+                error_msg = f"Feed parsing error: {bozo_exc}"
                 logger.error(
                     "feed_parsing_error", error=error_msg, source_name=source.name
                 )
@@ -44,6 +100,27 @@ class RSSScraperService:
                 source.last_error = error_msg
                 source.save()
 
+                return {
+                    "success": False,
+                    "articles_found": 0,
+                    "articles_new": 0,
+                    "error": error_msg,
+                }
+
+            if feed.bozo:
+                # Malformed but usable — record it and carry on.
+                logger.warning(
+                    "feed_malformed_but_usable",
+                    source_name=source.name,
+                    entries=len(feed.entries),
+                    error=str(getattr(feed, "bozo_exception", "")),
+                )
+
+            if not feed.entries:
+                error_msg = "Feed returned no entries"
+                logger.error("feed_empty", error=error_msg, source_name=source.name)
+                source.last_error = error_msg
+                source.save()
                 return {
                     "success": False,
                     "articles_found": 0,
@@ -223,11 +300,11 @@ class RSSScraperService:
         Fetch full page content for articles where RSS feed is truncated/empty.
         """
         try:
-            # Modern headers to mimic a real browser to bypass basic bot blocks (Cloudflare, etc.)
+            # Same browser headers as the feed fetch (BROWSER_HEADERS), but
+            # asking for HTML rather than XML.
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                **BROWSER_HEADERS,
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
             }
             # Timeout is critical to avoid hanging
             response = requests.get(url, headers=headers, timeout=12)
