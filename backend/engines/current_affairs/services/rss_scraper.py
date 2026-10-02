@@ -21,20 +21,47 @@ from ..models import CAArticle, CASource
 
 logger = structlog.get_logger(__name__)
 
-# Shared by the feed fetch and the full-content fetch. feedparser sends its own
-# User-Agent and has NO request timeout of its own — a publisher that refuses
-# that agent, or a slow host, would silently kill or stall the run. Fetching
-# with `requests` gives us a real HTTP status code and a hard timeout.
+# Full browser fingerprint, not just a User-Agent.
+#
+# 2026-10-02: Indian Express returned HTTP 403 to the GitHub Actions runner
+# while serving the same URL fine from a home connection. Edge bot-protection
+# (Cloudflare/Akamai class) scores the WHOLE header set, not the UA alone — a
+# request carrying only UA/Accept/Accept-Language looks nothing like a browser.
+# Sending the Sec-Fetch-* and Upgrade-Insecure-Requests headers a real Chrome
+# sends, over a Session (so any challenge cookie is kept), is the cheapest
+# thing that can plausibly pass. It may still not: see FEED_FALLBACK_NOTE.
 BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     ),
-    "Accept": "application/rss+xml,application/xml;q=0.9,text/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "application/rss+xml;q=0.9,*/*;q=0.8"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Cache-Control": "max-age=0",
 }
 
 FEED_TIMEOUT_SECONDS = 20
+
+# FEED_FALLBACK_NOTE
+# If a publisher blocks by IP RANGE rather than by request shape, no header set
+# will help — the GitHub Actions runner simply is not welcome. That is a
+# sourcing decision, not a code fix: move the source to a different execution
+# context, swap to a feed path that is not behind the same edge rule, or drop
+# it. Indian Express is a Tier 3 discovery source (never cited as evidence), so
+# losing it costs event discovery, not factual coverage.
+#
+# Either way a blocked source must NEVER take the run down: scrape_all_active()
+# continues, and the failure is recorded against this source alone.
 
 
 class RSSScraperService:
@@ -45,31 +72,68 @@ class RSSScraperService:
         """
         Fetch and parse one feed.
 
-        Fetches with `requests` (browser UA + hard timeout) and hands the bytes
-        to feedparser. Falls back to feedparser's own fetch if the HTTP request
-        itself fails, so this change can never be strictly worse than the bare
-        `feedparser.parse(url)` it replaces.
+        Order of attempts:
+          1. `requests` with a full browser fingerprint, over a Session.
+          2. On a non-200, feedparser's own fetch — a different request shape,
+             which occasionally passes where ours does not.
+          3. On total failure, return None so the caller can report the real
+             HTTP status instead of a bogus XML error.
+
+        ⚠️ A non-200 body is NEVER parsed. Feeding an HTML error page to an XML
+        parser is what produced the misleading "mismatched tag at <unknown>:5:2"
+        that masked a plain 403 for weeks.
         """
+        status: Any = None
         try:
-            response = requests.get(
-                source.url, headers=BROWSER_HEADERS, timeout=FEED_TIMEOUT_SECONDS
+            with requests.Session() as session:
+                session.headers.update(BROWSER_HEADERS)
+                response = session.get(source.url, timeout=FEED_TIMEOUT_SECONDS)
+            status = response.status_code
+
+            if status == 200:
+                return feedparser.parse(response.content)
+
+            logger.warning(
+                "feed_http_error",
+                source_name=source.name,
+                status=status,
+                note="non-200 body not parsed; trying feedparser direct",
             )
-            if response.status_code != 200:
-                logger.warning(
-                    "feed_http_error",
-                    source_name=source.name,
-                    status=response.status_code,
-                )
-                # Still parse it — some publishers return a usable body with a
-                # non-200 status. The bozo check below decides if it is usable.
-            return feedparser.parse(response.content)
         except Exception as exc:
             logger.warning(
-                "feed_http_fetch_failed",
-                source_name=source.name,
-                error=str(exc),
+                "feed_http_fetch_failed", source_name=source.name, error=str(exc)
             )
-            return feedparser.parse(source.url)
+
+        # Attempt 2 — feedparser's own fetch. Different header shape, so it
+        # sometimes succeeds where ours is refused. Cheap to try.
+        try:
+            feed = feedparser.parse(source.url)
+            if feed.entries:
+                logger.info(
+                    "feed_recovered_via_feedparser",
+                    source_name=source.name,
+                    blocked_status=status,
+                    entries=len(feed.entries),
+                )
+                return feed
+        except Exception as exc:
+            logger.warning(
+                "feed_direct_fetch_failed", source_name=source.name, error=str(exc)
+            )
+
+        # Both paths refused. Returning None lets the caller report the HTTP
+        # status honestly rather than inventing an XML parse error.
+        logger.error(
+            "feed_blocked",
+            source_name=source.name,
+            status=status,
+            hint=(
+                "Edge bot-protection or IP-range block. If this persists from "
+                "CI but works locally, it is the runner's IP — see "
+                "FEED_FALLBACK_NOTE."
+            ),
+        )
+        return None
 
     @staticmethod
     def scrape_source(source: CASource) -> Dict[str, Any]:
@@ -80,6 +144,20 @@ class RSSScraperService:
 
         try:
             feed = RSSScraperService._fetch_feed(source)
+
+            # _fetch_feed returns None when every fetch path was refused
+            # (403 / 429 / network). Report the block honestly; do NOT invent
+            # an XML parse error from an HTML error page.
+            if feed is None:
+                error_msg = "Feed fetch blocked or unreachable (see feed_blocked log)"
+                source.last_error = error_msg
+                source.save()
+                return {
+                    "success": False,
+                    "articles_found": 0,
+                    "articles_new": 0,
+                    "error": error_msg,
+                }
 
             # `bozo` is set by ANY well-formedness warning — a stray ampersand,
             # a smart quote, one malformed item. feedparser's loose parser
