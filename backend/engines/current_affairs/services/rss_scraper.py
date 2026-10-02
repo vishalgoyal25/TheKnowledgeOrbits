@@ -52,6 +52,11 @@ BROWSER_HEADERS = {
 
 FEED_TIMEOUT_SECONDS = 20
 
+# U+FFFD. Its presence in decoded text means bytes were lost in the decode and
+# the text can no longer be trusted as a citation source — see the encoding
+# note in _fetch_full_content.
+REPLACEMENT_CHAR = "�"
+
 # FEED_FALLBACK_NOTE
 # If a publisher blocks by IP RANGE rather than by request shape, no header set
 # will help — the GitHub Actions runner simply is not welcome. That is a
@@ -388,7 +393,46 @@ class RSSScraperService:
             response = requests.get(url, headers=headers, timeout=12)
 
             if response.status_code == 200:
-                soup = BeautifulSoup(response.content, "html.parser")
+                # ── ENCODING (fixed 2026-10-02) ──────────────────────────────
+                # Passing response.content (BYTES) made BeautifulSoup guess the
+                # encoding with UnicodeDammit, which emitted "Some characters
+                # could not be decoded ... replaced with REPLACEMENT CHARACTER"
+                # on every article and silently corrupted the body text.
+                #
+                # Why it happened: `requests` follows RFC 2616 and defaults
+                # `response.encoding` to ISO-8859-1 whenever a text/* response
+                # carries no charset in its Content-Type. Indian news sites are
+                # UTF-8, so curly quotes, em dashes and diacritics in names were
+                # mangled before anything else ran.
+                #
+                # 🔴 This is not cosmetic for the Data Factory. Corrupted bytes
+                # mean corrupted chunk text, which means atom `char_span`
+                # offsets that point at garbage. The verification contract
+                # depends on the stored text being byte-exact.
+                if not response.encoding or response.encoding.lower() in (
+                    "iso-8859-1",
+                    "latin-1",
+                    "latin1",
+                ):
+                    detected = response.apparent_encoding
+                    if detected:
+                        response.encoding = detected
+
+                html = response.text
+
+                # Make corruption VISIBLE rather than silent. If replacement
+                # characters survived the decode, the text is already damaged
+                # and must not be trusted as a citation source.
+                if REPLACEMENT_CHAR in html:
+                    logger.warning(
+                        "content_encoding_degraded",
+                        url=url,
+                        declared=response.headers.get("Content-Type"),
+                        used=response.encoding,
+                        replacement_chars=html.count(REPLACEMENT_CHAR),
+                    )
+
+                soup = BeautifulSoup(html, "html.parser")
 
                 # Heuristic to find article content specifically targeting TH and IE
                 # The Hindu: div.articlebodycontent, class^=content-body
