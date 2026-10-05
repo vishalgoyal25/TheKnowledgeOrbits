@@ -63,6 +63,9 @@ INSTALLED_APPS = [
     # Growth Stack G1 — site-wide visitor telemetry (NOT engines.analytics,
     # which is the learner-facing study feature)
     "engines.telemetry",
+    # Data Factory — product-agnostic evidence engine, df_* tables.
+    # Act 0 phase 0.1: DfSource, DfArtifact, DfChunk, DfAtom.
+    "engines.data_factory",
 ]
 
 # Custom User Model
