@@ -235,6 +235,30 @@ def _extract_anchors(claim: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
     return hard, soft
 
 
+# ── Public surface for other Factory services ──────────────────────────────
+#
+# Added 2026-10-06 for claim_locator, which must agree with this module about
+# what makes a span relevant. Exposed as supported names rather than letting a
+# second module reach into privates, and far better than the alternative: a
+# locator with its OWN notion of anchors would propose spans the checker then
+# rejects, and every such disagreement would look like a verifier error.
+
+
+def extract_anchors(claim: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The claim's ``(hard, soft)`` anchors, as the checker sees them."""
+    return _extract_anchors(claim)
+
+
+def fold_for_comparison(value: str) -> str:
+    """Fold text the way anchor matching does.
+
+    🔴 FOR COMPARISON ONLY -- never store this and never slice with it. It
+    casefolds, collapses digit grouping and rewrites percent spellings, so an
+    offset taken against the result points nowhere in the stored text.
+    """
+    return _normalise_for_comparison(value)
+
+
 def check_span(
     *,
     text: str,
