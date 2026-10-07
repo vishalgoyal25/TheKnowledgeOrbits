@@ -59,14 +59,27 @@ class DfSource(models.Model):
     TIER_CHOICES = [
         (TIER_T1, "T1 - Indian primary (PIB, ministries, RBI, courts, BIS)"),
         (TIER_T2, "T2 - International primary (UN, FAO, IUCN, World Bank)"),
-        (TIER_T3, "T3 - Reputable press (event detection ONLY, never cited)"),
+        (TIER_T3, "T3 - Reputable press (citable; see DfArtifact.exhaustiveness)"),
         (TIER_T4, "T4 - Generated or encyclopaedic (context ONLY, never cited)"),
     ]
 
-    # Citable tiers, named once so no caller hardcodes the pair. T3/T4 are
-    # retrieval context only -- citing them would make verification circular,
-    # which is the finding that justifies this whole engine (00_MASTER_RECAP 3.6).
-    CITABLE_TIERS = (TIER_T1, TIER_T2)
+    # Citable tiers, named once so no caller hardcodes the set.
+    #
+    # CHANGED 2026-10-06: T3 moved IN. The old rule ("T3 is event detection
+    # only") bundled two unrelated objections, and the fatal one -- circularity
+    # -- never applied to newspapers. It applies to T4: book_chunk is
+    # LLM-generated and Wikipedia is derived, so verifying against either is
+    # self-referential. The Hindu is primary journalism with a newsroom and a
+    # corrections policy, which is a different thing entirely.
+    #
+    # What replaces the old rule is NOT a tier rule at all. A newspaper can
+    # prove a claim TRUE; it can almost never prove one FALSE, because accuracy
+    # and COMPLETENESS are different properties and an article was never trying
+    # to be exhaustive. That distinction lives on DfArtifact.exhaustiveness, so
+    # no caller needs a special case for the press.
+    #
+    # 09_FUSION_AND_EVIDENCE.md 10; 00_MASTER_RECAP.md "Source tiers".
+    CITABLE_TIERS = (TIER_T1, TIER_T2, TIER_T3)
 
     ADAPTER_CHOICES = [
         ("rss", "RSS / Atom feed"),
@@ -92,9 +105,11 @@ class DfSource(models.Model):
         max_length=2,
         choices=TIER_CHOICES,
         help_text=(
-            "Evidence tier. Only T1/T2 may be cited as evidence; T3 is event "
-            "detection and T4 is retrieval context. Snapshotted onto each atom "
-            "at extraction time, so re-grading this never rewrites past citations."
+            "Evidence tier. T1/T2/T3 may be cited; T4 is retrieval context only, "
+            "because verifying against generated or derived text is circular. "
+            "Whether a source can prove a claim FALSE is NOT decided here -- that "
+            "is DfArtifact.exhaustiveness. Snapshotted onto each atom at "
+            "extraction time, so re-grading this never rewrites past citations."
         ),
     )
     adapter = models.CharField(
@@ -234,7 +249,55 @@ class DfArtifact(models.Model):
     S3 holds the raw bytes; this row holds what we know about them. The raw
     archive is what makes the Factory non-rigid: a new extraction angle re-runs
     over the archive without re-fetching anything.
+
+    Why exhaustiveness lives here (09_FUSION_AND_EVIDENCE.md 8)
+    -----------------------------------------------------------
+    Claim: "the scheme covers 15 states". Evidence: a release listing 12.
+    That is FALSE if the release is the authoritative complete list, and
+    UNPROVEN if it is a passing mention. Same claim, same span, opposite
+    verdicts -- and the deciding fact is a property of the DOCUMENT, which is
+    not visible in the span the verifier reads.
+
+    So it is declared here, at acquisition, and the Verdict Resolver reads it.
+    That is what lets the verifier split into an LLM that judges entailment and
+    free code that resolves the verdict.
     """
+
+    EXHAUSTIVENESS_EXHAUSTIVE = "EXHAUSTIVE"
+    EXHAUSTIVENESS_PARTIAL = "PARTIAL"
+    EXHAUSTIVENESS_UNKNOWN = "UNKNOWN"
+    EXHAUSTIVENESS_CHOICES = [
+        (EXHAUSTIVENESS_EXHAUSTIVE, "Complete for its stated scope"),
+        (EXHAUSTIVENESS_PARTIAL, "Mentions the subject but is not a full list"),
+        (EXHAUSTIVENESS_UNKNOWN, "Not yet classified -- treated as PARTIAL"),
+    ]
+
+    # Only an EXHAUSTIVE document can turn "the span does not say this" into
+    # FALSE. Everything else yields UNPROVEN.
+    #
+    # The errors are asymmetric, and the default is chosen deliberately:
+    # a missed FALSE kills one question, which is cheap and invisible. A wrong
+    # FALSE publishes a true statement marked false -- an error in a paying
+    # student's hands, which is the exact failure that destroys trust in a
+    # verification-first product. So UNKNOWN is safe by construction.
+    PROVES_FALSE_EXHAUSTIVENESS = (EXHAUSTIVENESS_EXHAUSTIVE,)
+
+    SECTION_EXPLAINER = "explainer"
+    SECTION_NEWS = "news"
+    SECTION_EDITORIAL = "editorial"
+    SECTION_DATA = "data"
+    SECTION_CHOICES = [
+        (SECTION_EXPLAINER, "Explainer (IE 'Explained', TH 'Text & Context')"),
+        (SECTION_NEWS, "News report"),
+        (SECTION_EDITORIAL, "Editorial or op-ed"),
+        (SECTION_DATA, "Data release, budget table, statistical publication"),
+    ]
+
+    # Editorials are excluded from factual atom extraction: an editorial's job
+    # is to argue, and an argument cannot be TRUE or FALSE against a span.
+    # They are ROUTED, not discarded -- the same prose is the most valuable
+    # material we have for Mains answer writing.
+    FACTUAL_ATOM_SECTIONS = (SECTION_EXPLAINER, SECTION_NEWS, SECTION_DATA)
 
     id = models.UUIDField(
         primary_key=True,
@@ -308,6 +371,65 @@ class DfArtifact(models.Model):
         help_text="When we fetched it. Set explicitly, never auto_now_add -- a "
         "re-parse from the archive must preserve the original fetch time.",
     )
+    exhaustiveness = models.CharField(
+        max_length=12,
+        choices=EXHAUSTIVENESS_CHOICES,
+        default=EXHAUSTIVENESS_UNKNOWN,
+        help_text=(
+            "Whether this document is COMPLETE for what it covers, which is what "
+            "separates FALSE from UNPROVEN. An MEA 'List of Outcomes', a PIB "
+            "scheme notification, a bare Act and an official laureate list are "
+            "EXHAUSTIVE -- absence from them is proof. Any news article is "
+            "PARTIAL: accurate, but never trying to be complete. Defaults to "
+            "UNKNOWN, which behaves as PARTIAL, so an unclassified source can "
+            "yield TRUE or UNPROVEN but never FALSE."
+        ),
+    )
+    exhaustive_scope = models.TextField(
+        blank=True,
+        help_text=(
+            "What this document is complete ABOUT, in plain words -- 'outcomes of "
+            "this state visit', 'states covered by this scheme'. Exhaustiveness is "
+            "never global: the Constitution is complete for Articles and silent on "
+            "cyclones. Blank unless exhaustiveness is EXHAUSTIVE."
+        ),
+    )
+    section_type = models.CharField(
+        max_length=12,
+        choices=SECTION_CHOICES,
+        default=SECTION_NEWS,
+        help_text=(
+            "Which kind of page this is. A newspaper is not one kind of document: "
+            "an IE 'Explained' page is the highest-value prose in the corpus, a "
+            "report carries event facts, a budget table carries figures, and an "
+            "editorial carries argument. Editorials are excluded from factual "
+            "atom extraction and routed to Mains instead."
+        ),
+    )
+    entity_signature = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Cached canonical entity ids mentioned in the BODY, used for event "
+            "clustering. The headline is deliberately excluded from every "
+            "matching decision -- it is written to be clicked, so 'Poll body "
+            "springs a surprise' and 'ECI announces SIR in 12 states' are the "
+            "same event while 'Cyclone fury' and 'Cyclone warning withdrawn' are "
+            "opposite facts. Empty list means not yet computed."
+        ),
+    )
+    numeric_signature = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Every number, amount, count, percentage and date in the body, "
+            "normalised. GUARD RAIL: '5,000 crore' and '500 crore' in otherwise "
+            "identical sentences score ~0.98 cosine, so an embedding alone would "
+            "merge them and the Factory would publish a figure it cannot defend. "
+            "These are compared BY CODE, exactly -- divergence alongside high "
+            "semantic similarity is a contradiction, never a corroboration."
+        ),
+    )
     created_at = models.DateTimeField(
         auto_now_add=True, help_text="Row creation timestamp"
     )
@@ -326,9 +448,31 @@ class DfArtifact(models.Model):
             ),
             # Ingestion freshness: publication -> atom available.
             models.Index(fields=["-published_at"], name="df_artifact_pub_idx"),
+            # Atom extraction reads "recent documents of these section types",
+            # excluding editorials. Composite rather than section_type alone:
+            # four values is weak selectivity on its own, but ordering by
+            # publication inside a section makes the index carry the sort too.
+            models.Index(
+                fields=["section_type", "-published_at"],
+                name="df_artifact_section_pub_idx",
+            ),
         ]
         verbose_name = "Data Factory artifact"
         verbose_name_plural = "Data Factory artifacts"
 
     def __str__(self) -> str:
         return f"{self.source.name} @ {self.retrieved_at:%Y-%m-%d} ({self.content_hash[:8]})"
+
+    @property
+    def can_prove_false(self) -> bool:
+        """Whether absence of support in this document means FALSE, not UNPROVEN.
+
+        Read by the Verdict Resolver. Deliberately a property and not a
+        verifier-side judgement: the LLM that reads the span cannot see this.
+        """
+        return self.exhaustiveness in self.PROVES_FALSE_EXHAUSTIVENESS
+
+    @property
+    def yields_factual_atoms(self) -> bool:
+        """Whether factual atoms may be extracted from this document."""
+        return self.section_type in self.FACTUAL_ATOM_SECTIONS

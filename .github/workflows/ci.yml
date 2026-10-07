@@ -181,12 +181,27 @@ jobs:
   # needs: backend-tests waits for ALL 3 matrix shards automatically.
   # needs: backend-lint ensures lint also passed before deploying.
   # ONLY triggers on main branch after everything is green.
+  #
+  # ⏸ GATED OFF 2026-10-05 — Render was de-provisioned by the developer and the
+  # deploy hook now points at nothing, so this job failed on every merge to main
+  # and left CI permanently red. A gate that is always red is a gate nobody
+  # reads.
+  #
+  # The job body below is UNCHANGED and kept as readable legacy: the AWS
+  # migration (FEATURES/DATA_FACTORY/FEATURES_AWS_Deployment.md) is built
+  # alongside it, never on top of it, and this is the reference for how deploy
+  # worked before.
+  #
+  # To re-enable: set repository variable DEPLOY_RENDER=true (Settings →
+  # Secrets and variables → Actions → Variables). No code change required.
+  # Unset or any other value = job is skipped, not failed.
   # ============================================
   deploy:
     name: Trigger Render Deployment
     needs: [backend-lint, backend-tests, frontend-integrity]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' # Only deploy from the main branch
+    # ⏸ Render de-provisioned — see the note above. Both conditions must hold.
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_RENDER == 'true'
     steps:
       - name: Trigger Render Deploy Hook
         # Ensure you have RENDER_DEPLOY_HOOK_URL set in your GitHub Repository Secrets

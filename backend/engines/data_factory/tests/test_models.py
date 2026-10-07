@@ -278,15 +278,170 @@ def test_chunk_with_atoms_cannot_be_deleted():
     [
         (DfSource.TIER_T1, True),
         (DfSource.TIER_T2, True),
-        (DfSource.TIER_T3, False),
+        (DfSource.TIER_T3, True),
         (DfSource.TIER_T4, False),
     ],
 )
-def test_only_t1_and_t2_sources_are_citable(tier, citable):
-    """T3 is event detection, T4 is context. Citing either would make
-    verification circular -- the finding that justifies this engine.
+def test_only_generated_and_derived_sources_are_uncitable(tier, citable):
+    """CHANGED 2026-10-06: T3 moved from uncitable to citable.
+
+    The old rule bundled two unrelated objections. Circularity -- the one that
+    actually justifies this engine -- applies to T4 and T4 alone: book_chunk is
+    LLM-generated and Wikipedia is derived, so verifying against either is
+    self-referential. The Hindu is primary journalism and was never that.
+
+    What stops a newspaper being misused is NOT this flag. It is
+    DfArtifact.exhaustiveness: a news article is PARTIAL, so it can prove a
+    claim TRUE but almost never FALSE. See the exhaustiveness tests below.
     """
     assert make_source(tier=tier).is_citable is citable
+
+
+@pytest.mark.django_db
+def test_t4_remains_uncitable_because_circularity_is_the_real_objection():
+    """A regression guard with a reason attached.
+
+    If a later change makes T4 citable, the Factory starts verifying
+    LLM-generated text against LLM-generated text and the entire evidence
+    claim collapses while every test still passes. This is the one tier line
+    that must not move.
+    """
+    assert DfSource.TIER_T4 not in DfSource.CITABLE_TIERS
+
+
+# ── Exhaustiveness: what separates FALSE from UNPROVEN ──────────────────────
+
+
+@pytest.mark.django_db
+def test_artifact_defaults_to_unknown_and_cannot_prove_false():
+    """🔴 The safety direction, and the single most important default here.
+
+    An artifact nobody has classified must never let the Verdict Resolver turn
+    "the span does not say this" into FALSE. The errors are asymmetric: a
+    missed FALSE kills one question, which is cheap and invisible; a wrong
+    FALSE publishes a true statement marked false, in a paying student's hands.
+
+    So this asserts the DEFAULT, not a configured value -- the safe behaviour
+    has to be what you get when nobody does anything.
+    """
+    artifact = make_artifact()
+
+    assert artifact.exhaustiveness == DfArtifact.EXHAUSTIVENESS_UNKNOWN
+    assert artifact.can_prove_false is False
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("exhaustiveness", "proves_false"),
+    [
+        (DfArtifact.EXHAUSTIVENESS_EXHAUSTIVE, True),
+        (DfArtifact.EXHAUSTIVENESS_PARTIAL, False),
+        (DfArtifact.EXHAUSTIVENESS_UNKNOWN, False),
+    ],
+)
+def test_only_an_exhaustive_document_can_prove_false(exhaustiveness, proves_false):
+    """Only a document complete for its scope makes absence into proof.
+
+    An MEA 'List of Outcomes' enumerates every outcome, so "not in the list"
+    is genuinely FALSE. A news article is accurate but was never trying to be
+    complete, so the same absence proves nothing.
+    """
+    artifact = make_artifact(exhaustiveness=exhaustiveness)
+
+    assert artifact.can_prove_false is proves_false
+
+
+@pytest.mark.django_db
+def test_a_citable_press_source_still_cannot_prove_false():
+    """🔴 The whole point of splitting citability from exhaustiveness.
+
+    T3 is citable as of 2026-10-06, so this artifact may back a TRUE verdict.
+    It must still be unable to produce a FALSE one, because accuracy and
+    completeness are different properties. If this test ever fails, the two
+    concepts have been collapsed back into one and newspapers can kill
+    questions they never had the standing to kill.
+    """
+    press = make_source(tier=DfSource.TIER_T3)
+    article = make_artifact(source=press, section_type=DfArtifact.SECTION_NEWS)
+
+    assert press.is_citable is True
+    assert article.can_prove_false is False
+
+
+# ── Section type: routed, never discarded ──────────────────────────────────
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("section_type", "factual"),
+    [
+        (DfArtifact.SECTION_EXPLAINER, True),
+        (DfArtifact.SECTION_NEWS, True),
+        (DfArtifact.SECTION_DATA, True),
+        (DfArtifact.SECTION_EDITORIAL, False),
+    ],
+)
+def test_editorials_yield_no_factual_atoms(section_type, factual):
+    """An editorial argues; an argument is not TRUE or FALSE against a span.
+
+    ⚠️ Excluded from factual extraction, NOT discarded -- the same prose is the
+    most valuable material in the corpus for Mains answer writing. The model
+    records which kind of page this is; the routing is the consumer's job.
+    """
+    assert make_artifact(section_type=section_type).yields_factual_atoms is factual
+
+
+@pytest.mark.django_db
+def test_artifact_defaults_to_news_section():
+    """Defaulting to `news` keeps every pre-existing row extractable.
+
+    The alternative -- defaulting to `editorial`, or to blank -- would silently
+    stop atom extraction on everything already fetched.
+    """
+    assert make_artifact().section_type == DfArtifact.SECTION_NEWS
+
+
+# ── Matching signatures: the guard rail ────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_signatures_default_to_empty_lists_and_survive_a_round_trip():
+    """Numbers are compared BY CODE, so they need somewhere exact to live.
+
+    '5,000 crore' and '500 crore' in otherwise identical sentences score ~0.98
+    cosine. An embedding alone would merge them and the Factory would publish a
+    figure it cannot defend, so the numeric signature is stored explicitly and
+    compared exactly rather than inferred from similarity.
+    """
+    blank = make_artifact()
+    assert blank.entity_signature == []
+    assert blank.numeric_signature == []
+
+    signed = make_artifact(
+        entity_signature=["eci", "supreme-court"],
+        numeric_signature=[5.0e9, 12, "2026-01-14"],
+    )
+    signed.refresh_from_db()
+
+    # The round trip matters: these are compared for EXACT equality, so a
+    # JSONB coercion that turned 5.0e9 into a string would silently convert a
+    # contradiction into a corroboration.
+    assert signed.entity_signature == ["eci", "supreme-court"]
+    assert signed.numeric_signature == [5.0e9, 12, "2026-01-14"]
+
+
+@pytest.mark.django_db
+def test_two_amounts_an_order_of_magnitude_apart_do_not_compare_equal():
+    """The failure this guard rail exists to prevent, pinned as a test.
+
+    Both artifacts describe the same scheme in near-identical language. Only
+    the amount differs. Equality on the numeric signature is what stops them
+    being linked as corroborating.
+    """
+    five_hundred_crore = make_artifact(numeric_signature=[5.0e9])
+    five_thousand_crore = make_artifact(numeric_signature=[5.0e10])
+
+    assert five_hundred_crore.numeric_signature != five_thousand_crore.numeric_signature
 
 
 @pytest.mark.django_db
