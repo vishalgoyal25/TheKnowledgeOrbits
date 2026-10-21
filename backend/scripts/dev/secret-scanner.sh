@@ -60,7 +60,18 @@ check() {
 
 # ── Credentials ──────────────────────────────────────────────────────────────
 check "Telegram bot token"      '[0-9]{8,10}:[A-Za-z0-9_-]{35}'            "$ADDED"
-check "Twilio Account SID"      'AC[0-9a-f]{32}'                           "$ADDED"
+# ⚠ ANCHORED to word boundaries - 2026-10-22. The unanchored form was
+# 'AC[0-9a-f]{32}', and `check` runs grep with -i, so it matched ANY hex blob
+# containing "ac" followed by 32 more hex chars. A 64-char SHA256 hits that
+# almost every time, which blocked infra/bootstrap/.terraform.lock.hcl (a file
+# of provider checksums that HashiCorp's own tooling says to commit). It would
+# equally have false-positived on package-lock.json integrity hashes or any
+# quoted git SHA.
+#
+# A real Account SID is exactly AC + 32 hex = 34 chars, standing alone, so \b
+# on both sides catches every genuine one while rejecting substrings of longer
+# hex. This makes the check STRICTER, not weaker.
+check "Twilio Account SID"      '\bAC[0-9a-f]{32}\b'                       "$ADDED"
 check "OpenAI / Groq style key" '(sk-[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,})' "$ADDED"
 check "GitHub token"            'gh[pousr]_[A-Za-z0-9]{30,}'               "$ADDED"
 check "Slack token"             'xox[baprs]-[A-Za-z0-9-]{10,}'             "$ADDED"
