@@ -185,6 +185,13 @@ terraform.rc
 override.tf
 override_*.tf
 
+# Partial backend configuration. Holds the state bucket name, which embeds the
+# AWS account id. Not a secret - it appears in every ARN - but the repo is
+# PUBLIC and there is no reason to publish an account identifier.
+# Supplied at init:  terraform init -backend-config=backend.hcl
+# The committed template is backend.hcl.example (NOT matched by this pattern).
+backend.hcl
+
 # NOT IGNORED, DELIBERATELY: .terraform.lock.hcl
 #   It pins provider versions AND their checksums - the Terraform equivalent
 #   of package-lock.json. Ignoring it lets two machines resolve different

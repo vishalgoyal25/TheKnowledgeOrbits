@@ -1,0 +1,41 @@
+# ==============================================================================
+# infra/bootstrap/backend.hcl.example          ✅ COMMITTED - template only
+# ==============================================================================
+# Copy this to `backend.hcl` (gitignored) and fill in the real bucket name,
+# then initialise with:
+#
+#     terraform init -backend-config=backend.hcl
+#
+# ------------------------------------------------------------------------------
+# WHY THIS FILE EXISTS  -  partial backend configuration
+# ------------------------------------------------------------------------------
+#   A `backend` block CANNOT use variables. It is read before any expression is
+#   evaluated, so every value must be a literal - which would put the state
+#   bucket name, and therefore the AWS account id, into a tracked file in a
+#   PUBLIC repository.
+#
+#   Terraform's answer is "partial configuration": omit an argument from the
+#   backend block and supply it at `init` time instead. backend.tf keeps the
+#   non-sensitive fields (key, region, encrypt, use_lockfile); this file carries
+#   the one field we would rather not publish.
+#
+#   ⚠ To be precise about the risk: an AWS account id is NOT a secret. It
+#   appears in every ARN, and you hand it to partners to configure cross-account
+#   roles. AWS does not classify it as sensitive. But it is an identifier that
+#   enables account enumeration and gives a social-engineering foothold against
+#   support - so "do not broadcast" rather than "never expose". The repo is
+#   public and the cost of omitting it is one CLI flag.
+#
+# ------------------------------------------------------------------------------
+# ⚠ THE COST OF THIS CHOICE, STATED HONESTLY
+# ------------------------------------------------------------------------------
+#   1. EVERY `terraform init` in this layer needs the flag. Forget it and
+#      Terraform prompts for the bucket interactively - annoying, not dangerous.
+#   2. A fresh clone has no backend.hcl. Copy this file and fill it in before
+#      the first init.
+#   3. CI must supply it too - either by writing the file from a repository
+#      variable, or by passing `-backend-config="bucket=..."` directly.
+#      (Step 7, deploy-aws.yml.)
+# ==============================================================================
+
+bucket = "tko-tfstate-<your-12-digit-account-id>"
